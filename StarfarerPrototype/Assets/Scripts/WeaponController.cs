@@ -1,8 +1,8 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// Sol fare tuşuna basıldığında ateş eden silah kontrolcüsü.
-/// Mermi sprite'ı Unity'nin built-in "Sprites/Default" kaynağından alınır.
 /// </summary>
 public class WeaponController : MonoBehaviour
 {
@@ -15,12 +15,17 @@ public class WeaponController : MonoBehaviour
     void Start()
     {
         if (bulletSprite == null)
-            bulletSprite = Resources.GetBuiltinResource<Sprite>("Sprites/Default");
+        {
+            Texture2D tex = new Texture2D(1, 1);
+            tex.SetPixel(0, 0, Color.white);
+            tex.Apply();
+            bulletSprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f));
+        }
     }
 
     void Update()
     {
-        if (Input.GetMouseButton(0) && Time.time >= nextFireTime)
+        if (Mouse.current.leftButton.isPressed && Time.time >= nextFireTime)
         {
             nextFireTime = Time.time + fireRate;
             SpawnBullet();
