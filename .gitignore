@@ -1,15 +1,14 @@
 # Unity için önerilen gitignore
 
 # Genel Unity klasörleri ve dosyaları
-
-/[Ll]ibrary/
-/[Tt]emp/
-/[Oo]bj/
-/[Bb]uild/
-/[Bb]uilds/
-/[Ll]ogs/
-/[Uu]ser[Ss]ettings/
-/[Mm]emoryCaptures/
+/StarfarerPrototype/[Ll]ibrary/
+/StarfarerPrototype/[Tt]emp/
+/StarfarerPrototype/[Oo]bj/
+/StarfarerPrototype/[Bb]uild/
+/StarfarerPrototype/[Bb]uilds/
+/StarfarerPrototype/[Ll]ogs/
+/StarfarerPrototype/[Uu]ser[Ss]ettings/
+/StarfarerPrototype/[Mm]emoryCaptures/
 
 # Asset Store araçları klasörü
 /[Aa]ssets/AssetStoreTools*
@@ -43,6 +42,9 @@ sysinfo.txt
 *.aab
 *.unitypackage
 *.app
+*.exe
+*.x86_64
+*.x86
 
 # Crashlytics
 crashlytics-build.properties
@@ -63,6 +65,14 @@ crashlytics-build.properties
 Icon?
 ehthumbs.db
 [Tt]humbs.db
+
+# Windows sistem dosyaları
+Thumbs.db
+Desktop.ini
+
+# JetBrains Rider
+*.sln
+*.csproj
 
 # ASLA yoksayılmaması gereken dosyalar
 !*.meta
