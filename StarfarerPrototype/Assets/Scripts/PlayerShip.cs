@@ -2,21 +2,22 @@ using UnityEngine;
 
 /// <summary>
 /// Ekranın ortasında sabit duran ana gemi.
+/// SpriteRenderer sahnede kayıtlıdır; Awake'te texture oluşturulup atanır.
 /// </summary>
 public class PlayerShip : MonoBehaviour
 {
     void Awake()
     {
         SpriteRenderer sr = GetComponent<SpriteRenderer>();
-        sr.sprite = CreateWhiteSprite();
-        sr.color = Color.white;
-    }
 
-    static Sprite CreateWhiteSprite()
-    {
-        Texture2D tex = new Texture2D(1, 1);
-        tex.SetPixel(0, 0, Color.white);
+        Texture2D tex = new Texture2D(4, 4);
+        Color[] colors = new Color[16];
+        for (int i = 0; i < 16; i++) colors[i] = Color.white;
+        tex.SetPixels(colors);
         tex.Apply();
-        return Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f));
+
+        sr.sprite = Sprite.Create(tex, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 1f);
+        sr.color = Color.white;
+        sr.sortingOrder = 0;
     }
 }

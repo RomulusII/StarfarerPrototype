@@ -3,6 +3,7 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// Sol fare tuşuna basıldığında ateş eden silah kontrolcüsü.
+/// Mermi sprite'ı runtime'da oluşturulur.
 /// </summary>
 public class WeaponController : MonoBehaviour
 {
@@ -16,10 +17,12 @@ public class WeaponController : MonoBehaviour
     {
         if (bulletSprite == null)
         {
-            Texture2D tex = new Texture2D(1, 1);
-            tex.SetPixel(0, 0, Color.white);
+            Texture2D tex = new Texture2D(4, 4);
+            Color[] colors = new Color[16];
+            for (int i = 0; i < 16; i++) colors[i] = Color.white;
+            tex.SetPixels(colors);
             tex.Apply();
-            bulletSprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f));
+            bulletSprite = Sprite.Create(tex, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 1f);
         }
     }
 
@@ -36,7 +39,7 @@ public class WeaponController : MonoBehaviour
     {
         GameObject obj = new GameObject("Bullet");
         obj.transform.SetPositionAndRotation(transform.position, transform.rotation);
-        obj.transform.localScale = Vector3.one * 0.15f;
+        obj.transform.localScale = Vector3.one * 0.5f;
 
         SpriteRenderer sr = obj.AddComponent<SpriteRenderer>();
         sr.sprite = bulletSprite;
