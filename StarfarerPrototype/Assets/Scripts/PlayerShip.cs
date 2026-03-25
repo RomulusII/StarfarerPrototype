@@ -17,7 +17,7 @@ public class PlayerShip : MonoBehaviour
         tex.Apply();
 
         sr.sprite = Sprite.Create(tex, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 1f);
-        sr.color = Color.white;
+        sr.color = new Color(0.3f, 0.3f, 0.4f); // koyu mavi-gri, uzay gemisi hissi
         sr.sortingOrder = 0;
     }
 }
