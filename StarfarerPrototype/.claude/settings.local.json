@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(find C:DatenGitStarfarerPrototypeStarfarerPrototypeAssets -type f -name *.cs)",
-      "Bash(find C:DatenGitStarfarerPrototypeStarfarerPrototypeAssets -type f -name *.prefab)"
+      "Bash(find C:DatenGitStarfarerPrototypeStarfarerPrototypeAssets -type f -name *.prefab)",
+      "Bash(ls:*)"
     ]
   }
 }
