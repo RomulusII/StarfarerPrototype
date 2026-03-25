@@ -67,4 +67,15 @@ public class EnemyBot : MonoBehaviour
         if (_healthBar.currentHealth <= 0f)
             Destroy(gameObject);
     }
+
+    void OnTriggerEnter2D(Collider2D other)
+    {
+        if (!other.CompareTag("Player")) return;
+
+        HealthBar playerHealth = other.GetComponent<HealthBar>();
+        if (playerHealth != null)
+            playerHealth.TakeDamage(20f);
+
+        Destroy(gameObject);
+    }
 }
