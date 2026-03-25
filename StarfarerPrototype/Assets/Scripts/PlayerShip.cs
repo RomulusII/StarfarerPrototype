@@ -1,23 +1,29 @@
 using UnityEngine;
 
 /// <summary>
-/// Ekranın ortasında sabit duran ana gemi.
-/// SpriteRenderer sahnede kayıtlıdır; Awake'te texture oluşturulup atanır.
+/// Ekranın alt bölgesinde sabit duran ana gemi.
+/// Görsel: "Body" child objesinde 400x100px texture (4:1 yatay gemi gövdesi).
+/// Uniform scale — proporsiyon texture boyutundan gelir.
 /// </summary>
 public class PlayerShip : MonoBehaviour
 {
     void Awake()
     {
-        SpriteRenderer sr = GetComponent<SpriteRenderer>();
-
-        Texture2D tex = new Texture2D(4, 4);
-        Color[] colors = new Color[16];
-        for (int i = 0; i < 16; i++) colors[i] = Color.white;
-        tex.SetPixels(colors);
+        // 400x100 px → ppu 100 → dünya boyutu 4 x 1 birim
+        Texture2D tex = new Texture2D(400, 100);
+        Color[] pixels = new Color[400 * 100];
+        Color shipColor = new Color(0.3f, 0.3f, 0.4f);
+        for (int i = 0; i < pixels.Length; i++) pixels[i] = shipColor;
+        tex.SetPixels(pixels);
         tex.Apply();
 
-        sr.sprite = Sprite.Create(tex, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 1f);
-        sr.color = new Color(0.3f, 0.3f, 0.4f); // koyu mavi-gri, uzay gemisi hissi
+        GameObject body = new GameObject("Body");
+        body.transform.SetParent(transform, false);
+        body.transform.localPosition = Vector3.zero;
+        body.transform.localScale = Vector3.one;
+
+        SpriteRenderer sr = body.AddComponent<SpriteRenderer>();
+        sr.sprite = Sprite.Create(tex, new Rect(0, 0, 400, 100), new Vector2(0.5f, 0.5f), 100f);
         sr.sortingOrder = 0;
     }
 }

@@ -2,24 +2,30 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Geminin ön tarafındaki silah noktası.
-/// SpriteRenderer sahnede kayıtlıdır; Awake'te texture oluşturulup atanır.
-/// Her karede mouse dünya pozisyonuna doğru döner.
+/// Geminin sağ tarafında mouse'a dönen silah noktası.
+/// Görsel: "WeaponVisual" child objesinde 20x80px texture (ince uzun namlu).
+/// Uniform scale — proporsiyon texture boyutundan gelir.
 /// </summary>
 public class WeaponMount : MonoBehaviour
 {
     void Awake()
     {
-        SpriteRenderer sr = GetComponent<SpriteRenderer>();
-
-        Texture2D tex = new Texture2D(4, 4);
-        Color[] colors = new Color[16];
-        for (int i = 0; i < 16; i++) colors[i] = Color.white;
-        tex.SetPixels(colors);
+        // 20x80 px → ppu 100 → dünya boyutu 0.2 x 0.8 birim (ince, uzun namlu)
+        Texture2D tex = new Texture2D(20, 80);
+        Color[] pixels = new Color[20 * 80];
+        Color barrelColor = new Color(1f, 0.92f, 0f); // sarı
+        for (int i = 0; i < pixels.Length; i++) pixels[i] = barrelColor;
+        tex.SetPixels(pixels);
         tex.Apply();
 
-        sr.sprite = Sprite.Create(tex, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 1f);
-        sr.color = new Color(1f, 0.92f, 0f); // sarı
+        GameObject visual = new GameObject("WeaponVisual");
+        visual.transform.SetParent(transform, false);
+        visual.transform.localPosition = Vector3.zero;
+        visual.transform.localScale = Vector3.one;
+
+        SpriteRenderer sr = visual.AddComponent<SpriteRenderer>();
+        // Pivot alt-merkez: namlu WeaponMount noktasından yukarı uzanır
+        sr.sprite = Sprite.Create(tex, new Rect(0, 0, 20, 80), new Vector2(0.5f, 0f), 100f);
         sr.sortingOrder = 1;
     }
 

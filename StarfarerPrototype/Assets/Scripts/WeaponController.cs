@@ -2,12 +2,12 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Sol fare tuşuna basıldığında ateş eden silah kontrolcüsü.
-/// Mermi sprite'ı runtime'da oluşturulur.
+/// Sol fare tuşuna basıldığında mermi ateşler.
+/// Bullet görsel: 10x30px texture (ince uzun mermi), uniform scale (1,1,1).
 /// </summary>
 public class WeaponController : MonoBehaviour
 {
-    [SerializeField] private float bulletSpeed = 8f;
+    [SerializeField] private float bulletSpeed = 10f;
     [SerializeField] private float fireRate = 0.15f;
 
     private float nextFireTime;
@@ -17,12 +17,13 @@ public class WeaponController : MonoBehaviour
     {
         if (bulletSprite == null)
         {
-            Texture2D tex = new Texture2D(4, 4);
-            Color[] colors = new Color[16];
-            for (int i = 0; i < 16; i++) colors[i] = Color.white;
-            tex.SetPixels(colors);
+            // 10x30 px → ppu 100 → dünya boyutu 0.1 x 0.3 birim
+            Texture2D tex = new Texture2D(10, 30);
+            Color[] pixels = new Color[10 * 30];
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = Color.white;
+            tex.SetPixels(pixels);
             tex.Apply();
-            bulletSprite = Sprite.Create(tex, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 1f);
+            bulletSprite = Sprite.Create(tex, new Rect(0, 0, 10, 30), new Vector2(0.5f, 0.5f), 100f);
         }
     }
 
@@ -39,7 +40,7 @@ public class WeaponController : MonoBehaviour
     {
         GameObject obj = new GameObject("Bullet");
         obj.transform.SetPositionAndRotation(transform.position, transform.rotation);
-        obj.transform.localScale = Vector3.one * 0.5f;
+        obj.transform.localScale = Vector3.one;
 
         SpriteRenderer sr = obj.AddComponent<SpriteRenderer>();
         sr.sprite = bulletSprite;
