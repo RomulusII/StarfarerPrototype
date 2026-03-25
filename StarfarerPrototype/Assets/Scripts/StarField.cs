@@ -6,9 +6,9 @@ using UnityEngine;
 /// </summary>
 public class StarField : MonoBehaviour
 {
-    [SerializeField] private int starCount = 200;
-    [SerializeField] private float areaWidth = 22f;
-    [SerializeField] private float areaHeight = 12f;
+    [SerializeField] private int starCount = 400;
+    [SerializeField] private float areaWidth = 30f;
+    [SerializeField] private float areaHeight = 30f;
 
     void Awake()
     {
