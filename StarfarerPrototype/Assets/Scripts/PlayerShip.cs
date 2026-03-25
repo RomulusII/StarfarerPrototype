@@ -7,8 +7,12 @@ using UnityEngine;
 /// </summary>
 public class PlayerShip : MonoBehaviour
 {
+    Vector3 _fixedPosition;
+
     void Awake()
     {
+        _fixedPosition = transform.position;
+
         // 400x100 px → ppu 100 → dünya boyutu 4 x 1 birim
         Texture2D tex = new Texture2D(400, 100);
         Color[] pixels = new Color[400 * 100];
@@ -25,5 +29,12 @@ public class PlayerShip : MonoBehaviour
         SpriteRenderer sr = body.AddComponent<SpriteRenderer>();
         sr.sprite = Sprite.Create(tex, new Rect(0, 0, 400, 100), new Vector2(0.5f, 0.5f), 100f);
         sr.sortingOrder = 0;
+    }
+
+    void LateUpdate()
+    {
+        // Hiçbir şeyin gemiyi hareket ettirememesi için pozisyonu her frame kilitle
+        transform.position = _fixedPosition;
+        transform.rotation = Quaternion.identity;
     }
 }

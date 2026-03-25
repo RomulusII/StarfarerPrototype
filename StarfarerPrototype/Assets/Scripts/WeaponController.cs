@@ -11,7 +11,7 @@ public class WeaponController : MonoBehaviour
     [SerializeField] private float fireRate = 0.15f;
 
     private float nextFireTime;
-    private static Sprite bulletSprite;
+    private Sprite bulletSprite;
 
     void Start()
     {

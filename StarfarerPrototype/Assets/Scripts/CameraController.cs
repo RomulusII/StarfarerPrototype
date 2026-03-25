@@ -34,7 +34,8 @@ public class CameraController : MonoBehaviour
         // Kayma: t > 0.8 olduğunda başlar, power curve korunur
         float moveT = Mathf.Clamp01((t - 0.8f) / 0.2f); // 0.8-1.0 → 0-1
         float curvedMoveT = Mathf.Pow(moveT, 2f);
-        Vector3 targetPos = new Vector3(direction.x * curvedMoveT * 8f, direction.y * curvedMoveT * 8f, -10f);
+        // Y ekseni hareketi kapalı — gemi sabit alt bölgede görünür kalsın
+        Vector3 targetPos = new Vector3(direction.x * curvedMoveT * 8f, 0f, -10f);
 
         transform.position = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * 3f);
 
