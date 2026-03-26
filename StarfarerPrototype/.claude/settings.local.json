@@ -3,7 +3,14 @@
     "allow": [
       "Bash(find C:DatenGitStarfarerPrototypeStarfarerPrototypeAssets -type f -name *.cs)",
       "Bash(find C:DatenGitStarfarerPrototypeStarfarerPrototypeAssets -type f -name *.prefab)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(find C:DatenGitStarfarerPrototypeStarfarerPrototypeAssetsScripts -name *.cs -type f)",
+      "Bash(grep -i \"\\\\.cs$\")",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//c/Daten/Git/StarfarerPrototype/StarfarerPrototype/**)",
+      "Bash(done)",
+      "Bash(xargs head:*)"
     ]
   }
 }

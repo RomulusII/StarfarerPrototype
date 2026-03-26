@@ -45,7 +45,7 @@ public class EnemyBot : MonoBehaviour
     {
         _healthBar = GetComponent<HealthBar>();
 
-        PlayerShip player = FindObjectOfType<PlayerShip>();
+        PlayerShip player = FindFirstObjectByType<PlayerShip>();
         _targetY = player != null ? player.transform.position.y : 0f;
     }
 
