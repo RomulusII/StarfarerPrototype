@@ -11,7 +11,9 @@
       "Read(//c/Daten/Git/StarfarerPrototype/StarfarerPrototype/**)",
       "Bash(done)",
       "Bash(xargs head:*)",
-      "Bash(git remote:*)"
+      "Bash(git remote:*)",
+      "Bash(git add:*)",
+      "Bash(git check-ignore:*)"
     ]
   }
 }
