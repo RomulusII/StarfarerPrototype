@@ -18,9 +18,6 @@ public class HealthBar : MonoBehaviour
     const float BarHeight = 0.12f;
     const float BarGap    = 0.04f;
 
-    private float healthBarTimer = 0f;
-    private const float HEALTH_BAR_DURATION = 3f;
-
     Transform _shieldBg;
     Transform _shieldFill;
     Transform _healthBg;
@@ -42,8 +39,6 @@ public class HealthBar : MonoBehaviour
     public void TakeDamage(float amount)
     {
         currentHealth -= amount;
-        healthBarTimer = HEALTH_BAR_DURATION; // yeni hasar → timer sıfırla
-        SetHealthBarVisible(true);
     }
 
     Transform MakeBar(string objName, Color color, int sortOrder)
@@ -64,13 +59,8 @@ public class HealthBar : MonoBehaviour
 
     void LateUpdate()
     {
-        // Can barı timer
-        if (healthBarTimer > 0f)
-        {
-            healthBarTimer -= Time.deltaTime;
-            if (healthBarTimer <= 0f)
-                SetHealthBarVisible(false);
-        }
+        // HP full ise gizle, hasar almışsa sürekli göster
+        SetHealthBarVisible(currentHealth < maxHealth);
 
         // Kalkan görünürlüğü: maxShield > 0 ise her zaman göster
         SetShieldBarVisible(maxShield > 0f);
