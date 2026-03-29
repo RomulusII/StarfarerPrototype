@@ -1,11 +1,10 @@
 using UnityEngine;
 
 /// <summary>
-/// Her 3 saniyede bir sağ kenarda rastgele Y pozisyonunda EnemyBot spawn eder.
+/// Her spawnInterval saniyede bir sağ kenarda rastgele Y pozisyonunda EnemyBot spawn eder.
 /// </summary>
 public class EnemySpawner : MonoBehaviour
 {
-    public GameObject enemyBotPrefab;
     public float spawnInterval = 3f;
 
     float _timer;
@@ -16,11 +15,15 @@ public class EnemySpawner : MonoBehaviour
         if (_timer >= spawnInterval)
         {
             _timer = 0f;
-            if (enemyBotPrefab != null)
-            {
-                float y = Random.Range(-3f, 3f);
-                Instantiate(enemyBotPrefab, new Vector3(12f, y, 0f), Quaternion.identity);
-            }
+            SpawnEnemy();
         }
+    }
+
+    void SpawnEnemy()
+    {
+        GameObject go = new GameObject("EnemyBot");
+        go.transform.position = new Vector3(12f, Random.Range(-3f, 3f), 0f);
+        go.AddComponent<HealthBar>();
+        go.AddComponent<EnemyBot>();
     }
 }
