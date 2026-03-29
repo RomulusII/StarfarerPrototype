@@ -12,6 +12,7 @@ using UnityEngine.UI;
 public class GameManager : MonoBehaviour
 {
     HealthBar _playerHealth;
+    PlayerShip _playerShip;
     WeaponController _weaponController;
     WeaponMount _weaponMount;
     bool _gameOver = false;
@@ -22,7 +23,8 @@ public class GameManager : MonoBehaviour
         GameObject player = GameObject.FindWithTag("Player");
         if (player != null)
         {
-            _playerHealth    = player.GetComponent<HealthBar>();
+            _playerHealth     = player.GetComponent<HealthBar>();
+            _playerShip       = player.GetComponent<PlayerShip>();
             _weaponController = player.GetComponentInChildren<WeaponController>();
             _weaponMount      = player.GetComponentInChildren<WeaponMount>();
         }
@@ -43,7 +45,7 @@ public class GameManager : MonoBehaviour
     {
         if (_gameOver) return;
 
-        if (_playerHealth != null && _playerHealth.currentHealth <= 0f)
+        if (_playerShip != null && !_playerShip.IsAlive)
             TriggerGameOver();
     }
 

@@ -5,15 +5,16 @@ using UnityEngine;
 /// Always rendered upright (world rotation zero) above the owning ship.
 /// Shield bar (top, blue) — Health bar (bottom, green).
 /// Fill bars are left-anchored: shrink from right as value decreases.
+/// HP ve kalkan verilerini PlayerShip ve ShieldGeneratorComponent'ten okur.
 /// </summary>
 public class HealthBar : MonoBehaviour
 {
-    public float maxShield    = 100f;
+    public float maxShield     = 100f;
     public float currentShield = 100f;
-    public float maxHealth    = 100f;
+    public float maxHealth     = 100f;
     public float currentHealth = 100f;
-    public float barWidth     = 2f;
-    public float barOffsetY   = 0.7f; // ship center'ından yukarıya mesafe
+    public float barWidth      = 2f;
+    public float barOffsetY    = 0.7f; // ship center'ından yukarıya mesafe
 
     const float BarHeight = 0.12f;
     const float BarGap    = 0.04f;
@@ -22,6 +23,8 @@ public class HealthBar : MonoBehaviour
     Transform _shieldFill;
     Transform _healthBg;
     Transform _healthFill;
+
+    PlayerShip _playerShip;
 
     void Awake()
     {
@@ -36,9 +39,27 @@ public class HealthBar : MonoBehaviour
         SetShieldBarVisible(maxShield > 0f);
     }
 
+    void Start()
+    {
+        _playerShip = GetComponent<PlayerShip>();
+        if (_playerShip != null)
+        {
+            maxHealth    = _playerShip.maxHullHP;
+            currentHealth = _playerShip.currentHullHP;
+        }
+    }
+
     public void TakeDamage(float amount)
     {
-        currentHealth -= amount;
+        if (_playerShip != null)
+        {
+            _playerShip.TakeDamage(amount);
+            currentHealth = _playerShip.currentHullHP;
+        }
+        else
+        {
+            currentHealth -= amount;
+        }
     }
 
     Transform MakeBar(string objName, Color color, int sortOrder)
@@ -49,30 +70,34 @@ public class HealthBar : MonoBehaviour
         tex.Apply();
 
         var go = new GameObject(objName);
-        go.transform.SetParent(transform); // PlayerShip'in child'ı olarak ata
+        go.transform.SetParent(transform);
         var sr = go.AddComponent<SpriteRenderer>();
         // Pivot sol-orta (0, 0.5) → scale.x değişince sol kenar sabit kalır
-        sr.sprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0f, 0.5f), 1f);
+        sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0f, 0.5f), 1f);
         sr.sortingOrder = sortOrder;
         return go.transform;
     }
 
     void LateUpdate()
     {
-        // HP full ise gizle, hasar almışsa sürekli göster
-        SetHealthBarVisible(currentHealth < maxHealth);
+        float hullHP    = _playerShip != null ? _playerShip.currentHullHP : currentHealth;
+        float hullMax   = _playerShip != null ? _playerShip.maxHullHP     : maxHealth;
 
-        // Kalkan görünürlüğü: maxShield > 0 ise her zaman göster
-        SetShieldBarVisible(maxShield > 0f);
+        float totalShield    = ShieldGeneratorComponent.GetTotalShield();
+        float totalMaxShield = ShieldGeneratorComponent.GetTotalMaxShield();
 
-        float shieldRatio = maxShield > 0f ? Mathf.Clamp01(currentShield / maxShield) : 0f;
-        float healthRatio = maxHealth > 0f ? Mathf.Clamp01(currentHealth / maxHealth) : 0f;
+        float healthRatio = hullMax > 0f
+            ? Mathf.Clamp01(hullHP / hullMax)
+            : 0f;
+        float shieldRatio = Mathf.Clamp01(totalShield / Mathf.Max(1f, totalMaxShield));
 
-        // Lokal koordinatlar: geminin merkezinden offset
+        SetHealthBarVisible(hullHP < hullMax);
+        SetShieldBarVisible(totalMaxShield > 0f);
+
         float leftX   = -barWidth * 0.5f;
         float healthY = barOffsetY;
         float shieldY = barOffsetY + BarHeight + BarGap;
-        float z       = -0.1f; // parent'ın önüne al
+        float z       = -0.1f;
 
         PlaceBar(_healthBg,   leftX, healthY, z, barWidth,               BarHeight);
         PlaceBar(_healthFill, leftX, healthY, z, barWidth * healthRatio, BarHeight);
@@ -83,7 +108,7 @@ public class HealthBar : MonoBehaviour
     void PlaceBar(Transform t, float x, float y, float z, float w, float h)
     {
         t.localPosition = new Vector3(x, y, z);
-        t.rotation      = Quaternion.identity; // gemi dönse bile barlar dünya uzayında dik kalır
+        t.rotation      = Quaternion.identity;
         t.localScale    = new Vector3(w, h, 1f);
     }
 

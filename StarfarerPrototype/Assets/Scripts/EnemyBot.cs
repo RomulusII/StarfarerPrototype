@@ -72,9 +72,17 @@ public class EnemyBot : MonoBehaviour
     {
         if (!other.CompareTag("Player")) return;
 
-        HealthBar playerHealth = other.GetComponent<HealthBar>();
-        if (playerHealth != null)
-            playerHealth.TakeDamage(20f);
+        PlayerShip playerShip = other.GetComponent<PlayerShip>();
+        if (playerShip != null)
+        {
+            playerShip.TakeDamage(20f);
+        }
+        else
+        {
+            HealthBar playerHealth = other.GetComponent<HealthBar>();
+            if (playerHealth != null)
+                playerHealth.TakeDamage(20f);
+        }
 
         Destroy(gameObject);
     }
