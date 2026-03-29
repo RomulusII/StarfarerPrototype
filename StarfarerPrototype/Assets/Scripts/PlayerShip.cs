@@ -45,6 +45,15 @@ public class PlayerShip : MonoBehaviour
         col.size      = new Vector2(4f, 1f);
         col.isTrigger = true;
 
+        if (FindFirstObjectByType<GeneratorComponent>() == null)
+        {
+            var genGO = new GameObject("Generator_Default");
+            genGO.transform.SetParent(transform);
+            genGO.transform.localPosition = Vector3.zero;
+            var gen = genGO.AddComponent<GeneratorComponent>();
+            gen.productionAmount = 15f;
+        }
+
         if (FindFirstObjectByType<ShieldGeneratorComponent>() == null)
         {
             GameObject shieldGO = new GameObject("ShieldGenerator_Default");

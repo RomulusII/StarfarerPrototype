@@ -29,6 +29,18 @@ public class GameManager : MonoBehaviour
             _weaponMount      = player.GetComponentInChildren<WeaponMount>();
         }
 
+        if (FindFirstObjectByType<EnergyBus>() == null)
+        {
+            var go = new GameObject("EnergyBus");
+            go.AddComponent<EnergyBus>();
+        }
+
+        if (FindFirstObjectByType<ResourceInventory>() == null)
+        {
+            var go = new GameObject("ResourceInventory");
+            go.AddComponent<ResourceInventory>();
+        }
+
         EnsureEventSystem();
         BuildGameOverUI();
     }

@@ -25,6 +25,7 @@ public class HealthBar : MonoBehaviour
     Transform _healthFill;
 
     PlayerShip _playerShip;
+    ShieldGeneratorComponent _shield;
 
     void Awake()
     {
@@ -33,18 +34,18 @@ public class HealthBar : MonoBehaviour
         _shieldBg   = MakeBar("ShieldBg",   new Color(0.05f, 0.1f,  0.3f),  10);
         _shieldFill = MakeBar("ShieldFill", new Color(0.2f,  0.4f,  1.0f),  11);
 
-        // Can barı başlangıçta gizli
         SetHealthBarVisible(false);
-        // Kalkan barı: maxShield == 0 ise gizle
-        SetShieldBarVisible(maxShield > 0f);
+        SetShieldBarVisible(false);
     }
 
     void Start()
     {
         _playerShip = GetComponent<PlayerShip>();
+        _shield     = GetComponentInChildren<ShieldGeneratorComponent>();
+
         if (_playerShip != null)
         {
-            maxHealth    = _playerShip.maxHullHP;
+            maxHealth     = _playerShip.maxHullHP;
             currentHealth = _playerShip.currentHullHP;
         }
     }
@@ -83,16 +84,22 @@ public class HealthBar : MonoBehaviour
         float hullHP    = _playerShip != null ? _playerShip.currentHullHP : currentHealth;
         float hullMax   = _playerShip != null ? _playerShip.maxHullHP     : maxHealth;
 
-        float totalShield    = ShieldGeneratorComponent.GetTotalShield();
-        float totalMaxShield = ShieldGeneratorComponent.GetTotalMaxShield();
-
         float healthRatio = hullMax > 0f
             ? Mathf.Clamp01(hullHP / hullMax)
             : 0f;
-        float shieldRatio = Mathf.Clamp01(totalShield / Mathf.Max(1f, totalMaxShield));
+
+        float shieldRatio = 0f;
+        if (_shield != null && _shield.maxShield > 0f)
+        {
+            shieldRatio = Mathf.Clamp01(_shield.currentShield / _shield.maxShield);
+            SetShieldBarVisible(true);
+        }
+        else
+        {
+            SetShieldBarVisible(false);
+        }
 
         SetHealthBarVisible(hullHP < hullMax);
-        SetShieldBarVisible(totalMaxShield > 0f);
 
         float leftX   = -barWidth * 0.5f;
         float healthY = barOffsetY;

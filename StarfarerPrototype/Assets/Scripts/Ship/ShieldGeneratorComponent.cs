@@ -8,7 +8,7 @@ public class ShieldGeneratorComponent : ShipComponentBase
 {
     public float maxShield        = 100f;
     public float currentShield;
-    public float rechargeRate     = 10f;
+    public float rechargeRate     = 1.5f;
     public float rechargeEnergyCost = 5f;
 
     public bool IsShieldFull => currentShield >= maxShield;
