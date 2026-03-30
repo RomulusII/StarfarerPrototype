@@ -61,7 +61,7 @@ public class PlayerShip : MonoBehaviour
             shieldGO.transform.localPosition = Vector3.zero;
             var shield = shieldGO.AddComponent<ShieldGeneratorComponent>();
             shield.maxShield          = 100f;
-            shield.rechargeRate       = 8f;
+            shield.rechargeRate       = 1f;
             shield.rechargeEnergyCost = 3f;
         }
     }
