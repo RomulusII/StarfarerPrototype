@@ -18,6 +18,15 @@ public class GameManager : MonoBehaviour
     bool _gameOver = false;
     GameObject _gameOverPanel;
 
+    void Awake()
+    {
+        if (FindFirstObjectByType<EnergyBar>() == null)
+        {
+            var go = new GameObject("EnergyBarHUD");
+            go.AddComponent<EnergyBar>();
+        }
+    }
+
     void Start()
     {
         GameObject player = GameObject.FindWithTag("Player");

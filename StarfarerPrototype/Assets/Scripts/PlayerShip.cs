@@ -23,6 +23,12 @@ public class PlayerShip : MonoBehaviour
         currentHullHP  = maxHullHP;
         _fixedPosition = transform.position;
 
+        if (FindFirstObjectByType<EnergyBus>() == null)
+        {
+            var busGO = new GameObject("EnergyBus");
+            busGO.AddComponent<EnergyBus>();
+        }
+
         // 400x100 px → ppu 100 → dünya boyutu 4 x 1 birim
         Texture2D tex    = new Texture2D(400, 100);
         Color[]   pixels = new Color[400 * 100];
@@ -64,6 +70,13 @@ public class PlayerShip : MonoBehaviour
             shield.rechargeRate       = 1f;
             shield.rechargeEnergyCost = 3f;
         }
+
+        var coreGenGO = new GameObject("CoreGenerator");
+        coreGenGO.transform.SetParent(transform);
+        coreGenGO.transform.localPosition = Vector3.zero;
+        coreGenGO.transform.localScale    = Vector3.one;
+        var coreGen = coreGenGO.AddComponent<GeneratorComponent>();
+        coreGen.productionAmount = 8f;
     }
 
     void Start()
@@ -75,6 +88,9 @@ public class PlayerShip : MonoBehaviour
     public void TakeDamage(float amount)
     {
         float remaining = ShieldGeneratorComponent.AbsorbDamageAll(amount);
+
+        foreach (var sg in FindObjectsByType<ShieldGeneratorComponent>(FindObjectsSortMode.None))
+            sg.NotifyDamageTaken();
 
         currentHullHP = Mathf.Max(0f, currentHullHP - remaining);
 
