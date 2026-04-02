@@ -48,4 +48,35 @@ public class ResourceInventory : MonoBehaviour
     public bool HasMetal(float amount)      => metal      >= amount;
     public bool HasCrystal(float amount)    => crystal    >= amount;
     public bool HasEnergyScrap(float amount) => energyScrap >= amount;
+
+    // --- ResourceType tabanlı API (ShipLoadout için) ---
+
+    public bool TrySpend(ResourceType type, int amount)
+    {
+        switch (type)
+        {
+            case ResourceType.RawMaterial:    return SpendMetal(amount);
+            case ResourceType.EnergyCrystal:  return SpendCrystal(amount);
+            default: return false;
+        }
+    }
+
+    public void Add(ResourceType type, int amount)
+    {
+        switch (type)
+        {
+            case ResourceType.RawMaterial:   AddMetal(amount);   break;
+            case ResourceType.EnergyCrystal: AddCrystal(amount); break;
+        }
+    }
+
+    public int Get(ResourceType type)
+    {
+        switch (type)
+        {
+            case ResourceType.RawMaterial:   return (int)metal;
+            case ResourceType.EnergyCrystal: return (int)crystal;
+            default: return 0;
+        }
+    }
 }

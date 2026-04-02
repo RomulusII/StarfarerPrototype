@@ -71,6 +71,9 @@ public class PlayerShip : MonoBehaviour
             shield.rechargeEnergyCost = 3f;
         }
 
+        if (!TryGetComponent<ShipLoadout>(out _))
+            gameObject.AddComponent<ShipLoadout>();
+
         var coreGenGO = new GameObject("CoreGenerator");
         coreGenGO.transform.SetParent(transform);
         coreGenGO.transform.localPosition = Vector3.zero;
