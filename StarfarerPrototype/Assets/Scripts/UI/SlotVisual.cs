@@ -1,10 +1,11 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 /// <summary>
 /// PlayerShip child'ı olan world-space slot göstergesi.
 /// UpgradeUI açıkken daire sprite gösterir; renk, slot durumuna göre değişir.
 /// </summary>
-public class SlotVisual : MonoBehaviour
+public class SlotVisual : MonoBehaviour, IPointerClickHandler
 {
     public int  slotIndex;
     public bool isWeaponSlot;
@@ -16,8 +17,14 @@ public class SlotVisual : MonoBehaviour
     // Lifecycle
     // -------------------------------------------------------------------------
 
+    void Start()
+    {
+        Debug.Log($"SlotVisual {slotIndex} Start (isWeaponSlot={isWeaponSlot})");
+    }
+
     void Awake()
     {
+
         _sr             = gameObject.AddComponent<SpriteRenderer>();
         _sr.sprite      = CreateCircleSprite();
         _sr.sortingOrder = 5;
@@ -26,6 +33,15 @@ public class SlotVisual : MonoBehaviour
         var col        = gameObject.AddComponent<CircleCollider2D>();
         col.isTrigger  = true;
         col.radius     = 0.3f;
+
+        // OnMouseDown için Main Camera'da Physics2DRaycaster gerekir
+        var cam = Camera.main;
+        if (cam != null && cam.GetComponent<UnityEngine.EventSystems.PhysicsRaycaster>() == null
+                        && cam.GetComponent<UnityEngine.EventSystems.Physics2DRaycaster>() == null)
+        {
+            cam.gameObject.AddComponent<UnityEngine.EventSystems.Physics2DRaycaster>();
+            Debug.Log("SlotVisual: Physics2DRaycaster added to Main Camera");
+        }
     }
 
     void Update()
@@ -47,11 +63,14 @@ public class SlotVisual : MonoBehaviour
             _sr.color = new Color(0.2f, 0.8f, 0.2f, 0.9f);    // yeşil
     }
 
-    void OnMouseDown()
+    public void OnPointerClick(PointerEventData eventData)
     {
+        Debug.Log($"SlotVisual {slotIndex} clicked (IsPaused={UpgradeUI.IsPaused})");
         if (!UpgradeUI.IsPaused) return;
         if (UpgradeUI.Instance != null)
             UpgradeUI.Instance.OnSlotClicked(slotIndex);
+        else
+            Debug.LogWarning("SlotVisual: UpgradeUI.Instance is null");
     }
 
     // -------------------------------------------------------------------------
