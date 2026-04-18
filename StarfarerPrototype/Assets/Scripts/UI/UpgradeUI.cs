@@ -29,9 +29,27 @@ public class UpgradeUI : MonoBehaviour
     {
         if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
         {
-            _canvas.enabled = !_canvas.enabled;
-            IsPaused        = _canvas.enabled;
-            Time.timeScale  = _canvas.enabled ? 0f : 1f;
+            bool opening = !_canvas.enabled;
+
+            if (opening)
+            {
+                var cam = FindFirstObjectByType<CameraController>();
+                if (cam != null)
+                {
+                    Vector3 shipPos = _loadout != null ? _loadout.transform.position : Vector3.zero;
+                    cam.ZoomToShip(shipPos, null);
+                }
+                _canvas.enabled = true;
+                IsPaused        = true;
+                Time.timeScale  = 0f;
+            }
+            else
+            {
+                _canvas.enabled = false;
+                IsPaused        = false;
+                FindFirstObjectByType<CameraController>()?.RestoreFromUpgrade();
+                Time.timeScale  = 1f;
+            }
         }
     }
 

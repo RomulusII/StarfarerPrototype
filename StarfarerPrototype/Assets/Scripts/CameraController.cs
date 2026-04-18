@@ -9,40 +9,95 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(Camera))]
 public class CameraController : MonoBehaviour
 {
-    private Camera cam;
+    private Camera _cam;
+
+    private bool   _isUpgradeMode;
+    private bool   _isRestoring;
+    private Vector3 _savedPosition;
+    private float  _savedSize;
+    private Vector3 _targetPosition;
+    private float  _targetSize;
+    private System.Action _onZoomComplete;
+
+    private const float ZoomSpeed = 5f;
 
     void Awake()
     {
-        cam = GetComponent<Camera>();
+        _cam = GetComponent<Camera>();
     }
 
     void Update()
     {
+        if (_isUpgradeMode)
+        {
+            HandleUpgradeZoom();
+            return;
+        }
+
         Vector2 inputPos = ReadInputPosition();
         if (inputPos == Vector2.zero) return;
 
         Vector2 screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
 
-        // Ekran merkezine göre -1..+1 arası delta
         Vector2 delta = (inputPos - screenCenter) / screenCenter;
-
-        // 0..1 arası uzaklık (köşe = ~1.41, clamp ile sınırla)
         float t = Mathf.Clamp01(delta.magnitude);
-
         Vector2 direction = delta.normalized;
 
-        // Kayma: t > 0.8 olduğunda başlar, power curve korunur
-        float moveT = Mathf.Clamp01((t - 0.8f) / 0.2f); // 0.8-1.0 → 0-1
+        float moveT = Mathf.Clamp01((t - 0.8f) / 0.2f);
         float curvedMoveT = Mathf.Pow(moveT, 2f);
-        // Y ekseni hareketi kapalı — gemi sabit alt bölgede görünür kalsın
         Vector3 targetPos = new Vector3(direction.x * curvedMoveT * 8f, 0f, -10f);
-
         transform.position = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * 3f);
 
-        // Zoom: t > 0.9 olduğunda başlar, t <= 0.9 iken ortho size sabit 5
-        float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f); // 0.9-1.0 → 0-1
+        float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
         float targetSize = Mathf.Lerp(5f, 7f, zoomT);
-        cam.orthographicSize = Mathf.Lerp(cam.orthographicSize, targetSize, Time.deltaTime * 3f);
+        _cam.orthographicSize = Mathf.Lerp(_cam.orthographicSize, targetSize, Time.deltaTime * 3f);
+    }
+
+    public void ZoomToShip(Vector3 shipPosition, System.Action onComplete)
+    {
+        _savedPosition  = transform.position;
+        _savedSize      = _cam.orthographicSize;
+
+        _targetPosition = new Vector3(shipPosition.x, shipPosition.y, -10f);
+        _targetSize     = 2.5f;
+        _onZoomComplete = onComplete;
+
+        _isRestoring   = false;
+        _isUpgradeMode = true;
+    }
+
+    public void RestoreFromUpgrade()
+    {
+        _targetPosition = _savedPosition;
+        _targetSize     = _savedSize;
+        _isRestoring    = true;
+    }
+
+    private void HandleUpgradeZoom()
+    {
+        float step = ZoomSpeed * Time.unscaledDeltaTime;
+
+        transform.position    = Vector3.Lerp(transform.position, _targetPosition, step);
+        _cam.orthographicSize = Mathf.Lerp(_cam.orthographicSize, _targetSize, step);
+
+        bool arrived = Vector3.Distance(transform.position, _targetPosition) < 0.01f
+                    && Mathf.Abs(_cam.orthographicSize - _targetSize) < 0.01f;
+
+        if (!arrived) return;
+
+        transform.position    = _targetPosition;
+        _cam.orthographicSize = _targetSize;
+
+        if (_isRestoring)
+        {
+            _isUpgradeMode = false;
+            _isRestoring   = false;
+        }
+        else
+        {
+            _onZoomComplete?.Invoke();
+            _onZoomComplete = null;
+        }
     }
 
     /// <summary>Touch varsa birincil dokunuş, yoksa mouse. İkisi de yoksa Vector2.zero.</summary>
