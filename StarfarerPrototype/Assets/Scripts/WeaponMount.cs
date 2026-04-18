@@ -31,6 +31,7 @@ public class WeaponMount : MonoBehaviour
 
     void Update()
     {
+        if (UpgradeUI.IsPaused) return;
         Vector2 mouseScreen = Mouse.current.position.ReadValue();
         Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(
             new Vector3(mouseScreen.x, mouseScreen.y, 0f));

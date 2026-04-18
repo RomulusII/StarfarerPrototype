@@ -79,6 +79,7 @@ public class ShipLoadout : MonoBehaviour
     public bool SellComponent(int slotIndex, bool returnResources = true)
     {
         if (slotIndex < 0 || slotIndex >= slotCount) return false;
+        if (slotIndex == 5) return false; // Weapon slot satılamaz
         if (_installedDefs[slotIndex] == null) return false;
 
         if (returnResources && ResourceInventory.Instance != null)

@@ -51,6 +51,7 @@ public class EnemyBot : MonoBehaviour
 
     void Update()
     {
+        if (UpgradeUI.IsPaused) return;
         Vector3 pos = transform.position;
         pos.x -= speed * Time.deltaTime;
         pos.y  = Mathf.MoveTowards(pos.y, _targetY, speed * 0.3f * Time.deltaTime);

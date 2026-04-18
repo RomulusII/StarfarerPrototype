@@ -11,6 +11,7 @@ public class EnemySpawner : MonoBehaviour
 
     void Update()
     {
+        if (UpgradeUI.IsPaused) return;
         _timer += Time.deltaTime;
         if (_timer >= spawnInterval)
         {

@@ -52,6 +52,7 @@ public class GameManager : MonoBehaviour
 
         EnsureEventSystem();
         BuildGameOverUI();
+        BuildUpgradeUI();
     }
 
     static void EnsureEventSystem()
@@ -86,6 +87,15 @@ public class GameManager : MonoBehaviour
     }
 
     // ── UI Builder ─────────────────────────────────────────────────────────
+
+    void BuildUpgradeUI()
+    {
+        var upgradeGO = new GameObject("UpgradeCanvas");
+        var upgradeUI = upgradeGO.AddComponent<UpgradeUI>();
+
+        if (_playerShip != null && _playerShip.TryGetComponent<ShipLoadout>(out var loadout))
+            upgradeUI.SetLoadout(loadout);
+    }
 
     void BuildGameOverUI()
     {

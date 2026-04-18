@@ -74,6 +74,33 @@ public class PlayerShip : MonoBehaviour
         if (!TryGetComponent<ShipLoadout>(out _))
             gameObject.AddComponent<ShipLoadout>();
 
+        // World-space slot objeleri — gemi 4x1 birim koordinat sistemine göre
+        Vector2[] slotPositions = new Vector2[]
+        {
+            new Vector2(-1.5f,  0.8f),  // 0 — Üst Sol
+            new Vector2( 0f,    0.8f),  // 1 — Üst Orta
+            new Vector2( 1.5f,  0.8f),  // 2 — Üst Sağ
+            new Vector2(-1.5f,  0f),    // 3 — Orta Sol
+            new Vector2(-0.5f,  0f),    // 4 — Orta OrtaSol
+            new Vector2( 0.5f,  0f),    // 5 — Orta OrtaSağ (Weapon)
+            new Vector2( 1.5f,  0f),    // 6 — Orta Sağ
+            new Vector2(-1.5f, -0.8f),  // 7 — Alt Sol
+            new Vector2( 0f,   -0.8f),  // 8 — Alt Orta
+            new Vector2( 1.5f, -0.8f),  // 9 — Alt Sağ
+        };
+
+        for (int i = 0; i < slotPositions.Length; i++)
+        {
+            var slotGO = new GameObject($"Slot_{i}");
+            slotGO.transform.SetParent(transform, false);
+            slotGO.transform.localPosition = slotPositions[i];
+            slotGO.transform.localScale    = Vector3.one;
+
+            var visual          = slotGO.AddComponent<SlotVisual>();
+            visual.slotIndex    = i;
+            visual.isWeaponSlot = (i == 5);
+        }
+
         var coreGenGO = new GameObject("CoreGenerator");
         coreGenGO.transform.SetParent(transform);
         coreGenGO.transform.localPosition = Vector3.zero;

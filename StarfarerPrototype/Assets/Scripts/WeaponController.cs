@@ -29,6 +29,7 @@ public class WeaponController : MonoBehaviour
 
     void Update()
     {
+        if (UpgradeUI.IsPaused) return;
         if (Mouse.current.leftButton.isPressed && Time.time >= nextFireTime)
         {
             nextFireTime = Time.time + fireRate;
