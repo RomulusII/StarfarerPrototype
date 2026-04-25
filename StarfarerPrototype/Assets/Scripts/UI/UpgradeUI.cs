@@ -7,6 +7,12 @@ using UnityEngine.EventSystems;
 /// <summary>
 /// Tab tuşuyla oyunu durduran, world-space SlotVisual'ları aktif eden ve
 /// slot tıklanınca sağ kenarda popup panel açan yönetici.
+///
+/// Panel layout (500x400):
+///   Başlık     — top anchor, 40px
+///   DetailStrip— iki eşit kutu (sol=kurulu, sağ=seçili), 160px
+///   Content    — component listesi / dolu slot butonları
+///   CloseBtn   — bottom anchor, 40px
 /// </summary>
 public class UpgradeUI : MonoBehaviour
 {
@@ -20,13 +26,18 @@ public class UpgradeUI : MonoBehaviour
     private Text       _popupTitle;
     private GameObject _popupContent;
 
-    private GameObject _detailPanel;
-    private Text       _detailNameText;
-    private Text       _detailTypeText;
-    private Text       _detailTierText;
-    private Text       _detailCostText;
+    // Sol kutu — kurulu component
+    private Text _leftNameText;
+    private Text _leftTypeText;
+    private Text _leftTierText;
+    private Text _leftCostText;
 
-    // Hardcoded katalog — Step 3'te ScriptableObject asset listesiyle değiştirilecek
+    // Sağ kutu — hover/tap ile seçili opsiyon
+    private Text _rightNameText;
+    private Text _rightTypeText;
+    private Text _rightTierText;
+    private Text _rightCostText;
+
     private static ComponentDefinition[] _catalogDefs;
 
     // -------------------------------------------------------------------------
@@ -80,52 +91,52 @@ public class UpgradeUI : MonoBehaviour
         Debug.Log($"[UpgradeUI] OnSlotClicked: slot={slotIndex}");
 
         bool empty = _loadout == null || _loadout.IsSlotEmpty(slotIndex);
-        ComponentDefinition def = empty ? null : _loadout.GetSlotDef(slotIndex);
+        ComponentDefinition installed = empty ? null : _loadout.GetSlotDef(slotIndex);
 
-        Debug.Log($"[UpgradeUI] slot={slotIndex} empty={empty} def={def?.componentName ?? "null"}");
+        Debug.Log($"[UpgradeUI] slot={slotIndex} empty={empty} def={installed?.componentName ?? "null"}");
 
         _popupTitle.text = empty
             ? $"Slot {slotIndex} \u2014 Bo\u015f"
-            : $"Slot {slotIndex} \u2014 {def.componentName}";
+            : $"Slot {slotIndex} \u2014 {installed.componentName}";
 
-        // _detailPanel korunur, geri kalan child'lar temizlenir
+        // Sol kutu: kurulu component (boşsa temizle)
+        if (installed != null)
+            FillBox(_leftNameText, _leftTypeText, _leftTierText, _leftCostText, installed);
+        else
+            ClearBox(_leftNameText, _leftTypeText, _leftTierText, _leftCostText);
+
+        // Sağ kutu: sıfırla (yeni slot seçildi)
+        ClearBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText);
+
+        // Liste içeriğini yeniden oluştur
         foreach (Transform child in _popupContent.transform)
-        {
-            if (child.gameObject != _detailPanel)
-                Destroy(child.gameObject);
-        }
-        HideDetail();
+            Destroy(child.gameObject);
 
         if (empty)
             BuildEmptyContent(slotIndex);
         else
-            BuildFilledContent(slotIndex, def);
+            BuildFilledContent(slotIndex, installed);
 
         _popupPanel.SetActive(true);
         Debug.Log($"[UpgradeUI] popup SetActive(true)");
     }
 
+    /// <summary>Sağ kutuyu doldurur (hover / tap).</summary>
     public void ShowDetail(ComponentDefinition def)
     {
         if (def == null) return;
-        _detailNameText.text = def.componentName;
-        _detailTypeText.text = TypeLabel(def.componentType);
-        _detailTierText.text = $"Tier {def.tier}";
-        _detailCostText.text = $"{def.cost} Ham Madde";
-        _detailPanel.SetActive(true);
+        FillBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText, def);
     }
 
-    public void HideDetail() => _detailPanel.SetActive(false);
+    /// <summary>Sağ kutuyu temizler (hover çıkışı).</summary>
+    public void HideDetail() =>
+        ClearBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText);
 
     // -------------------------------------------------------------------------
     // Popup Content
     // -------------------------------------------------------------------------
 
-    void ClosePopup()
-    {
-        HideDetail();
-        _popupPanel.SetActive(false);
-    }
+    void ClosePopup() => _popupPanel.SetActive(false);
 
     void BuildEmptyContent(int slotIndex)
     {
@@ -144,12 +155,11 @@ public class UpgradeUI : MonoBehaviour
             rowLE.preferredHeight = 40f;
             rowLE.flexibleWidth   = 1f;
 
-            // Tıklanabilir / hover'lanabilir isim alanı
+            // Hover / tap alanı (görünmez arka plan + ComponentRowHover)
             var nameArea = new GameObject("NameArea", typeof(RectTransform));
             nameArea.transform.SetParent(row.transform, false);
 
-            var nameAreaImg = nameArea.AddComponent<Image>();
-            nameAreaImg.color = Color.clear;           // raycasting için görünmez arka plan
+            nameArea.AddComponent<Image>().color = Color.clear;
 
             var hover = nameArea.AddComponent<ComponentRowHover>();
             hover.def = def;
@@ -166,10 +176,10 @@ public class UpgradeUI : MonoBehaviour
             nameTxt.fontSize  = 16;
             nameTxt.color     = Color.white;
             nameTxt.alignment = TextAnchor.MiddleLeft;
-            var nameTxtRect = (RectTransform)nameTxtGo.transform;
-            nameTxtRect.anchorMin = Vector2.zero;
-            nameTxtRect.anchorMax = Vector2.one;
-            nameTxtRect.sizeDelta = Vector2.zero;
+            var nRect = (RectTransform)nameTxtGo.transform;
+            nRect.anchorMin = Vector2.zero;
+            nRect.anchorMax = Vector2.one;
+            nRect.sizeDelta = Vector2.zero;
 
             var capturedDef = def;
             AddButton(row.transform, "Kur", () =>
@@ -262,8 +272,7 @@ public class UpgradeUI : MonoBehaviour
         _popupPanel = new GameObject("SlotPopup", typeof(RectTransform));
         _popupPanel.transform.SetParent(transform, false);
 
-        var bg = _popupPanel.AddComponent<Image>();
-        bg.color = new Color(0f, 0f, 0f, 0.85f);
+        _popupPanel.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.85f);
 
         var panelRect = (RectTransform)_popupPanel.transform;
         panelRect.anchorMin        = new Vector2(1f, 0.5f);
@@ -272,7 +281,7 @@ public class UpgradeUI : MonoBehaviour
         panelRect.anchoredPosition = new Vector2(-20f, 0f);
         panelRect.sizeDelta        = new Vector2(500f, 400f);
 
-        // Başlık
+        // Başlık — top 10px, 40px yükseklik
         var titleGo = new GameObject("Title", typeof(RectTransform));
         titleGo.transform.SetParent(_popupPanel.transform, false);
         _popupTitle           = titleGo.AddComponent<Text>();
@@ -288,12 +297,17 @@ public class UpgradeUI : MonoBehaviour
         titleRect.anchoredPosition = new Vector2(0f, -10f);
         titleRect.sizeDelta        = new Vector2(0f, 40f);
 
-        // İçerik alanı (detay paneli + satır listesi birlikte)
+        // Detay şeridi — başlığın hemen altı, 160px
+        // Panel 400px: top=350px from bottom (0.875), bottom=190px from bottom (0.475)
+        BuildDetailStrip();
+
+        // Liste alanı — şeridin altı, kapat butonunun üstü
+        // top=0.455 (182px), bottom=0.13 (52px) → ~130px yükseklik
         _popupContent = new GameObject("Content", typeof(RectTransform));
         _popupContent.transform.SetParent(_popupPanel.transform, false);
         var contentRect = (RectTransform)_popupContent.transform;
-        contentRect.anchorMin        = new Vector2(0f, 0.14f);
-        contentRect.anchorMax        = new Vector2(1f, 0.87f);
+        contentRect.anchorMin        = new Vector2(0f, 0.13f);
+        contentRect.anchorMax        = new Vector2(1f, 0.455f);
         contentRect.pivot            = new Vector2(0.5f, 1f);
         contentRect.anchoredPosition = Vector2.zero;
         contentRect.sizeDelta        = Vector2.zero;
@@ -305,37 +319,59 @@ public class UpgradeUI : MonoBehaviour
         vLayout.childForceExpandWidth  = true;
         vLayout.childForceExpandHeight = false;
 
-        BuildDetailPanel();
         BuildCloseButton();
 
         _popupPanel.SetActive(false);
     }
 
-    void BuildDetailPanel()
+    void BuildDetailStrip()
     {
-        _detailPanel = new GameObject("DetailPanel", typeof(RectTransform));
-        _detailPanel.transform.SetParent(_popupContent.transform, false);
+        var strip = new GameObject("DetailStrip", typeof(RectTransform));
+        strip.transform.SetParent(_popupPanel.transform, false);
 
-        var bg = _detailPanel.AddComponent<Image>();
-        bg.color = new Color(0.08f, 0.1f, 0.22f, 1f);
+        var stripRect = (RectTransform)strip.transform;
+        stripRect.anchorMin        = new Vector2(0f, 0.475f);
+        stripRect.anchorMax        = new Vector2(1f, 0.875f);
+        stripRect.pivot            = new Vector2(0.5f, 0.5f);
+        stripRect.anchoredPosition = Vector2.zero;
+        stripRect.sizeDelta        = Vector2.zero;
 
-        var le = _detailPanel.AddComponent<LayoutElement>();
-        le.preferredHeight = 160f;
-        le.flexibleWidth   = 1f;
+        var hl = strip.AddComponent<HorizontalLayoutGroup>();
+        hl.spacing                = 6f;
+        hl.padding                = new RectOffset(10, 10, 8, 8);
+        hl.childForceExpandWidth  = true;
+        hl.childForceExpandHeight = true;
+        hl.childAlignment         = TextAnchor.UpperLeft;
 
-        var vl = _detailPanel.AddComponent<VerticalLayoutGroup>();
-        vl.padding                = new RectOffset(14, 14, 12, 10);
+        BuildDetailBox(strip.transform,
+            new Color(0.08f, 0.10f, 0.22f, 1f),
+            out _leftNameText, out _leftTypeText, out _leftTierText, out _leftCostText);
+
+        BuildDetailBox(strip.transform,
+            new Color(0.08f, 0.20f, 0.12f, 1f),
+            out _rightNameText, out _rightTypeText, out _rightTierText, out _rightCostText);
+    }
+
+    static void BuildDetailBox(Transform parent, Color bgColor,
+        out Text nameText, out Text typeText, out Text tierText, out Text costText)
+    {
+        var box = new GameObject("DetailBox", typeof(RectTransform));
+        box.transform.SetParent(parent, false);
+
+        box.AddComponent<Image>().color = bgColor;
+        box.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+        var vl = box.AddComponent<VerticalLayoutGroup>();
+        vl.padding                = new RectOffset(10, 10, 8, 8);
         vl.spacing                = 5f;
         vl.childAlignment         = TextAnchor.UpperLeft;
         vl.childForceExpandWidth  = true;
         vl.childForceExpandHeight = false;
 
-        _detailNameText = MakeDetailText(_detailPanel.transform, "", 18, FontStyle.Bold);
-        _detailTypeText = MakeDetailText(_detailPanel.transform, "", 14, FontStyle.Normal);
-        _detailTierText = MakeDetailText(_detailPanel.transform, "", 14, FontStyle.Normal);
-        _detailCostText = MakeDetailText(_detailPanel.transform, "", 14, FontStyle.Normal);
-
-        _detailPanel.SetActive(false);
+        nameText = MakeDetailText(box.transform, "", 15, FontStyle.Bold);
+        typeText = MakeDetailText(box.transform, "", 13, FontStyle.Normal);
+        tierText = MakeDetailText(box.transform, "", 13, FontStyle.Normal);
+        costText = MakeDetailText(box.transform, "", 13, FontStyle.Normal);
     }
 
     static Text MakeDetailText(Transform parent, string text, int fontSize, FontStyle style)
@@ -349,7 +385,7 @@ public class UpgradeUI : MonoBehaviour
         t.fontSize  = fontSize;
         t.fontStyle = style;
         t.color     = Color.white;
-        t.alignment = TextAnchor.MiddleLeft;
+        t.alignment = TextAnchor.UpperLeft;
 
         var le = go.AddComponent<LayoutElement>();
         le.preferredHeight = fontSize + 8f;
@@ -378,6 +414,23 @@ public class UpgradeUI : MonoBehaviour
         rect.sizeDelta        = new Vector2(110f, 40f);
 
         AttachLabel(go.transform, "Kapat", 15);
+    }
+
+    // -------------------------------------------------------------------------
+    // Detail Helpers
+    // -------------------------------------------------------------------------
+
+    static void FillBox(Text n, Text ty, Text ti, Text c, ComponentDefinition def)
+    {
+        n.text  = def.componentName;
+        ty.text = TypeLabel(def.componentType);
+        ti.text = $"Tier {def.tier}";
+        c.text  = $"{def.cost} Ham Madde";
+    }
+
+    static void ClearBox(Text n, Text ty, Text ti, Text c)
+    {
+        n.text = ty.text = ti.text = c.text = "";
     }
 
     // -------------------------------------------------------------------------
@@ -459,8 +512,8 @@ public class UpgradeUI : MonoBehaviour
 
 /// <summary>
 /// Katalog satırının isim alanına eklenir.
-/// PC: hover ile detay panelini açar/kapatır.
-/// Mobil: tıklama ile detay panelini açar.
+/// PC: hover → sağ kutuyu doldurur / temizler.
+/// Mobil: tap → sağ kutuyu doldurur (açık kalır).
 /// </summary>
 [RequireComponent(typeof(Image))]
 public class ComponentRowHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
