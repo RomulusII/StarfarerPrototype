@@ -67,7 +67,11 @@ public class WeaponController : MonoBehaviour
         if (!Mouse.current.leftButton.isPressed) return;
         if (Time.time < _nextFireTime) return;
 
-        if (EnergyBus.Instance == null || !EnergyBus.Instance.RequestEnergy(energyCostPerShot))
+        float energyMulti = BoostController.Mode == BoostMode.Shield ? 1f / 3f :
+                            BoostController.Mode == BoostMode.Weapon  ? 3f : 1f;
+
+        if (EnergyBus.Instance == null ||
+            !EnergyBus.Instance.RequestEnergy(energyCostPerShot * energyMulti))
             return;
 
         _nextFireTime = Time.time + fireRate;
@@ -115,9 +119,14 @@ public class WeaponController : MonoBehaviour
 
     void SpawnBullet(Sprite sprite, WeaponType type, float speed)
     {
+        float damageMulti = BoostController.Mode == BoostMode.Weapon ? 2f :
+                            BoostController.Mode == BoostMode.Shield  ? 1f / 3f : 1f;
+        float scaleMulti  = BoostController.Mode == BoostMode.Weapon ? 1.5f :
+                            BoostController.Mode == BoostMode.Shield  ? 0.6f : 1f;
+
         var go = new GameObject("Bullet");
         go.transform.SetPositionAndRotation(transform.position, transform.rotation);
-        go.transform.localScale = Vector3.one;
+        go.transform.localScale = Vector3.one * scaleMulti;
 
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite       = sprite;
@@ -125,7 +134,7 @@ public class WeaponController : MonoBehaviour
 
         var b = go.AddComponent<Bullet>();
         b.speed      = speed;
-        b.damage     = damage;
+        b.damage     = damage * damageMulti;
         b.weaponType = type;
     }
 

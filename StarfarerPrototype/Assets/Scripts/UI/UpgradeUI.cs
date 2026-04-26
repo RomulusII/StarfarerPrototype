@@ -94,14 +94,25 @@ public class UpgradeUI : MonoBehaviour
 
         Debug.Log($"[UpgradeUI] slot={slotIndex} empty={empty} def={installed?.componentName ?? "null"}");
 
-        _popupTitle.text = empty
-            ? $"Slot {slotIndex} \u2014 Bo\u015f"
-            : $"Slot {slotIndex} \u2014 {installed.componentName}";
-
-        if (installed != null)
-            FillBox(_leftNameText, _leftTypeText, _leftTierText, _leftCostText, installed);
+        if (slotIndex == 5)
+        {
+            var activeDef = _loadout?.GetWeaponDef(_loadout.GetActiveWeaponType());
+            _popupTitle.text = activeDef != null
+                ? $"Slot 5 \u2014 {activeDef.componentName}"
+                : "Slot 5 \u2014 Ana Silah";
+            FillBox(_leftNameText, _leftTypeText, _leftTierText, _leftCostText,
+                    activeDef ?? installed);
+        }
         else
-            ClearBox(_leftNameText, _leftTypeText, _leftTierText, _leftCostText);
+        {
+            _popupTitle.text = empty
+                ? $"Slot {slotIndex} \u2014 Bo\u015f"
+                : $"Slot {slotIndex} \u2014 {installed.componentName}";
+            if (installed != null)
+                FillBox(_leftNameText, _leftTypeText, _leftTierText, _leftCostText, installed);
+            else
+                ClearBox(_leftNameText, _leftTypeText, _leftTierText, _leftCostText);
+        }
 
         ClearBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText);
 
@@ -210,6 +221,12 @@ public class UpgradeUI : MonoBehaviour
 
     void BuildFilledContent(int slotIndex, ComponentDefinition def)
     {
+        if (slotIndex == 5)
+        {
+            BuildWeaponSwitchRows();
+            return;
+        }
+
         MakeTextLabel(_popupContent.transform, $"Tier {def.tier}", 15, TextAnchor.MiddleLeft);
 
         var btnRow = CreateRow(_popupContent.transform);
@@ -228,8 +245,107 @@ public class UpgradeUI : MonoBehaviour
             }
         }
 
-        if (slotIndex != 5)
-            AddButton(btnRow.transform, "Sat", () => SellAndRefresh(slotIndex), 100f);
+        AddButton(btnRow.transform, "Sat", () => SellAndRefresh(slotIndex), 100f);
+    }
+
+    // Her silah tipi için ayrı satır: isim/tier + Satın Al veya Seç + Upgrade
+    void BuildWeaponSwitchRows()
+    {
+        MakeTextLabel(_popupContent.transform, "ANA S\u0130LAH", 13, TextAnchor.MiddleLeft);
+
+        var weaponTypes = new[]
+        {
+            (WeaponType.Laser,   "Lazer"),
+            (WeaponType.Kinetic, "Kinetik"),
+            (WeaponType.Plasma,  "Plazma"),
+        };
+
+        foreach (var (type, label) in weaponTypes)
+        {
+            bool unlocked = _loadout != null && _loadout.IsWeaponTypeUnlocked(type);
+            bool isActive = _loadout != null && _loadout.GetActiveWeaponType() == type;
+            var capturedType = type;
+
+            var row = CreateRow(_popupContent.transform);
+
+            // İsim + tier
+            ComponentDefinition curDef  = unlocked ? _loadout.GetWeaponDef(type) : ShipLoadout.GetWeaponChainStart(type);
+            string tierStr = unlocked ? $" Mk{curDef?.tier ?? 1}" : " —";
+            var nameGo = new GameObject("WeaponLabel", typeof(RectTransform));
+            nameGo.transform.SetParent(row.transform, false);
+            var nameTxt = nameGo.AddComponent<Text>();
+            nameTxt.text      = label + tierStr;
+            nameTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            nameTxt.fontSize  = 15;
+            nameTxt.color     = unlocked ? Color.white : new Color(0.5f, 0.5f, 0.5f, 1f);
+            nameTxt.alignment = TextAnchor.MiddleLeft;
+            var nameLE = nameGo.AddComponent<LayoutElement>();
+            nameLE.flexibleWidth   = 1f;
+            nameLE.preferredHeight = 40f;
+
+            if (!unlocked)
+            {
+                // Satın Al butonu
+                ComponentDefinition unlockDef = ShipLoadout.GetWeaponChainStart(type);
+                bool canAfford = ResourceInventory.Instance != null && unlockDef != null &&
+                                 ResourceInventory.Instance.Get(unlockDef.costResource) >= unlockDef.cost;
+                string costLabel = unlockDef != null ? $"Sat\u0131n Al\n{unlockDef.cost}" : "Sat\u0131n Al";
+                var buyBtn = AddButton(row.transform, costLabel, () => UnlockWeaponAndRefresh(capturedType), 80f);
+                if (!canAfford)
+                {
+                    buyBtn.interactable = false;
+                    buyBtn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
+                }
+            }
+            else
+            {
+                // Seç butonu
+                var selBtn = AddButton(row.transform, "Se\u00e7", () => SwitchWeaponAndRefresh(capturedType), 60f);
+                if (isActive)
+                    selBtn.GetComponent<Image>().color = new Color(0.10f, 0.55f, 0.20f, 1f);
+
+                // Upgrade butonu
+                if (curDef?.upgradeTo != null)
+                {
+                    int diff = curDef.upgradeTo.cost - curDef.sellValue;
+                    bool canAfford = ResourceInventory.Instance != null &&
+                                     ResourceInventory.Instance.Get(curDef.upgradeTo.costResource) >= diff;
+                    string upLabel = $"\u2191Mk{curDef.upgradeTo.tier}\n{diff}";
+                    var upBtn = AddButton(row.transform, upLabel, () => UpgradeWeaponTypeAndRefresh(capturedType), 70f);
+                    if (!canAfford)
+                    {
+                        upBtn.interactable = false;
+                        upBtn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
+                    }
+                }
+            }
+        }
+    }
+
+    void UnlockWeaponAndRefresh(WeaponType type)
+    {
+        if (_loadout == null) return;
+        if (_loadout.UnlockWeaponType(type))
+        {
+            RefreshResourceDisplay();
+            OnSlotClicked(5);
+        }
+    }
+
+    void SwitchWeaponAndRefresh(WeaponType type)
+    {
+        _loadout?.SwitchWeapon(type);
+        OnSlotClicked(5);
+    }
+
+    void UpgradeWeaponTypeAndRefresh(WeaponType type)
+    {
+        if (_loadout == null) return;
+        if (_loadout.UpgradeWeaponType(type))
+        {
+            RefreshResourceDisplay();
+            OnSlotClicked(5);
+        }
     }
 
     void UpgradeAndRefresh(int slotIndex)

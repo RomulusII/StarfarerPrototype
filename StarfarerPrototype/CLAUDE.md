@@ -35,8 +35,7 @@ Incremental Space Shooter with Base Management. Referans: FTL, Into the Breach r
 Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 5), Otomatik Turretler, İkincil Silahlar (point defence dahil)
 
 ### Ana Silah (Slot 5)
-Oyun başında Lazer Mk1 kurulu gelir. Upgrade zinciri lineer (Mk1→Mk2→Mk3).
-Silah tipi değişimi (Lazer/Kinetik/Plazma arası geçiş) ayrı bir **switch mekanizması** ile yapılacak — henüz tasarlanmadı.
+Oyun başında Lazer Mk1 kurulu gelir. Her silah tipi (Lazer/Kinetik/Plazma) bağımsız Mk1→Mk2→Mk3 zincirine sahip; hepsi aynı anda farklı tier'larda olabilir. Switch butonu ile aktif tip seçilir. Yeni tip satın alınınca `_unlockedWeapons` dict'e eklenir; slot mekanizması bypass edilir.
 
 ### Otomatik Turretler
 Slot'a kurulunca belirli bir aralıkta en yakın düşmana otomatik ateş açar.
@@ -139,31 +138,24 @@ float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 
 ---
 
-## Sıradaki Adımlar
+## Tamamlananlar (devam)
 
-- [x] 1. [Kur] / [Sat] / [Upgrade] butonları gerçek kurulum yapıyor (kaynak yetersizse inaktif, maliyet kırmızı)
-- [ ] 2. ComponentDefinition asset'leri — Inspector'da ScriptableObject oluştur
-- [x] 3. ResourceInventory HUD — ham madde + kristal GeneralPanel'de gösteriliyor, her işlemde güncelleniyor
-- [x] 4. Silah tipleri — Kinetik / Lazer / Plazma implementasyonu tamamlandı
-- [x] 5. Slot 5 oyun başında Lazer Mk1 ile dolu başlıyor (ShipLoadout.Start, deductCost=false)
-- [ ] 5. Enerji dağıtım UI — kalkan / silah / itici slider
-
----
-
-## Bekleyen Tasarım Kararları
-
-- [ ] Ana silah switch mekanizması — Lazer/Kinetik/Plazma arası geçiş nasıl yapılacak? (UI, maliyet, kısıt)
+- [x] [Kur] / [Sat] / [Upgrade] butonları — kaynak yetersizse inaktif, maliyet kırmızı
+- [x] ResourceInventory HUD — ham madde + kristal GeneralPanel'de, her işlemde güncelleniyor
+- [x] Silah tipleri — Kinetik / Lazer / Plazma, her biri bağımsız Mk1→Mk2→Mk3 zinciri
+- [x] Ana silah switch mekanizması — slot 5'te per-tip Satın Al / Seç / Upgrade butonları
+- [x] Boost sistemi — Kalkan/Silah boost toggle, BoostHUD, çarpan efektleri
 
 ---
 
-## Büyük Sistemler (sıra bekliyor)
+## Sıradaki Adımlar (öncelik sırasıyla)
 
-- [ ] Toplayıcı gemiler
-- [ ] Kaynak toplama sistemi
-- [ ] Düşman çeşitleri — zırhlı, kalkan, avcı/bomber
-- [ ] Boss taşıyıcı gemi
-- [ ] Bölüm sistemi (8–10 bölüm)
+- [ ] Düşman çeşitleri — zırhlı (kinetike dirençli), kalkan botu (lazere dirençli), avcı/bomber
 - [ ] Otomatik turretler — slot'a kurulunca en yakın düşmana ateş, enerji tüketir
+- [ ] Toplayıcı gemiler + kaynak toplama sistemi
+- [ ] Stat upgrade sistemi — komponent başına %'lik stat artışları (damage, HP, fire rate vb.), birden fazla komponent tipine uygulanabilir genel yapı
+- [ ] Bölüm sistemi (8–10 bölüm, wave yapısı, bölüm arası geçiş)
+- [ ] Boss taşıyıcı gemi
 - [ ] Point defence turretleri — küçük/hızlı hedeflere odaklı otomatik turret
 - [ ] Mobil UI
 - [ ] Ses efektleri

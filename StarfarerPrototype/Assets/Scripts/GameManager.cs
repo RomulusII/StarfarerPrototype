@@ -53,6 +53,7 @@ public class GameManager : MonoBehaviour
         EnsureEventSystem();
         BuildGameOverUI();
         BuildUpgradeUI();
+        BuildBoostHUD();
     }
 
     static void EnsureEventSystem()
@@ -95,6 +96,12 @@ public class GameManager : MonoBehaviour
 
         if (_playerShip != null && _playerShip.TryGetComponent<ShipLoadout>(out var loadout))
             upgradeUI.SetLoadout(loadout);
+    }
+
+    void BuildBoostHUD()
+    {
+        var go = new GameObject("BoostHUD");
+        go.AddComponent<BoostHUD>();
     }
 
     void BuildGameOverUI()

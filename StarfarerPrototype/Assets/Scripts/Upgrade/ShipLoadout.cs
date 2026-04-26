@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -10,7 +11,14 @@ public class ShipLoadout : MonoBehaviour
 
     private ShipComponentBase[]   _slots;
     private ComponentDefinition[] _installedDefs;
-    private GameObject[]          _slotObjects; // WeaponController gibi ShipComponentBase olmayan tipler için
+    private GameObject[]          _slotObjects;
+
+    // Silah switch sistemi
+    private readonly Dictionary<WeaponType, ComponentDefinition> _unlockedWeapons = new();
+    private WeaponType _activeWeaponType = WeaponType.Laser;
+
+    public bool IsWeaponTypeUnlocked(WeaponType type) => _unlockedWeapons.ContainsKey(type);
+    public WeaponType GetActiveWeaponType() => _activeWeaponType;
 
     void Awake()
     {
@@ -21,22 +29,72 @@ public class ShipLoadout : MonoBehaviour
 
     void Start()
     {
-        InstallComponent(CreateLazerMk1(), slotIndex: 5, deductCost: false);
+        InitWeaponChains();
+        // Lazer başlangıçta ücretsiz kurulu gelir
+        InstallComponent(_laserChain[0], slotIndex: 5, deductCost: false);
     }
 
-    static ComponentDefinition CreateLazerMk1()
+    // -------------------------------------------------------------------------
+    // Silah zincirleri (statik, oyun ömrü boyunca tek kez oluşturulur)
+    // -------------------------------------------------------------------------
+
+    static ComponentDefinition[] _laserChain;
+    static ComponentDefinition[] _kineticChain;
+    static ComponentDefinition[] _plasmaChain;
+
+    static void InitWeaponChains()
     {
-        var def = ScriptableObject.CreateInstance<ComponentDefinition>();
-        def.componentName         = "Lazer Topu Mk1";
-        def.componentType         = ComponentType.Weapon;
-        def.weaponType            = WeaponType.Laser;
-        def.tier                  = 1;
-        def.costResource          = ResourceType.EnergyCrystal;
-        def.cost                  = 0;
-        def.weaponDamage          = 8f;
-        def.weaponFireRate        = 0.07f;
-        def.weaponEnergyCostPerShot = 2f;
-        return def;
+        if (_laserChain != null) return;
+
+        var lm3 = W("Lazer Topu Mk3",   WeaponType.Laser,   3, ResourceType.EnergyCrystal, 60, 25, null,  18f, 0.05f, 3f);
+        var lm2 = W("Lazer Topu Mk2",   WeaponType.Laser,   2, ResourceType.EnergyCrystal, 35, 15, lm3,   12f, 0.06f, 2.5f);
+        var lm1 = W("Lazer Topu Mk1",   WeaponType.Laser,   1, ResourceType.EnergyCrystal,  0,  0, lm2,    8f, 0.07f, 2f);
+        _laserChain = new[] { lm1, lm2, lm3 };
+
+        var km3 = W("Kinetik Top Mk3",  WeaponType.Kinetic, 3, ResourceType.RawMaterial,   50, 20, null,  18f, 0.12f);
+        var km2 = W("Kinetik Top Mk2",  WeaponType.Kinetic, 2, ResourceType.RawMaterial,   28, 10, km3,   14f, 0.13f);
+        var km1 = W("Kinetik Top Mk1",  WeaponType.Kinetic, 1, ResourceType.RawMaterial,   12,  5, km2,   10f, 0.15f);
+        _kineticChain = new[] { km1, km2, km3 };
+
+        var pm3 = W("Plazma Topu Mk3",  WeaponType.Plasma,  3, ResourceType.RawMaterial,   65, 25, null,  45f, 0.10f, 0f, 0.7f,  4);
+        var pm2 = W("Plazma Topu Mk2",  WeaponType.Plasma,  2, ResourceType.RawMaterial,   38, 15, pm3,   36f, 0.11f, 0f, 0.75f, 3);
+        var pm1 = W("Plazma Topu Mk1",  WeaponType.Plasma,  1, ResourceType.RawMaterial,   20,  8, pm2,   28f, 0.12f, 0f, 0.8f,  3);
+        _plasmaChain = new[] { pm1, pm2, pm3 };
+    }
+
+    static ComponentDefinition W(string name, WeaponType wt, int tier,
+        ResourceType res, int cost, int sell, ComponentDefinition upgTo,
+        float dmg = 10f, float rate = 0.15f, float energy = 0f,
+        float charge = 0.8f, int burst = 3)
+    {
+        var d = ScriptableObject.CreateInstance<ComponentDefinition>();
+        d.componentName             = name;
+        d.componentType             = ComponentType.Weapon;
+        d.weaponType                = wt;
+        d.tier                      = tier;
+        d.costResource              = res;
+        d.cost                      = cost;
+        d.sellValue                 = sell;
+        d.upgradeTo                 = upgTo;
+        d.weaponDamage              = dmg;
+        d.weaponFireRate            = rate;
+        d.weaponEnergyCostPerShot   = energy;
+        d.weaponChargeTime          = charge;
+        d.weaponBurstCount          = burst;
+        return d;
+    }
+
+    /// <summary>Bir silah tipinin Mk1 tanımını döner (unlock maliyeti dahil).</summary>
+    public static ComponentDefinition GetWeaponChainStart(WeaponType type)
+    {
+        InitWeaponChains();
+        return type switch
+        {
+            WeaponType.Laser   => _laserChain[0],
+            WeaponType.Kinetic => _kineticChain[0],
+            WeaponType.Plasma  => _plasmaChain[0],
+            _                  => null,
+        };
     }
 
     // -------------------------------------------------------------------------
@@ -85,9 +143,11 @@ public class ShipLoadout : MonoBehaviour
                 break;
 
             case ComponentType.Weapon:
+                _unlockedWeapons[def.weaponType] = def;
+                _activeWeaponType = def.weaponType;
                 var wc = GetComponentInChildren<WeaponController>();
                 if (wc != null) wc.Configure(def);
-                Destroy(go); // WeaponController sahnede zaten var, ayrı GO gerekmez
+                Destroy(go);
                 go = null;
                 break;
         }
@@ -138,6 +198,54 @@ public class ShipLoadout : MonoBehaviour
         SellComponent(slotIndex, returnResources: false); // eski komponenti yok et, para iade etme
         return InstallComponent(upgradeTarget, slotIndex, deductCost: false);
     }
+
+    public void SwitchWeapon(WeaponType type)
+    {
+        if (!_unlockedWeapons.TryGetValue(type, out var def)) return;
+        _activeWeaponType = type;
+        _installedDefs[5] = def;
+        GetComponentInChildren<WeaponController>()?.Configure(def);
+    }
+
+    /// <summary>Yeni bir silah tipini satın alıp açar. Zaten açıksa false döner.</summary>
+    public bool UnlockWeaponType(WeaponType type)
+    {
+        if (_unlockedWeapons.ContainsKey(type)) return false;
+        var def = GetWeaponChainStart(type);
+        if (def == null) return false;
+        if (def.cost > 0)
+        {
+            if (ResourceInventory.Instance == null) return false;
+            if (!ResourceInventory.Instance.TrySpend(def.costResource, def.cost)) return false;
+        }
+        _unlockedWeapons[type] = def;
+        return true;
+    }
+
+    /// <summary>Belirli bir silah tipini bağımsız olarak upgrade eder (aktif olmak zorunda değil).</summary>
+    public bool UpgradeWeaponType(WeaponType type)
+    {
+        if (!_unlockedWeapons.TryGetValue(type, out var current)) return false;
+        if (current.upgradeTo == null) return false;
+        var next    = current.upgradeTo;
+        int diff    = next.cost - current.sellValue;
+        if (diff > 0)
+        {
+            if (ResourceInventory.Instance == null) return false;
+            if (!ResourceInventory.Instance.TrySpend(next.costResource, diff)) return false;
+        }
+        _unlockedWeapons[type] = next;
+        if (_activeWeaponType == type)
+        {
+            _installedDefs[5] = next;
+            GetComponentInChildren<WeaponController>()?.Configure(next);
+        }
+        return true;
+    }
+
+    /// <summary>Bir silah tipinin mevcut (en son upgrade edilmiş) tanımını döner.</summary>
+    public ComponentDefinition GetWeaponDef(WeaponType type) =>
+        _unlockedWeapons.TryGetValue(type, out var d) ? d : null;
 
     public ShipComponentBase GetSlotComponent(int slotIndex)
     {
