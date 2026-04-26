@@ -253,6 +253,21 @@ public class ShipLoadout : MonoBehaviour
         return _slots[slotIndex];
     }
 
+    /// <summary>Normal/Hard modda komponent yok edilince slot'u temizler.</summary>
+    public void ClearSlotForComponent(ShipComponentBase comp)
+    {
+        for (int i = 0; i < slotCount; i++)
+        {
+            if (_slots[i] == comp)
+            {
+                _slots[i]         = null;
+                _installedDefs[i] = null;
+                _slotObjects[i]   = null;
+                return;
+            }
+        }
+    }
+
     public ComponentDefinition GetSlotDef(int slotIndex)
     {
         if (slotIndex < 0 || slotIndex >= slotCount) return null;

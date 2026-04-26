@@ -25,7 +25,7 @@ Incremental Space Shooter with Base Management. Referans: FTL, Into the Breach r
 - **Ana gemi:** Devasa, sabit pozisyonda, mermilerden kaçamaz
 - **Silah:** Mouse/touch ile nişan alınır, sol tık/dokunma ile ateş edilir
 - **Silah tipleri:** Lazer (kalkana etkili, sürekli enerji tüketir), Plazma (şarj edip burst atar), Kinetik (mermili, enerji yemez)
-- **Enerji sistemi:** Jeneratör ürettiği enerjiyi kalkan/silah/itici arasında dağıtır, oyuncu manuel ayarlar
+- **Enerji sistemi:** Jeneratör ürettiği enerjiyi kalkan/silah arasında dağıtır; Boost sistemi anlık yönlendirme sağlar
 - **Toplayıcı gemiler:** Tuşa basarak asteroid/enkaz bölgesine gönderilir, geri çağrılabilir
 - **Kaynak:** 2 tip — Ham madde (fiziksel sistemler için), Enerji kristali (enerji sistemleri için)
 - **Upgrade sistemi:** Anlık, bölüm içinde. Komponent satılıp başka şey alınabilir
@@ -34,20 +34,51 @@ Incremental Space Shooter with Base Management. Referans: FTL, Into the Breach r
 ### Gemi Upgrade Slotları
 Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 5), Otomatik Turretler, İkincil Silahlar (point defence dahil)
 
-### Ana Silah (Slot 5)
-Oyun başında Lazer Mk1 kurulu gelir. Her silah tipi (Lazer/Kinetik/Plazma) bağımsız Mk1→Mk2→Mk3 zincirine sahip; hepsi aynı anda farklı tier'larda olabilir. Switch butonu ile aktif tip seçilir. Yeni tip satın alınınca `_unlockedWeapons` dict'e eklenir; slot mekanizması bypass edilir.
+### Ana Silah (Slot 5) — Tasarım Kararları
+- Oyun başında **Lazer Mk1** ücretsiz kurulu gelir
+- Her silah tipi (**Lazer / Kinetik / Plazma**) bağımsız Mk1→Mk2→Mk3 zincirine sahip
+- Tüm tipler aynı anda farklı tier'larda olabilir; switch butonu ile aktif tip seçilir
+- Yeni tip satın alınınca `_unlockedWeapons` dict'e eklenir — normal slot mekanizması bypass edilir
+- Upgrade UI'da slot 5 seçilince her tip için ayrı satır: kilitliyse **Satın Al**, açıksa **Seç** + **Upgrade** butonu
+- Upgrade, aktif olmayan tipler için de yapılabilir (bağımsız zincir)
+
+### Boost Sistemi — Tasarım Kararları
+- İki boost modu var: **Kalkan Boost** ve **Silah Boost** — birbirini iptal eder, toggle çalışır
+- **Kalkan Boost aktif:**
+  - Kalkan şarj hızı ×3, enerji maliyeti ×5
+  - Silah hasarı ×1/3, mermi boyutu ×0.6
+  - Lazer enerji maliyeti ×1/3
+- **Silah Boost aktif:**
+  - Silah hasarı ×2, mermi boyutu ×1.5
+  - Lazer enerji maliyeti ×3
+  - Kalkan şarjı durur
+- Boost HUD upgrade ekranı açıkken gizlenir
+
+### Düşman Çeşitliliği — Tasarım Kararları
+
+**Uzak saldırganlar** (hareket ederken periyodik ateş, mermileri kalkan üzerinden hasar verir):
+- **Swarm:** HP 30, hız 3, lazer'e kırılgan (×1.5). Ateş hızı ~4sn.
+- **Armored:** HP 80, hız 1.5, kinetike dirençli (×0.3), plazmaya zayıf (×1.8). Ateş hızı ~6sn, hasar 15.
+- **Shield:** HP 50 + 40 kalkan, hız 2. Kalkana karşı kinetik (×1.5) kırar, lazer etkisiz (×0.25). Ateş hızı ~3sn.
+
+**Yakın saldırganlar** (geminin kalkan çemberine kadar girer, komponentlere doğrudan ateş eder):
+- **Bomber:** Gemiye yaklaşır (x≈2), hover ederken 3 mermi atar, her mermi rastgele bir operasyonel komponenti hedefler. Kalkan bypass eder. Sonra hızla geri çekilir.
+- Bomber mermileri doğrudan `ShipComponentBase.TakeDamage()` çağırır — kalkan sistemi araya girmez
+- İleride **Fighter** tipi de eklenebilir (tasarım henüz netleşmedi)
+
+**Gelecek:** Büyük düşman gemilerinin attığı **area-effect bombalar** komponentlere de hasar verebilir (tasarım kararı bekliyor).
+
+### Komponent HP Sistemi — Tasarım Kararları
+- Her komponent kendi `currentHP / maxHP`'sini `ShipComponentBase`'de tutar
+- Oyuncu komponentlerin HP'sini göremez (UI şimdilik yok; ileride eklenebilir)
+- HP sıfırlandığında zorluk ayarına göre davranış:
+  - **Easy:** Komponent deaktif kalır (`_deactivated = true`), GO yok edilmez. RepairUnit maxHP'ye tamir edince otomatik yeniden açılır.
+  - **Normal / Hard:** `ShipLoadout` slot'u temizler, GO yok edilir. Yeniden kurulum gerekir.
+- `DifficultyManager.Current` statik; oyun başında ayarlanır (default: Normal)
+- RepairUnit en düşük HP oranlı komponenti önceliklendirir; Easy modda deaktif komponentleri de tamir eder
 
 ### Otomatik Turretler
-Slot'a kurulunca belirli bir aralıkta en yakın düşmana otomatik ateş açar.
-Oyuncunun müdahalesi gerekmez. Enerji tüketir.
-Point defence turretleri küçük/hızlı hedeflere odaklanır.
-
-### Düşman Çeşitliliği
-- Küçük hızlı botlar (sürü)
-- Zırhlı botlar (kinetike karşı dirençli)
-- Kalkan botlar (lazere karşı dirençli)
-- Avcı/Bomber: Kalkandan geçip direkt komponentlere saldırır
-- Boss: Büyük taşıyıcı gemi, kendi avcılarını üretir, aşamalı yok edilir
+Slot'a kurulunca belirli bir aralıkta en yakın düşmana otomatik ateş açar. Oyuncunun müdahalesi gerekmez. Enerji tüketir. Point defence turretleri küçük/hızlı hedeflere odaklanır.
 
 ### Bölüm Yapısı
 8-10 bölüm, ortalama 2-3 dakika. Çeşitlilik:
@@ -88,22 +119,36 @@ Point defence turretleri küçük/hızlı hedeflere odaklanır.
 
 | Script | Görev |
 |--------|-------|
-| PlayerShip.cs | Ana gemi, sabit pozisyon |
+| PlayerShip.cs | Ana gemi, sabit pozisyon, `TakeDamage(amount, bypassShields)` |
 | WeaponMount.cs | Mouse'a dönen silah noktası |
-| WeaponController.cs | Ateş etme, New Input System |
-| Bullet.cs | Mermi hareketi, trigger collision, 3sn sonra yok olur |
+| WeaponController.cs | Kinetic/Laser/Plasma ateş mantığı, Boost çarpanları |
+| Bullet.cs | Oyuncu mermisi — hareket, trigger collision, 3sn sonra yok |
+| EnemyBot.cs | Swarm/Armored/Shield/Bomber — hareket, ateş, hasar direnci, Bomber state machine |
+| EnemyBullet.cs | Düşman mermisi — hull modu (kalkan üzerinden) veya komponent modu (doğrudan) |
+| EnemySpawner.cs | Ağırlıklı rastgele tip seçimi ile düşman spawn eder |
 | StarField.cs | 400 yıldız, -15/+15 birim arası random pozisyon |
-| CameraController.cs | Parallax kayma + zoom, power curve (t^2), kayma %80'den, zoom %90'dan başlar |
-| HealthBar.cs | Can/kalkan barı, SpriteRenderer tabanlı (Canvas değil), child olarak eklenir |
-| EnemyBot.cs | Kırmızı küçük bot, sağdan sola hareket, PlayerShip'e çarpınca hasar |
-| EnemySpawner.cs | Her 3sn bir EnemyBot spawn eder |
-| GameManager.cs | HP sıfırlanınca Game Over, Restart, Time.timeScale yönetimi |
+| CameraController.cs | Parallax kayma + zoom, power curve (t²) |
+| HealthBar.cs | Can/kalkan barı, SpriteRenderer tabanlı, child olarak eklenir |
+| GameManager.cs | HP sıfırlanınca Game Over, Restart, TimeScale yönetimi |
+| ShipComponentBase.cs | Tüm komponentlerin base class'ı — HP, TakeDamage, zorluk-aware yıkım |
+| ShipLoadout.cs | 10 slot yönetimi, silah zinciri + switch sistemi |
+| ComponentDefinition.cs | ScriptableObject — komponent istatistikleri ve upgrade zinciri |
+| DifficultyManager.cs | Easy/Normal/Hard statik seçim |
+| BoostController.cs | Shield/Weapon boost toggle (static) |
+| BoostHUD.cs | Boost butonları Canvas, upgrade açıkken gizlenir |
+| ShieldGeneratorComponent.cs | Kalkan üretimi, Boost çarpanları |
+| GeneratorComponent.cs | Enerji üretimi |
+| RepairUnitComponent.cs | En hasarlı komponenti otomatik tamir eder |
+| EnergyBus.cs | Enerji dağıtım sistemi |
+| ResourceInventory.cs | Ham madde + kristal envanteri |
+| UpgradeUI.cs | Tab ile açılan upgrade ekranı, 4 panel layout |
+| SlotVisual.cs | World-space slot göstergesi, tıklama ile UpgradeUI tetiklenir |
 
 ---
 
 ## Kamera Sistemi
 - **Temel pozisyon:** (0, 0, -10), Orthographic Size: 5
-- **Kayma:** Mouse ekranın %80'inden sonra başlar, maksimum 8 birim, power curve t^2
+- **Kayma:** Mouse ekranın %80'inden sonra başlar, maksimum 8 birim, power curve t²
 - **Zoom:** Mouse ekranın %90'ından sonra başlar, Size 5→7
 - **Formül:**
 ```csharp
@@ -131,32 +176,38 @@ float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 - [x] Enerji sistemi — EnergyBus, CoreGenerator
 - [x] Kalkan sistemi — recharge delay, ShieldGeneratorComponent
 - [x] Upgrade sistemi — ShipLoadout, ComponentDefinition (hardcoded)
-- [x] Upgrade UI — layout, slot tıklama, hover detay
+- [x] Upgrade UI — layout, slot tıklama, hover detay, 4 panel
 - [x] Kamera zoom — upgrade açılınca gemiye zoom, Tab'la geri
 - [x] World slot daireleri — SlotVisual, renk göstergesi
 - [x] Temel silah, mermi, düşman, spawner, GameManager
-
----
-
-## Tamamlananlar (devam)
-
 - [x] [Kur] / [Sat] / [Upgrade] butonları — kaynak yetersizse inaktif, maliyet kırmızı
-- [x] ResourceInventory HUD — ham madde + kristal GeneralPanel'de, her işlemde güncelleniyor
-- [x] Silah tipleri — Kinetik / Lazer / Plazma, her biri bağımsız Mk1→Mk2→Mk3 zinciri
-- [x] Ana silah switch mekanizması — slot 5'te per-tip Satın Al / Seç / Upgrade butonları
+- [x] ResourceInventory HUD — ham madde + kristal GeneralPanel'de
+- [x] Silah tipleri — Kinetic/Laser/Plasma, her biri bağımsız Mk1→Mk2→Mk3 zinciri
+- [x] Ana silah switch mekanizması — per-tip Satın Al / Seç / Upgrade, bağımsız upgrade
 - [x] Boost sistemi — Kalkan/Silah boost toggle, BoostHUD, çarpan efektleri
+- [x] Düşman çeşitleri — Swarm/Armored/Shield/Bomber, ateş sistemi, Bomber komponent hedefleme
+- [x] Komponent HP sistemi — Easy deaktivasyon / Normal+Hard yıkım, DifficultyManager
 
 ---
 
 ## Sıradaki Adımlar (öncelik sırasıyla)
 
-- [ ] Düşman çeşitleri — zırhlı (kinetike dirençli), kalkan botu (lazere dirençli), avcı/bomber
 - [ ] Otomatik turretler — slot'a kurulunca en yakın düşmana ateş, enerji tüketir
 - [ ] Toplayıcı gemiler + kaynak toplama sistemi
-- [ ] Stat upgrade sistemi — komponent başına %'lik stat artışları (damage, HP, fire rate vb.), birden fazla komponent tipine uygulanabilir genel yapı
+- [ ] Stat upgrade sistemi — komponent başına %'lik stat artışları (damage, HP, fire rate vb.)
 - [ ] Bölüm sistemi (8–10 bölüm, wave yapısı, bölüm arası geçiş)
 - [ ] Boss taşıyıcı gemi
 - [ ] Point defence turretleri — küçük/hızlı hedeflere odaklı otomatik turret
 - [ ] Mobil UI
 - [ ] Ses efektleri
 - [ ] Gerçek sprite'lar — görsel iyileştirme
+
+---
+
+## Bekleyen Tasarım Kararları
+
+- [ ] Fighter tipi düşman — Bomber'dan nasıl ayrışır? (tasarım netleşmedi)
+- [ ] Area-effect bombalar — büyük düşman gemilerinden, komponentlere hasar verir mi?
+- [ ] Komponent HP göstergesi — oyuncuya nasıl gösterilecek? (UI tasarımı yok)
+- [ ] Zorluk seçim ekranı — oyun başında mı, menüde mi?
+- [ ] Stat upgrade sistemi detayı — hangi statlar, kaç seviye, maliyet eğrisi

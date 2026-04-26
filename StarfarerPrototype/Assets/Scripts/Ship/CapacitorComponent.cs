@@ -28,10 +28,10 @@ public class CapacitorComponent : ShipComponentBase
             EnergyBus.Instance.RemoveCapacity(capacityBonus);
     }
 
-    public override void OnDestroyed()
+    protected override void OnComponentDestroyed()
     {
         if (EnergyBus.Instance != null)
             EnergyBus.Instance.RemoveCapacity(capacityBonus);
-        base.OnDestroyed();
+        base.OnComponentDestroyed();
     }
 }

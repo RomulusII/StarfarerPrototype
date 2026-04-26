@@ -115,12 +115,19 @@ public class PlayerShip : MonoBehaviour
         _healthBar = GetComponent<HealthBar>();
     }
 
-    public void TakeDamage(float amount)
+    public void TakeDamage(float amount, bool bypassShields = false)
     {
-        float remaining = ShieldGeneratorComponent.AbsorbDamageAll(amount);
-
-        foreach (var sg in FindObjectsByType<ShieldGeneratorComponent>(FindObjectsSortMode.None))
-            sg.NotifyDamageTaken();
+        float remaining;
+        if (bypassShields)
+        {
+            remaining = amount;
+        }
+        else
+        {
+            remaining = ShieldGeneratorComponent.AbsorbDamageAll(amount);
+            foreach (var sg in FindObjectsByType<ShieldGeneratorComponent>(FindObjectsSortMode.None))
+                sg.NotifyDamageTaken();
+        }
 
         currentHullHP = Mathf.Max(0f, currentHullHP - remaining);
 
