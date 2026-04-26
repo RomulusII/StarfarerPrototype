@@ -23,10 +23,13 @@ public class RepairUnitComponent : ShipComponentBase
         ShipComponentBase target = FindMostDamagedComponent();
         if (target == null) return;
 
+        float effectiveRate   = repairRate    * GetMultiplier("repairRate");
+        float effectiveEnergy = energyPerRepair / GetMultiplier("energyEfficiency");
+
         if (EnergyBus.Instance != null &&
-            EnergyBus.Instance.RequestEnergy(energyPerRepair * Time.deltaTime))
+            EnergyBus.Instance.RequestEnergy(effectiveEnergy * Time.deltaTime))
         {
-            target.Repair(repairRate * Time.deltaTime);
+            target.Repair(effectiveRate * Time.deltaTime);
         }
     }
 

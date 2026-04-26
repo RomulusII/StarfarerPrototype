@@ -17,6 +17,9 @@ public class ShipLoadout : MonoBehaviour
     private readonly Dictionary<WeaponType, ComponentDefinition> _unlockedWeapons = new();
     private WeaponType _activeWeaponType = WeaponType.Laser;
 
+    // Silah stat upgrade seviyeleri — silah tipinden bağımsız, kalıcı
+    private readonly Dictionary<WeaponType, Dictionary<string, int>> _weaponStatLevels = new();
+
     public bool IsWeaponTypeUnlocked(WeaponType type) => _unlockedWeapons.ContainsKey(type);
     public WeaponType GetActiveWeaponType() => _activeWeaponType;
 
@@ -116,7 +119,7 @@ public class ShipLoadout : MonoBehaviour
 
         GameObject go = new GameObject(def.componentName);
         go.transform.SetParent(transform);
-        go.transform.localPosition = Vector3.zero;
+        go.transform.localPosition = GetSlotLocalPosition(slotIndex);
         go.transform.localScale    = Vector3.one;
 
         ShipComponentBase comp = null;
@@ -149,6 +152,12 @@ public class ShipLoadout : MonoBehaviour
                 if (wc != null) wc.Configure(def);
                 Destroy(go);
                 go = null;
+                break;
+
+            case ComponentType.Turret:
+                var tc = go.AddComponent<TurretController>();
+                tc.Configure(def);
+                comp = tc;
                 break;
         }
 
@@ -201,10 +210,38 @@ public class ShipLoadout : MonoBehaviour
 
     public void SwitchWeapon(WeaponType type)
     {
-        if (!_unlockedWeapons.TryGetValue(type, out var def)) return;
+        if (!_unlockedWeapons.TryGetValue(type, out _)) return;
         _activeWeaponType = type;
-        _installedDefs[5] = def;
-        GetComponentInChildren<WeaponController>()?.Configure(def);
+        _installedDefs[5] = _unlockedWeapons[type];
+        ApplyActiveWeaponStats();
+    }
+
+    public int GetWeaponStatLevel(WeaponType type, string key)
+    {
+        if (!_weaponStatLevels.TryGetValue(type, out var stats)) return 0;
+        return stats.TryGetValue(key, out var lvl) ? lvl : 0;
+    }
+
+    /// <summary>UI tarafından çağrılır; maliyet zaten düşülmüştür.</summary>
+    public void ApplyWeaponStatUpgrade(WeaponType type, string key)
+    {
+        if (!_weaponStatLevels.ContainsKey(type))
+            _weaponStatLevels[type] = new Dictionary<string, int>();
+        int cur = GetWeaponStatLevel(type, key);
+        if (cur >= ShipComponentBase.MaxStatLevel) return;
+        _weaponStatLevels[type][key] = cur + 1;
+        if (_activeWeaponType == type) ApplyActiveWeaponStats();
+    }
+
+    void ApplyActiveWeaponStats()
+    {
+        if (!_unlockedWeapons.TryGetValue(_activeWeaponType, out var def)) return;
+        var wc = GetComponentInChildren<WeaponController>();
+        if (wc == null) return;
+        wc.Configure(def);
+        if (!_weaponStatLevels.TryGetValue(_activeWeaponType, out var stats)) return;
+        if (stats.TryGetValue("damage",   out var d)) wc.damage   *= Mathf.Pow(1.5f, d);
+        if (stats.TryGetValue("fireRate", out var f)) wc.fireRate /= Mathf.Pow(1.5f, f);
     }
 
     /// <summary>Yeni bir silah tipini satın alıp açar. Zaten açıksa false döner.</summary>
@@ -251,6 +288,14 @@ public class ShipLoadout : MonoBehaviour
     {
         if (slotIndex < 0 || slotIndex >= slotCount) return null;
         return _slots[slotIndex];
+    }
+
+    Vector3 GetSlotLocalPosition(int slotIndex)
+    {
+        foreach (var sv in GetComponentsInChildren<SlotVisual>())
+            if (sv.slotIndex == slotIndex)
+                return sv.transform.localPosition;
+        return Vector3.zero;
     }
 
     /// <summary>Normal/Hard modda komponent yok edilince slot'u temizler.</summary>

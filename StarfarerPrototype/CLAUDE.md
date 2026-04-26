@@ -77,8 +77,26 @@ Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 5), Otomatik Turretler, İki
 - `DifficultyManager.Current` statik; oyun başında ayarlanır (default: Normal)
 - RepairUnit en düşük HP oranlı komponenti önceliklendirir; Easy modda deaktif komponentleri de tamir eder
 
-### Otomatik Turretler
-Slot'a kurulunca belirli bir aralıkta en yakın düşmana otomatik ateş açar. Oyuncunun müdahalesi gerekmez. Enerji tüketir. Point defence turretleri küçük/hızlı hedeflere odaklanır.
+### Otomatik Turretler — Tasarım Kararları
+
+Slot'a kurulunca otomatik ateş açar, oyuncu müdahalesi gerekmez. Enerji tüketir.
+
+**Fire Rate skalası:** Düşük = 20sn'de 1 atış (`fireRate=20f`) · Orta = 5sn'de 1 (`fireRate=5f`) · Hızlı = saniyede 1 (`fireRate=1f`)
+
+**Mermi ömrü** saniye cinsinden tanımlanır (`Destroy(go, lifeTime)`). Ömür × hız = efektif menzil.
+
+| Tip | Fire Rate | Hasar | Mermi Hızı | Enerji | Ömür | Özellik |
+|-----|-----------|-------|------------|--------|------|---------|
+| **Gatling** | Hızlı (1f) | Düşük | Orta | Düşük | 3s | Şarjör + reload mekaniği |
+| **Plazma** | Düşük (20f) | Orta | Düşük | Yüksek | 4s | — |
+| **Lazer** | Orta (5f) | Orta | Yüksek | Yüksek | 4s | — |
+| **Roket** | Çok düşük (30f+) | Yüksek | Orta | Düşük | 10s | Güdümlü, hedefi izler |
+| **Point Defence** | Hızlı (1f) | Düşük | Orta | Orta | 0.8s | Gelen roketleri + Bomber/Fighter/Drone hedefler, kısa menzil |
+
+**Hedefleme kuralları:**
+- Gatling / Plazma / Lazer / Roket: en yakın düşman gemisini hedefler
+- Point Defence: önce gelen roketleri, sonra kalkan içine girmiş küçük gemileri (Bomber, Fighter, Drone) hedefler
+- İnce ayarlar (kesin değerler) sonraya bırakıldı
 
 ### Bölüm Yapısı
 8-10 bölüm, ortalama 2-3 dakika. Çeşitlilik:
@@ -192,7 +210,7 @@ float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 
 ## Sıradaki Adımlar (öncelik sırasıyla)
 
-- [ ] Otomatik turretler — slot'a kurulunca en yakın düşmana ateş, enerji tüketir
+- [x] Otomatik turretler — Gatling/Plazma/Lazer/Roket/Point Defence, slot pozisyonuna kurulur
 - [ ] Toplayıcı gemiler + kaynak toplama sistemi
 - [ ] Stat upgrade sistemi — komponent başına %'lik stat artışları (damage, HP, fire rate vb.)
 - [ ] Bölüm sistemi (8–10 bölüm, wave yapısı, bölüm arası geçiş)

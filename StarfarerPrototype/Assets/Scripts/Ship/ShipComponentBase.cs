@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -18,6 +19,31 @@ public abstract class ShipComponentBase : MonoBehaviour
 
     public bool IsDeactivated => _deactivated;
     public bool IsOperational  => currentHP > 0f && !_deactivated;
+
+    // ── Stat upgrade sistemi ──────────────────────────────────────────────────
+    // key → seviye (0-5). 0 = upgrade yapılmamış.
+    public readonly Dictionary<string, int> StatLevels = new();
+    public const int MaxStatLevel = 5;
+
+    /// <summary>Verilen stat key'i için upgrade çarpanını döner. Seviye başına ×1.5.</summary>
+    public float GetMultiplier(string key) =>
+        Mathf.Pow(1.5f, StatLevels.TryGetValue(key, out var lvl) ? lvl : 0);
+
+    /// <summary>Verilen stat'ın mevcut seviyesini döner.</summary>
+    public int GetStatLevel(string key) =>
+        StatLevels.TryGetValue(key, out var lvl) ? lvl : 0;
+
+    /// <summary>Stat upgrade'i uygular. UI tarafından çağrılır, maliyet zaten düşülmüştür.</summary>
+    public void ApplyStatUpgrade(string key)
+    {
+        int cur = GetStatLevel(key);
+        if (cur >= MaxStatLevel) return;
+        StatLevels[key] = cur + 1;
+        OnStatUpgraded(key);
+    }
+
+    /// <summary>Alt sınıflar override eder — stat değişince etkin değeri yeniden hesaplar.</summary>
+    public virtual void OnStatUpgraded(string key) { }
 
     protected virtual void Awake()
     {

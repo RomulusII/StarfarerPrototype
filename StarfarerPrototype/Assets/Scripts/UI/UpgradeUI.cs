@@ -224,6 +224,7 @@ public class UpgradeUI : MonoBehaviour
         if (slotIndex == 5)
         {
             BuildWeaponSwitchRows();
+            BuildWeaponStatSection();
             return;
         }
 
@@ -246,6 +247,156 @@ public class UpgradeUI : MonoBehaviour
         }
 
         AddButton(btnRow.transform, "Sat", () => SellAndRefresh(slotIndex), 100f);
+
+        BuildStatUpgradeSection(slotIndex, def);
+    }
+
+    void BuildStatUpgradeSection(int slotIndex, ComponentDefinition def)
+    {
+        var stats = GetStatsForType(def.componentType);
+        if (stats == null || stats.Length == 0) return;
+
+        var comp = _loadout?.GetSlotComponent(slotIndex);
+
+        MakeTextLabel(_popupContent.transform, "\u2500\u2500 STAT UPGRADE \u2500\u2500", 11, TextAnchor.MiddleLeft);
+
+        foreach (var (key, statLabel) in stats)
+        {
+            int curLevel = comp != null && comp.StatLevels.TryGetValue(key, out var lvl) ? lvl : 0;
+            bool maxed   = curLevel >= ShipComponentBase.MaxStatLevel;
+            int cost     = maxed ? 0 : StatUpgradeCost(def, curLevel);
+            bool canAfford = !maxed && ResourceInventory.Instance != null &&
+                             ResourceInventory.Instance.Get(def.costResource) >= cost;
+
+            var row = CreateRow(_popupContent.transform);
+
+            var lblGo = new GameObject("StatLabel", typeof(RectTransform));
+            lblGo.transform.SetParent(row.transform, false);
+            var lbl       = lblGo.AddComponent<Text>();
+            lbl.text      = maxed ? $"{statLabel} Lv {curLevel}/5 MAX" : $"{statLabel} Lv {curLevel}/5  ({cost})";
+            lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            lbl.fontSize  = 13;
+            lbl.color     = maxed ? new Color(1f, 0.85f, 0.2f, 1f) : Color.white;
+            lbl.alignment = TextAnchor.MiddleLeft;
+            var lblLE     = lblGo.AddComponent<LayoutElement>();
+            lblLE.flexibleWidth   = 1f;
+            lblLE.preferredHeight = 36f;
+
+            if (!maxed)
+            {
+                var capturedKey  = key;
+                var capturedCost = cost;
+                var capturedDef  = def;
+                var capturedSlot = slotIndex;
+                var btn = AddButton(row.transform, "+", () => StatUpgradeAndRefresh(capturedSlot, capturedKey, capturedDef, capturedCost), 44f);
+                if (!canAfford)
+                {
+                    btn.interactable = false;
+                    btn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
+                }
+            }
+        }
+    }
+
+    void BuildWeaponStatSection()
+    {
+        var weaponTypes = new[]
+        {
+            (WeaponType.Laser,   "Lazer"),
+            (WeaponType.Kinetic, "Kinetik"),
+            (WeaponType.Plasma,  "Plazma"),
+        };
+
+        bool headerShown = false;
+        foreach (var (type, typeLabel) in weaponTypes)
+        {
+            if (_loadout == null || !_loadout.IsWeaponTypeUnlocked(type)) continue;
+            var curDef = _loadout.GetWeaponDef(type);
+            if (curDef == null) continue;
+
+            if (!headerShown)
+            {
+                MakeTextLabel(_popupContent.transform, "\u2500\u2500 STAT UPGRADE \u2500\u2500", 11, TextAnchor.MiddleLeft);
+                headerShown = true;
+            }
+
+            MakeTextLabel(_popupContent.transform, typeLabel, 12, TextAnchor.MiddleLeft);
+
+            var capturedType = type;
+            foreach (var (key, statLabel) in new[] { ("damage", "Hasar"), ("fireRate", "Ate\u015f H\u0131z\u0131") })
+            {
+                int curLevel = _loadout.GetWeaponStatLevel(type, key);
+                bool maxed   = curLevel >= ShipComponentBase.MaxStatLevel;
+                int cost     = maxed ? 0 : StatUpgradeCost(curDef, curLevel);
+                bool canAfford = !maxed && ResourceInventory.Instance != null &&
+                                 ResourceInventory.Instance.Get(curDef.costResource) >= cost;
+
+                var row = CreateRow(_popupContent.transform);
+
+                var lblGo = new GameObject("StatLabel", typeof(RectTransform));
+                lblGo.transform.SetParent(row.transform, false);
+                var lbl       = lblGo.AddComponent<Text>();
+                lbl.text      = maxed ? $"{statLabel} Lv {curLevel}/5 MAX" : $"{statLabel} Lv {curLevel}/5  ({cost})";
+                lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                lbl.fontSize  = 13;
+                lbl.color     = maxed ? new Color(1f, 0.85f, 0.2f, 1f) : Color.white;
+                lbl.alignment = TextAnchor.MiddleLeft;
+                var lblLE     = lblGo.AddComponent<LayoutElement>();
+                lblLE.flexibleWidth   = 1f;
+                lblLE.preferredHeight = 36f;
+
+                if (!maxed)
+                {
+                    var capturedKey  = key;
+                    var capturedCost = cost;
+                    var capturedDef  = curDef;
+                    var btn = AddButton(row.transform, "+", () => WeaponStatUpgradeAndRefresh(capturedType, capturedKey, capturedDef, capturedCost), 44f);
+                    if (!canAfford)
+                    {
+                        btn.interactable = false;
+                        btn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
+                    }
+                }
+            }
+        }
+    }
+
+    static int StatUpgradeCost(ComponentDefinition def, int currentLevel)
+    {
+        int baseCost = Mathf.Max(1, Mathf.RoundToInt(def.cost * 0.2f));
+        return Mathf.RoundToInt(baseCost * Mathf.Pow(2f, currentLevel));
+    }
+
+    static (string key, string label)[] GetStatsForType(ComponentType type)
+    {
+        switch (type)
+        {
+            case ComponentType.Generator:  return new[] { ("production", "\u00dcretim") };
+            case ComponentType.Shield:     return new[] { ("rechargeRate", "\u015earj H\u0131z\u0131"), ("maxShield", "Max Kalkan") };
+            case ComponentType.RepairUnit: return new[] { ("repairRate", "Tamir H\u0131z\u0131"), ("energyEfficiency", "Enerji Verimi") };
+            case ComponentType.Turret:     return new[] { ("damage", "Hasar"), ("fireRate", "Ate\u015f H\u0131z\u0131") };
+            default:                       return null;
+        }
+    }
+
+    void StatUpgradeAndRefresh(int slotIndex, string key, ComponentDefinition def, int cost)
+    {
+        if (_loadout == null) return;
+        var comp = _loadout.GetSlotComponent(slotIndex);
+        if (comp == null) return;
+        if (!ResourceInventory.Instance.TrySpend(def.costResource, cost)) return;
+        comp.ApplyStatUpgrade(key);
+        RefreshResourceDisplay();
+        OnSlotClicked(slotIndex);
+    }
+
+    void WeaponStatUpgradeAndRefresh(WeaponType type, string key, ComponentDefinition def, int cost)
+    {
+        if (_loadout == null) return;
+        if (!ResourceInventory.Instance.TrySpend(def.costResource, cost)) return;
+        _loadout.ApplyWeaponStatUpgrade(type, key);
+        RefreshResourceDisplay();
+        OnSlotClicked(5);
     }
 
     // Her silah tipi için ayrı satır: isim/tier + Satın Al veya Seç + Upgrade
@@ -386,26 +537,54 @@ public class UpgradeUI : MonoBehaviour
         var shield = ScriptableObject.CreateInstance<ComponentDefinition>();
         shield.componentName = "Kalkan Jenerat\u00f6r\u00fc Mk1";
         shield.componentType = ComponentType.Shield;
-        shield.tier          = 1;
-        shield.costResource  = ResourceType.RawMaterial;
-        shield.cost          = 10;
+        shield.tier = 1; shield.costResource = ResourceType.RawMaterial; shield.cost = 10;
 
         var repair = ScriptableObject.CreateInstance<ComponentDefinition>();
         repair.componentName = "Onar\u0131m Birimi Mk1";
         repair.componentType = ComponentType.RepairUnit;
-        repair.tier          = 1;
-        repair.costResource  = ResourceType.RawMaterial;
-        repair.cost          = 8;
+        repair.tier = 1; repair.costResource = ResourceType.RawMaterial; repair.cost = 8;
 
         var gen = ScriptableObject.CreateInstance<ComponentDefinition>();
         gen.componentName = "Enerji Jenerat\u00f6r\u00fc Mk1";
         gen.componentType = ComponentType.Generator;
-        gen.tier          = 1;
-        gen.costResource  = ResourceType.RawMaterial;
-        gen.cost          = 15;
+        gen.tier = 1; gen.costResource = ResourceType.RawMaterial; gen.cost = 15;
 
-        _catalogDefs = new[] { shield, repair, gen };
+        // Turretler
+        var gatling = T("Gatling Turret",   TurretType.Gatling,      ResourceType.RawMaterial,    12,
+            fireRate:1f,  damage:5f,  speed:9f,  life:3f,  energy:0.5f, mag:10, reload:3f);
+        var plasma  = T("Plazma Turret",    TurretType.Plasma,       ResourceType.EnergyCrystal,  20,
+            fireRate:20f, damage:25f, speed:5f,  life:4f,  energy:4f);
+        var laser   = T("Lazer Turret",     TurretType.Laser,        ResourceType.EnergyCrystal,  18,
+            fireRate:5f,  damage:15f, speed:14f, life:4f,  energy:3f);
+        var rocket  = T("Roket Turret",     TurretType.Rocket,       ResourceType.RawMaterial,    22,
+            fireRate:30f, damage:50f, speed:7f,  life:10f, energy:0.5f);
+        var pd      = T("Point Defence",    TurretType.PointDefence, ResourceType.RawMaterial,    15,
+            fireRate:1f,  damage:4f,  speed:8f,  life:0.8f,energy:1f);
+
+        _catalogDefs = new[] { shield, repair, gen, gatling, plasma, laser, rocket, pd };
         return _catalogDefs;
+    }
+
+    static ComponentDefinition T(string name, TurretType tt, ResourceType res, int cost,
+        float fireRate, float damage, float speed, float life, float energy,
+        int mag = 0, float reload = 0f)
+    {
+        var d = ScriptableObject.CreateInstance<ComponentDefinition>();
+        d.componentName        = name;
+        d.componentType        = ComponentType.Turret;
+        d.tier                 = 1;
+        d.costResource         = res;
+        d.cost                 = cost;
+        d.sellValue            = cost / 2;
+        d.turretType           = tt;
+        d.turretFireRate       = fireRate;
+        d.turretDamage         = damage;
+        d.turretBulletSpeed    = speed;
+        d.turretBulletLifeTime = life;
+        d.turretEnergyPerShot  = energy;
+        d.turretMagazineSize   = mag;
+        d.turretReloadTime     = reload;
+        return d;
     }
 
     static ComponentDefinition[] GetWeaponDefs()
@@ -457,6 +636,7 @@ public class UpgradeUI : MonoBehaviour
             case ComponentType.RepairUnit: return "Onar\u0131m Birimi";
             case ComponentType.Generator:  return "Enerji Jenerat\u00f6r\u00fc";
             case ComponentType.Weapon:     return "Silah";
+            case ComponentType.Turret:     return "Turret";
             default:                       return type.ToString();
         }
     }

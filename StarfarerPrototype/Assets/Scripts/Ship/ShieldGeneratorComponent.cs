@@ -53,17 +53,20 @@ public class ShieldGeneratorComponent : ShipComponentBase
         // Silah boost aktifken kalkan şarjı durur
         if (BoostController.Mode == BoostMode.Weapon) return;
 
-        if (IsShieldFull)   return;
         if (_timeSinceLastDamage < shieldRechargeDelay) return;
         if (_isDepleted && _depletedTimer < rechargeDelayAfterDepletion) return;
 
         float rechargeMulti = BoostController.Mode == BoostMode.Shield ? 3f : 1f;
         float energyMulti   = BoostController.Mode == BoostMode.Shield ? 5f : 1f;
 
+        float effectiveRate      = rechargeRate * rechargeMulti * GetMultiplier("rechargeRate");
+        float effectiveMaxShield = maxShield * GetMultiplier("maxShield");
+        if (IsShieldFull) return;
+
         if (EnergyBus.Instance != null &&
             EnergyBus.Instance.RequestEnergy(rechargeEnergyCost * energyMulti * Time.deltaTime))
         {
-            currentShield = Mathf.Min(currentShield + rechargeRate * rechargeMulti * Time.deltaTime, maxShield);
+            currentShield = Mathf.Min(currentShield + effectiveRate * Time.deltaTime, effectiveMaxShield);
         }
     }
 

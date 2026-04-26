@@ -22,5 +22,15 @@ public class ComponentDefinition : ScriptableObject
     public float weaponChargeTime;        // Plasma: dolum süresi (saniye)
     public int   weaponBurstCount;        // Plasma: burst başına mermi sayısı
 
+    // Turret alanları
+    public TurretType turretType;
+    public float turretFireRate;
+    public float turretDamage;
+    public float turretBulletSpeed;
+    public float turretBulletLifeTime;
+    public float turretEnergyPerShot;
+    public int   turretMagazineSize;   // Gatling: şarjör kapasitesi
+    public float turretReloadTime;     // Gatling: yeniden şarj süresi
+
     public ComponentDefinition upgradeTo;
 }
