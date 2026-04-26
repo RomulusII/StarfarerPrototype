@@ -21,6 +21,10 @@ public class UpgradeUI : MonoBehaviour
     private Text       _popupTitle;
     private GameObject _popupContent;
 
+    // Kaynak göstergeleri
+    private Text _hamMaddeText;
+    private Text _kristalText;
+
     // Sol kutu — kurulu component
     private Text _leftNameText;
     private Text _leftTypeText;
@@ -63,6 +67,7 @@ public class UpgradeUI : MonoBehaviour
                 _canvas.enabled = true;
                 IsPaused        = true;
                 Time.timeScale  = 0f;
+                RefreshResourceDisplay();
             }
             else
             {
@@ -114,6 +119,12 @@ public class UpgradeUI : MonoBehaviour
     {
         if (def == null) return;
         FillBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText, def);
+
+        bool canAfford = ResourceInventory.Instance != null &&
+                         ResourceInventory.Instance.Get(def.costResource) >= def.cost;
+        _rightCostText.color = canAfford
+            ? new Color(0.3f, 0.9f, 0.45f, 1f)
+            : new Color(1f, 0.25f, 0.25f, 1f);
     }
 
     /// <summary>Sağ kutuyu temizler (hover çıkışı).</summary>
@@ -124,9 +135,26 @@ public class UpgradeUI : MonoBehaviour
     // Popup Content
     // -------------------------------------------------------------------------
 
+    void RefreshResourceDisplay()
+    {
+        if (ResourceInventory.Instance == null) return;
+        _hamMaddeText.text = $"Ham Madde: {ResourceInventory.Instance.Get(ResourceType.RawMaterial)}";
+        _kristalText.text  = $"Kristal: {ResourceInventory.Instance.Get(ResourceType.EnergyCrystal)}";
+    }
+
+    void InstallAndRefresh(ComponentDefinition def, int slotIndex)
+    {
+        if (_loadout == null) return;
+        if (_loadout.InstallComponent(def, slotIndex))
+        {
+            RefreshResourceDisplay();
+            OnSlotClicked(slotIndex);
+        }
+    }
+
     void BuildEmptyContent(int slotIndex)
     {
-        foreach (var def in GetCatalogDefs())
+        foreach (var def in GetCatalogDefs(slotIndex))
         {
             var row = new GameObject("CatalogRow", typeof(RectTransform));
             row.transform.SetParent(_popupContent.transform, false);
@@ -165,9 +193,18 @@ public class UpgradeUI : MonoBehaviour
             nRect.anchorMax = Vector2.one;
             nRect.sizeDelta = Vector2.zero;
 
-            var capturedDef = def;
-            AddButton(row.transform, "Kur", () =>
-                Debug.Log($"Kur: {capturedDef.componentName} -> slot {slotIndex}"), 100f);
+            bool canAfford = ResourceInventory.Instance != null &&
+                             ResourceInventory.Instance.Get(def.costResource) >= def.cost;
+
+            var capturedDef   = def;
+            var capturedSlot  = slotIndex;
+            var kurBtn = AddButton(row.transform, "Kur", () => InstallAndRefresh(capturedDef, capturedSlot), 100f);
+
+            if (!canAfford)
+            {
+                kurBtn.interactable = false;
+                kurBtn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
+            }
         }
     }
 
@@ -178,19 +215,55 @@ public class UpgradeUI : MonoBehaviour
         var btnRow = CreateRow(_popupContent.transform);
 
         if (def.upgradeTo != null)
-            AddButton(btnRow.transform, "Upgrade", () =>
-                Debug.Log($"Upgrade: slot {slotIndex}"), 100f);
+        {
+            bool canAfford = ResourceInventory.Instance != null &&
+                             ResourceInventory.Instance.Get(def.upgradeTo.costResource) >=
+                             (def.upgradeTo.cost - def.sellValue);
+
+            var upgradeBtn = AddButton(btnRow.transform, "Upgrade", () => UpgradeAndRefresh(slotIndex), 100f);
+            if (!canAfford)
+            {
+                upgradeBtn.interactable = false;
+                upgradeBtn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
+            }
+        }
 
         if (slotIndex != 5)
-            AddButton(btnRow.transform, "Sat", () =>
-                Debug.Log($"Sat: slot {slotIndex}"), 100f);
+            AddButton(btnRow.transform, "Sat", () => SellAndRefresh(slotIndex), 100f);
+    }
+
+    void UpgradeAndRefresh(int slotIndex)
+    {
+        if (_loadout == null) return;
+        if (_loadout.UpgradeComponent(slotIndex))
+        {
+            RefreshResourceDisplay();
+            OnSlotClicked(slotIndex);
+        }
+    }
+
+    void SellAndRefresh(int slotIndex)
+    {
+        if (_loadout == null) return;
+        if (_loadout.SellComponent(slotIndex))
+        {
+            RefreshResourceDisplay();
+            OnSlotClicked(slotIndex);
+        }
     }
 
     // -------------------------------------------------------------------------
     // Hardcoded Catalog
     // -------------------------------------------------------------------------
 
-    static ComponentDefinition[] GetCatalogDefs()
+    static ComponentDefinition[] _weaponDefs;
+
+    static ComponentDefinition[] GetCatalogDefs(int slotIndex)
+    {
+        return GetComponentDefs();
+    }
+
+    static ComponentDefinition[] GetComponentDefs()
     {
         if (_catalogDefs != null) return _catalogDefs;
 
@@ -217,6 +290,47 @@ public class UpgradeUI : MonoBehaviour
 
         _catalogDefs = new[] { shield, repair, gen };
         return _catalogDefs;
+    }
+
+    static ComponentDefinition[] GetWeaponDefs()
+    {
+        if (_weaponDefs != null) return _weaponDefs;
+
+        var kinetic = ScriptableObject.CreateInstance<ComponentDefinition>();
+        kinetic.componentName      = "Kinetik Top Mk1";
+        kinetic.componentType      = ComponentType.Weapon;
+        kinetic.weaponType         = WeaponType.Kinetic;
+        kinetic.tier               = 1;
+        kinetic.costResource       = ResourceType.RawMaterial;
+        kinetic.cost               = 12;
+        kinetic.weaponDamage       = 12f;
+        kinetic.weaponFireRate     = 0.15f;
+
+        var laser = ScriptableObject.CreateInstance<ComponentDefinition>();
+        laser.componentName            = "Lazer Topu Mk1";
+        laser.componentType            = ComponentType.Weapon;
+        laser.weaponType               = WeaponType.Laser;
+        laser.tier                     = 1;
+        laser.costResource             = ResourceType.EnergyCrystal;
+        laser.cost                     = 18;
+        laser.weaponDamage             = 8f;
+        laser.weaponFireRate           = 0.07f;
+        laser.weaponEnergyCostPerShot  = 2f;
+
+        var plasma = ScriptableObject.CreateInstance<ComponentDefinition>();
+        plasma.componentName      = "Plazma Topu Mk1";
+        plasma.componentType      = ComponentType.Weapon;
+        plasma.weaponType         = WeaponType.Plasma;
+        plasma.tier               = 1;
+        plasma.costResource       = ResourceType.RawMaterial;
+        plasma.cost               = 20;
+        plasma.weaponDamage       = 28f;
+        plasma.weaponFireRate     = 0.12f;
+        plasma.weaponChargeTime   = 0.8f;
+        plasma.weaponBurstCount   = 3;
+
+        _weaponDefs = new[] { kinetic, laser, plasma };
+        return _weaponDefs;
     }
 
     static string TypeLabel(ComponentType type)
@@ -282,8 +396,8 @@ public class UpgradeUI : MonoBehaviour
             t.color = new Color(0.55f, 0.55f, 0.55f, 1f);
         }
 
-        foreach (var s in new[] { "Ham Madde: \u2014", "Kristal: \u2014" })
-            MakeLabel(_generalPanel.transform, s, 12, FontStyle.Normal);
+        _hamMaddeText = MakeLabel(_generalPanel.transform, "Ham Madde: \u2014", 12, FontStyle.Normal);
+        _kristalText  = MakeLabel(_generalPanel.transform, "Kristal: \u2014",  12, FontStyle.Normal);
     }
 
     // Sol üst — kurulu component bilgisi
@@ -450,7 +564,7 @@ public class UpgradeUI : MonoBehaviour
         le.flexibleWidth   = 1f;
     }
 
-    static void AddButton(Transform parent, string label, UnityAction onClick, float width = 80f)
+    static Button AddButton(Transform parent, string label, UnityAction onClick, float width = 80f)
     {
         var go = new GameObject($"Btn_{label}", typeof(RectTransform));
         go.transform.SetParent(parent, false);
@@ -467,6 +581,7 @@ public class UpgradeUI : MonoBehaviour
         le.preferredHeight = 44f;
 
         AttachLabel(go.transform, label, 16);
+        return btn;
     }
 
     // Tüm panel içi text için ortak yardımcı

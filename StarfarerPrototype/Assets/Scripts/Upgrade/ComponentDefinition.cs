@@ -15,8 +15,12 @@ public class ComponentDefinition : ScriptableObject
     public float maxShield;
     public float rechargeRate;
     public float repairRate;
+    public WeaponType weaponType;
     public float weaponDamage;
     public float weaponFireRate;
+    public float weaponEnergyCostPerShot; // Laser: her atışta harcanan enerji
+    public float weaponChargeTime;        // Plasma: dolum süresi (saniye)
+    public int   weaponBurstCount;        // Plasma: burst başına mermi sayısı
 
     public ComponentDefinition upgradeTo;
 }

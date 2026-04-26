@@ -19,6 +19,26 @@ public class ShipLoadout : MonoBehaviour
         _slotObjects   = new GameObject[slotCount];
     }
 
+    void Start()
+    {
+        InstallComponent(CreateLazerMk1(), slotIndex: 5, deductCost: false);
+    }
+
+    static ComponentDefinition CreateLazerMk1()
+    {
+        var def = ScriptableObject.CreateInstance<ComponentDefinition>();
+        def.componentName         = "Lazer Topu Mk1";
+        def.componentType         = ComponentType.Weapon;
+        def.weaponType            = WeaponType.Laser;
+        def.tier                  = 1;
+        def.costResource          = ResourceType.EnergyCrystal;
+        def.cost                  = 0;
+        def.weaponDamage          = 8f;
+        def.weaponFireRate        = 0.07f;
+        def.weaponEnergyCostPerShot = 2f;
+        return def;
+    }
+
     // -------------------------------------------------------------------------
     // Public API
     // -------------------------------------------------------------------------
@@ -65,7 +85,10 @@ public class ShipLoadout : MonoBehaviour
                 break;
 
             case ComponentType.Weapon:
-                go.AddComponent<WeaponController>(); // şimdilik stub; WeaponController ShipComponentBase değil
+                var wc = GetComponentInChildren<WeaponController>();
+                if (wc != null) wc.Configure(def);
+                Destroy(go); // WeaponController sahnede zaten var, ayrı GO gerekmez
+                go = null;
                 break;
         }
 

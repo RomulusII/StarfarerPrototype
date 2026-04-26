@@ -61,10 +61,14 @@ public class EnemyBot : MonoBehaviour
             Destroy(gameObject);
     }
 
-    public void TakeDamage(float amount)
+    public void TakeDamage(float amount, WeaponType weaponType = WeaponType.Kinetic)
     {
         if (_healthBar == null) return;
-        _healthBar.TakeDamage(amount);
+
+        // Lazer kalkana karşı %50 bonus hasar verir (gelecekte shield ayrımı eklenince kullanılacak)
+        float finalDamage = weaponType == WeaponType.Laser ? amount * 1.5f : amount;
+
+        _healthBar.TakeDamage(finalDamage);
         if (_healthBar.currentHealth <= 0f)
             Destroy(gameObject);
     }
