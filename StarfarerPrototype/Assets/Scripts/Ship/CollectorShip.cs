@@ -20,6 +20,10 @@ public class CollectorShip : MonoBehaviour
 
     Phase        _phase = Phase.Idle;
     Debris       _target;
+
+    // Diğer toplayıcıların çakışma kontrolü için
+    public Debris ClaimedDebris =>
+        (_phase == Phase.GoToDebris || _phase == Phase.Collecting) ? _target : null;
     Transform    _hangar;
     ShipMovement _movement;
     int          _cargo;        // tam birim kargo
@@ -120,11 +124,18 @@ public class CollectorShip : MonoBehaviour
 
     Debris FindClosestDebris()
     {
+        // Başka toplayıcıların zaten hedeflediği enkazları dışla
+        var claimed = new System.Collections.Generic.HashSet<Debris>();
+        foreach (var c in FindObjectsByType<CollectorShip>(FindObjectsSortMode.None))
+            if (c != this && c.ClaimedDebris != null)
+                claimed.Add(c.ClaimedDebris);
+
         var    all   = FindObjectsByType<Debris>(FindObjectsSortMode.None);
         Debris best  = null;
         float  bestD = float.MaxValue;
         foreach (var d in all)
         {
+            if (claimed.Contains(d)) continue;
             if (DebrisTooFar(d)) continue;
             float dist = Vector2.Distance(transform.position, d.transform.position);
             if (dist < bestD) { bestD = dist; best = d; }
