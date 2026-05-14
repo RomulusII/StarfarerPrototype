@@ -20,17 +20,26 @@ public class RepairUnitComponent : ShipComponentBase
     {
         if (!IsOperational) return;
 
-        ShipComponentBase target = FindMostDamagedComponent();
-        if (target == null) return;
-
-        float effectiveRate   = repairRate    * GetMultiplier("repairRate");
+        float effectiveRate   = repairRate     * GetMultiplier("repairRate");
         float effectiveEnergy = energyPerRepair / GetMultiplier("energyEfficiency");
 
-        if (EnergyBus.Instance != null &&
-            EnergyBus.Instance.RequestEnergy(effectiveEnergy * Time.deltaTime))
-        {
-            target.Repair(effectiveRate * Time.deltaTime);
-        }
+        if (EnergyBus.Instance == null ||
+            !EnergyBus.Instance.RequestEnergy(effectiveEnergy * Time.deltaTime))
+            return;
+
+        ShipComponentBase compTarget = FindMostDamagedComponent();
+        float compRatio = compTarget != null && compTarget.maxHP > 0f
+            ? compTarget.currentHP / compTarget.maxHP : 1f;
+
+        var ps = FindFirstObjectByType<PlayerShip>();
+        float hullRatio = ps != null && ps.maxHullHP > 0f
+            ? ps.currentHullHP / ps.maxHullHP : 1f;
+
+        // En çok hasarlı hedefi onar (hull veya komponent)
+        if (ps != null && hullRatio < 1f && hullRatio <= compRatio)
+            ps.currentHullHP = Mathf.Min(ps.maxHullHP, ps.currentHullHP + effectiveRate * Time.deltaTime);
+        else if (compTarget != null)
+            compTarget.Repair(effectiveRate * Time.deltaTime);
     }
 
     ShipComponentBase FindMostDamagedComponent()
