@@ -389,8 +389,7 @@ public class EnemyBot : MonoBehaviour
     {
         var tex = new Texture2D(w, h);
         var px  = new Color[w * h];
-        var c   = new Color(0.3f, 0.75f, 1f, 0.4f);
-        for (int i = 0; i < px.Length; i++) px[i] = c;
+        for (int i = 0; i < px.Length; i++) px[i] = Color.white;
         tex.SetPixels(px); tex.Apply();
 
         _shieldVisual = new GameObject("ShieldVisual");
@@ -401,6 +400,7 @@ public class EnemyBot : MonoBehaviour
         var sr = _shieldVisual.AddComponent<SpriteRenderer>();
         sr.sprite       = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
         sr.sortingOrder = 1;
+        sr.color        = new Color(0.3f, 0.75f, 1f, 0.55f);
     }
 
     void RefreshShieldVisual()
@@ -409,6 +409,6 @@ public class EnemyBot : MonoBehaviour
         if (_shieldHP <= 0f) { _shieldVisual.SetActive(false); return; }
         var sr = _shieldVisual.GetComponent<SpriteRenderer>();
         if (sr != null)
-            sr.color = new Color(0.3f, 0.75f, 1f, (_shieldHP / _maxShieldHP) * 0.5f);
+            sr.color = new Color(0.3f, 0.75f, 1f, (_shieldHP / _maxShieldHP) * 0.55f);
     }
 }
