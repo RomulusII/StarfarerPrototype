@@ -9,8 +9,8 @@ using UnityEngine;
 /// </summary>
 public class HealthBar : MonoBehaviour
 {
-    public float maxShield     = 100f;
-    public float currentShield = 100f;
+    public float maxShield     = 0f;
+    public float currentShield = 0f;
     public float maxHealth     = 100f;
     public float currentHealth = 100f;
     public float barWidth      = 2f;

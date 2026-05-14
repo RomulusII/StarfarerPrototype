@@ -26,6 +26,9 @@ public class EnemyBot : MonoBehaviour
     float      _shieldHP;
     float      _maxShieldHP;
     GameObject _shieldVisual;
+    float      _shieldRechargeTimer;
+    const float ShieldRechargeDelay = 4f;
+    const float ShieldRechargeRate  = 5f;
 
     // Ateş etme
     float _fireTimer;
@@ -154,6 +157,10 @@ public class EnemyBot : MonoBehaviour
                 FireAtTarget();
             }
         }
+
+        // Kalkan şarjı
+        if (enemyType == EnemyType.Shield)
+            UpdateShieldRecharge();
 
         // Ekran dışına çıkınca yok et
         if (Vector2.Distance(transform.position, Vector2.zero) > 30f)
@@ -335,6 +342,7 @@ public class EnemyBot : MonoBehaviour
         float shieldMult = wt == WeaponType.Kinetic ? 1.5f :
                            wt == WeaponType.Laser   ? 0.25f : 1f;
         float effective  = amount * shieldMult;
+        _shieldRechargeTimer = ShieldRechargeDelay;
         if (_shieldHP >= effective)
         {
             _shieldHP -= effective;
@@ -347,6 +355,17 @@ public class EnemyBot : MonoBehaviour
         SyncShieldBar();
         RefreshShieldVisual();
         return overflow;
+    }
+
+    void UpdateShieldRecharge()
+    {
+        if (_shieldHP >= _maxShieldHP) return;
+        _shieldRechargeTimer -= Time.deltaTime;
+        if (_shieldRechargeTimer > 0f) return;
+
+        _shieldHP = Mathf.Min(_shieldHP + ShieldRechargeRate * Time.deltaTime, _maxShieldHP);
+        SyncShieldBar();
+        RefreshShieldVisual();
     }
 
     void SyncShieldBar()
@@ -419,6 +438,7 @@ public class EnemyBot : MonoBehaviour
     {
         if (_shieldVisual == null) return;
         if (_shieldHP <= 0f) { _shieldVisual.SetActive(false); return; }
+        _shieldVisual.SetActive(true);
         var sr = _shieldVisual.GetComponent<SpriteRenderer>();
         if (sr != null)
             sr.color = new Color(0.3f, 0.75f, 1f, (_shieldHP / _maxShieldHP) * 0.55f);
