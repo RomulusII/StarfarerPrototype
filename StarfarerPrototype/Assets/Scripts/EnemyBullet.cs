@@ -78,12 +78,20 @@ public class EnemyBullet : MonoBehaviour
     void OnTriggerEnter2D(Collider2D other)
     {
         if (targetComponent != null) return;
-        if (!other.CompareTag("Player")) return;
 
-        var ship = other.GetComponent<PlayerShip>();
-        if (ship == null) return;
+        if (other.CompareTag("Player"))
+        {
+            var ship = other.GetComponent<PlayerShip>();
+            if (ship == null) return;
+            ship.TakeDamage(damage);
+            Destroy(gameObject);
+            return;
+        }
 
-        ship.TakeDamage(damage);
-        Destroy(gameObject);
+        var collector = other.GetComponent<CollectorShip>();
+        if (collector != null) { collector.TakeDamage(damage); Destroy(gameObject); return; }
+
+        var fighter = other.GetComponent<FighterShip>();
+        if (fighter != null) { fighter.TakeDamage(damage); Destroy(gameObject); }
     }
 }

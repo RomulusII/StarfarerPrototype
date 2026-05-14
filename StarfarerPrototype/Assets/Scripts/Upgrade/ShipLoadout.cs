@@ -35,6 +35,23 @@ public class ShipLoadout : MonoBehaviour
         InitWeaponChains();
         // Lazer başlangıçta ücretsiz kurulu gelir
         InstallComponent(_laserChain[0], slotIndex: 5, deductCost: false);
+        // Hangar her zaman slot 6'da kurulu başlar
+        InstallComponent(GetHangarDef(), slotIndex: 6, deductCost: false);
+    }
+
+    static ComponentDefinition _hangarDef;
+    static ComponentDefinition GetHangarDef()
+    {
+        if (_hangarDef != null) return _hangarDef;
+        var d = ScriptableObject.CreateInstance<ComponentDefinition>();
+        d.componentName = "Hangar";
+        d.componentType = ComponentType.Hangar;
+        d.tier          = 1;
+        d.costResource  = ResourceType.RawMaterial;
+        d.cost          = 20; // stat upgrade maliyet hesabı için baz değer
+        d.sellValue     = 0;
+        _hangarDef = d;
+        return _hangarDef;
     }
 
     // -------------------------------------------------------------------------
@@ -159,6 +176,11 @@ public class ShipLoadout : MonoBehaviour
                 tc.Configure(def);
                 comp = tc;
                 break;
+
+            case ComponentType.Hangar:
+                var hc = go.AddComponent<HangarComponent>();
+                comp = hc;
+                break;
         }
 
         _slots[slotIndex]         = comp;
@@ -171,7 +193,7 @@ public class ShipLoadout : MonoBehaviour
     public bool SellComponent(int slotIndex, bool returnResources = true)
     {
         if (slotIndex < 0 || slotIndex >= slotCount) return false;
-        if (slotIndex == 5) return false; // Weapon slot satılamaz
+        if (slotIndex == 5 || slotIndex == 6) return false; // Weapon + Hangar satılamaz
         if (_installedDefs[slotIndex] == null) return false;
 
         if (returnResources && ResourceInventory.Instance != null)

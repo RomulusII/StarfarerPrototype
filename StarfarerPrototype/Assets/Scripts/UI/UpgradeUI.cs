@@ -248,7 +248,10 @@ public class UpgradeUI : MonoBehaviour
 
         AddButton(btnRow.transform, "Sat", () => SellAndRefresh(slotIndex), 100f);
 
-        BuildStatUpgradeSection(slotIndex, def);
+        if (def.componentType == ComponentType.Hangar)
+            BuildHangarStatSection(slotIndex, def);
+        else
+            BuildStatUpgradeSection(slotIndex, def);
     }
 
     void BuildStatUpgradeSection(int slotIndex, ComponentDefinition def)
@@ -357,6 +360,100 @@ public class UpgradeUI : MonoBehaviour
                         btn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
                     }
                 }
+            }
+        }
+    }
+
+    void BuildHangarStatSection(int slotIndex, ComponentDefinition def)
+    {
+        var hangar = _loadout?.GetSlotComponent(slotIndex) as HangarComponent;
+        if (hangar == null) return;
+
+        MakeTextLabel(_popupContent.transform, "\u2500\u2500 HANGAR \u2500\u2500", 11, TextAnchor.MiddleLeft);
+
+        // Sayı yükseltmeleri (her level +1 gemi)
+        BuildHangarCountRow(slotIndex, def, hangar, "maxCollectors", "Max Toplay\u0131c\u0131", hangar.MaxCollectors);
+        BuildHangarCountRow(slotIndex, def, hangar, "maxFighters",   "Max Sava\u015f\u00e7\u0131",   hangar.MaxFighters);
+
+        MakeTextLabel(_popupContent.transform, "\u2500\u2500 STAT UPGRADE \u2500\u2500", 11, TextAnchor.MiddleLeft);
+
+        // Çarpan yükseltmeleri
+        foreach (var (key, label) in new[]
+        {
+            ("productionSpeed", "\u00dcretim H\u0131z\u0131"),
+            ("maxHP",           "Gemi Max HP"),
+            ("fireRate",        "Sava\u015f\u00e7\u0131 Ate\u015f"),
+            ("salvageRate",     "Toplama H\u0131z\u0131"),
+            ("speed",           "Gemi H\u0131z\u0131"),
+        })
+        {
+            int curLevel = hangar.StatLevels.TryGetValue(key, out var lvl) ? lvl : 0;
+            bool maxed   = curLevel >= ShipComponentBase.MaxStatLevel;
+            int cost     = maxed ? 0 : StatUpgradeCost(def, curLevel);
+            bool canAfford = !maxed && ResourceInventory.Instance != null &&
+                             ResourceInventory.Instance.Get(def.costResource) >= cost;
+
+            var row = CreateRow(_popupContent.transform);
+            var lblGo = new GameObject("StatLabel", typeof(RectTransform));
+            lblGo.transform.SetParent(row.transform, false);
+            var lbl       = lblGo.AddComponent<Text>();
+            lbl.text      = maxed ? $"{label} Lv {curLevel}/5 MAX" : $"{label} Lv {curLevel}/5  ({cost})";
+            lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            lbl.fontSize  = 13;
+            lbl.color     = maxed ? new Color(1f, 0.85f, 0.2f, 1f) : Color.white;
+            lbl.alignment = TextAnchor.MiddleLeft;
+            var lblLE     = lblGo.AddComponent<LayoutElement>();
+            lblLE.flexibleWidth   = 1f;
+            lblLE.preferredHeight = 34f;
+
+            if (!maxed)
+            {
+                var capturedKey  = key;
+                var capturedCost = cost;
+                var capturedDef  = def;
+                var capturedSlot = slotIndex;
+                var btn = AddButton(row.transform, "+", () => StatUpgradeAndRefresh(capturedSlot, capturedKey, capturedDef, capturedCost), 44f);
+                if (!canAfford)
+                {
+                    btn.interactable = false;
+                    btn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
+                }
+            }
+        }
+    }
+
+    void BuildHangarCountRow(int slotIndex, ComponentDefinition def, HangarComponent hangar, string key, string label, int currentCount)
+    {
+        int level  = hangar.GetStatLevel(key);
+        bool maxed = level >= ShipComponentBase.MaxStatLevel;
+        int cost   = maxed ? 0 : StatUpgradeCost(def, level);
+        bool canAfford = !maxed && ResourceInventory.Instance != null &&
+                         ResourceInventory.Instance.Get(def.costResource) >= cost;
+
+        var row = CreateRow(_popupContent.transform);
+        var lblGo = new GameObject("StatLabel", typeof(RectTransform));
+        lblGo.transform.SetParent(row.transform, false);
+        var lbl       = lblGo.AddComponent<Text>();
+        lbl.text      = maxed ? $"{label}: {currentCount} MAX" : $"{label}: {currentCount}  (+1 \u2192 {cost})";
+        lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        lbl.fontSize  = 13;
+        lbl.color     = maxed ? new Color(1f, 0.85f, 0.2f, 1f) : Color.white;
+        lbl.alignment = TextAnchor.MiddleLeft;
+        var lblLE     = lblGo.AddComponent<LayoutElement>();
+        lblLE.flexibleWidth   = 1f;
+        lblLE.preferredHeight = 34f;
+
+        if (!maxed)
+        {
+            var capturedKey  = key;
+            var capturedCost = cost;
+            var capturedDef  = def;
+            var capturedSlot = slotIndex;
+            var btn = AddButton(row.transform, "+1", () => StatUpgradeAndRefresh(capturedSlot, capturedKey, capturedDef, capturedCost), 50f);
+            if (!canAfford)
+            {
+                btn.interactable = false;
+                btn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
             }
         }
     }
@@ -637,6 +734,7 @@ public class UpgradeUI : MonoBehaviour
             case ComponentType.Generator:  return "Enerji Jenerat\u00f6r\u00fc";
             case ComponentType.Weapon:     return "Silah";
             case ComponentType.Turret:     return "Turret";
+            case ComponentType.Hangar:     return "Hangar";
             default:                       return type.ToString();
         }
     }

@@ -233,7 +233,24 @@ public class EnemyBot : MonoBehaviour
         float hull = CalcDamage(amount, weaponType);
         _healthBar.TakeDamage(hull);
         if (_healthBar.currentHealth <= 0f)
+        {
+            TrySpawnDebris();
             Destroy(gameObject);
+        }
+    }
+
+    void TrySpawnDebris()
+    {
+        if (Random.value > 0.5f) return; // %50 ihtimal
+
+        var go = new GameObject("Debris");
+        go.transform.position = transform.position;
+        var d = go.AddComponent<Debris>();
+
+        // Düşmanlar hep sola hareket eder; enkaz aynı yönde ama çok daha yavaş sürüklenir
+        Vector2 vel = new Vector2(-_speed * Random.Range(0.10f, 0.25f),
+                                   Random.Range(-0.3f, 0.3f));
+        d.Init(vel, Random.Range(5f, 18f));
     }
 
     float CalcDamage(float amount, WeaponType wt)
