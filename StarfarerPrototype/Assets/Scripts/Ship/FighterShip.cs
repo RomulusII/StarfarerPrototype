@@ -1,28 +1,31 @@
 using UnityEngine;
 
 /// <summary>
-/// Hangardan üretilen savaş gemisi.
-/// Yakın düşmanı hedefler, ateş eder; tehdit yoksa hangar etrafında devriye gezer.
-/// Hareket ShipMovement üzerinden yapılır; mass sabit, enginePower speed parametresinden türetilir.
+/// Hangardan üretilen savaş gemisi. Strafe pattern ile düşmanlara saldırır.
+/// Hedef yoksa hangar etrafında devriye gezer.
+/// ShipBrain taktik hareketini, ShipMovement fiziğini yönetir.
+///
+/// Dogfight: EnemyBot'lar da FighterShip'i tehdit olarak tarar,
+/// birbirine yörünge çizerek savaşırlar. FighterShip kıvraklığı (TurnRate)
+/// EnemyBot'ların orbit radiusunu etkiler.
 /// </summary>
 public class FighterShip : MonoBehaviour
 {
-    enum Phase { Patrolling, Attacking }
-
     public float maxHP    = 40f;
     public float currentHP = 40f;
     public float fireRate  = 2f;
     public float damage    = 8f;
 
-    Phase        _phase = Phase.Patrolling;
-    EnemyBot     _target;
+    EnemyBot     _currentTarget;
     Transform    _hangar;
     ShipMovement _movement;
+    ShipBrain    _brain;
     float        _fireTimer;
+    float        _targetScanTimer;
     Vector3      _patrolPoint;
 
     const float AttackRange  = 7f;
-    const float FireRange    = 4f;
+    const float FireRange    = 3f;
     const float PatrolRadius = 2.5f;
     const float Mass         = 1f;
 
@@ -40,6 +43,14 @@ public class FighterShip : MonoBehaviour
 
         _movement      = gameObject.AddComponent<ShipMovement>();
         _movement.mass = Mass;
+
+        _brain                = gameObject.AddComponent<ShipBrain>();
+        _brain.pattern        = CombatPattern.Strafe;
+        _brain.engageRange    = 5f;
+        _brain.fireRange      = FireRange;
+        _brain.orbitRadius    = 3.5f;
+        _brain.engageDuration = 3f;
+        _brain.repositionDelay = 0.8f;
     }
 
     public void Init(Transform hangar, float speed, float maxHP, float fireRate, float damage)
@@ -49,7 +60,7 @@ public class FighterShip : MonoBehaviour
         this.currentHP        = maxHP;
         this.fireRate         = fireRate;
         this.damage           = damage;
-        _movement.enginePower = speed * Mass;   // MaxSpeed ≈ speed
+        _movement.enginePower = speed * Mass;
         _movement.Initialize(0f);
         _fireTimer   = Random.Range(0f, fireRate);
         _patrolPoint = GetPatrolPoint();
@@ -59,38 +70,53 @@ public class FighterShip : MonoBehaviour
     {
         if (UpgradeUI.IsPaused) return;
 
-        switch (_phase)
+        // Hedef tara
+        _targetScanTimer -= Time.deltaTime;
+        if (_targetScanTimer <= 0f)
         {
-            case Phase.Patrolling:
-                _movement.MoveToward(_patrolPoint);
-                if (Vector2.Distance(transform.position, _patrolPoint) < 0.35f)
-                    _patrolPoint = GetPatrolPoint();
+            _targetScanTimer = 1.5f;
+            var nearest = FindClosestEnemy(AttackRange);
+            if (nearest != null)
+            {
+                _currentTarget = nearest;
+                _brain.SetTarget(nearest.transform);
+            }
+            else if (_currentTarget == null || !_currentTarget.gameObject.activeInHierarchy)
+            {
+                _currentTarget = null;
+                _brain.ClearTarget();
+            }
+        }
 
-                var nearest = FindClosestEnemy(AttackRange);
-                if (nearest != null) { _target = nearest; _phase = Phase.Attacking; }
-                break;
+        // Hedef kaybedildiyse sıfırla
+        if (_currentTarget != null && !_currentTarget.gameObject.activeInHierarchy)
+        {
+            _currentTarget = null;
+            _brain.ClearTarget();
+        }
 
-            case Phase.Attacking:
-                if (_target == null || !_target.gameObject.activeInHierarchy)
-                { _target = null; _phase = Phase.Patrolling; break; }
-
-                float dist = Vector2.Distance(transform.position, _target.transform.position);
-                if (dist > AttackRange + 2f) { _target = null; _phase = Phase.Patrolling; break; }
-
-                if (dist > FireRange)
-                    _movement.MoveToward(_target.transform.position);
-                else
-                    _movement.Brake();
-
-                _fireTimer -= Time.deltaTime;
-                if (_fireTimer <= 0f && dist <= FireRange)
-                {
-                    FireAt(_target);
-                    _fireTimer = fireRate;
-                }
-                break;
+        if (_brain.HasTarget)
+        {
+            // ShipBrain hareketi yönetir; biz sadece ateş ederiz
+            _fireTimer -= Time.deltaTime;
+            if (_brain.InFireRange && _fireTimer <= 0f)
+            {
+                FireAt(_currentTarget);
+                _fireTimer = fireRate;
+            }
+        }
+        else
+        {
+            // Hedef yok: hangar etrafında devriye
+            _movement.MoveToward(_patrolPoint);
+            if (Vector2.Distance(transform.position, _patrolPoint) < 0.35f)
+                _patrolPoint = GetPatrolPoint();
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Yardımcılar
+    // -------------------------------------------------------------------------
 
     Vector3 GetPatrolPoint()
     {
@@ -115,6 +141,7 @@ public class FighterShip : MonoBehaviour
 
     void FireAt(EnemyBot target)
     {
+        if (target == null) return;
         var dir = ((Vector3)target.transform.position - transform.position).normalized;
         var go  = new GameObject("FighterBullet");
         go.transform.position = transform.position;

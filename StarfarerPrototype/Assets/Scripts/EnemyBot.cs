@@ -5,13 +5,11 @@ public enum EnemyType { Swarm, Armored, Shield, Bomber }
 
 /// <summary>
 /// Tüm temel düşman tiplerini tek sınıfta toplar.
-/// Hareket ShipMovement component'ı üzerinden yapılır — ivme, frenleme ve dönme
-/// mass/enginePower oranından türetilir.
+/// Swarm/Armored/Shield: ShipBrain taktik state machine + ShipMovement fizik hareketi.
+/// Bomber: kendi Approaching→Hovering→Retreating state machine'ini kullanır.
 ///
-/// Swarm   — hafif, kıvrak, sinüs dalgasıyla yaklaşır. Lazer'e kırılgan.
-/// Armored — ağır, yavaş döner, doğrudan yaklaşır. Kinetike dirençli, plazmaya zayıf.
-/// Shield  — orta, kalkanı var (kinetik kırar, lazer geçemez).
-/// Bomber  — yaklaşır, hover eder, komponentlere ateş eder, geri çekilir.
+/// Hedefleme: her 1.5sn en yakın tehdidi (PlayerShip veya FighterShip) tarar.
+/// Böylece oyuncu Fighter'ları çıkardığında dogfight oluşur.
 /// </summary>
 public class EnemyBot : MonoBehaviour
 {
@@ -20,19 +18,20 @@ public class EnemyBot : MonoBehaviour
     PlayerShip   _playerShip;
     HealthBar    _healthBar;
     ShipMovement _movement;
+    ShipBrain    _brain;
+
+    float _contactDamage;
 
     // Kalkan botu
     float      _shieldHP;
     float      _maxShieldHP;
     GameObject _shieldVisual;
 
-    // Ateş etme (Swarm / Armored / Shield)
+    // Ateş etme
     float _fireTimer;
 
-    // Swarm sinüs dalgası
-    float _weaveFreq;
-    float _weaveAmp;
-    float _weavePhase;
+    // Hedef güncelleme
+    float _targetScanTimer;
 
     // Bomber state machine
     enum BomberPhase { Approaching, Hovering, Retreating }
@@ -54,8 +53,7 @@ public class EnemyBot : MonoBehaviour
         var rb         = gameObject.AddComponent<Rigidbody2D>();
         rb.bodyType    = RigidbodyType2D.Kinematic;
         rb.gravityScale = 0f;
-
-        _movement = gameObject.AddComponent<ShipMovement>();
+        _movement      = gameObject.AddComponent<ShipMovement>();
     }
 
     void Start()
@@ -69,10 +67,8 @@ public class EnemyBot : MonoBehaviour
                 _movement.mass        = 1f;
                 _movement.enginePower = 3f;
                 Apply(hp:30, contact:20f, w:60, h:40, new Color(0.9f, 0.20f, 0.20f));
-                _fireTimer  = Random.Range(2f, 5f);
-                _weaveFreq  = Random.Range(0.3f, 0.7f);
-                _weaveAmp   = Random.Range(0.4f, 0.8f);
-                _weavePhase = Random.Range(0f, Mathf.PI * 2f);
+                _fireTimer = Random.Range(2f, 5f);
+                SetupBrain(CombatPattern.Orbit,    engageRange:6f, fireRange:4f,   orbitRadius:4.5f, engageDuration:5f);
                 break;
 
             case EnemyType.Armored:
@@ -80,6 +76,7 @@ public class EnemyBot : MonoBehaviour
                 _movement.enginePower = 7.5f;
                 Apply(hp:80, contact:25f, w:80, h:55, new Color(0.42f, 0.45f, 0.50f));
                 _fireTimer = Random.Range(3f, 7f);
+                SetupBrain(CombatPattern.HoverFire, engageRange:5f, fireRange:3.5f, orbitRadius:4f,   engageDuration:8f);
                 break;
 
             case EnemyType.Shield:
@@ -89,6 +86,7 @@ public class EnemyBot : MonoBehaviour
                 _shieldHP = _maxShieldHP = 40f;
                 BuildShieldVisual(90, 65);
                 _fireTimer = Random.Range(1f, 3f);
+                SetupBrain(CombatPattern.Orbit,    engageRange:5.5f, fireRange:3.5f, orbitRadius:3.5f, engageDuration:5f);
                 break;
 
             case EnemyType.Bomber:
@@ -105,6 +103,18 @@ public class EnemyBot : MonoBehaviour
         _movement.Initialize(180f);
     }
 
+    void SetupBrain(CombatPattern pattern, float engageRange, float fireRange,
+                    float orbitRadius, float engageDuration)
+    {
+        _brain                  = gameObject.AddComponent<ShipBrain>();
+        _brain.pattern          = pattern;
+        _brain.engageRange      = engageRange;
+        _brain.fireRange        = fireRange;
+        _brain.orbitRadius      = orbitRadius;
+        _brain.engageDuration   = engageDuration;
+        _brain.repositionDelay  = 1f;
+    }
+
     // -------------------------------------------------------------------------
     // Update
     // -------------------------------------------------------------------------
@@ -119,35 +129,52 @@ public class EnemyBot : MonoBehaviour
             return;
         }
 
-        UpdateRangedMovement();
-
-        if (transform.position.x < -15f) { Destroy(gameObject); return; }
-
-        _fireTimer -= Time.deltaTime;
-        if (_fireTimer <= 0f)
+        // Hedef tara
+        _targetScanTimer -= Time.deltaTime;
+        if (_targetScanTimer <= 0f || !_brain.HasTarget)
         {
-            _fireTimer = FireRate() + Random.Range(0f, 1.5f);
-            FireAtHull();
+            _targetScanTimer = 1.5f;
+            var threat = FindClosestThreat();
+            if (threat != null)
+                _brain.SetTarget(threat);
         }
+
+        // Ateş et — ShipBrain ateş menziline girince
+        if (_brain.InFireRange)
+        {
+            _fireTimer -= Time.deltaTime;
+            if (_fireTimer <= 0f)
+            {
+                _fireTimer = FireRate() + Random.Range(0f, 1.5f);
+                FireAtTarget();
+            }
+        }
+
+        // Ekran dışına çıkınca yok et
+        if (Vector2.Distance(transform.position, Vector2.zero) > 30f)
+            Destroy(gameObject);
     }
 
-    void UpdateRangedMovement()
+    // En yakın tehdidi bulur: PlayerShip veya FighterShip
+    Transform FindClosestThreat()
     {
-        Vector2 dir;
-        if (enemyType == EnemyType.Swarm)
+        Transform best  = null;
+        float     bestD = float.MaxValue;
+
+        if (_playerShip != null)
         {
-            // Sinüs dalgası: çoğunlukla sola, dikey bileşen dalgalı
-            float sinY = Mathf.Sin(Time.time * _weaveFreq * Mathf.PI * 2f + _weavePhase) * _weaveAmp;
-            dir = new Vector2(-1f, sinY).normalized;
+            float d = Vector2.Distance(transform.position, _playerShip.transform.position);
+            if (d < bestD) { bestD = d; best = _playerShip.transform; }
         }
-        else
+
+        var fighters = FindObjectsByType<FighterShip>(FindObjectsSortMode.None);
+        foreach (var f in fighters)
         {
-            // Armored / Shield: sola ilerlerken oyuncu Y'sine yavaş yaklaşır
-            float targetY = _playerShip != null ? _playerShip.transform.position.y : 0f;
-            float yDiff   = Mathf.Clamp(targetY - transform.position.y, -3f, 3f);
-            dir = new Vector2(-1f, yDiff * 0.25f).normalized;
+            float d = Vector2.Distance(transform.position, f.transform.position);
+            if (d < bestD) { bestD = d; best = f.transform; }
         }
-        _movement.MoveInDirection(dir);
+
+        return best;
     }
 
     void UpdateBomber()
@@ -177,7 +204,6 @@ public class EnemyBot : MonoBehaviour
                 break;
 
             case BomberPhase.Retreating:
-                // Geldiği tarafa geri çekilir (sağ)
                 _movement.MoveInDirection(Vector2.right);
                 break;
         }
@@ -187,7 +213,7 @@ public class EnemyBot : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // Ateş etme yardımcıları
+    // Ateş etme
     // -------------------------------------------------------------------------
 
     float FireRate()
@@ -223,14 +249,16 @@ public class EnemyBot : MonoBehaviour
         }
     }
 
-    void FireAtHull()
+    void FireAtTarget()
     {
-        if (_playerShip == null) return;
-        var dir = (_playerShip.transform.position - transform.position).normalized;
+        Transform t = _brain?.TargetTransform;
+        if (t == null) t = _playerShip?.transform;
+        if (t == null) return;
 
-        var go = new GameObject("EnemyBullet");
+        var dir = (t.position - transform.position).normalized;
+        var go  = new GameObject("EnemyBullet");
         go.transform.position = transform.position;
-        var eb = go.AddComponent<EnemyBullet>();
+        var eb  = go.AddComponent<EnemyBullet>();
         eb.damage = FireDamage();
         eb.speed  = BulletSpeed();
         eb.SetDirection(dir);
@@ -242,7 +270,6 @@ public class EnemyBot : MonoBehaviour
         var operational = new List<ShipComponentBase>();
         foreach (var c in all)
             if (c.IsOperational) operational.Add(c);
-
         if (operational.Count == 0) return;
 
         var target = operational[Random.Range(0, operational.Count)];
@@ -261,7 +288,6 @@ public class EnemyBot : MonoBehaviour
     public void TakeDamage(float amount, WeaponType weaponType = WeaponType.Kinetic)
     {
         if (_healthBar == null) return;
-
         float hull = CalcDamage(amount, weaponType);
         _healthBar.TakeDamage(hull);
         if (_healthBar.currentHealth <= 0f)
@@ -275,11 +301,9 @@ public class EnemyBot : MonoBehaviour
             case EnemyType.Armored:
                 return wt == WeaponType.Kinetic ? amount * 0.30f :
                        wt == WeaponType.Plasma  ? amount * 1.80f : amount;
-
             case EnemyType.Shield:
                 return ApplyShieldLayer(amount, wt);
-
-            default: // Swarm + Bomber
+            default:
                 return wt == WeaponType.Laser ? amount * 1.5f : amount;
         }
     }
@@ -287,39 +311,28 @@ public class EnemyBot : MonoBehaviour
     float ApplyShieldLayer(float amount, WeaponType wt)
     {
         if (_shieldHP <= 0f) return amount;
-
         float shieldMult = wt == WeaponType.Kinetic ? 1.5f :
                            wt == WeaponType.Laser   ? 0.25f : 1f;
         float effective  = amount * shieldMult;
-
         if (_shieldHP >= effective)
         {
             _shieldHP -= effective;
             RefreshShieldVisual();
             return 0f;
         }
-
         float overflow = effective - _shieldHP;
         _shieldHP = 0f;
         RefreshShieldVisual();
         return overflow;
     }
 
-    // -------------------------------------------------------------------------
-    // Temas hasarı
-    // -------------------------------------------------------------------------
-
     void OnTriggerEnter2D(Collider2D other)
     {
-        if (!other.CompareTag("Player")) return;
-        if (_contactDamage <= 0f) return;
-
+        if (!other.CompareTag("Player") || _contactDamage <= 0f) return;
         var ship = other.GetComponent<PlayerShip>();
         ship?.TakeDamage(_contactDamage);
         Destroy(gameObject);
     }
-
-    float _contactDamage;
 
     // -------------------------------------------------------------------------
     // Görsel kurulum
@@ -328,7 +341,6 @@ public class EnemyBot : MonoBehaviour
     void Apply(float hp, float contact, int w, int h, Color color)
     {
         _contactDamage = contact;
-
         if (_healthBar != null)
         {
             _healthBar.maxHealth     = hp;
@@ -336,7 +348,6 @@ public class EnemyBot : MonoBehaviour
             _healthBar.barWidth      = w / 100f * 1.3f;
             _healthBar.barOffsetY    = h / 100f * 0.8f;
         }
-
         GetComponent<BoxCollider2D>().size = new Vector2(w / 100f, h / 100f);
         BuildBody(w, h, color);
     }
@@ -346,8 +357,7 @@ public class EnemyBot : MonoBehaviour
         var tex = new Texture2D(w, h);
         var px  = new Color[w * h];
         for (int i = 0; i < px.Length; i++) px[i] = c;
-        tex.SetPixels(px);
-        tex.Apply();
+        tex.SetPixels(px); tex.Apply();
 
         var body = new GameObject("Body");
         body.transform.SetParent(transform, false);
@@ -365,8 +375,7 @@ public class EnemyBot : MonoBehaviour
         var px  = new Color[w * h];
         var c   = new Color(0.3f, 0.75f, 1f, 0.4f);
         for (int i = 0; i < px.Length; i++) px[i] = c;
-        tex.SetPixels(px);
-        tex.Apply();
+        tex.SetPixels(px); tex.Apply();
 
         _shieldVisual = new GameObject("ShieldVisual");
         _shieldVisual.transform.SetParent(transform, false);
@@ -382,7 +391,6 @@ public class EnemyBot : MonoBehaviour
     {
         if (_shieldVisual == null) return;
         if (_shieldHP <= 0f) { _shieldVisual.SetActive(false); return; }
-
         var sr = _shieldVisual.GetComponent<SpriteRenderer>();
         if (sr != null)
             sr.color = new Color(0.3f, 0.75f, 1f, (_shieldHP / _maxShieldHP) * 0.5f);
