@@ -2,16 +2,12 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Oyun HUD'u: enerji + kaynak barları (sol üst köşe, her zaman görünür).
-/// Enerji (turuncu) → Metal (yeşil) → Kristal (mavi-yeşil), aynı boyut.
+/// Oyun HUD'u: enerji + kaynak barları (üst satırda yan yana, her zaman görünür).
+/// ENERJİ — METAL — KRİSTAL, ekranın tamamına yayılan tek satır.
 /// </summary>
 public class EnergyBar : MonoBehaviour
 {
-    const float BarW = 600f;
-    const float BarH = 40f;
-    const float BarX = 20f;
-    const float BarY = -20f;
-    const float Gap  = 6f;
+    const float BarH = 44f;  // piksel yükseklik (1080 referansında)
 
     RectTransform _energyFill;
     RectTransform _metalFill;
@@ -34,37 +30,36 @@ public class EnergyBar : MonoBehaviour
 
         gameObject.AddComponent<GraphicRaycaster>();
 
-        float yE = BarY;
-        float yM = BarY - BarH - Gap;
-        float yC = BarY - 2f * (BarH + Gap);
-
-        (_energyFill,  _energyText)  = MakeBar("Energy",  yE,
+        // Üç eşit genişlikte bar, aynı y konumunda (üst)
+        (_energyFill,  _energyText)  = MakeBar("Energy",  0f,     0.333f,
             new Color(0.28f, 0.18f, 0.00f, 0.88f),
             new Color(1.00f, 0.70f, 0.10f, 1.00f));
 
-        (_metalFill,   _metalText)   = MakeBar("Metal",   yM,
+        (_metalFill,   _metalText)   = MakeBar("Metal",   0.334f, 0.667f,
             new Color(0.20f, 0.26f, 0.18f, 0.88f),
             new Color(0.45f, 0.68f, 0.28f, 1.00f));
 
-        (_crystalFill, _crystalText) = MakeBar("Crystal", yC,
+        (_crystalFill, _crystalText) = MakeBar("Crystal", 0.668f, 1.0f,
             new Color(0.18f, 0.22f, 0.28f, 0.88f),
             new Color(0.28f, 0.58f, 0.80f, 1.00f));
     }
 
-    (RectTransform fill, Text label) MakeBar(string id, float y, Color bgCol, Color fillCol)
+    (RectTransform fill, Text label) MakeBar(string id, float xMin, float xMax, Color bgCol, Color fillCol)
     {
         var bgGO = new GameObject(id + "Bg");
         bgGO.transform.SetParent(transform, false);
         bgGO.AddComponent<Image>().color = bgCol;
 
-        var bg          = bgGO.GetComponent<RectTransform>();
-        bg.anchorMin        = new Vector2(0f, 1f);
-        bg.anchorMax        = new Vector2(0f, 1f);
-        bg.pivot            = new Vector2(0f, 1f);
-        bg.anchoredPosition = new Vector2(BarX, y);
-        bg.sizeDelta        = new Vector2(BarW, BarH);
+        var bg = bgGO.GetComponent<RectTransform>();
+        // Yatay: anchor tabanlı üçte bir genişlik
+        // Dikey: en üst kenar (anchorMin.y = anchorMax.y = 1), BarH piksel aşağı uzanır
+        bg.anchorMin        = new Vector2(xMin, 1f);
+        bg.anchorMax        = new Vector2(xMax, 1f);
+        bg.pivot            = new Vector2(0f,   1f);
+        bg.anchoredPosition = Vector2.zero;
+        bg.sizeDelta        = new Vector2(0f, BarH);
 
-        // Dolum barı
+        // Dolum barı — yatay yayılır, tam yükseklik
         var fillGO = new GameObject(id + "Fill");
         fillGO.transform.SetParent(bgGO.transform, false);
         fillGO.AddComponent<Image>().color = fillCol;
@@ -74,9 +69,9 @@ public class EnergyBar : MonoBehaviour
         fill.anchorMax        = new Vector2(0f, 1f);
         fill.pivot            = new Vector2(0f, 0.5f);
         fill.anchoredPosition = Vector2.zero;
-        fill.sizeDelta        = new Vector2(0f, 0f);
+        fill.sizeDelta        = Vector2.zero;
 
-        // Yazı — dolum barının üstünde render olur (sonra eklendi = üstte)
+        // Metin — dolum barının üzerinde render edilir
         var txtGO = new GameObject(id + "Text");
         txtGO.transform.SetParent(bgGO.transform, false);
 
@@ -98,7 +93,6 @@ public class EnergyBar : MonoBehaviour
 
     void Update()
     {
-        // Enerji
         float eCur = 0f, eMax = 1f;
         if (EnergyBus.Instance != null && EnergyBus.Instance.maxEnergy > 0f)
         {
@@ -107,7 +101,6 @@ public class EnergyBar : MonoBehaviour
         }
         SetBar(_energyFill, _energyText, eCur, eMax, "ENERJİ");
 
-        // Kaynaklar
         if (ResourceInventory.Instance != null)
         {
             SetBar(_metalFill,   _metalText,   ResourceInventory.Instance.metal,   ResourceInventory.Instance.maxMetal,   "METAL");
@@ -118,7 +111,10 @@ public class EnergyBar : MonoBehaviour
     void SetBar(RectTransform fill, Text lbl, float cur, float max, string name)
     {
         float ratio = max > 0f ? Mathf.Clamp01(cur / max) : 0f;
-        fill.sizeDelta = new Vector2(BarW * ratio, 0f);
+        var aMax   = fill.anchorMax;
+        aMax.x     = ratio;
+        fill.anchorMax = aMax;
+        fill.sizeDelta = Vector2.zero;
         lbl.text = $"{name}   {cur:0} / {max:0}";
     }
 }

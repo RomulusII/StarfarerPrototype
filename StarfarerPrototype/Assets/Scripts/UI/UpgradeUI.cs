@@ -1,3 +1,4 @@
+using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.InputSystem;
@@ -21,31 +22,36 @@ public class UpgradeUI : MonoBehaviour
     private Text       _popupTitle;
     private GameObject _popupContent;
 
-    // Kaynak göstergeleri
-    private Text _hamMaddeText;
-    private Text _kristalText;
-
     // Genel panel — canlı stat kutuları
     private RectTransform _hpFill, _shieldFill, _energyFill;
     private Text          _hpStatText, _shieldStatText, _energyStatText;
 
-    // Sol kutu — kurulu component
+    // SlotInfo sol sütun — kurulu bileşen temel bilgisi
     private Text _leftNameText;
     private Text _leftTypeText;
     private Text _leftTierText;
     private Text _leftCostText;
 
-    // Sağ kutu — hover/tap ile seçili opsiyon
+    // SlotInfo sağ sütun — bileşen aktüel istatistikleri
+    private Text _slotStatsText;
+
+    // HoverDetail — opsiyon detayı (bileşen hover veya stat açıklaması)
     private Text _rightNameText;
     private Text _rightTypeText;
     private Text _rightTierText;
     private Text _rightCostText;
+    private Text _optionDescText;
+
+    // Seçili stat takibi
+    private string _selectedStatKey  = null;
+    private int    _selectedStatSlot = -1;
+    private int    _currentSlotIndex = -1;
 
     private static ComponentDefinition[] _catalogDefs;
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Lifecycle
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     void Awake()
     {
@@ -71,7 +77,6 @@ public class UpgradeUI : MonoBehaviour
                 _canvas.enabled = true;
                 IsPaused        = true;
                 Time.timeScale  = 0f;
-                RefreshResourceDisplay();
             }
             else
             {
@@ -86,9 +91,9 @@ public class UpgradeUI : MonoBehaviour
             UpdateStatBoxes();
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Public API
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     public void SetLoadout(ShipLoadout loadout) => _loadout = loadout;
 
@@ -96,32 +101,38 @@ public class UpgradeUI : MonoBehaviour
     {
         Debug.Log($"[UpgradeUI] OnSlotClicked: slot={slotIndex}");
 
+        // Farklı slot seçilince stat seçimini sıfırla
+        if (slotIndex != _currentSlotIndex)
+        {
+            _selectedStatKey  = null;
+            _selectedStatSlot = -1;
+            ClearBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText);
+            if (_optionDescText != null) _optionDescText.text = "";
+        }
+        _currentSlotIndex = slotIndex;
+
         bool empty = _loadout == null || _loadout.IsSlotEmpty(slotIndex);
         ComponentDefinition installed = empty ? null : _loadout.GetSlotDef(slotIndex);
-
-        Debug.Log($"[UpgradeUI] slot={slotIndex} empty={empty} def={installed?.componentName ?? "null"}");
 
         if (slotIndex == 5)
         {
             var activeDef = _loadout?.GetWeaponDef(_loadout.GetActiveWeaponType());
             _popupTitle.text = activeDef != null
-                ? $"Slot 5 \u2014 {activeDef.componentName}"
-                : "Slot 5 \u2014 Ana Silah";
+                ? $"Slot 5 — {activeDef.componentName}"
+                : "Slot 5 — Ana Silah";
             FillBox(_leftNameText, _leftTypeText, _leftTierText, _leftCostText,
                     activeDef ?? installed);
         }
         else
         {
             _popupTitle.text = empty
-                ? $"Slot {slotIndex} \u2014 Bo\u015f"
-                : $"Slot {slotIndex} \u2014 {installed.componentName}";
+                ? $"Slot {slotIndex} — Boş"
+                : $"Slot {slotIndex} — {installed.componentName}";
             if (installed != null)
                 FillBox(_leftNameText, _leftTypeText, _leftTierText, _leftCostText, installed);
             else
                 ClearBox(_leftNameText, _leftTypeText, _leftTierText, _leftCostText);
         }
-
-        ClearBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText);
 
         foreach (Transform child in _popupContent.transform)
             Destroy(child.gameObject);
@@ -130,12 +141,20 @@ public class UpgradeUI : MonoBehaviour
             BuildEmptyContent(slotIndex);
         else
             BuildFilledContent(slotIndex, installed);
+
+        // Sağ sütun istatistiklerini güncelle
+        UpdateSlotInfoStats();
+
+        // Eğer aynı slotta stat seçiliyse açıklamayı yeniden göster
+        if (!string.IsNullOrEmpty(_selectedStatKey) && _selectedStatSlot == slotIndex)
+            ShowStatDescriptionInternal(_selectedStatKey);
     }
 
-    /// <summary>Sağ kutuyu doldurur (hover / tap).</summary>
+    /// <summary>Katalog hover — sağ paneli bileşen bilgisiyle doldurur.</summary>
     public void ShowDetail(ComponentDefinition def)
     {
         if (def == null) return;
+        if (_optionDescText != null) _optionDescText.text = "";
         FillBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText, def);
 
         bool canAfford = ResourceInventory.Instance != null &&
@@ -145,29 +164,58 @@ public class UpgradeUI : MonoBehaviour
             : new Color(1f, 0.25f, 0.25f, 1f);
     }
 
-    /// <summary>Sağ kutuyu temizler (hover çıkışı).</summary>
-    public void HideDetail() =>
-        ClearBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText);
-
-    // -------------------------------------------------------------------------
-    // Popup Content
-    // -------------------------------------------------------------------------
-
-    void RefreshResourceDisplay()
+    /// <summary>Katalog hover çıkışı — stat seçiliyse temizleme.</summary>
+    public void HideDetail()
     {
-        if (ResourceInventory.Instance == null) return;
-        _hamMaddeText.text = $"Ham Madde: {ResourceInventory.Instance.Get(ResourceType.RawMaterial)}";
-        _kristalText.text  = $"Kristal: {ResourceInventory.Instance.Get(ResourceType.EnergyCrystal)}";
+        if (!string.IsNullOrEmpty(_selectedStatKey)) return;
+        ClearBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText);
+        if (_optionDescText != null) _optionDescText.text = "";
     }
+
+    /// <summary>Stat etiketine tıklandığında çağrılır (toggle davranışı).</summary>
+    public void ShowStatDescription(string statKey, int slotIndex)
+    {
+        if (_selectedStatKey == statKey && _selectedStatSlot == slotIndex)
+        {
+            DeselectStat();
+            return;
+        }
+        _selectedStatKey  = statKey;
+        _selectedStatSlot = slotIndex;
+        ShowStatDescriptionInternal(statKey);
+        UpdateSlotInfoStats();
+    }
+
+    public void DeselectStat()
+    {
+        _selectedStatKey  = null;
+        _selectedStatSlot = -1;
+        ClearBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText);
+        if (_optionDescText != null) _optionDescText.text = "";
+        UpdateSlotInfoStats();
+    }
+
+    void ShowStatDescriptionInternal(string statKey)
+    {
+        _rightNameText.text = "";
+        _rightTypeText.text = "";
+        _rightTierText.text = "";
+        _rightCostText.text = "";
+        if (_optionDescText != null)
+            _optionDescText.text = GetStatDescription(statKey);
+    }
+
+    // =========================================================================
+    // Popup Content
+    // =========================================================================
+
+    void RefreshResourceDisplay() { /* Kaynak göstergesi kaldırıldı — EnergyBar HUD'da gösterilir */ }
 
     void InstallAndRefresh(ComponentDefinition def, int slotIndex)
     {
         if (_loadout == null) return;
         if (_loadout.InstallComponent(def, slotIndex))
-        {
-            RefreshResourceDisplay();
             OnSlotClicked(slotIndex);
-        }
     }
 
     void BuildEmptyContent(int slotIndex)
@@ -214,8 +262,8 @@ public class UpgradeUI : MonoBehaviour
             bool canAfford = ResourceInventory.Instance != null &&
                              ResourceInventory.Instance.Get(def.costResource) >= def.cost;
 
-            var capturedDef   = def;
-            var capturedSlot  = slotIndex;
+            var capturedDef  = def;
+            var capturedSlot = slotIndex;
             var kurBtn = AddButton(row.transform, "Kur", () => InstallAndRefresh(capturedDef, capturedSlot), 100f);
 
             if (!canAfford)
@@ -268,7 +316,7 @@ public class UpgradeUI : MonoBehaviour
 
         var comp = _loadout?.GetSlotComponent(slotIndex);
 
-        MakeTextLabel(_popupContent.transform, "\u2500\u2500 STAT UPGRADE \u2500\u2500", 20, TextAnchor.MiddleLeft);
+        MakeTextLabel(_popupContent.transform, "── STAT UPGRADE ──", 20, TextAnchor.MiddleLeft);
 
         foreach (var (key, statLabel) in stats)
         {
@@ -278,6 +326,8 @@ public class UpgradeUI : MonoBehaviour
             bool canAfford = !maxed && ResourceInventory.Instance != null &&
                              ResourceInventory.Instance.Get(def.costResource) >= cost;
 
+            bool isSelected = !maxed && _selectedStatKey == key && _selectedStatSlot == slotIndex;
+
             var row = CreateRow(_popupContent.transform);
 
             var lblGo = new GameObject("StatLabel", typeof(RectTransform));
@@ -286,11 +336,21 @@ public class UpgradeUI : MonoBehaviour
             lbl.text      = maxed ? $"{statLabel} Lv {curLevel}/5 MAX" : $"{statLabel} Lv {curLevel}/5  ({cost})";
             lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             lbl.fontSize  = 24;
-            lbl.color     = maxed ? new Color(1f, 0.85f, 0.2f, 1f) : Color.white;
-            lbl.alignment = TextAnchor.MiddleLeft;
-            var lblLE     = lblGo.AddComponent<LayoutElement>();
+            lbl.color     = maxed       ? new Color(1f, 0.85f, 0.2f, 1f)   :
+                            isSelected  ? new Color(0.5f, 1f, 0.6f, 1f)    :
+                                          Color.white;
+            lbl.alignment       = TextAnchor.MiddleLeft;
+            lbl.raycastTarget   = true;
+            var lblLE           = lblGo.AddComponent<LayoutElement>();
             lblLE.flexibleWidth   = 1f;
             lblLE.preferredHeight = 52f;
+
+            if (!maxed)
+            {
+                var click       = lblGo.AddComponent<StatLabelClick>();
+                click.statKey   = key;
+                click.slotIndex = slotIndex;
+            }
 
             if (!maxed)
             {
@@ -326,20 +386,22 @@ public class UpgradeUI : MonoBehaviour
 
             if (!headerShown)
             {
-                MakeTextLabel(_popupContent.transform, "\u2500\u2500 STAT UPGRADE \u2500\u2500", 20, TextAnchor.MiddleLeft);
+                MakeTextLabel(_popupContent.transform, "── STAT UPGRADE ──", 20, TextAnchor.MiddleLeft);
                 headerShown = true;
             }
 
             MakeTextLabel(_popupContent.transform, typeLabel, 22, TextAnchor.MiddleLeft);
 
             var capturedType = type;
-            foreach (var (key, statLabel) in new[] { ("damage", "Hasar"), ("fireRate", "Ate\u015f H\u0131z\u0131") })
+            foreach (var (key, statLabel) in new[] { ("damage", "Hasar"), ("fireRate", "Ateş Hızı") })
             {
                 int curLevel = _loadout.GetWeaponStatLevel(type, key);
                 bool maxed   = curLevel >= ShipComponentBase.MaxStatLevel;
                 int cost     = maxed ? 0 : StatUpgradeCost(curDef, curLevel);
                 bool canAfford = !maxed && ResourceInventory.Instance != null &&
                                  ResourceInventory.Instance.Get(curDef.costResource) >= cost;
+
+                bool isSelected = !maxed && _selectedStatKey == key && _selectedStatSlot == 5;
 
                 var row = CreateRow(_popupContent.transform);
 
@@ -349,11 +411,21 @@ public class UpgradeUI : MonoBehaviour
                 lbl.text      = maxed ? $"{statLabel} Lv {curLevel}/5 MAX" : $"{statLabel} Lv {curLevel}/5  ({cost})";
                 lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
                 lbl.fontSize  = 24;
-                lbl.color     = maxed ? new Color(1f, 0.85f, 0.2f, 1f) : Color.white;
-                lbl.alignment = TextAnchor.MiddleLeft;
-                var lblLE     = lblGo.AddComponent<LayoutElement>();
+                lbl.color     = maxed      ? new Color(1f, 0.85f, 0.2f, 1f) :
+                                isSelected ? new Color(0.5f, 1f, 0.6f, 1f)  :
+                                             Color.white;
+                lbl.alignment     = TextAnchor.MiddleLeft;
+                lbl.raycastTarget = true;
+                var lblLE         = lblGo.AddComponent<LayoutElement>();
                 lblLE.flexibleWidth   = 1f;
                 lblLE.preferredHeight = 52f;
+
+                if (!maxed)
+                {
+                    var click       = lblGo.AddComponent<StatLabelClick>();
+                    click.statKey   = key;
+                    click.slotIndex = 5;
+                }
 
                 if (!maxed)
                 {
@@ -376,22 +448,20 @@ public class UpgradeUI : MonoBehaviour
         var hangar = _loadout?.GetSlotComponent(slotIndex) as HangarComponent;
         if (hangar == null) return;
 
-        MakeTextLabel(_popupContent.transform, "\u2500\u2500 HANGAR \u2500\u2500", 20, TextAnchor.MiddleLeft);
+        MakeTextLabel(_popupContent.transform, "── HANGAR ──", 20, TextAnchor.MiddleLeft);
 
-        // Sayı yükseltmeleri (her level +1 gemi)
-        BuildHangarCountRow(slotIndex, def, hangar, "maxCollectors", "Max Toplay\u0131c\u0131", hangar.MaxCollectors);
-        BuildHangarCountRow(slotIndex, def, hangar, "maxFighters",   "Max Sava\u015f\u00e7\u0131",   hangar.MaxFighters);
+        BuildHangarCountRow(slotIndex, def, hangar, "maxCollectors", "Max Toplayıcı", hangar.MaxCollectors);
+        BuildHangarCountRow(slotIndex, def, hangar, "maxFighters",   "Max Savaşçı",   hangar.MaxFighters);
 
-        MakeTextLabel(_popupContent.transform, "\u2500\u2500 STAT UPGRADE \u2500\u2500", 20, TextAnchor.MiddleLeft);
+        MakeTextLabel(_popupContent.transform, "── STAT UPGRADE ──", 20, TextAnchor.MiddleLeft);
 
-        // Çarpan yükseltmeleri
         foreach (var (key, label) in new[]
         {
-            ("productionSpeed", "\u00dcretim H\u0131z\u0131"),
+            ("productionSpeed", "Üretim Hızı"),
             ("maxHP",           "Gemi Max HP"),
-            ("fireRate",        "Sava\u015f\u00e7\u0131 Ate\u015f"),
-            ("salvageRate",     "Toplama H\u0131z\u0131"),
-            ("speed",           "Gemi H\u0131z\u0131"),
+            ("fireRate",        "Savaşçı Ateş"),
+            ("salvageRate",     "Toplama Hızı"),
+            ("speed",           "Gemi Hızı"),
         })
         {
             int curLevel = hangar.StatLevels.TryGetValue(key, out var lvl) ? lvl : 0;
@@ -400,6 +470,8 @@ public class UpgradeUI : MonoBehaviour
             bool canAfford = !maxed && ResourceInventory.Instance != null &&
                              ResourceInventory.Instance.Get(def.costResource) >= cost;
 
+            bool isSelected = !maxed && _selectedStatKey == key && _selectedStatSlot == slotIndex;
+
             var row = CreateRow(_popupContent.transform);
             var lblGo = new GameObject("StatLabel", typeof(RectTransform));
             lblGo.transform.SetParent(row.transform, false);
@@ -407,11 +479,21 @@ public class UpgradeUI : MonoBehaviour
             lbl.text      = maxed ? $"{label} Lv {curLevel}/5 MAX" : $"{label} Lv {curLevel}/5  ({cost})";
             lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             lbl.fontSize  = 24;
-            lbl.color     = maxed ? new Color(1f, 0.85f, 0.2f, 1f) : Color.white;
-            lbl.alignment = TextAnchor.MiddleLeft;
-            var lblLE     = lblGo.AddComponent<LayoutElement>();
+            lbl.color     = maxed      ? new Color(1f, 0.85f, 0.2f, 1f) :
+                            isSelected ? new Color(0.5f, 1f, 0.6f, 1f)  :
+                                         Color.white;
+            lbl.alignment     = TextAnchor.MiddleLeft;
+            lbl.raycastTarget = true;
+            var lblLE         = lblGo.AddComponent<LayoutElement>();
             lblLE.flexibleWidth   = 1f;
             lblLE.preferredHeight = 50f;
+
+            if (!maxed)
+            {
+                var click       = lblGo.AddComponent<StatLabelClick>();
+                click.statKey   = key;
+                click.slotIndex = slotIndex;
+            }
 
             if (!maxed)
             {
@@ -437,18 +519,30 @@ public class UpgradeUI : MonoBehaviour
         bool canAfford = !maxed && ResourceInventory.Instance != null &&
                          ResourceInventory.Instance.Get(def.costResource) >= cost;
 
+        bool isSelected = !maxed && _selectedStatKey == key && _selectedStatSlot == slotIndex;
+
         var row = CreateRow(_popupContent.transform);
         var lblGo = new GameObject("StatLabel", typeof(RectTransform));
         lblGo.transform.SetParent(row.transform, false);
         var lbl       = lblGo.AddComponent<Text>();
-        lbl.text      = maxed ? $"{label}: {currentCount} MAX" : $"{label}: {currentCount}  (+1 \u2192 {cost})";
+        lbl.text      = maxed ? $"{label}: {currentCount} MAX" : $"{label}: {currentCount}  (+1 → {cost})";
         lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         lbl.fontSize  = 24;
-        lbl.color     = maxed ? new Color(1f, 0.85f, 0.2f, 1f) : Color.white;
-        lbl.alignment = TextAnchor.MiddleLeft;
-        var lblLE     = lblGo.AddComponent<LayoutElement>();
+        lbl.color     = maxed      ? new Color(1f, 0.85f, 0.2f, 1f) :
+                        isSelected ? new Color(0.5f, 1f, 0.6f, 1f)  :
+                                     Color.white;
+        lbl.alignment     = TextAnchor.MiddleLeft;
+        lbl.raycastTarget = true;
+        var lblLE         = lblGo.AddComponent<LayoutElement>();
         lblLE.flexibleWidth   = 1f;
         lblLE.preferredHeight = 34f;
+
+        if (!maxed)
+        {
+            var click       = lblGo.AddComponent<StatLabelClick>();
+            click.statKey   = key;
+            click.slotIndex = slotIndex;
+        }
 
         if (!maxed)
         {
@@ -475,10 +569,10 @@ public class UpgradeUI : MonoBehaviour
     {
         switch (type)
         {
-            case ComponentType.Generator:  return new[] { ("production", "\u00dcretim") };
-            case ComponentType.Shield:     return new[] { ("rechargeRate", "\u015earj H\u0131z\u0131"), ("maxShield", "Max Kalkan") };
-            case ComponentType.RepairUnit: return new[] { ("repairRate", "Tamir H\u0131z\u0131"), ("energyEfficiency", "Enerji Verimi") };
-            case ComponentType.Turret:     return new[] { ("damage", "Hasar"), ("fireRate", "Ate\u015f H\u0131z\u0131") };
+            case ComponentType.Generator:  return new[] { ("production", "Üretim") };
+            case ComponentType.Shield:     return new[] { ("rechargeRate", "Şarj Hızı"), ("maxShield", "Max Kalkan") };
+            case ComponentType.RepairUnit: return new[] { ("repairRate", "Tamir Hızı"), ("energyEfficiency", "Enerji Verimi") };
+            case ComponentType.Turret:     return new[] { ("damage", "Hasar"), ("fireRate", "Ateş Hızı") };
             default:                       return null;
         }
     }
@@ -490,7 +584,6 @@ public class UpgradeUI : MonoBehaviour
         if (comp == null) return;
         if (!ResourceInventory.Instance.TrySpend(def.costResource, cost)) return;
         comp.ApplyStatUpgrade(key);
-        RefreshResourceDisplay();
         OnSlotClicked(slotIndex);
     }
 
@@ -499,14 +592,12 @@ public class UpgradeUI : MonoBehaviour
         if (_loadout == null) return;
         if (!ResourceInventory.Instance.TrySpend(def.costResource, cost)) return;
         _loadout.ApplyWeaponStatUpgrade(type, key);
-        RefreshResourceDisplay();
         OnSlotClicked(5);
     }
 
-    // Her silah tipi için ayrı satır: isim/tier + Satın Al veya Seç + Upgrade
     void BuildWeaponSwitchRows()
     {
-        MakeTextLabel(_popupContent.transform, "ANA S\u0130LAH", 24, TextAnchor.MiddleLeft);
+        MakeTextLabel(_popupContent.transform, "ANA SİLAH", 24, TextAnchor.MiddleLeft);
 
         var weaponTypes = new[]
         {
@@ -523,7 +614,6 @@ public class UpgradeUI : MonoBehaviour
 
             var row = CreateRow(_popupContent.transform);
 
-            // İsim + tier
             ComponentDefinition curDef  = unlocked ? _loadout.GetWeaponDef(type) : ShipLoadout.GetWeaponChainStart(type);
             string tierStr = unlocked ? $" Mk{curDef?.tier ?? 1}" : " —";
             var nameGo = new GameObject("WeaponLabel", typeof(RectTransform));
@@ -540,11 +630,10 @@ public class UpgradeUI : MonoBehaviour
 
             if (!unlocked)
             {
-                // Satın Al butonu
                 ComponentDefinition unlockDef = ShipLoadout.GetWeaponChainStart(type);
                 bool canAfford = ResourceInventory.Instance != null && unlockDef != null &&
                                  ResourceInventory.Instance.Get(unlockDef.costResource) >= unlockDef.cost;
-                string costLabel = unlockDef != null ? $"Sat\u0131n Al\n{unlockDef.cost}" : "Sat\u0131n Al";
+                string costLabel = unlockDef != null ? $"Satın Al\n{unlockDef.cost}" : "Satın Al";
                 var buyBtn = AddButton(row.transform, costLabel, () => UnlockWeaponAndRefresh(capturedType), 80f);
                 if (!canAfford)
                 {
@@ -554,18 +643,16 @@ public class UpgradeUI : MonoBehaviour
             }
             else
             {
-                // Seç butonu
-                var selBtn = AddButton(row.transform, "Se\u00e7", () => SwitchWeaponAndRefresh(capturedType), 60f);
+                var selBtn = AddButton(row.transform, "Seç", () => SwitchWeaponAndRefresh(capturedType), 60f);
                 if (isActive)
                     selBtn.GetComponent<Image>().color = new Color(0.10f, 0.55f, 0.20f, 1f);
 
-                // Upgrade butonu
                 if (curDef?.upgradeTo != null)
                 {
                     int diff = curDef.upgradeTo.cost - curDef.sellValue;
                     bool canAfford = ResourceInventory.Instance != null &&
                                      ResourceInventory.Instance.Get(curDef.upgradeTo.costResource) >= diff;
-                    string upLabel = $"\u2191Mk{curDef.upgradeTo.tier}\n{diff}";
+                    string upLabel = $"↑Mk{curDef.upgradeTo.tier}\n{diff}";
                     var upBtn = AddButton(row.transform, upLabel, () => UpgradeWeaponTypeAndRefresh(capturedType), 70f);
                     if (!canAfford)
                     {
@@ -581,10 +668,7 @@ public class UpgradeUI : MonoBehaviour
     {
         if (_loadout == null) return;
         if (_loadout.UnlockWeaponType(type))
-        {
-            RefreshResourceDisplay();
             OnSlotClicked(5);
-        }
     }
 
     void SwitchWeaponAndRefresh(WeaponType type)
@@ -597,71 +681,216 @@ public class UpgradeUI : MonoBehaviour
     {
         if (_loadout == null) return;
         if (_loadout.UpgradeWeaponType(type))
-        {
-            RefreshResourceDisplay();
             OnSlotClicked(5);
-        }
     }
 
     void UpgradeAndRefresh(int slotIndex)
     {
         if (_loadout == null) return;
         if (_loadout.UpgradeComponent(slotIndex))
-        {
-            RefreshResourceDisplay();
             OnSlotClicked(slotIndex);
-        }
     }
 
     void SellAndRefresh(int slotIndex)
     {
         if (_loadout == null) return;
         if (_loadout.SellComponent(slotIndex))
-        {
-            RefreshResourceDisplay();
             OnSlotClicked(slotIndex);
+    }
+
+    // =========================================================================
+    // Stat Açıklamaları ve Bileşen İstatistikleri
+    // =========================================================================
+
+    void UpdateSlotInfoStats()
+    {
+        if (_slotStatsText == null) return;
+        _slotStatsText.text = _currentSlotIndex >= 0
+            ? BuildComponentStatsText(_currentSlotIndex)
+            : "";
+    }
+
+    string BuildComponentStatsText(int slotIndex)
+    {
+        if (slotIndex == 5) return BuildWeaponStatsText();
+
+        var def  = _loadout?.GetSlotDef(slotIndex);
+        var comp = _loadout?.GetSlotComponent(slotIndex);
+        if (def == null || comp == null) return "";
+
+        var sb = new StringBuilder();
+
+        switch (def.componentType)
+        {
+            case ComponentType.Turret:
+            {
+                var tc = comp as TurretController;
+                if (tc == null) break;
+                float dmg = tc.damage    * tc.GetMultiplier("damage");
+                float sps = tc.GetMultiplier("fireRate") / tc.fireRate;
+                float eng = tc.energyPerShot;
+
+                sb.AppendLine(DeltaLine("Hasar",        dmg, "damage",    false));
+                sb.AppendLine(DeltaLine("Ateş/sn", sps, "fireRate",  false));
+                sb.AppendLine($"Enerji/atış: {eng:0.##}");
+                if (tc.magazineSize > 0)
+                {
+                    sb.AppendLine($"Şajör: {tc.magazineSize}");
+                    sb.AppendLine($"Yeniden şarj: {tc.reloadTime:0.#}s");
+                }
+                break;
+            }
+            case ComponentType.RepairUnit:
+            {
+                var ru = comp as RepairUnitComponent;
+                if (ru == null) break;
+                float rate = ru.repairRate    * ru.GetMultiplier("repairRate");
+                float eng  = ru.energyPerRepair / ru.GetMultiplier("energyEfficiency");
+                sb.AppendLine(DeltaLine("Tamir/sn",  rate, "repairRate",       false));
+                sb.AppendLine(DeltaLine("Enerji/sn", eng,  "energyEfficiency", true));
+                break;
+            }
+            case ComponentType.Generator:
+            {
+                var gen = comp as GeneratorComponent;
+                if (gen == null) break;
+                float prod = gen.productionAmount * gen.GetMultiplier("production");
+                sb.AppendLine(DeltaLine("Üretim/sn", prod, "production", false));
+                break;
+            }
+            case ComponentType.Shield:
+            {
+                var sg = comp as ShieldGeneratorComponent;
+                if (sg == null) break;
+                float maxS     = sg.maxShield    * sg.GetMultiplier("maxShield");
+                float recharge = sg.rechargeRate * sg.GetMultiplier("rechargeRate");
+                sb.AppendLine(DeltaLine("Max kalkan", maxS,     "maxShield",    false));
+                sb.AppendLine(DeltaLine("Şarj/sn", recharge, "rechargeRate", false));
+                break;
+            }
+            case ComponentType.Hangar:
+            {
+                var hc = comp as HangarComponent;
+                if (hc == null) break;
+                sb.AppendLine($"Max toplayıcı: {hc.MaxCollectors}");
+                sb.AppendLine($"Max savaşçı: {hc.MaxFighters}");
+                float eff = hc.EffProductionTime;
+                sb.AppendLine($"Üretim süresi: {eff:0.#}s");
+                sb.AppendLine($"Gemi hızı: {hc.EffShipSpeed:0.#}");
+                break;
+            }
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    string BuildWeaponStatsText()
+    {
+        if (_loadout == null) return "";
+        var type = _loadout.GetActiveWeaponType();
+        var def  = _loadout.GetWeaponDef(type);
+        if (def == null) return "";
+
+        // WeaponController'dan güncel değerleri al (stat upgrade uygulanmış)
+        var wc = _loadout.GetComponentInChildren<WeaponController>();
+        if (wc == null)
+        {
+            return $"Hasar: {def.weaponDamage:0.#}\nAteş aralığı: {def.weaponFireRate:0.##}s";
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"Hasar: {wc.damage:0.#}");
+        sb.AppendLine($"Ateş aralığı: {wc.fireRate:0.##}s");
+        if (wc.energyCostPerShot > 0f)
+            sb.AppendLine($"Enerji/atış: {wc.energyCostPerShot:0.#}");
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Seçili stat bu satırla eşleşiyorsa delta değeri ekler.
+    /// isDecreasing=true → upgrade azaltıcı (enerji verimi gibi).
+    /// </summary>
+    string DeltaLine(string label, float current, string statKey, bool isDecreasing)
+    {
+        string valStr = $"{current:0.##}";
+        if (_selectedStatKey != statKey || _selectedStatSlot != _currentSlotIndex)
+            return $"{label}: {valStr}";
+
+        float delta;
+        string sign;
+        if (!isDecreasing) { delta = current * 0.5f;            sign = "+"; }
+        else               { delta = current * (1f - 1f/1.5f);  sign = "-"; }
+
+        return $"{label}: {valStr}  ({sign}{delta:0.##})";
+    }
+
+    static string GetStatDescription(string key)
+    {
+        switch (key)
+        {
+            case "damage":           return "Turretin verdiği hasarı artırır.\nHer seviye ×1.5 çarpanı ekler.";
+            case "fireRate":         return "Ateş hızını artırır.\nHer seviye ×1.5 çarpanı ekler.";
+            case "repairRate":       return "Saniyede tamir edilen HP miktarını artırır.\nHer seviye ×1.5 çarpanı ekler.";
+            case "energyEfficiency": return "Tamir için harcanan enerji miktarını azaltır.\nHer seviye ÷1.5 azalma sağlar.";
+            case "production":       return "Saniyede üretilen enerji miktarını artırır.\nHer seviye ×1.5 çarpanı ekler.";
+            case "rechargeRate":     return "Kalkan şarj hızını artırır.\nHer seviye ×1.5 çarpanı ekler.";
+            case "maxShield":        return "Maksimum kalkan kapasitesini artırır.\nHer seviye ×1.5 çarpanı ekler.";
+            case "productionSpeed":  return "Toplayıcı/savaşçı üretim hızını artırır.\nHer seviye ×1.5 çarpanı ekler.";
+            case "maxHP":            return "Gemi bileşenlerinin dayanaklılığını artırır.\nHer seviye ×1.5 çarpanı ekler.";
+            case "salvageRate":      return "Enkaz toplama hızını artırır.\nHer seviye ×1.5 çarpanı ekler.";
+            case "speed":            return "Toplayıcı/savaşçı gemi hızını artırır.\nHer seviye ×1.5 çarpanı ekler.";
+            case "maxCollectors":    return "Hangarın maksimum toplayıcı sayısını artırır.\nHer seviye +1 toplayıcı ekler.";
+            case "maxFighters":      return "Hangarın maksimum savaşçı sayısını artırır.\nHer seviye +1 savaşçı ekler.";
+            default:                 return key;
         }
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Hardcoded Catalog
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     static ComponentDefinition[] _weaponDefs;
 
-    static ComponentDefinition[] GetCatalogDefs(int slotIndex)
-    {
-        return GetComponentDefs();
-    }
+    static ComponentDefinition[] GetCatalogDefs(int slotIndex) => GetComponentDefs();
 
     static ComponentDefinition[] GetComponentDefs()
     {
         if (_catalogDefs != null) return _catalogDefs;
 
         var shield = ScriptableObject.CreateInstance<ComponentDefinition>();
-        shield.componentName = "Kalkan Jenerat\u00f6r\u00fc Mk1";
+        shield.componentName = "Kalkan Jeneratörü Mk1";
         shield.componentType = ComponentType.Shield;
-        shield.tier = 1; shield.costResource = ResourceType.RawMaterial; shield.cost = 10;
+        shield.tier          = 1;
+        shield.costResource  = ResourceType.RawMaterial;
+        shield.cost          = 10;
+        shield.sellValue     = 5;
+        shield.maxShield     = 100f;   // Bug fix: katalog tanımında değer eksikti
+        shield.rechargeRate  = 1.5f;   // Bug fix: katalog tanımında değer eksikti
 
         var repair = ScriptableObject.CreateInstance<ComponentDefinition>();
-        repair.componentName = "Onar\u0131m Birimi Mk1";
+        repair.componentName = "Onarım Birimi Mk1";
         repair.componentType = ComponentType.RepairUnit;
-        repair.tier = 1; repair.costResource = ResourceType.RawMaterial; repair.cost = 8;
+        repair.tier          = 1;
+        repair.costResource  = ResourceType.RawMaterial;
+        repair.cost          = 8;
+        repair.sellValue     = 4;
+        repair.repairRate    = 8f;
 
         var gen = ScriptableObject.CreateInstance<ComponentDefinition>();
-        gen.componentName    = "Enerji Jenerat\u00f6r\u00fc Mk1";
+        gen.componentName    = "Enerji Jeneratörü Mk1";
         gen.componentType    = ComponentType.Generator;
         gen.tier             = 1;
         gen.costResource     = ResourceType.RawMaterial;
         gen.cost             = 15;
+        gen.sellValue        = 7;
         gen.productionAmount = 10f;
 
-        // Turretler
+        // Turretler — Lazer ve Plazma RawMaterial kullanır (önceden Crystal'dı, kaynak sıkıntısı yaratıyordu)
         var gatling = T("Gatling Turret",   TurretType.Gatling,      ResourceType.RawMaterial,    12,
             fireRate:1f,  damage:5f,  speed:9f,  life:3f,  energy:0.5f, mag:10, reload:3f);
-        var plasma  = T("Plazma Turret",    TurretType.Plasma,       ResourceType.EnergyCrystal,  20,
+        var plasma  = T("Plazma Turret",    TurretType.Plasma,       ResourceType.RawMaterial,    20,
             fireRate:20f, damage:25f, speed:5f,  life:4f,  energy:4f);
-        var laser   = T("Lazer Turret",     TurretType.Laser,        ResourceType.EnergyCrystal,  18,
+        var laser   = T("Lazer Turret",     TurretType.Laser,        ResourceType.RawMaterial,    18,
             fireRate:5f,  damage:15f, speed:14f, life:4f,  energy:3f);
         var rocket  = T("Roket Turret",     TurretType.Rocket,       ResourceType.RawMaterial,    22,
             fireRate:30f, damage:50f, speed:7f,  life:10f, energy:0.5f);
@@ -694,54 +923,13 @@ public class UpgradeUI : MonoBehaviour
         return d;
     }
 
-    static ComponentDefinition[] GetWeaponDefs()
-    {
-        if (_weaponDefs != null) return _weaponDefs;
-
-        var kinetic = ScriptableObject.CreateInstance<ComponentDefinition>();
-        kinetic.componentName      = "Kinetik Top Mk1";
-        kinetic.componentType      = ComponentType.Weapon;
-        kinetic.weaponType         = WeaponType.Kinetic;
-        kinetic.tier               = 1;
-        kinetic.costResource       = ResourceType.RawMaterial;
-        kinetic.cost               = 12;
-        kinetic.weaponDamage       = 12f;
-        kinetic.weaponFireRate     = 0.15f;
-
-        var laser = ScriptableObject.CreateInstance<ComponentDefinition>();
-        laser.componentName            = "Lazer Topu Mk1";
-        laser.componentType            = ComponentType.Weapon;
-        laser.weaponType               = WeaponType.Laser;
-        laser.tier                     = 1;
-        laser.costResource             = ResourceType.EnergyCrystal;
-        laser.cost                     = 18;
-        laser.weaponDamage             = 8f;
-        laser.weaponFireRate           = 0.07f;
-        laser.weaponEnergyCostPerShot  = 2f;
-
-        var plasma = ScriptableObject.CreateInstance<ComponentDefinition>();
-        plasma.componentName      = "Plazma Topu Mk1";
-        plasma.componentType      = ComponentType.Weapon;
-        plasma.weaponType         = WeaponType.Plasma;
-        plasma.tier               = 1;
-        plasma.costResource       = ResourceType.RawMaterial;
-        plasma.cost               = 20;
-        plasma.weaponDamage       = 28f;
-        plasma.weaponFireRate     = 0.12f;
-        plasma.weaponChargeTime   = 0.8f;
-        plasma.weaponBurstCount   = 3;
-
-        _weaponDefs = new[] { kinetic, laser, plasma };
-        return _weaponDefs;
-    }
-
     static string TypeLabel(ComponentType type)
     {
         switch (type)
         {
             case ComponentType.Shield:     return "Kalkan";
-            case ComponentType.RepairUnit: return "Onar\u0131m Birimi";
-            case ComponentType.Generator:  return "Enerji Jenerat\u00f6r\u00fc";
+            case ComponentType.RepairUnit: return "Onarım Birimi";
+            case ComponentType.Generator:  return "Enerji Jeneratörü";
             case ComponentType.Weapon:     return "Silah";
             case ComponentType.Turret:     return "Turret";
             case ComponentType.Hangar:     return "Hangar";
@@ -749,9 +937,9 @@ public class UpgradeUI : MonoBehaviour
         }
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Canvas / Panel Builder
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     void BuildCanvas()
     {
@@ -773,6 +961,7 @@ public class UpgradeUI : MonoBehaviour
     }
 
     // Sol şerit — tam yükseklik, dar
+    // Üst %5 boş bırakılır: EnergyBar HUD görünür kalsın
     void BuildGeneralPanel()
     {
         _generalPanel = new GameObject("GeneralPanel", typeof(RectTransform));
@@ -781,7 +970,7 @@ public class UpgradeUI : MonoBehaviour
 
         var r = (RectTransform)_generalPanel.transform;
         r.anchorMin        = new Vector2(0f, 0f);
-        r.anchorMax        = new Vector2(0.11f, 1f);
+        r.anchorMax        = new Vector2(0.11f, 0.95f);  // üst %5 serbest
         r.anchoredPosition = Vector2.zero;
         r.sizeDelta        = Vector2.zero;
 
@@ -791,63 +980,105 @@ public class UpgradeUI : MonoBehaviour
         vl.childForceExpandWidth  = true;
         vl.childForceExpandHeight = false;
 
-        var headerTxt = MakeLabel(_generalPanel.transform, "GENEL B\u0130LG\u0130LER", 40, FontStyle.Bold);
+        var headerTxt = MakeLabel(_generalPanel.transform, "GENEL BİLGİLER", 36, FontStyle.Bold);
         headerTxt.color = new Color(0.4f, 0.3f, 0.55f, 1f);
 
         (_hpFill,     _hpStatText)     = MakeStatBox(_generalPanel.transform, "HP",
             new Color(0.12f, 0.22f, 0.12f, 0.88f), new Color(0.25f, 0.72f, 0.30f, 1f));
         (_shieldFill, _shieldStatText) = MakeStatBox(_generalPanel.transform, "KALKAN",
             new Color(0.10f, 0.14f, 0.26f, 0.88f), new Color(0.25f, 0.55f, 0.90f, 1f));
-        (_energyFill, _energyStatText) = MakeStatBox(_generalPanel.transform, "ENERJ\u0130",
+        (_energyFill, _energyStatText) = MakeStatBox(_generalPanel.transform, "ENERJİ",
             new Color(0.22f, 0.14f, 0.04f, 0.88f), new Color(0.95f, 0.65f, 0.10f, 1f));
-
-        MakeLabel(_generalPanel.transform, "", 6, FontStyle.Normal); // bo\u015fluk
-
-        _hamMaddeText = MakeLabel(_generalPanel.transform, "Ham Madde: \u2014", 22, FontStyle.Normal);
-        _kristalText  = MakeLabel(_generalPanel.transform, "Kristal: \u2014",   22, FontStyle.Normal);
+        // Ham madde ve kristal göstergeleri kaldırıldı — EnergyBar HUD'da mevcut
     }
 
-    // Sol üst — kurulu component bilgisi
+    // Sol üst — kurulu bileşen bilgisi (genişletildi, 2 sütun)
     void BuildSlotInfoPanel()
     {
         _slotInfoPanel = new GameObject("SlotInfoPanel", typeof(RectTransform));
         _slotInfoPanel.transform.SetParent(transform, false);
         _slotInfoPanel.AddComponent<Image>().color = new Color(0.05f, 0.10f, 0.18f, 0.95f);
+        _slotInfoPanel.AddComponent<DeselectOnClick>();
 
         var r = (RectTransform)_slotInfoPanel.transform;
-        r.anchorMin        = new Vector2(0.115f, 0.70f);
-        r.anchorMax        = new Vector2(0.375f, 0.98f);
+        r.anchorMin        = new Vector2(0.115f, 0.67f);
+        r.anchorMax        = new Vector2(0.57f,  0.95f);  // genişletildi + üst boşluk
         r.anchoredPosition = Vector2.zero;
         r.sizeDelta        = Vector2.zero;
 
-        var vl = _slotInfoPanel.AddComponent<VerticalLayoutGroup>();
-        vl.padding                = new RectOffset(14, 14, 12, 12);
-        vl.spacing                = 10f;
-        vl.childForceExpandWidth  = true;
-        vl.childForceExpandHeight = false;
+        var outerVL = _slotInfoPanel.AddComponent<VerticalLayoutGroup>();
+        outerVL.padding                = new RectOffset(14, 14, 12, 12);
+        outerVL.spacing                = 8f;
+        outerVL.childForceExpandWidth  = true;
+        outerVL.childForceExpandHeight = false;
 
-        var headerTxt = MakeLabel(_slotInfoPanel.transform, "SLOT B\u0130LG\u0130S\u0130", 40, FontStyle.Bold);
+        // Başlık
+        var headerTxt = MakeLabel(_slotInfoPanel.transform, "SLOT BİLGİSİ", 36, FontStyle.Bold);
         headerTxt.color = new Color(0.29f, 0.47f, 0.67f, 1f);
 
-        _leftNameText = MakeLabel(_slotInfoPanel.transform, "", 40, FontStyle.Bold);
-        _leftTypeText = MakeLabel(_slotInfoPanel.transform, "", 28, FontStyle.Normal);
+        // İçerik alanı — iki sütun yan yana
+        var contentGo = new GameObject("Content", typeof(RectTransform));
+        contentGo.transform.SetParent(_slotInfoPanel.transform, false);
+        var contentLE = contentGo.AddComponent<LayoutElement>();
+        contentLE.flexibleWidth   = 1f;
+        contentLE.preferredHeight = 220f;
+
+        var hLayout = contentGo.AddComponent<HorizontalLayoutGroup>();
+        hLayout.spacing                = 14f;
+        hLayout.childForceExpandWidth  = true;
+        hLayout.childForceExpandHeight = true;
+
+        // Sol sütun — temel bilgi
+        var leftCol = new GameObject("LeftCol", typeof(RectTransform));
+        leftCol.transform.SetParent(contentGo.transform, false);
+        var leftVL = leftCol.AddComponent<VerticalLayoutGroup>();
+        leftVL.spacing                = 6f;
+        leftVL.childForceExpandWidth  = true;
+        leftVL.childForceExpandHeight = false;
+        leftCol.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+        _leftNameText = MakeLabel(leftCol.transform, "", 36, FontStyle.Bold);
+        _leftTypeText = MakeLabel(leftCol.transform, "", 26, FontStyle.Normal);
         _leftTypeText.color = new Color(0.3f, 0.75f, 0.9f, 1f);
-        _leftTierText = MakeLabel(_slotInfoPanel.transform, "", 26, FontStyle.Normal);
+        _leftTierText = MakeLabel(leftCol.transform, "", 24, FontStyle.Normal);
         _leftTierText.color = new Color(1f, 0.85f, 0.2f, 1f);
-        _leftCostText = MakeLabel(_slotInfoPanel.transform, "", 26, FontStyle.Normal);
+        _leftCostText = MakeLabel(leftCol.transform, "", 24, FontStyle.Normal);
         _leftCostText.color = new Color(0.3f, 0.9f, 0.45f, 1f);
+
+        // Sağ sütun — bileşen istatistikleri
+        var rightCol = new GameObject("RightCol", typeof(RectTransform));
+        rightCol.transform.SetParent(contentGo.transform, false);
+        var rightVL = rightCol.AddComponent<VerticalLayoutGroup>();
+        rightVL.spacing                = 4f;
+        rightVL.childForceExpandWidth  = true;
+        rightVL.childForceExpandHeight = false;
+        rightCol.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+        var statsGo = new GameObject("StatsText", typeof(RectTransform));
+        statsGo.transform.SetParent(rightCol.transform, false);
+        _slotStatsText                   = statsGo.AddComponent<Text>();
+        _slotStatsText.font              = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        _slotStatsText.fontSize          = 22;
+        _slotStatsText.color             = new Color(0.85f, 0.95f, 1f, 1f);
+        _slotStatsText.alignment         = TextAnchor.UpperLeft;
+        _slotStatsText.horizontalOverflow = HorizontalWrapMode.Wrap;
+        _slotStatsText.verticalOverflow   = VerticalWrapMode.Overflow;
+        var statsLE = statsGo.AddComponent<LayoutElement>();
+        statsLE.flexibleWidth   = 1f;
+        statsLE.preferredHeight = 220f;
     }
 
-    // Sağ üst — hover/tap ile seçilen opsiyon
+    // Sağ üst — hover/tap ile seçilen opsiyon detayı
     void BuildHoverDetailPanel()
     {
         _hoverDetailPanel = new GameObject("HoverDetailPanel", typeof(RectTransform));
         _hoverDetailPanel.transform.SetParent(transform, false);
         _hoverDetailPanel.AddComponent<Image>().color = new Color(0.04f, 0.12f, 0.05f, 0.95f);
+        _hoverDetailPanel.AddComponent<DeselectOnClick>();
 
         var r = (RectTransform)_hoverDetailPanel.transform;
-        r.anchorMin        = new Vector2(0.785f, 0.70f);
-        r.anchorMax        = new Vector2(0.995f, 0.98f);
+        r.anchorMin        = new Vector2(0.785f, 0.67f);
+        r.anchorMax        = new Vector2(0.995f, 0.95f);  // üst boşluk
         r.anchoredPosition = Vector2.zero;
         r.sizeDelta        = Vector2.zero;
 
@@ -857,24 +1088,40 @@ public class UpgradeUI : MonoBehaviour
         vl.childForceExpandWidth  = true;
         vl.childForceExpandHeight = false;
 
-        var headerTxt = MakeLabel(_hoverDetailPanel.transform, "OPS\u0130YON DETAYI", 40, FontStyle.Bold);
+        var headerTxt = MakeLabel(_hoverDetailPanel.transform, "OPSİYON DETAYI", 36, FontStyle.Bold);
         headerTxt.color = new Color(0.29f, 0.60f, 0.29f, 1f);
 
-        _rightNameText = MakeLabel(_hoverDetailPanel.transform, "", 40, FontStyle.Bold);
-        _rightTypeText = MakeLabel(_hoverDetailPanel.transform, "", 28, FontStyle.Normal);
+        // Bileşen bilgisi alanı (katalog hover için)
+        _rightNameText = MakeLabel(_hoverDetailPanel.transform, "", 36, FontStyle.Bold);
+        _rightTypeText = MakeLabel(_hoverDetailPanel.transform, "", 26, FontStyle.Normal);
         _rightTypeText.color = new Color(0.3f, 0.75f, 0.9f, 1f);
-        _rightTierText = MakeLabel(_hoverDetailPanel.transform, "", 26, FontStyle.Normal);
+        _rightTierText = MakeLabel(_hoverDetailPanel.transform, "", 24, FontStyle.Normal);
         _rightTierText.color = new Color(1f, 0.85f, 0.2f, 1f);
-        _rightCostText = MakeLabel(_hoverDetailPanel.transform, "", 26, FontStyle.Normal);
+        _rightCostText = MakeLabel(_hoverDetailPanel.transform, "", 24, FontStyle.Normal);
         _rightCostText.color = new Color(0.3f, 0.9f, 0.45f, 1f);
+
+        // Stat açıklama alanı (stat label click için)
+        var descGo = new GameObject("OptionDesc", typeof(RectTransform));
+        descGo.transform.SetParent(_hoverDetailPanel.transform, false);
+        _optionDescText                   = descGo.AddComponent<Text>();
+        _optionDescText.font              = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        _optionDescText.fontSize          = 22;
+        _optionDescText.color             = new Color(0.85f, 0.98f, 0.85f, 1f);
+        _optionDescText.alignment         = TextAnchor.UpperLeft;
+        _optionDescText.horizontalOverflow = HorizontalWrapMode.Wrap;
+        _optionDescText.verticalOverflow   = VerticalWrapMode.Overflow;
+        var descLE = descGo.AddComponent<LayoutElement>();
+        descLE.flexibleWidth   = 1f;
+        descLE.preferredHeight = 160f;
     }
 
-    // Sağ alt — component listesi
+    // Sağ alt — bileşen listesi
     void BuildListPanel()
     {
         _listPanel = new GameObject("ListPanel", typeof(RectTransform));
         _listPanel.transform.SetParent(transform, false);
         _listPanel.AddComponent<Image>().color = new Color(0.04f, 0.04f, 0.08f, 0.95f);
+        _listPanel.AddComponent<DeselectOnClick>();
 
         var r = (RectTransform)_listPanel.transform;
         r.anchorMin        = new Vector2(0.785f, 0.025f);
@@ -882,7 +1129,6 @@ public class UpgradeUI : MonoBehaviour
         r.anchoredPosition = Vector2.zero;
         r.sizeDelta        = Vector2.zero;
 
-        // Başlık (listenin üst %12'si)
         var titleGo = new GameObject("Title", typeof(RectTransform));
         titleGo.transform.SetParent(_listPanel.transform, false);
         _popupTitle           = titleGo.AddComponent<Text>();
@@ -897,7 +1143,6 @@ public class UpgradeUI : MonoBehaviour
         titleRect.anchoredPosition = Vector2.zero;
         titleRect.sizeDelta        = Vector2.zero;
 
-        // İçerik (satır listesi)
         _popupContent = new GameObject("Content", typeof(RectTransform));
         _popupContent.transform.SetParent(_listPanel.transform, false);
         var contentRect = (RectTransform)_popupContent.transform;
@@ -915,26 +1160,29 @@ public class UpgradeUI : MonoBehaviour
         vLayout.childForceExpandHeight = false;
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Detail Helpers
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     static void FillBox(Text n, Text ty, Text ti, Text c, ComponentDefinition def)
     {
+        if (def == null) return;
         n.text  = def.componentName;
         ty.text = TypeLabel(def.componentType);
         ti.text = $"Tier {def.tier}";
-        c.text  = $"{def.cost} Ham Madde";
+        string resLabel = def.costResource == ResourceType.EnergyCrystal ? "Kristal" : "Ham Madde";
+        c.text  = $"{def.cost} {resLabel}";
     }
 
     static void ClearBox(Text n, Text ty, Text ti, Text c)
     {
+        if (n == null) return;
         n.text = ty.text = ti.text = c.text = "";
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // UI Helpers
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     static GameObject CreateRow(Transform parent)
     {
@@ -991,7 +1239,6 @@ public class UpgradeUI : MonoBehaviour
         return btn;
     }
 
-    // Stat kutusu — arka plan + dolum barı + metin
     static (RectTransform fill, Text txt) MakeStatBox(Transform parent, string title, Color bgColor, Color fillColor)
     {
         var boxGo = new GameObject(title + "Box", typeof(RectTransform));
@@ -1030,16 +1277,24 @@ public class UpgradeUI : MonoBehaviour
 
     void UpdateStatBoxes()
     {
-        var ps     = _loadout != null ? _loadout.GetComponent<PlayerShip>()             : null;
-        var repair = _loadout != null ? _loadout.GetComponentInChildren<RepairUnitComponent>() : null;
+        var ps = _loadout != null ? _loadout.GetComponent<PlayerShip>() : null;
 
-        float repairRate = (repair != null && repair.IsOperational)
-            ? repair.repairRate * repair.GetMultiplier("repairRate") : 0f;
+        // HP: tüm RepairUnit bileşenlerinin toplam tamir hızı
+        float totalRepairRate = 0f;
+        if (_loadout != null)
+        {
+            foreach (var ru in _loadout.GetComponentsInChildren<RepairUnitComponent>())
+            {
+                if (ru.IsOperational)
+                    totalRepairRate += ru.repairRate * ru.GetMultiplier("repairRate");
+            }
+        }
         float hullHP  = ps != null ? ps.currentHullHP : 0f;
         float maxHull = ps != null ? ps.maxHullHP      : 1f;
         UpdateStatBox(_hpFill, _hpStatText, hullHP, maxHull, "HP",
-            repairRate > 0f ? $"+{repairRate:0.#}/s" : "");
+            totalRepairRate > 0f ? $"+{totalRepairRate:0.#}/s" : "");
 
+        // Kalkan: tüm ShieldGenerator toplamı
         float totalShield = 0f, totalMaxShield = 0f, totalRecharge = 0f;
         if (_loadout != null)
         {
@@ -1047,8 +1302,8 @@ public class UpgradeUI : MonoBehaviour
             {
                 if (!sg.IsOperational) continue;
                 totalShield    += sg.currentShield;
-                totalMaxShield += sg.maxShield * sg.GetMultiplier("maxShield");
-                totalRecharge  += sg.rechargeRate * sg.GetMultiplier("rechargeRate");
+                totalMaxShield += sg.maxShield     * sg.GetMultiplier("maxShield");
+                totalRecharge  += sg.rechargeRate  * sg.GetMultiplier("rechargeRate");
             }
         }
         UpdateStatBox(_shieldFill, _shieldStatText,
@@ -1057,6 +1312,7 @@ public class UpgradeUI : MonoBehaviour
                 ? (totalRecharge > 0f ? $"+{totalRecharge:0.#}/s" : "")
                 : "yok");
 
+        // Enerji
         float eCur = 0f, eMax = 1f, eProd = 0f;
         if (EnergyBus.Instance != null)
         {
@@ -1077,7 +1333,6 @@ public class UpgradeUI : MonoBehaviour
         lbl.text = $"{name}  {cur:0}/{max:0}{rateStr}";
     }
 
-    // Tüm panel içi text için ortak yardımcı
     static Text MakeLabel(Transform parent, string text, int fontSize, FontStyle style)
     {
         var go = new GameObject("Txt", typeof(RectTransform));
@@ -1117,11 +1372,11 @@ public class UpgradeUI : MonoBehaviour
     }
 }
 
-/// <summary>
-/// Katalog satırının isim alanına eklenir.
-/// PC: hover → sağ kutuyu doldurur / temizler.
-/// Mobil: tap → sağ kutuyu doldurur (açık kalır).
-/// </summary>
+// =============================================================================
+// Yardımcı MonoBehaviour'lar
+// =============================================================================
+
+/// <summary>Katalog satırı hover → sağ paneli bileşen bilgisiyle doldurur.</summary>
 [RequireComponent(typeof(Image))]
 public class ComponentRowHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
 {
@@ -1130,4 +1385,25 @@ public class ComponentRowHover : MonoBehaviour, IPointerEnterHandler, IPointerEx
     public void OnPointerEnter(PointerEventData _) => UpgradeUI.Instance?.ShowDetail(def);
     public void OnPointerExit(PointerEventData _)  => UpgradeUI.Instance?.HideDetail();
     public void OnPointerClick(PointerEventData _) => UpgradeUI.Instance?.ShowDetail(def);
+}
+
+/// <summary>Stat upgrade etiketine tıklanınca açıklama gösterir (toggle).</summary>
+public class StatLabelClick : MonoBehaviour, IPointerClickHandler
+{
+    public string statKey;
+    public int    slotIndex;
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        UpgradeUI.Instance?.ShowStatDescription(statKey, slotIndex);
+    }
+}
+
+/// <summary>Panel arka planına tıklanınca stat seçimini temizler.</summary>
+public class DeselectOnClick : MonoBehaviour, IPointerClickHandler
+{
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        UpgradeUI.Instance?.DeselectStat();
+    }
 }
