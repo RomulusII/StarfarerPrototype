@@ -25,6 +25,10 @@ public class UpgradeUI : MonoBehaviour
     private Text _hamMaddeText;
     private Text _kristalText;
 
+    // Genel panel — canlı stat kutuları
+    private RectTransform _hpFill, _shieldFill, _energyFill;
+    private Text          _hpStatText, _shieldStatText, _energyStatText;
+
     // Sol kutu — kurulu component
     private Text _leftNameText;
     private Text _leftTypeText;
@@ -77,6 +81,9 @@ public class UpgradeUI : MonoBehaviour
                 Time.timeScale  = 1f;
             }
         }
+
+        if (_canvas != null && _canvas.enabled)
+            UpdateStatBoxes();
     }
 
     // -------------------------------------------------------------------------
@@ -642,9 +649,12 @@ public class UpgradeUI : MonoBehaviour
         repair.tier = 1; repair.costResource = ResourceType.RawMaterial; repair.cost = 8;
 
         var gen = ScriptableObject.CreateInstance<ComponentDefinition>();
-        gen.componentName = "Enerji Jenerat\u00f6r\u00fc Mk1";
-        gen.componentType = ComponentType.Generator;
-        gen.tier = 1; gen.costResource = ResourceType.RawMaterial; gen.cost = 15;
+        gen.componentName    = "Enerji Jenerat\u00f6r\u00fc Mk1";
+        gen.componentType    = ComponentType.Generator;
+        gen.tier             = 1;
+        gen.costResource     = ResourceType.RawMaterial;
+        gen.cost             = 15;
+        gen.productionAmount = 10f;
 
         // Turretler
         var gatling = T("Gatling Turret",   TurretType.Gatling,      ResourceType.RawMaterial,    12,
@@ -784,14 +794,17 @@ public class UpgradeUI : MonoBehaviour
         var headerTxt = MakeLabel(_generalPanel.transform, "GENEL B\u0130LG\u0130LER", 40, FontStyle.Bold);
         headerTxt.color = new Color(0.4f, 0.3f, 0.55f, 1f);
 
-        foreach (var s in new[] { "HP", "Kalkan", "Enerji" })
-        {
-            var t = MakeLabel(_generalPanel.transform, s, 22, FontStyle.Normal);
-            t.color = new Color(0.55f, 0.55f, 0.55f, 1f);
-        }
+        (_hpFill,     _hpStatText)     = MakeStatBox(_generalPanel.transform, "HP",
+            new Color(0.12f, 0.22f, 0.12f, 0.88f), new Color(0.25f, 0.72f, 0.30f, 1f));
+        (_shieldFill, _shieldStatText) = MakeStatBox(_generalPanel.transform, "KALKAN",
+            new Color(0.10f, 0.14f, 0.26f, 0.88f), new Color(0.25f, 0.55f, 0.90f, 1f));
+        (_energyFill, _energyStatText) = MakeStatBox(_generalPanel.transform, "ENERJ\u0130",
+            new Color(0.22f, 0.14f, 0.04f, 0.88f), new Color(0.95f, 0.65f, 0.10f, 1f));
+
+        MakeLabel(_generalPanel.transform, "", 6, FontStyle.Normal); // bo\u015fluk
 
         _hamMaddeText = MakeLabel(_generalPanel.transform, "Ham Madde: \u2014", 22, FontStyle.Normal);
-        _kristalText  = MakeLabel(_generalPanel.transform, "Kristal: \u2014",  12, FontStyle.Normal);
+        _kristalText  = MakeLabel(_generalPanel.transform, "Kristal: \u2014",   22, FontStyle.Normal);
     }
 
     // Sol üst — kurulu component bilgisi
@@ -976,6 +989,92 @@ public class UpgradeUI : MonoBehaviour
 
         AttachLabel(go.transform, label, 28);
         return btn;
+    }
+
+    // Stat kutusu — arka plan + dolum barı + metin
+    static (RectTransform fill, Text txt) MakeStatBox(Transform parent, string title, Color bgColor, Color fillColor)
+    {
+        var boxGo = new GameObject(title + "Box", typeof(RectTransform));
+        boxGo.transform.SetParent(parent, false);
+        boxGo.AddComponent<Image>().color = bgColor;
+        var boxLE           = boxGo.AddComponent<LayoutElement>();
+        boxLE.preferredHeight = 62f;
+        boxLE.flexibleWidth   = 1f;
+
+        var fillGo = new GameObject("Fill", typeof(RectTransform));
+        fillGo.transform.SetParent(boxGo.transform, false);
+        fillGo.AddComponent<Image>().color = fillColor;
+        var fillRT              = (RectTransform)fillGo.transform;
+        fillRT.anchorMin        = new Vector2(0f, 0f);
+        fillRT.anchorMax        = new Vector2(0f, 1f);
+        fillRT.pivot            = new Vector2(0f, 0.5f);
+        fillRT.anchoredPosition = Vector2.zero;
+        fillRT.sizeDelta        = Vector2.zero;
+
+        var txtGo = new GameObject("Txt", typeof(RectTransform));
+        txtGo.transform.SetParent(boxGo.transform, false);
+        var txt       = txtGo.AddComponent<Text>();
+        txt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        txt.fontSize  = 18;
+        txt.fontStyle = FontStyle.Bold;
+        txt.color     = new Color(1f, 1f, 1f, 0.95f);
+        txt.alignment = TextAnchor.MiddleLeft;
+        var txtRT              = (RectTransform)txtGo.transform;
+        txtRT.anchorMin        = Vector2.zero;
+        txtRT.anchorMax        = Vector2.one;
+        txtRT.anchoredPosition = new Vector2(6f, 0f);
+        txtRT.sizeDelta        = new Vector2(-6f, 0f);
+
+        return (fillRT, txt);
+    }
+
+    void UpdateStatBoxes()
+    {
+        var ps     = _loadout != null ? _loadout.GetComponent<PlayerShip>()             : null;
+        var repair = _loadout != null ? _loadout.GetComponentInChildren<RepairUnitComponent>() : null;
+
+        float repairRate = (repair != null && repair.IsOperational)
+            ? repair.repairRate * repair.GetMultiplier("repairRate") : 0f;
+        float hullHP  = ps != null ? ps.currentHullHP : 0f;
+        float maxHull = ps != null ? ps.maxHullHP      : 1f;
+        UpdateStatBox(_hpFill, _hpStatText, hullHP, maxHull, "HP",
+            repairRate > 0f ? $"+{repairRate:0.#}/s" : "");
+
+        float totalShield = 0f, totalMaxShield = 0f, totalRecharge = 0f;
+        if (_loadout != null)
+        {
+            foreach (var sg in _loadout.GetComponentsInChildren<ShieldGeneratorComponent>())
+            {
+                if (!sg.IsOperational) continue;
+                totalShield    += sg.currentShield;
+                totalMaxShield += sg.maxShield * sg.GetMultiplier("maxShield");
+                totalRecharge  += sg.rechargeRate * sg.GetMultiplier("rechargeRate");
+            }
+        }
+        UpdateStatBox(_shieldFill, _shieldStatText,
+            totalShield, Mathf.Max(1f, totalMaxShield), "KALKAN",
+            totalMaxShield > 0f
+                ? (totalRecharge > 0f ? $"+{totalRecharge:0.#}/s" : "")
+                : "yok");
+
+        float eCur = 0f, eMax = 1f, eProd = 0f;
+        if (EnergyBus.Instance != null)
+        {
+            eCur  = EnergyBus.Instance.currentEnergy;
+            eMax  = EnergyBus.Instance.maxEnergy;
+            eProd = EnergyBus.Instance.TotalProduction;
+        }
+        UpdateStatBox(_energyFill, _energyStatText, eCur, eMax, "ENERJİ",
+            eProd > 0f ? $"+{eProd:0.#}/s" : "");
+    }
+
+    static void UpdateStatBox(RectTransform fill, Text lbl, float cur, float max, string name, string rate)
+    {
+        float ratio  = max > 0f ? Mathf.Clamp01(cur / max) : 0f;
+        fill.anchorMax = new Vector2(ratio, 1f);
+        fill.sizeDelta = Vector2.zero;
+        string rateStr = string.IsNullOrEmpty(rate) ? "" : $"  ({rate})";
+        lbl.text = $"{name}  {cur:0}/{max:0}{rateStr}";
     }
 
     // Tüm panel içi text için ortak yardımcı

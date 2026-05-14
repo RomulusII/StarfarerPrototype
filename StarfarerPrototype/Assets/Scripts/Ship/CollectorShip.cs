@@ -144,6 +144,11 @@ public class CollectorShip : MonoBehaviour
         return best;
     }
 
+    public void SetSpeed(float speed)
+    {
+        _movement.enginePower = speed * Mass;
+    }
+
     public void TakeDamage(float amount)
     {
         currentHP -= amount;

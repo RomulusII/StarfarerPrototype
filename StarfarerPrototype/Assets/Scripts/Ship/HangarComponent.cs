@@ -86,6 +86,16 @@ public class HangarComponent : ShipComponentBase
         _fighters.Add(fig);
     }
 
+    public override void OnStatUpgraded(string key)
+    {
+        if (key != "speed") return;
+        float s = EffShipSpeed;
+        foreach (var c in _collectors)
+            if (c != null) c.SetSpeed(s);
+        foreach (var f in _fighters)
+            if (f != null) f.SetSpeed(s);
+    }
+
     void BuildVisual()
     {
         var tex = new Texture2D(36, 24);

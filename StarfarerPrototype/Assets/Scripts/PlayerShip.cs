@@ -57,7 +57,7 @@ public class PlayerShip : MonoBehaviour
             genGO.transform.SetParent(transform);
             genGO.transform.localPosition = Vector3.zero;
             var gen = genGO.AddComponent<GeneratorComponent>();
-            gen.productionAmount = 15f;
+            gen.Init(15f);
         }
 
         if (FindFirstObjectByType<ShieldGeneratorComponent>() == null)

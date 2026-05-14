@@ -145,7 +145,7 @@ public class ShipLoadout : MonoBehaviour
         {
             case ComponentType.Generator:
                 var gen = go.AddComponent<GeneratorComponent>();
-                gen.productionAmount = def.productionAmount;
+                gen.Init(def.productionAmount);
                 comp = gen;
                 break;
 

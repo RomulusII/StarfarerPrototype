@@ -32,6 +32,20 @@ public class GeneratorComponent : ShipComponentBase
             EnergyBus.Instance.UnregisterProducer(_effectiveProduction);
     }
 
+    /// <summary>
+    /// Başlangıç üretim miktarını doğru şekilde ayarlar.
+    /// AddComponent sonrası hemen çağrılmalıdır — Awake'teki kayıt düzeltirilir.
+    /// </summary>
+    public void Init(float production)
+    {
+        if (EnergyBus.Instance != null)
+            EnergyBus.Instance.UnregisterProducer(_effectiveProduction);
+        productionAmount     = production;
+        _effectiveProduction = production;
+        if (EnergyBus.Instance != null)
+            EnergyBus.Instance.RegisterProducer(_effectiveProduction);
+    }
+
     public override void OnStatUpgraded(string key)
     {
         if (key != "production") return;

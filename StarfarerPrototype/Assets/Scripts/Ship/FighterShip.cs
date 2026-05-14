@@ -161,6 +161,11 @@ public class FighterShip : MonoBehaviour
         Destroy(go, 1.5f);
     }
 
+    public void SetSpeed(float speed)
+    {
+        _movement.enginePower = speed * Mass;
+    }
+
     public void TakeDamage(float amount)
     {
         currentHP -= amount;
