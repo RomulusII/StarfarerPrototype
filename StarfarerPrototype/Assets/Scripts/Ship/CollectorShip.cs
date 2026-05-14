@@ -3,7 +3,11 @@ using UnityEngine;
 /// <summary>
 /// Enkaz (Debris) toplamak için hangardan üretilen küçük gemi.
 /// Durum makinesi: Idle → GoToDebris → Collecting → Returning → Idle.
-/// Hareket ShipMovement üzerinden yapılır; mass sabit, enginePower speed parametresinden türetilir.
+///
+/// Kurallar:
+///   - Enkaz hangardan MaxDebrisRange'den uzaksa hedef almaz / bırakır.
+///   - Kargo dolunca Returning'e geçer, hangara varınca boşaltır.
+///   - Kapasite dolmamışsa aynı seferde birden fazla enkaz toplayabilir.
 /// </summary>
 public class CollectorShip : MonoBehaviour
 {
@@ -12,23 +16,26 @@ public class CollectorShip : MonoBehaviour
     public float maxHP       = 50f;
     public float currentHP   = 50f;
     public float salvageRate = 5f;
+    public float maxCargo    = 30f;
 
     Phase        _phase = Phase.Idle;
     Debris       _target;
     Transform    _hangar;
     ShipMovement _movement;
-    float        _resourceAccum;
+    int          _cargo;        // tam birim kargo
+    float        _accumulator;  // kesirli birikim
     float        _hoverPhase;
 
-    const float Mass = 1.5f;
+    const float Mass          = 1.5f;
+    const float MaxDebrisRange = 12f;   // hangardan max enkaz takip mesafesi
 
     void Awake()
     {
         _hoverPhase = Random.Range(0f, Mathf.PI * 2f);
         BuildVisual();
 
-        var col    = gameObject.AddComponent<CircleCollider2D>();
-        col.radius = 0.2f;
+        var col       = gameObject.AddComponent<CircleCollider2D>();
+        col.radius    = 0.2f;
         col.isTrigger = true;
 
         var rb          = gameObject.AddComponent<Rigidbody2D>();
@@ -45,7 +52,7 @@ public class CollectorShip : MonoBehaviour
         this.maxHP            = maxHP;
         this.currentHP        = maxHP;
         this.salvageRate      = salvageRate;
-        _movement.enginePower = speed * Mass;   // MaxSpeed ≈ speed
+        _movement.enginePower = speed * Mass;
         _movement.Initialize(0f);
     }
 
@@ -56,37 +63,51 @@ public class CollectorShip : MonoBehaviour
         switch (_phase)
         {
             case Phase.Idle:
+                if (_cargo >= (int)maxCargo) { _phase = Phase.Returning; break; }
                 var d = FindClosestDebris();
                 if (d != null) { _target = d; _phase = Phase.GoToDebris; }
                 else HoverNearHangar();
                 break;
 
             case Phase.GoToDebris:
-                if (_target == null) { _phase = Phase.Idle; break; }
+                if (_target == null || _target.IsEmpty) { _target = null; _phase = Phase.Idle; break; }
+                if (DebrisTooFar(_target))               { _target = null; _phase = Phase.Idle; break; }
                 _movement.MoveToward(_target.transform.position);
                 if (Vector2.Distance(transform.position, _target.transform.position) < 0.3f)
                     _phase = Phase.Collecting;
                 break;
 
             case Phase.Collecting:
-                if (_target == null || _target.IsEmpty) { _target = null; _phase = Phase.Returning; break; }
+                if (_target == null || _target.IsEmpty) { _target = null; _phase = Phase.Idle; break; }
+                if (_cargo >= (int)maxCargo)             { _phase = Phase.Returning; break; }
                 _movement.Brake();
-                float got = _target.Collect(salvageRate * Time.deltaTime);
-                _resourceAccum += got;
-                while (_resourceAccum >= 1f)
+                _accumulator += _target.Collect(salvageRate * Time.deltaTime);
+                while (_accumulator >= 1f)
                 {
-                    ResourceInventory.Instance?.Add(_target.resourceType, 1);
-                    _resourceAccum -= 1f;
+                    _cargo++;
+                    _accumulator -= 1f;
                 }
+                if (_cargo >= (int)maxCargo) _phase = Phase.Returning;
                 break;
 
             case Phase.Returning:
                 if (_hangar == null) { _phase = Phase.Idle; break; }
                 _movement.MoveToward(_hangar.position);
                 if (Vector2.Distance(transform.position, _hangar.position) < 0.6f)
-                    _phase = Phase.Idle;
+                {
+                    ResourceInventory.Instance?.Add(ResourceType.RawMaterial, _cargo);
+                    _cargo       = 0;
+                    _accumulator = 0f;
+                    _phase       = Phase.Idle;
+                }
                 break;
         }
+    }
+
+    bool DebrisTooFar(Debris d)
+    {
+        if (_hangar == null) return false;
+        return Vector2.Distance(_hangar.position, d.transform.position) > MaxDebrisRange;
     }
 
     void HoverNearHangar()
@@ -99,11 +120,12 @@ public class CollectorShip : MonoBehaviour
 
     Debris FindClosestDebris()
     {
-        var  all   = FindObjectsByType<Debris>(FindObjectsSortMode.None);
+        var    all   = FindObjectsByType<Debris>(FindObjectsSortMode.None);
         Debris best  = null;
         float  bestD = float.MaxValue;
         foreach (var d in all)
         {
+            if (DebrisTooFar(d)) continue;
             float dist = Vector2.Distance(transform.position, d.transform.position);
             if (dist < bestD) { bestD = dist; best = d; }
         }
