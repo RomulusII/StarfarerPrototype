@@ -2,19 +2,28 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Canvas tabanlı enerji HUD barı. Screen Space Overlay.
-/// Awake()'te tüm hiyerarşiyi kod ile oluşturur.
-/// EnergyBus.Instance üzerinden enerji oranını okur.
+/// Oyun HUD'u: enerji + kaynak barları (sol üst köşe, her zaman görünür).
+/// Enerji (turuncu) → Metal (yeşil) → Kristal (mavi-yeşil), aynı boyut.
 /// </summary>
 public class EnergyBar : MonoBehaviour
 {
-    RectTransform _fillRect;
+    const float BarW = 600f;
+    const float BarH = 40f;
+    const float BarX = 20f;
+    const float BarY = -20f;
+    const float Gap  = 6f;
+
+    RectTransform _energyFill;
+    RectTransform _metalFill;
+    RectTransform _crystalFill;
+    Text          _energyText;
+    Text          _metalText;
+    Text          _crystalText;
 
     void Awake()
     {
-        // ── Canvas ────────────────────────────────────────────────────────────
         var canvas = gameObject.AddComponent<Canvas>();
-        canvas.renderMode  = RenderMode.ScreenSpaceOverlay;
+        canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 10;
 
         var scaler = gameObject.AddComponent<CanvasScaler>();
@@ -25,41 +34,91 @@ public class EnergyBar : MonoBehaviour
 
         gameObject.AddComponent<GraphicRaycaster>();
 
-        // ── EnergyBarBg ───────────────────────────────────────────────────────
-        var bgGO  = new GameObject("EnergyBarBg");
+        float yE = BarY;
+        float yM = BarY - BarH - Gap;
+        float yC = BarY - 2f * (BarH + Gap);
+
+        (_energyFill,  _energyText)  = MakeBar("Energy",  yE,
+            new Color(0.28f, 0.18f, 0.00f, 0.88f),
+            new Color(1.00f, 0.70f, 0.10f, 1.00f));
+
+        (_metalFill,   _metalText)   = MakeBar("Metal",   yM,
+            new Color(0.20f, 0.26f, 0.18f, 0.88f),
+            new Color(0.45f, 0.68f, 0.28f, 1.00f));
+
+        (_crystalFill, _crystalText) = MakeBar("Crystal", yC,
+            new Color(0.18f, 0.22f, 0.28f, 0.88f),
+            new Color(0.28f, 0.58f, 0.80f, 1.00f));
+    }
+
+    (RectTransform fill, Text label) MakeBar(string id, float y, Color bgCol, Color fillCol)
+    {
+        var bgGO = new GameObject(id + "Bg");
         bgGO.transform.SetParent(transform, false);
+        bgGO.AddComponent<Image>().color = bgCol;
 
-        var bgImg  = bgGO.AddComponent<Image>();
-        bgImg.color = new Color(0.3f, 0.2f, 0f, 0.8f);
+        var bg          = bgGO.GetComponent<RectTransform>();
+        bg.anchorMin        = new Vector2(0f, 1f);
+        bg.anchorMax        = new Vector2(0f, 1f);
+        bg.pivot            = new Vector2(0f, 1f);
+        bg.anchoredPosition = new Vector2(BarX, y);
+        bg.sizeDelta        = new Vector2(BarW, BarH);
 
-        var bgRect = bgGO.GetComponent<RectTransform>();
-        bgRect.anchorMin        = new Vector2(0f, 1f);
-        bgRect.anchorMax        = new Vector2(0f, 1f);
-        bgRect.pivot            = new Vector2(0f, 1f);
-        bgRect.anchoredPosition = new Vector2(20f, -20f);
-        bgRect.sizeDelta        = new Vector2(300f, 20f);
-
-        // ── EnergyBarFill ─────────────────────────────────────────────────────
-        var fillGO = new GameObject("EnergyBarFill");
+        // Dolum barı
+        var fillGO = new GameObject(id + "Fill");
         fillGO.transform.SetParent(bgGO.transform, false);
+        fillGO.AddComponent<Image>().color = fillCol;
 
-        var fillImg  = fillGO.AddComponent<Image>();
-        fillImg.color = new Color(1f, 0.7f, 0.1f, 1f);
+        var fill          = fillGO.GetComponent<RectTransform>();
+        fill.anchorMin        = new Vector2(0f, 0f);
+        fill.anchorMax        = new Vector2(0f, 1f);
+        fill.pivot            = new Vector2(0f, 0.5f);
+        fill.anchoredPosition = Vector2.zero;
+        fill.sizeDelta        = new Vector2(0f, 0f);
 
-        _fillRect               = fillGO.GetComponent<RectTransform>();
-        _fillRect.anchorMin     = new Vector2(0f, 0f);
-        _fillRect.anchorMax     = new Vector2(0f, 1f);
-        _fillRect.pivot         = new Vector2(0f, 0.5f);
-        _fillRect.anchoredPosition = Vector2.zero;
-        _fillRect.sizeDelta     = new Vector2(300f, 0f);
+        // Yazı — dolum barının üstünde render olur (sonra eklendi = üstte)
+        var txtGO = new GameObject(id + "Text");
+        txtGO.transform.SetParent(bgGO.transform, false);
+
+        var txt       = txtGO.AddComponent<Text>();
+        txt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        txt.fontSize  = 22;
+        txt.fontStyle = FontStyle.Bold;
+        txt.color     = new Color(1f, 1f, 1f, 0.92f);
+        txt.alignment = TextAnchor.MiddleLeft;
+
+        var tr          = txtGO.GetComponent<RectTransform>();
+        tr.anchorMin        = Vector2.zero;
+        tr.anchorMax        = Vector2.one;
+        tr.anchoredPosition = new Vector2(10f, 0f);
+        tr.sizeDelta        = new Vector2(-10f, 0f);
+
+        return (fill, txt);
     }
 
     void Update()
     {
-        float ratio = 0f;
+        // Enerji
+        float eCur = 0f, eMax = 1f;
         if (EnergyBus.Instance != null && EnergyBus.Instance.maxEnergy > 0f)
-            ratio = Mathf.Clamp01(EnergyBus.Instance.currentEnergy / EnergyBus.Instance.maxEnergy);
+        {
+            eCur = EnergyBus.Instance.currentEnergy;
+            eMax = EnergyBus.Instance.maxEnergy;
+        }
+        SetBar(_energyFill, _energyText, eCur, eMax, "ENERJİ");
 
-        _fillRect.sizeDelta = new Vector2(300f * ratio, 0f);
+        // Kaynaklar
+        if (ResourceInventory.Instance != null)
+        {
+            SetBar(_metalFill,   _metalText,   ResourceInventory.Instance.metal,   ResourceInventory.Instance.maxMetal,   "METAL");
+            SetBar(_crystalFill, _crystalText, ResourceInventory.Instance.crystal, ResourceInventory.Instance.maxCrystal, "KRİSTAL");
+        }
+    }
+
+    void SetBar(RectTransform fill, Text lbl, float cur, float max, string name)
+    {
+        float ratio = max > 0f ? Mathf.Clamp01(cur / max) : 0f;
+        fill.sizeDelta = new Vector2(BarW * ratio, 0f);
+        lbl.text = $"{name}   {cur:0} / {max:0}";
     }
 }

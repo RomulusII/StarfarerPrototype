@@ -177,7 +177,7 @@ public class UpgradeUI : MonoBehaviour
             rowH.childAlignment         = TextAnchor.MiddleLeft;
 
             var rowLE = row.AddComponent<LayoutElement>();
-            rowLE.preferredHeight = 52f;
+            rowLE.preferredHeight = 74f;
             rowLE.flexibleWidth   = 1f;
 
             var nameArea = new GameObject("NameArea", typeof(RectTransform));
@@ -189,14 +189,14 @@ public class UpgradeUI : MonoBehaviour
 
             var nameAreaLE = nameArea.AddComponent<LayoutElement>();
             nameAreaLE.flexibleWidth   = 1f;
-            nameAreaLE.preferredHeight = 52f;
+            nameAreaLE.preferredHeight = 74f;
 
             var nameTxtGo = new GameObject("NameText", typeof(RectTransform));
             nameTxtGo.transform.SetParent(nameArea.transform, false);
             var nameTxt = nameTxtGo.AddComponent<Text>();
             nameTxt.text      = def.componentName;
             nameTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            nameTxt.fontSize  = 17;
+            nameTxt.fontSize  = 32;
             nameTxt.color     = Color.white;
             nameTxt.alignment = TextAnchor.MiddleLeft;
             var nRect = (RectTransform)nameTxtGo.transform;
@@ -261,7 +261,7 @@ public class UpgradeUI : MonoBehaviour
 
         var comp = _loadout?.GetSlotComponent(slotIndex);
 
-        MakeTextLabel(_popupContent.transform, "\u2500\u2500 STAT UPGRADE \u2500\u2500", 11, TextAnchor.MiddleLeft);
+        MakeTextLabel(_popupContent.transform, "\u2500\u2500 STAT UPGRADE \u2500\u2500", 20, TextAnchor.MiddleLeft);
 
         foreach (var (key, statLabel) in stats)
         {
@@ -278,12 +278,12 @@ public class UpgradeUI : MonoBehaviour
             var lbl       = lblGo.AddComponent<Text>();
             lbl.text      = maxed ? $"{statLabel} Lv {curLevel}/5 MAX" : $"{statLabel} Lv {curLevel}/5  ({cost})";
             lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            lbl.fontSize  = 13;
+            lbl.fontSize  = 24;
             lbl.color     = maxed ? new Color(1f, 0.85f, 0.2f, 1f) : Color.white;
             lbl.alignment = TextAnchor.MiddleLeft;
             var lblLE     = lblGo.AddComponent<LayoutElement>();
             lblLE.flexibleWidth   = 1f;
-            lblLE.preferredHeight = 36f;
+            lblLE.preferredHeight = 52f;
 
             if (!maxed)
             {
@@ -319,11 +319,11 @@ public class UpgradeUI : MonoBehaviour
 
             if (!headerShown)
             {
-                MakeTextLabel(_popupContent.transform, "\u2500\u2500 STAT UPGRADE \u2500\u2500", 11, TextAnchor.MiddleLeft);
+                MakeTextLabel(_popupContent.transform, "\u2500\u2500 STAT UPGRADE \u2500\u2500", 20, TextAnchor.MiddleLeft);
                 headerShown = true;
             }
 
-            MakeTextLabel(_popupContent.transform, typeLabel, 12, TextAnchor.MiddleLeft);
+            MakeTextLabel(_popupContent.transform, typeLabel, 22, TextAnchor.MiddleLeft);
 
             var capturedType = type;
             foreach (var (key, statLabel) in new[] { ("damage", "Hasar"), ("fireRate", "Ate\u015f H\u0131z\u0131") })
@@ -341,12 +341,12 @@ public class UpgradeUI : MonoBehaviour
                 var lbl       = lblGo.AddComponent<Text>();
                 lbl.text      = maxed ? $"{statLabel} Lv {curLevel}/5 MAX" : $"{statLabel} Lv {curLevel}/5  ({cost})";
                 lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                lbl.fontSize  = 13;
+                lbl.fontSize  = 24;
                 lbl.color     = maxed ? new Color(1f, 0.85f, 0.2f, 1f) : Color.white;
                 lbl.alignment = TextAnchor.MiddleLeft;
                 var lblLE     = lblGo.AddComponent<LayoutElement>();
                 lblLE.flexibleWidth   = 1f;
-                lblLE.preferredHeight = 36f;
+                lblLE.preferredHeight = 52f;
 
                 if (!maxed)
                 {
@@ -369,13 +369,13 @@ public class UpgradeUI : MonoBehaviour
         var hangar = _loadout?.GetSlotComponent(slotIndex) as HangarComponent;
         if (hangar == null) return;
 
-        MakeTextLabel(_popupContent.transform, "\u2500\u2500 HANGAR \u2500\u2500", 11, TextAnchor.MiddleLeft);
+        MakeTextLabel(_popupContent.transform, "\u2500\u2500 HANGAR \u2500\u2500", 20, TextAnchor.MiddleLeft);
 
         // Sayı yükseltmeleri (her level +1 gemi)
         BuildHangarCountRow(slotIndex, def, hangar, "maxCollectors", "Max Toplay\u0131c\u0131", hangar.MaxCollectors);
         BuildHangarCountRow(slotIndex, def, hangar, "maxFighters",   "Max Sava\u015f\u00e7\u0131",   hangar.MaxFighters);
 
-        MakeTextLabel(_popupContent.transform, "\u2500\u2500 STAT UPGRADE \u2500\u2500", 11, TextAnchor.MiddleLeft);
+        MakeTextLabel(_popupContent.transform, "\u2500\u2500 STAT UPGRADE \u2500\u2500", 20, TextAnchor.MiddleLeft);
 
         // Çarpan yükseltmeleri
         foreach (var (key, label) in new[]
@@ -399,12 +399,12 @@ public class UpgradeUI : MonoBehaviour
             var lbl       = lblGo.AddComponent<Text>();
             lbl.text      = maxed ? $"{label} Lv {curLevel}/5 MAX" : $"{label} Lv {curLevel}/5  ({cost})";
             lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            lbl.fontSize  = 13;
+            lbl.fontSize  = 24;
             lbl.color     = maxed ? new Color(1f, 0.85f, 0.2f, 1f) : Color.white;
             lbl.alignment = TextAnchor.MiddleLeft;
             var lblLE     = lblGo.AddComponent<LayoutElement>();
             lblLE.flexibleWidth   = 1f;
-            lblLE.preferredHeight = 34f;
+            lblLE.preferredHeight = 50f;
 
             if (!maxed)
             {
@@ -436,7 +436,7 @@ public class UpgradeUI : MonoBehaviour
         var lbl       = lblGo.AddComponent<Text>();
         lbl.text      = maxed ? $"{label}: {currentCount} MAX" : $"{label}: {currentCount}  (+1 \u2192 {cost})";
         lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        lbl.fontSize  = 13;
+        lbl.fontSize  = 24;
         lbl.color     = maxed ? new Color(1f, 0.85f, 0.2f, 1f) : Color.white;
         lbl.alignment = TextAnchor.MiddleLeft;
         var lblLE     = lblGo.AddComponent<LayoutElement>();
@@ -499,7 +499,7 @@ public class UpgradeUI : MonoBehaviour
     // Her silah tipi için ayrı satır: isim/tier + Satın Al veya Seç + Upgrade
     void BuildWeaponSwitchRows()
     {
-        MakeTextLabel(_popupContent.transform, "ANA S\u0130LAH", 13, TextAnchor.MiddleLeft);
+        MakeTextLabel(_popupContent.transform, "ANA S\u0130LAH", 24, TextAnchor.MiddleLeft);
 
         var weaponTypes = new[]
         {
@@ -524,12 +524,12 @@ public class UpgradeUI : MonoBehaviour
             var nameTxt = nameGo.AddComponent<Text>();
             nameTxt.text      = label + tierStr;
             nameTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            nameTxt.fontSize  = 15;
+            nameTxt.fontSize  = 28;
             nameTxt.color     = unlocked ? Color.white : new Color(0.5f, 0.5f, 0.5f, 1f);
             nameTxt.alignment = TextAnchor.MiddleLeft;
             var nameLE = nameGo.AddComponent<LayoutElement>();
             nameLE.flexibleWidth   = 1f;
-            nameLE.preferredHeight = 40f;
+            nameLE.preferredHeight = 58f;
 
             if (!unlocked)
             {
@@ -781,16 +781,16 @@ public class UpgradeUI : MonoBehaviour
         vl.childForceExpandWidth  = true;
         vl.childForceExpandHeight = false;
 
-        var headerTxt = MakeLabel(_generalPanel.transform, "GENEL B\u0130LG\u0130LER", 12, FontStyle.Bold);
+        var headerTxt = MakeLabel(_generalPanel.transform, "GENEL B\u0130LG\u0130LER", 40, FontStyle.Bold);
         headerTxt.color = new Color(0.4f, 0.3f, 0.55f, 1f);
 
         foreach (var s in new[] { "HP", "Kalkan", "Enerji" })
         {
-            var t = MakeLabel(_generalPanel.transform, s, 12, FontStyle.Normal);
+            var t = MakeLabel(_generalPanel.transform, s, 22, FontStyle.Normal);
             t.color = new Color(0.55f, 0.55f, 0.55f, 1f);
         }
 
-        _hamMaddeText = MakeLabel(_generalPanel.transform, "Ham Madde: \u2014", 12, FontStyle.Normal);
+        _hamMaddeText = MakeLabel(_generalPanel.transform, "Ham Madde: \u2014", 22, FontStyle.Normal);
         _kristalText  = MakeLabel(_generalPanel.transform, "Kristal: \u2014",  12, FontStyle.Normal);
     }
 
@@ -813,15 +813,15 @@ public class UpgradeUI : MonoBehaviour
         vl.childForceExpandWidth  = true;
         vl.childForceExpandHeight = false;
 
-        var headerTxt = MakeLabel(_slotInfoPanel.transform, "SLOT B\u0130LG\u0130S\u0130", 12, FontStyle.Bold);
+        var headerTxt = MakeLabel(_slotInfoPanel.transform, "SLOT B\u0130LG\u0130S\u0130", 40, FontStyle.Bold);
         headerTxt.color = new Color(0.29f, 0.47f, 0.67f, 1f);
 
-        _leftNameText = MakeLabel(_slotInfoPanel.transform, "", 22, FontStyle.Bold);
-        _leftTypeText = MakeLabel(_slotInfoPanel.transform, "", 15, FontStyle.Normal);
+        _leftNameText = MakeLabel(_slotInfoPanel.transform, "", 40, FontStyle.Bold);
+        _leftTypeText = MakeLabel(_slotInfoPanel.transform, "", 28, FontStyle.Normal);
         _leftTypeText.color = new Color(0.3f, 0.75f, 0.9f, 1f);
-        _leftTierText = MakeLabel(_slotInfoPanel.transform, "", 14, FontStyle.Normal);
+        _leftTierText = MakeLabel(_slotInfoPanel.transform, "", 26, FontStyle.Normal);
         _leftTierText.color = new Color(1f, 0.85f, 0.2f, 1f);
-        _leftCostText = MakeLabel(_slotInfoPanel.transform, "", 14, FontStyle.Normal);
+        _leftCostText = MakeLabel(_slotInfoPanel.transform, "", 26, FontStyle.Normal);
         _leftCostText.color = new Color(0.3f, 0.9f, 0.45f, 1f);
     }
 
@@ -844,15 +844,15 @@ public class UpgradeUI : MonoBehaviour
         vl.childForceExpandWidth  = true;
         vl.childForceExpandHeight = false;
 
-        var headerTxt = MakeLabel(_hoverDetailPanel.transform, "OPS\u0130YON DETAYI", 12, FontStyle.Bold);
+        var headerTxt = MakeLabel(_hoverDetailPanel.transform, "OPS\u0130YON DETAYI", 40, FontStyle.Bold);
         headerTxt.color = new Color(0.29f, 0.60f, 0.29f, 1f);
 
-        _rightNameText = MakeLabel(_hoverDetailPanel.transform, "", 22, FontStyle.Bold);
-        _rightTypeText = MakeLabel(_hoverDetailPanel.transform, "", 15, FontStyle.Normal);
+        _rightNameText = MakeLabel(_hoverDetailPanel.transform, "", 40, FontStyle.Bold);
+        _rightTypeText = MakeLabel(_hoverDetailPanel.transform, "", 28, FontStyle.Normal);
         _rightTypeText.color = new Color(0.3f, 0.75f, 0.9f, 1f);
-        _rightTierText = MakeLabel(_hoverDetailPanel.transform, "", 14, FontStyle.Normal);
+        _rightTierText = MakeLabel(_hoverDetailPanel.transform, "", 26, FontStyle.Normal);
         _rightTierText.color = new Color(1f, 0.85f, 0.2f, 1f);
-        _rightCostText = MakeLabel(_hoverDetailPanel.transform, "", 14, FontStyle.Normal);
+        _rightCostText = MakeLabel(_hoverDetailPanel.transform, "", 26, FontStyle.Normal);
         _rightCostText.color = new Color(0.3f, 0.9f, 0.45f, 1f);
     }
 
@@ -874,7 +874,7 @@ public class UpgradeUI : MonoBehaviour
         titleGo.transform.SetParent(_listPanel.transform, false);
         _popupTitle           = titleGo.AddComponent<Text>();
         _popupTitle.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        _popupTitle.fontSize  = 18;
+        _popupTitle.fontSize  = 34;
         _popupTitle.fontStyle = FontStyle.Bold;
         _popupTitle.color     = Color.white;
         _popupTitle.alignment = TextAnchor.MiddleCenter;
@@ -935,7 +935,7 @@ public class UpgradeUI : MonoBehaviour
         h.childAlignment         = TextAnchor.MiddleLeft;
 
         var le = go.AddComponent<LayoutElement>();
-        le.preferredHeight = 40f;
+        le.preferredHeight = 58f;
         le.flexibleWidth   = 1f;
 
         return go;
@@ -972,9 +972,9 @@ public class UpgradeUI : MonoBehaviour
 
         var le = go.AddComponent<LayoutElement>();
         le.preferredWidth  = width;
-        le.preferredHeight = 44f;
+        le.preferredHeight = 62f;
 
-        AttachLabel(go.transform, label, 16);
+        AttachLabel(go.transform, label, 28);
         return btn;
     }
 

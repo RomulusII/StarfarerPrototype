@@ -84,7 +84,8 @@ public class CollectorShip : MonoBehaviour
             case Phase.Collecting:
                 if (_target == null || _target.IsEmpty) { _target = null; _phase = Phase.Idle; break; }
                 if (_cargo >= (int)maxCargo)             { _phase = Phase.Returning; break; }
-                _movement.Brake();
+                // Enkaz ile birlikte sürüklen — ShipMovement bypass, doğrudan pozisyon güncelle
+                transform.position += (Vector3)(_target.Velocity * Time.deltaTime);
                 _accumulator += _target.Collect(salvageRate * Time.deltaTime);
                 while (_accumulator >= 1f)
                 {

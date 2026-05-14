@@ -32,6 +32,13 @@ public class EnemyBot : MonoBehaviour
 
     // Ateş etme
     float _fireTimer;
+    float _fireRateBase;
+
+    // Namlu + dolum göstergesi
+    Transform      _barrelTransform;
+    Transform      _reloadFillTransform;
+    SpriteRenderer _reloadFillSR;
+    bool           _fireFlash;
 
     // Hedef güncelleme
     float _targetScanTimer;
@@ -70,16 +77,20 @@ public class EnemyBot : MonoBehaviour
                 _movement.mass        = 1f;
                 _movement.enginePower = 3f;
                 Apply(hp:30, contact:20f, w:60, h:40, new Color(0.9f, 0.20f, 0.20f));
-                _fireTimer = Random.Range(2f, 5f);
+                _fireRateBase = 4f;
+                _fireTimer    = Random.Range(0f, _fireRateBase);
                 SetupBrain(CombatPattern.Orbit,    engageRange:6f, fireRange:5.5f, orbitRadius:4.5f, engageDuration:5f);
+                BuildBarrel(new Color(0.7f, 0.15f, 0.15f));
                 break;
 
             case EnemyType.Armored:
                 _movement.mass        = 5f;
                 _movement.enginePower = 7.5f;
                 Apply(hp:80, contact:25f, w:80, h:55, new Color(0.42f, 0.45f, 0.50f));
-                _fireTimer = Random.Range(3f, 7f);
+                _fireRateBase = 6f;
+                _fireTimer    = Random.Range(0f, _fireRateBase);
                 SetupBrain(CombatPattern.HoverFire, engageRange:5f, fireRange:5f, orbitRadius:4f,   engageDuration:8f);
+                BuildBarrel(new Color(0.4f, 0.4f, 0.45f));
                 break;
 
             case EnemyType.Shield:
@@ -93,8 +104,10 @@ public class EnemyBot : MonoBehaviour
                     _healthBar.maxShield     = _maxShieldHP;
                     _healthBar.currentShield = _shieldHP;
                 }
-                _fireTimer = Random.Range(1f, 3f);
+                _fireRateBase = 3f;
+                _fireTimer    = Random.Range(0f, _fireRateBase);
                 SetupBrain(CombatPattern.Orbit,    engageRange:5.5f, fireRange:4.5f, orbitRadius:3.5f, engageDuration:5f);
+                BuildBarrel(new Color(0.15f, 0.2f, 0.7f));
                 break;
 
             case EnemyType.Bomber:
@@ -148,15 +161,14 @@ public class EnemyBot : MonoBehaviour
         }
 
         // Ateş et — ShipBrain ateş menziline girince
-        if (_brain.InFireRange)
+        _fireTimer -= Time.deltaTime;
+        if (_brain.InFireRange && _fireTimer <= 0f)
         {
-            _fireTimer -= Time.deltaTime;
-            if (_fireTimer <= 0f)
-            {
-                _fireTimer = FireRate() + Random.Range(0f, 1.5f);
-                FireAtTarget();
-            }
+            _fireTimer = _fireRateBase;
+            FireAtTarget();
         }
+
+        UpdateBarrel();
 
         // Kalkan şarjı
         if (enemyType == EnemyType.Shield)
@@ -228,16 +240,42 @@ public class EnemyBot : MonoBehaviour
     // Ateş etme
     // -------------------------------------------------------------------------
 
-    float FireRate()
+    void UpdateBarrel()
     {
-        switch (enemyType)
+        if (_barrelTransform == null) return;
+
+        // Flash temizle
+        if (_fireFlash)
         {
-            case EnemyType.Swarm:   return 4f;
-            case EnemyType.Armored: return 6f;
-            case EnemyType.Shield:  return 3f;
-            default:                return 5f;
+            _fireFlash = false;
+            if (_reloadFillSR != null)      _reloadFillSR.color = ReloadColor(0f);
+            if (_reloadFillTransform != null) _reloadFillTransform.localScale = new Vector3(0f, 1f, 1f);
+        }
+
+        // Nişan al
+        Transform target = _brain?.TargetTransform;
+        if (target != null)
+        {
+            var   dir   = (target.position - _barrelTransform.position).normalized;
+            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+            _barrelTransform.rotation = Quaternion.Euler(0f, 0f, angle);
+        }
+        else
+        {
+            _barrelTransform.rotation = transform.rotation;
+        }
+
+        // Dolum göstergesi
+        if (_reloadFillTransform != null && !_fireFlash)
+        {
+            float ratio = _fireRateBase > 0f ? 1f - Mathf.Clamp01(_fireTimer / _fireRateBase) : 1f;
+            _reloadFillTransform.localScale = new Vector3(ratio, 1f, 1f);
+            if (_reloadFillSR != null) _reloadFillSR.color = ReloadColor(ratio);
         }
     }
+
+    static Color ReloadColor(float t) =>
+        new Color(1f, Mathf.Lerp(0.1f, 0.55f, t), 0f, Mathf.Lerp(0.1f, 0.65f, t));
 
     float FireDamage()
     {
@@ -269,11 +307,19 @@ public class EnemyBot : MonoBehaviour
 
         var dir = (t.position - transform.position).normalized;
         var go  = new GameObject("EnemyBullet");
-        go.transform.position = transform.position;
+        go.transform.position = _barrelTransform != null
+            ? _barrelTransform.position + _barrelTransform.right * 0.18f
+            : transform.position;
         var eb  = go.AddComponent<EnemyBullet>();
         eb.damage = FireDamage();
         eb.speed  = BulletSpeed();
         eb.SetDirection(dir);
+
+        _fireFlash = true;
+        if (_reloadFillSR != null)
+            _reloadFillSR.color = new Color(1f, 1f, 0.8f, 0.95f);
+        if (_reloadFillTransform != null)
+            _reloadFillTransform.localScale = new Vector3(1f, 1f, 1f);
     }
 
     void FireAtComponent()
@@ -414,6 +460,43 @@ public class EnemyBot : MonoBehaviour
         var sr = body.AddComponent<SpriteRenderer>();
         sr.sprite       = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
         sr.sortingOrder = 0;
+    }
+
+    void BuildBarrel(Color barrelColor)
+    {
+        // Namlu kökü — geminin merkezinde, rotasyon buradan yapılır
+        var root = new GameObject("Barrel");
+        root.transform.SetParent(transform, false);
+        root.transform.localPosition = Vector3.zero;
+        _barrelTransform = root.transform;
+
+        // Namlu gövdesi (18x3 px, pivot sol-orta → sağa uzanır)
+        var barrelTex = MakeTex(18, 3, barrelColor);
+        var barrelSR  = root.AddComponent<SpriteRenderer>();
+        barrelSR.sprite       = Sprite.Create(barrelTex, new Rect(0,0,18,3), new Vector2(0f,0.5f), 100f);
+        barrelSR.sortingOrder = 2;
+
+        // Dolum göstergesi (18x2 px, namlunun hemen üstünde, pivot sol-orta)
+        var fillGO = new GameObject("ReloadFill");
+        fillGO.transform.SetParent(root.transform, false);
+        fillGO.transform.localPosition = new Vector3(0f, 0.04f, 0f);
+        _reloadFillTransform = fillGO.transform;
+        _reloadFillTransform.localScale = new Vector3(0f, 1f, 1f);
+
+        var fillTex = MakeTex(18, 2, Color.white);
+        _reloadFillSR = fillGO.AddComponent<SpriteRenderer>();
+        _reloadFillSR.sprite       = Sprite.Create(fillTex, new Rect(0,0,18,2), new Vector2(0f,0.5f), 100f);
+        _reloadFillSR.sortingOrder = 3;
+        _reloadFillSR.color        = ReloadColor(0f);
+    }
+
+    static Texture2D MakeTex(int w, int h, Color c)
+    {
+        var tex = new Texture2D(w, h);
+        var px  = new Color[w * h];
+        for (int i = 0; i < px.Length; i++) px[i] = c;
+        tex.SetPixels(px); tex.Apply();
+        return tex;
     }
 
     void BuildShieldVisual(int w, int h)

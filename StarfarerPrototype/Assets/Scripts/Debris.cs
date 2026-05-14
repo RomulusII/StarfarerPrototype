@@ -11,7 +11,8 @@ public class Debris : MonoBehaviour
 
     Vector2 _velocity;
 
-    public bool IsEmpty => resourceAmount <= 0f;
+    public bool    IsEmpty   => resourceAmount <= 0f;
+    public Vector2 Velocity  => _velocity;
 
     public void Init(Vector2 velocity, float amount, ResourceType type = ResourceType.RawMaterial)
     {
