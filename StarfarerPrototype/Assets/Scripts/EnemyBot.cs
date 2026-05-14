@@ -5,39 +5,41 @@ public enum EnemyType { Swarm, Armored, Shield, Bomber }
 
 /// <summary>
 /// Tüm temel düşman tiplerini tek sınıfta toplar.
+/// Hareket ShipMovement component'ı üzerinden yapılır — ivme, frenleme ve dönme
+/// mass/enginePower oranından türetilir.
 ///
-/// Swarm   — hızlı, zayıf, lazer'e karşı kırılgan. Uzaktan ateş eder.
-/// Armored — yavaş, sağlam, kinetike dirençli. Uzaktan ateş eder.
-/// Shield  — orta hız, kalkanı var (kinetik kırar, lazer geçemez). Uzaktan ateş eder.
-/// Bomber  — yaklaşır, geminin içine girer, komponentlere doğrudan ateş eder.
-///
-/// Awake'te sadece fizik; görseller + istatistikler Start'ta enemyType'a göre kurulur.
-/// Spawner, AddComponent'ten sonra enemyType'ı set eder (Start henüz çalışmaz).
+/// Swarm   — hafif, kıvrak, sinüs dalgasıyla yaklaşır. Lazer'e kırılgan.
+/// Armored — ağır, yavaş döner, doğrudan yaklaşır. Kinetike dirençli, plazmaya zayıf.
+/// Shield  — orta, kalkanı var (kinetik kırar, lazer geçemez).
+/// Bomber  — yaklaşır, hover eder, komponentlere ateş eder, geri çekilir.
 /// </summary>
 public class EnemyBot : MonoBehaviour
 {
     public EnemyType enemyType = EnemyType.Swarm;
 
-    // Ortak
-    float _speed;
-    float _contactDamage;
-    float _targetY;
-    PlayerShip _playerShip;
-    HealthBar  _healthBar;
+    PlayerShip   _playerShip;
+    HealthBar    _healthBar;
+    ShipMovement _movement;
 
     // Kalkan botu
-    float _shieldHP;
-    float _maxShieldHP;
+    float      _shieldHP;
+    float      _maxShieldHP;
     GameObject _shieldVisual;
 
-    // Ateş etme (Swarm/Armored/Shield)
+    // Ateş etme (Swarm / Armored / Shield)
     float _fireTimer;
+
+    // Swarm sinüs dalgası
+    float _weaveFreq;
+    float _weaveAmp;
+    float _weavePhase;
 
     // Bomber state machine
     enum BomberPhase { Approaching, Hovering, Retreating }
-    BomberPhase _bomberPhase = BomberPhase.Approaching;
-    float _bomberFireTimer;
-    int   _bomberShotsLeft;
+    BomberPhase _bomberPhase;
+    float       _bomberFireTimer;
+    int         _bomberShotsLeft;
+    Vector2     _bomberHoverPos;
     const float BomberHoverX  = 2.0f;
     const int   BomberShotMax = 3;
 
@@ -47,42 +49,60 @@ public class EnemyBot : MonoBehaviour
 
     void Awake()
     {
-        var col = gameObject.AddComponent<BoxCollider2D>();
-        col.size = new Vector2(0.6f, 0.4f);
-
-        var rb = gameObject.AddComponent<Rigidbody2D>();
+        var col        = gameObject.AddComponent<BoxCollider2D>();
+        col.size       = new Vector2(0.6f, 0.4f);
+        var rb         = gameObject.AddComponent<Rigidbody2D>();
         rb.bodyType    = RigidbodyType2D.Kinematic;
         rb.gravityScale = 0f;
+
+        _movement = gameObject.AddComponent<ShipMovement>();
     }
 
     void Start()
     {
         _healthBar  = GetComponent<HealthBar>();
         _playerShip = FindFirstObjectByType<PlayerShip>();
-        _targetY    = _playerShip != null ? _playerShip.transform.position.y : 0f;
 
         switch (enemyType)
         {
             case EnemyType.Swarm:
-                Apply(hp:30,  speed:3f,   contact:20f, w:60, h:40, new Color(0.9f,  0.20f, 0.20f));
-                _fireTimer = Random.Range(2f, 5f);
+                _movement.mass        = 1f;
+                _movement.enginePower = 3f;
+                Apply(hp:30, contact:20f, w:60, h:40, new Color(0.9f, 0.20f, 0.20f));
+                _fireTimer  = Random.Range(2f, 5f);
+                _weaveFreq  = Random.Range(0.3f, 0.7f);
+                _weaveAmp   = Random.Range(0.4f, 0.8f);
+                _weavePhase = Random.Range(0f, Mathf.PI * 2f);
                 break;
+
             case EnemyType.Armored:
-                Apply(hp:80,  speed:1.5f, contact:25f, w:80, h:55, new Color(0.42f, 0.45f, 0.50f));
+                _movement.mass        = 5f;
+                _movement.enginePower = 7.5f;
+                Apply(hp:80, contact:25f, w:80, h:55, new Color(0.42f, 0.45f, 0.50f));
                 _fireTimer = Random.Range(3f, 7f);
                 break;
+
             case EnemyType.Shield:
-                Apply(hp:50,  speed:2f,   contact:20f, w:70, h:50, new Color(0.25f, 0.35f, 0.85f));
+                _movement.mass        = 3f;
+                _movement.enginePower = 6f;
+                Apply(hp:50, contact:20f, w:70, h:50, new Color(0.25f, 0.35f, 0.85f));
                 _shieldHP = _maxShieldHP = 40f;
                 BuildShieldVisual(90, 65);
                 _fireTimer = Random.Range(1f, 3f);
                 break;
+
             case EnemyType.Bomber:
-                Apply(hp:40,  speed:3.5f, contact:0f,  w:52, h:52, new Color(0.9f,  0.50f, 0.10f));
+                _movement.mass        = 2f;
+                _movement.enginePower = 7f;
+                Apply(hp:40, contact:0f, w:52, h:52, new Color(0.9f, 0.50f, 0.10f));
+                _bomberPhase     = BomberPhase.Approaching;
                 _bomberFireTimer = 1.2f;
                 _bomberShotsLeft = BomberShotMax;
+                _bomberHoverPos  = new Vector2(BomberHoverX, transform.position.y);
                 break;
         }
+
+        _movement.Initialize(180f);
     }
 
     // -------------------------------------------------------------------------
@@ -99,15 +119,10 @@ public class EnemyBot : MonoBehaviour
             return;
         }
 
-        // Ortak hareket (Swarm / Armored / Shield)
-        var pos = transform.position;
-        pos.x -= _speed * Time.deltaTime;
-        pos.y  =  Mathf.MoveTowards(pos.y, _targetY, _speed * 0.3f * Time.deltaTime);
-        transform.position = pos;
+        UpdateRangedMovement();
 
-        if (pos.x < -15f) { Destroy(gameObject); return; }
+        if (transform.position.x < -15f) { Destroy(gameObject); return; }
 
-        // Ateş etme
         _fireTimer -= Time.deltaTime;
         if (_fireTimer <= 0f)
         {
@@ -116,15 +131,32 @@ public class EnemyBot : MonoBehaviour
         }
     }
 
+    void UpdateRangedMovement()
+    {
+        Vector2 dir;
+        if (enemyType == EnemyType.Swarm)
+        {
+            // Sinüs dalgası: çoğunlukla sola, dikey bileşen dalgalı
+            float sinY = Mathf.Sin(Time.time * _weaveFreq * Mathf.PI * 2f + _weavePhase) * _weaveAmp;
+            dir = new Vector2(-1f, sinY).normalized;
+        }
+        else
+        {
+            // Armored / Shield: sola ilerlerken oyuncu Y'sine yavaş yaklaşır
+            float targetY = _playerShip != null ? _playerShip.transform.position.y : 0f;
+            float yDiff   = Mathf.Clamp(targetY - transform.position.y, -3f, 3f);
+            dir = new Vector2(-1f, yDiff * 0.25f).normalized;
+        }
+        _movement.MoveInDirection(dir);
+    }
+
     void UpdateBomber()
     {
-        var pos = transform.position;
-
         switch (_bomberPhase)
         {
             case BomberPhase.Approaching:
-                pos.x -= _speed * Time.deltaTime;
-                if (pos.x <= BomberHoverX)
+                _movement.MoveToward(_bomberHoverPos);
+                if (_movement.IsNear(_bomberHoverPos, 0.2f))
                 {
                     _bomberPhase     = BomberPhase.Hovering;
                     _bomberFireTimer = 1.2f;
@@ -132,8 +164,7 @@ public class EnemyBot : MonoBehaviour
                 break;
 
             case BomberPhase.Hovering:
-                // Dikey salınım
-                pos.y += Mathf.Sin(Time.time * 3.5f) * 0.025f;
+                _movement.Brake();
                 _bomberFireTimer -= Time.deltaTime;
                 if (_bomberFireTimer <= 0f)
                 {
@@ -146,12 +177,13 @@ public class EnemyBot : MonoBehaviour
                 break;
 
             case BomberPhase.Retreating:
-                pos.x -= _speed * 1.8f * Time.deltaTime;
+                // Geldiği tarafa geri çekilir (sağ)
+                _movement.MoveInDirection(Vector2.right);
                 break;
         }
 
-        transform.position = pos;
-        if (pos.x < -15f) Destroy(gameObject);
+        float x = transform.position.x;
+        if (x < -15f || x > 20f) Destroy(gameObject);
     }
 
     // -------------------------------------------------------------------------
@@ -206,7 +238,7 @@ public class EnemyBot : MonoBehaviour
 
     void FireAtComponent()
     {
-        var all = FindObjectsByType<ShipComponentBase>(FindObjectsSortMode.None);
+        var all        = FindObjectsByType<ShipComponentBase>(FindObjectsSortMode.None);
         var operational = new List<ShipComponentBase>();
         foreach (var c in all)
             if (c.IsOperational) operational.Add(c);
@@ -214,7 +246,7 @@ public class EnemyBot : MonoBehaviour
         if (operational.Count == 0) return;
 
         var target = operational[Random.Range(0, operational.Count)];
-        var go = new GameObject("EnemyBullet_Comp");
+        var go     = new GameObject("EnemyBullet_Comp");
         go.transform.position = transform.position;
         var eb = go.AddComponent<EnemyBullet>();
         eb.damage          = 18f;
@@ -233,24 +265,7 @@ public class EnemyBot : MonoBehaviour
         float hull = CalcDamage(amount, weaponType);
         _healthBar.TakeDamage(hull);
         if (_healthBar.currentHealth <= 0f)
-        {
-            TrySpawnDebris();
             Destroy(gameObject);
-        }
-    }
-
-    void TrySpawnDebris()
-    {
-        if (Random.value > 0.5f) return; // %50 ihtimal
-
-        var go = new GameObject("Debris");
-        go.transform.position = transform.position;
-        var d = go.AddComponent<Debris>();
-
-        // Düşmanlar hep sola hareket eder; enkaz aynı yönde ama çok daha yavaş sürüklenir
-        Vector2 vel = new Vector2(-_speed * Random.Range(0.10f, 0.25f),
-                                   Random.Range(-0.3f, 0.3f));
-        d.Init(vel, Random.Range(5f, 18f));
     }
 
     float CalcDamage(float amount, WeaponType wt)
@@ -275,7 +290,7 @@ public class EnemyBot : MonoBehaviour
 
         float shieldMult = wt == WeaponType.Kinetic ? 1.5f :
                            wt == WeaponType.Laser   ? 0.25f : 1f;
-        float effective = amount * shieldMult;
+        float effective  = amount * shieldMult;
 
         if (_shieldHP >= effective)
         {
@@ -304,13 +319,14 @@ public class EnemyBot : MonoBehaviour
         Destroy(gameObject);
     }
 
+    float _contactDamage;
+
     // -------------------------------------------------------------------------
     // Görsel kurulum
     // -------------------------------------------------------------------------
 
-    void Apply(float hp, float speed, float contact, int w, int h, Color color)
+    void Apply(float hp, float contact, int w, int h, Color color)
     {
-        _speed         = speed;
         _contactDamage = contact;
 
         if (_healthBar != null)

@@ -114,9 +114,10 @@ public class HealthBar : MonoBehaviour
 
     void PlaceBar(Transform t, float x, float y, float z, float w, float h)
     {
-        t.localPosition = new Vector3(x, y, z);
-        t.rotation      = Quaternion.identity;
-        t.localScale    = new Vector3(w, h, 1f);
+        // World space: parent döndüğünde barlar yatay/dikey kalır
+        t.position   = transform.position + new Vector3(x, y, z);
+        t.rotation   = Quaternion.identity;
+        t.localScale = new Vector3(w, h, 1f);
     }
 
     void SetHealthBarVisible(bool visible)
