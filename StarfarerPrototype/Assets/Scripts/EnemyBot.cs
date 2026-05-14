@@ -68,7 +68,7 @@ public class EnemyBot : MonoBehaviour
                 _movement.enginePower = 3f;
                 Apply(hp:30, contact:20f, w:60, h:40, new Color(0.9f, 0.20f, 0.20f));
                 _fireTimer = Random.Range(2f, 5f);
-                SetupBrain(CombatPattern.Orbit,    engageRange:6f, fireRange:4f,   orbitRadius:4.5f, engageDuration:5f);
+                SetupBrain(CombatPattern.Orbit,    engageRange:6f, fireRange:5.5f, orbitRadius:4.5f, engageDuration:5f);
                 break;
 
             case EnemyType.Armored:
@@ -76,7 +76,7 @@ public class EnemyBot : MonoBehaviour
                 _movement.enginePower = 7.5f;
                 Apply(hp:80, contact:25f, w:80, h:55, new Color(0.42f, 0.45f, 0.50f));
                 _fireTimer = Random.Range(3f, 7f);
-                SetupBrain(CombatPattern.HoverFire, engageRange:5f, fireRange:3.5f, orbitRadius:4f,   engageDuration:8f);
+                SetupBrain(CombatPattern.HoverFire, engageRange:5f, fireRange:5f, orbitRadius:4f,   engageDuration:8f);
                 break;
 
             case EnemyType.Shield:
@@ -86,7 +86,7 @@ public class EnemyBot : MonoBehaviour
                 _shieldHP = _maxShieldHP = 40f;
                 BuildShieldVisual(90, 65);
                 _fireTimer = Random.Range(1f, 3f);
-                SetupBrain(CombatPattern.Orbit,    engageRange:5.5f, fireRange:3.5f, orbitRadius:3.5f, engageDuration:5f);
+                SetupBrain(CombatPattern.Orbit,    engageRange:5.5f, fireRange:4.5f, orbitRadius:3.5f, engageDuration:5f);
                 break;
 
             case EnemyType.Bomber:
