@@ -54,7 +54,7 @@ public class WeaponController : MonoBehaviour
         if (Mouse.current.leftButton.isPressed && Time.time >= _nextFireTime)
         {
             _nextFireTime = Time.time + fireRate;
-            SpawnBullet(_kineticSprite, WeaponType.Kinetic, speed: 12f);
+            SpawnBullet(_kineticSprite, WeaponType.Kinetic, speed: 6f);
         }
     }
 
@@ -75,7 +75,7 @@ public class WeaponController : MonoBehaviour
             return;
 
         _nextFireTime = Time.time + fireRate;
-        SpawnBullet(_laserSprite, WeaponType.Laser, speed: 16f);
+        SpawnBullet(_laserSprite, WeaponType.Laser, speed: 8f);
     }
 
     // -------------------------------------------------------------------------
@@ -107,7 +107,7 @@ public class WeaponController : MonoBehaviour
         _burstRunning = true;
         for (int i = 0; i < burstCount; i++)
         {
-            SpawnBullet(_plasmaSprite, WeaponType.Plasma, speed: 10f);
+            SpawnBullet(_plasmaSprite, WeaponType.Plasma, speed: 5f);
             yield return new WaitForSeconds(0.08f);
         }
         _burstRunning = false;

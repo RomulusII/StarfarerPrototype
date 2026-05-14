@@ -11,7 +11,7 @@ public class TurretController : ShipComponentBase
     public TurretType turretType     = TurretType.Gatling;
     public float      fireRate       = 1f;
     public float      damage         = 5f;
-    public float      bulletSpeed    = 8f;
+    public float      bulletSpeed    = 4f;
     public float      bulletLifeTime = 3f;
     public float      energyPerShot  = 1f;
     public int        magazineSize   = 10;

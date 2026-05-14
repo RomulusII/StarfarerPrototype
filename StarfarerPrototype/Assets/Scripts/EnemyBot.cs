@@ -216,10 +216,10 @@ public class EnemyBot : MonoBehaviour
     {
         switch (enemyType)
         {
-            case EnemyType.Swarm:   return 6f;
-            case EnemyType.Armored: return 4f;
-            case EnemyType.Shield:  return 7f;
-            default:                return 5f;
+            case EnemyType.Swarm:   return 3f;
+            case EnemyType.Armored: return 2f;
+            case EnemyType.Shield:  return 3.5f;
+            default:                return 2.5f;
         }
     }
 
@@ -250,7 +250,7 @@ public class EnemyBot : MonoBehaviour
         go.transform.position = transform.position;
         var eb = go.AddComponent<EnemyBullet>();
         eb.damage          = 18f;
-        eb.speed           = 4.5f;
+        eb.speed           = 2.25f;
         eb.targetComponent = target;
     }
 

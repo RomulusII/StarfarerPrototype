@@ -121,7 +121,7 @@ public class FighterShip : MonoBehaviour
 
         var tb        = go.AddComponent<TurretBullet>();
         tb.damage     = damage;
-        tb.speed      = 10f;
+        tb.speed      = 5f;
         tb.weaponType = WeaponType.Kinetic;
         tb.isGuided   = false;
         tb.SetDirection(dir);
