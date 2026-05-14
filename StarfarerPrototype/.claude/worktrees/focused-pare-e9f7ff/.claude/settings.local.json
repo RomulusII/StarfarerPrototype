@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(powershell -c \"[console]::beep\\(700,100\\); [console]::beep\\(1000,180\\)\")"
+    ]
+  }
+}
