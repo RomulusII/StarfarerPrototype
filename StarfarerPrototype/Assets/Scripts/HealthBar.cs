@@ -89,15 +89,18 @@ public class HealthBar : MonoBehaviour
             : 0f;
 
         float shieldRatio = 0f;
+        bool  hasShield   = false;
         if (_shield != null && _shield.maxShield > 0f)
         {
             shieldRatio = Mathf.Clamp01(_shield.currentShield / _shield.maxShield);
-            SetShieldBarVisible(true);
+            hasShield   = true;
         }
-        else
+        else if (maxShield > 0f)
         {
-            SetShieldBarVisible(false);
+            shieldRatio = Mathf.Clamp01(currentShield / maxShield);
+            hasShield   = true;
         }
+        SetShieldBarVisible(hasShield);
 
         SetHealthBarVisible(hullHP < hullMax);
 

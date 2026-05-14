@@ -85,6 +85,11 @@ public class EnemyBot : MonoBehaviour
                 Apply(hp:50, contact:20f, w:70, h:50, new Color(0.25f, 0.35f, 0.85f));
                 _shieldHP = _maxShieldHP = 40f;
                 BuildShieldVisual(90, 65);
+                if (_healthBar != null)
+                {
+                    _healthBar.maxShield     = _maxShieldHP;
+                    _healthBar.currentShield = _shieldHP;
+                }
                 _fireTimer = Random.Range(1f, 3f);
                 SetupBrain(CombatPattern.Orbit,    engageRange:5.5f, fireRange:4.5f, orbitRadius:3.5f, engageDuration:5f);
                 break;
@@ -333,13 +338,20 @@ public class EnemyBot : MonoBehaviour
         if (_shieldHP >= effective)
         {
             _shieldHP -= effective;
+            SyncShieldBar();
             RefreshShieldVisual();
             return 0f;
         }
         float overflow = effective - _shieldHP;
         _shieldHP = 0f;
+        SyncShieldBar();
         RefreshShieldVisual();
         return overflow;
+    }
+
+    void SyncShieldBar()
+    {
+        if (_healthBar != null) _healthBar.currentShield = _shieldHP;
     }
 
     void OnTriggerEnter2D(Collider2D other)
