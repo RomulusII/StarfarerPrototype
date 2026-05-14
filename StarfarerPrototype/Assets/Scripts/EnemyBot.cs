@@ -291,7 +291,23 @@ public class EnemyBot : MonoBehaviour
         float hull = CalcDamage(amount, weaponType);
         _healthBar.TakeDamage(hull);
         if (_healthBar.currentHealth <= 0f)
+        {
+            SpawnDebris();
             Destroy(gameObject);
+        }
+    }
+
+    void SpawnDebris()
+    {
+        int count = Random.Range(2, 5);
+        for (int i = 0; i < count; i++)
+        {
+            var go = new GameObject("Debris");
+            go.transform.position = transform.position;
+            var d = go.AddComponent<Debris>();
+            Vector2 vel = Random.insideUnitCircle.normalized * Random.Range(0.3f, 1.2f);
+            d.Init(vel, Random.Range(5f, 15f));
+        }
     }
 
     float CalcDamage(float amount, WeaponType wt)
