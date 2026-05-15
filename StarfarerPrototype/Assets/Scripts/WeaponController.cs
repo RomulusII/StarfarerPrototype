@@ -1,41 +1,44 @@
-using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Kinetik  — sol tık basılı tutunca otomatik ateş, enerji yok.
-/// Lazer    — sol tık basılı tutunca hızlı ateş, her atışta enerji tüketir.
-///            Enerji bitince durur.
-/// Plazma   — sol tık basılı tutunca şarj olur, dolunca otomatik burst atar.
-///            Burst arasında fireRate kadar beklenir.
+/// Kinetik  — basılı tutunca otomatik ateş, enerji yok.
+/// Lazer    — basılı tutunca hızlı ateş, her atışta enerji tüketir.
+/// Plazma   — basılı tut → namlu ucunda küre büyür, bırak → büyüklüğe göre geniş bolt fırlar.
+///            Minimum şarj süresi (chargeTime * 0.25) dolmadan bırakılırsa iptal.
 /// </summary>
 public class WeaponController : MonoBehaviour
 {
     public WeaponType weaponType   = WeaponType.Kinetic;
     public float damage            = 10f;
-    public float fireRate          = 0.15f;
-    public float energyCostPerShot = 3f;   // Lazer
-    public float chargeTime        = 0.8f; // Plazma
-    public int   burstCount        = 3;    // Plazma
+    public float fireRate          = 0.15f;   // Kinetik/Lazer: atışlar arası, Plazma: atış sonrası bekleme
+    public float energyCostPerShot = 3f;      // Lazer
+    public float chargeTime        = 2.0f;    // Plazma: tam şarja ulaşma süresi
 
-    private float   _nextFireTime;
-    private float   _chargeStart  = -1f;
-    private bool    _burstRunning;
+    private float      _nextFireTime;
+    private float      _chargeStart = -1f;
+    private GameObject _chargeSphere;
 
     private Sprite _kineticSprite;
     private Sprite _laserSprite;
-    private Sprite _plasmaSprite;
+    private Sprite _plasmaCircle;  // şarj küresi ve bolt için
 
     void Start()
     {
         _kineticSprite = MakeSprite(10, 30, Color.white);
         _laserSprite   = MakeSprite(4,  44, Color.cyan);
-        _plasmaSprite  = MakeSprite(18, 18, new Color(0.4f, 1f, 0.3f));
+        _plasmaCircle  = MakeCircleSprite(32, Color.white); // renk runtime'da set edilir
     }
+
+    void OnDestroy() => CancelCharge();
 
     void Update()
     {
-        if (UpgradeUI.IsPaused) return;
+        if (UpgradeUI.IsPaused)
+        {
+            CancelCharge();
+            return;
+        }
 
         switch (weaponType)
         {
@@ -79,38 +82,104 @@ public class WeaponController : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // Mod: Plazma
+    // Mod: Plazma — Another World tarzı şarj + bırak
     // -------------------------------------------------------------------------
 
     void UpdatePlasma()
     {
-        if (Mouse.current.leftButton.isPressed)
+        bool held     = Mouse.current.leftButton.isPressed;
+        bool released = Mouse.current.leftButton.wasReleasedThisFrame;
+
+        if (held)
         {
             if (_chargeStart < 0f)
-                _chargeStart = Time.time;
-
-            if (!_burstRunning && Time.time - _chargeStart >= chargeTime && Time.time >= _nextFireTime)
             {
-                _nextFireTime = Time.time + fireRate * burstCount + 0.3f;
-                _chargeStart  = -1f;
-                StartCoroutine(FireBurst());
+                _chargeStart  = Time.time;
+                _chargeSphere = CreateChargeSphere();
             }
+            float ratio = ChargeRatio();
+            UpdateChargeSphere(ratio);
         }
-        else
+
+        if (released)
         {
-            _chargeStart = -1f;
+            float heldSeconds = _chargeStart >= 0f ? Time.time - _chargeStart : 0f;
+            float ratio       = Mathf.Clamp01(heldSeconds / chargeTime);
+            CancelCharge();
+
+            float minCharge = chargeTime * 0.25f;
+            if (heldSeconds >= minCharge && Time.time >= _nextFireTime)
+            {
+                _nextFireTime = Time.time + fireRate;
+                FirePlasmaBolt(ratio);
+            }
         }
     }
 
-    IEnumerator FireBurst()
+    float ChargeRatio() =>
+        _chargeStart >= 0f ? Mathf.Clamp01((Time.time - _chargeStart) / chargeTime) : 0f;
+
+    void CancelCharge()
     {
-        _burstRunning = true;
-        for (int i = 0; i < burstCount; i++)
-        {
-            SpawnBullet(_plasmaSprite, WeaponType.Plasma, speed: 5f);
-            yield return new WaitForSeconds(0.08f);
-        }
-        _burstRunning = false;
+        _chargeStart = -1f;
+        if (_chargeSphere != null) { Destroy(_chargeSphere); _chargeSphere = null; }
+    }
+
+    GameObject CreateChargeSphere()
+    {
+        var go = new GameObject("PlasmaCharge");
+        go.transform.SetParent(transform, false);
+        // Namlu ucu: WeaponMount sprite'ı (20x80px, PPU=100) → 0.8 birim, pivot alt-orta
+        // transform.up = ateş yönü → local Y pozitifi = namlu ucu
+        go.transform.localPosition = new Vector3(0f, 0.8f, 0f);
+
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite       = _plasmaCircle;
+        sr.sortingOrder = 5;
+        go.transform.localScale = Vector3.one * 0.04f;
+        return go;
+    }
+
+    void UpdateChargeSphere(float ratio)
+    {
+        if (_chargeSphere == null) return;
+        float scale = Mathf.Lerp(0.04f, 0.60f, ratio);
+        _chargeSphere.transform.localScale = Vector3.one * scale;
+        var sr = _chargeSphere.GetComponent<SpriteRenderer>();
+        if (sr != null)
+            sr.color = Color.Lerp(
+                new Color(0.3f, 1f, 0.2f, 0.75f),
+                new Color(0.9f, 1f, 0.4f, 1.00f),
+                ratio);
+    }
+
+    void FirePlasmaBolt(float chargeRatio)
+    {
+        float dmgMulti = BoostController.Mode == BoostMode.Weapon ? 2f   :
+                         BoostController.Mode == BoostMode.Shield  ? 1f/3f : 1f;
+        float sclMulti = BoostController.Mode == BoostMode.Weapon ? 1.5f :
+                         BoostController.Mode == BoostMode.Shield  ? 0.6f  : 1f;
+
+        // Beam genişliği = şarj anındaki küre çapı
+        float beamWidth = Mathf.Lerp(0.10f, 0.65f, chargeRatio) * sclMulti;
+        float maxLen    = beamWidth * 32f;
+        float spd       = Mathf.Lerp(7f, 14f, chargeRatio);
+        float totalDmg  = damage * Mathf.Lerp(0.5f, 2.5f, chargeRatio) * dmgMulti;
+
+        var go = new GameObject("PlasmaBeam");
+        // Namlu ucundan spawn: local Y = 0.8 → world: transform.up * 0.8
+        go.transform.SetPositionAndRotation(
+            transform.position + transform.up * 0.8f,
+            transform.rotation);
+
+        var beam = go.AddComponent<PlasmaBeam>();
+        beam.beamWidth   = beamWidth;
+        beam.maxLength   = maxLen;
+        beam.headSpeed   = spd;
+        beam.totalEnergy = totalDmg;
+        // Bir düşmanı 0.33 saniyede tüketir; kalabalık grupta daha hızlı
+        beam.dps         = totalDmg * 3f;
+        beam.weaponType  = WeaponType.Plasma;
     }
 
     // -------------------------------------------------------------------------
@@ -119,10 +188,10 @@ public class WeaponController : MonoBehaviour
 
     void SpawnBullet(Sprite sprite, WeaponType type, float speed)
     {
-        float damageMulti = BoostController.Mode == BoostMode.Weapon ? 2f :
-                            BoostController.Mode == BoostMode.Shield  ? 1f / 3f : 1f;
+        float damageMulti = BoostController.Mode == BoostMode.Weapon ? 2f   :
+                            BoostController.Mode == BoostMode.Shield  ? 1f/3f : 1f;
         float scaleMulti  = BoostController.Mode == BoostMode.Weapon ? 1.5f :
-                            BoostController.Mode == BoostMode.Shield  ? 0.6f : 1f;
+                            BoostController.Mode == BoostMode.Shield  ? 0.6f  : 1f;
 
         var go = new GameObject("Bullet");
         go.transform.SetPositionAndRotation(transform.position, transform.rotation);
@@ -148,14 +217,36 @@ public class WeaponController : MonoBehaviour
         return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
     }
 
+    // Dairesel (alpha kenar kesen) sprite — plazma küre ve bolt için
+    static Sprite MakeCircleSprite(int res, Color color)
+    {
+        var tex     = new Texture2D(res, res);
+        tex.filterMode = FilterMode.Bilinear;
+        var pixels  = new Color[res * res];
+        float center = (res - 1) / 2f;
+        float radius = center;
+        for (int i = 0; i < pixels.Length; i++)
+        {
+            float dx   = (i % res) - center;
+            float dy   = (i / res) - center;
+            float dist = Mathf.Sqrt(dx * dx + dy * dy);
+            // Yumuşak kenar (anti-alias benzeri)
+            float alpha = Mathf.Clamp01(1f - (dist - radius + 1.5f));
+            pixels[i] = new Color(color.r, color.g, color.b, alpha * color.a);
+        }
+        tex.SetPixels(pixels);
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, res, res), new Vector2(0.5f, 0.5f), res);
+    }
+
     /// <summary>ShipLoadout tarafından çağrılır.</summary>
     public void Configure(ComponentDefinition def)
     {
+        CancelCharge(); // silah değişince şarjı iptal et
         weaponType        = def.weaponType;
-        damage            = def.weaponDamage     > 0 ? def.weaponDamage     : 10f;
-        fireRate          = def.weaponFireRate    > 0 ? def.weaponFireRate    : 0.15f;
-        energyCostPerShot = def.weaponEnergyCostPerShot > 0 ? def.weaponEnergyCostPerShot : 3f;
-        chargeTime        = def.weaponChargeTime  > 0 ? def.weaponChargeTime  : 0.8f;
-        burstCount        = def.weaponBurstCount  > 0 ? def.weaponBurstCount  : 3;
+        damage            = def.weaponDamage            > 0 ? def.weaponDamage            : 10f;
+        fireRate          = def.weaponFireRate           > 0 ? def.weaponFireRate           : 0.15f;
+        energyCostPerShot = def.weaponEnergyCostPerShot  > 0 ? def.weaponEnergyCostPerShot  : 3f;
+        chargeTime        = def.weaponChargeTime         > 0 ? def.weaponChargeTime         : 2.0f;
     }
 }

@@ -76,9 +76,11 @@ public class ShipLoadout : MonoBehaviour
         var km1 = W("Kinetik Top Mk1",  WeaponType.Kinetic, 1, ResourceType.RawMaterial,   12,  5, km2,   10f, 0.15f);
         _kineticChain = new[] { km1, km2, km3 };
 
-        var pm3 = W("Plazma Topu Mk3",  WeaponType.Plasma,  3, ResourceType.RawMaterial,   65, 25, null,  45f, 0.10f, 0f, 0.7f,  4);
-        var pm2 = W("Plazma Topu Mk2",  WeaponType.Plasma,  2, ResourceType.RawMaterial,   38, 15, pm3,   36f, 0.11f, 0f, 0.75f, 3);
-        var pm1 = W("Plazma Topu Mk1",  WeaponType.Plasma,  1, ResourceType.RawMaterial,   20,  8, pm2,   28f, 0.12f, 0f, 0.8f,  3);
+        // Plazma — Another World tarzı şarj+bırak mekaniği
+        // fireRate = atış sonrası bekleme (cooldown), chargeTime = tam şarj süresi
+        var pm3 = W("Plazma Topu Mk3",  WeaponType.Plasma,  3, ResourceType.RawMaterial,   65, 25, null,  45f, 1.0f, 0f, 1.4f, 0);
+        var pm2 = W("Plazma Topu Mk2",  WeaponType.Plasma,  2, ResourceType.RawMaterial,   38, 15, pm3,   36f, 1.2f, 0f, 1.7f, 0);
+        var pm1 = W("Plazma Topu Mk1",  WeaponType.Plasma,  1, ResourceType.RawMaterial,   20,  8, pm2,   28f, 1.5f, 0f, 2.0f, 0);
         _plasmaChain = new[] { pm1, pm2, pm3 };
     }
 

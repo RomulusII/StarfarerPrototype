@@ -31,6 +31,7 @@ public class UpgradeUI : MonoBehaviour
     private Text _leftTypeText;
     private Text _leftTierText;
     private Text _leftCostText;
+    private Text _leftUpgradeCostText;
 
     // SlotInfo sağ sütun — bileşen aktüel istatistikleri
     private Text _slotStatsText;
@@ -144,6 +145,7 @@ public class UpgradeUI : MonoBehaviour
 
         // Sağ sütun istatistiklerini güncelle
         UpdateSlotInfoStats();
+        UpdateCostDisplay(slotIndex);
 
         // Eğer aynı slotta stat seçiliyse açıklamayı yeniden göster
         if (!string.IsNullOrEmpty(_selectedStatKey) && _selectedStatSlot == slotIndex)
@@ -159,6 +161,7 @@ public class UpgradeUI : MonoBehaviour
 
         bool canAfford = ResourceInventory.Instance != null &&
                          ResourceInventory.Instance.Get(def.costResource) >= def.cost;
+        _rightCostText.text  = $"{def.cost} {ResourceLabel(def.costResource)}";
         _rightCostText.color = canAfford
             ? new Color(0.3f, 0.9f, 0.45f, 1f)
             : new Color(1f, 0.25f, 0.25f, 1f);
@@ -184,6 +187,7 @@ public class UpgradeUI : MonoBehaviour
         _selectedStatSlot = slotIndex;
         ShowStatDescriptionInternal(statKey);
         UpdateSlotInfoStats();
+        UpdateCostDisplay(_currentSlotIndex);
     }
 
     public void DeselectStat()
@@ -193,6 +197,7 @@ public class UpgradeUI : MonoBehaviour
         ClearBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText);
         if (_optionDescText != null) _optionDescText.text = "";
         UpdateSlotInfoStats();
+        UpdateCostDisplay(_currentSlotIndex);
     }
 
     void ShowStatDescriptionInternal(string statKey)
@@ -710,6 +715,115 @@ public class UpgradeUI : MonoBehaviour
             : "";
     }
 
+    void UpdateCostDisplay(int slotIndex)
+    {
+        if (_leftCostText == null) return;
+
+        if (slotIndex < 0)
+        {
+            _leftCostText.text = "";
+            if (_leftUpgradeCostText != null) _leftUpgradeCostText.text = "";
+            return;
+        }
+
+        if (slotIndex == 5)
+        {
+            UpdateWeaponCostDisplay();
+            return;
+        }
+
+        var def  = _loadout?.GetSlotDef(slotIndex);
+        var comp = _loadout?.GetSlotComponent(slotIndex);
+        if (def == null)
+        {
+            _leftCostText.text = "";
+            if (_leftUpgradeCostText != null) _leftUpgradeCostText.text = "";
+            return;
+        }
+
+        // Toplam harcanan: kurulum + tüm stat upgrade maliyetleri
+        int total = def.cost;
+        if (comp != null)
+            foreach (var kvp in comp.StatLevels)
+                for (int i = 0; i < kvp.Value; i++)
+                    total += StatUpgradeCost(def, i);
+
+        string resLabel = ResourceLabel(def.costResource);
+        _leftCostText.text  = $"{total} {resLabel}";
+        _leftCostText.color = new Color(0.3f, 0.9f, 0.45f, 1f);
+
+        // Seçili stat upgrade masrafı
+        if (_leftUpgradeCostText == null) return;
+        if (!string.IsNullOrEmpty(_selectedStatKey) && _selectedStatSlot == slotIndex)
+        {
+            int curLevel = comp != null && comp.StatLevels.TryGetValue(_selectedStatKey, out var lvl) ? lvl : 0;
+            if (curLevel < ShipComponentBase.MaxStatLevel)
+            {
+                int upgCost    = StatUpgradeCost(def, curLevel);
+                bool canAfford = ResourceInventory.Instance != null &&
+                                 ResourceInventory.Instance.Get(def.costResource) >= upgCost;
+                _leftUpgradeCostText.text  = $"(+{upgCost} {resLabel})";
+                _leftUpgradeCostText.color = canAfford
+                    ? new Color(0.3f, 0.9f, 0.45f, 1f)
+                    : new Color(1f, 0.25f, 0.25f, 1f);
+            }
+            else _leftUpgradeCostText.text = "";
+        }
+        else _leftUpgradeCostText.text = "";
+    }
+
+    void UpdateWeaponCostDisplay()
+    {
+        if (_loadout == null) return;
+        var type   = _loadout.GetActiveWeaponType();
+        var curDef = _loadout.GetWeaponDef(type);
+        if (curDef == null) return;
+
+        // Zincir boyunca harcanan miktar (Mk1→current)
+        int total = 0;
+        var it  = ShipLoadout.GetWeaponChainStart(type);
+        ComponentDefinition prev = null;
+        while (it != null)
+        {
+            total += prev == null ? it.cost : Mathf.Max(0, it.cost - prev.sellValue);
+            if (it == curDef) break;
+            prev = it;
+            it   = it.upgradeTo;
+        }
+        // Stat upgrade maliyetleri
+        foreach (var key in new[] { "damage", "fireRate" })
+        {
+            int level = _loadout.GetWeaponStatLevel(type, key);
+            for (int i = 0; i < level; i++)
+                total += StatUpgradeCost(curDef, i);
+        }
+
+        string resLabel = ResourceLabel(curDef.costResource);
+        _leftCostText.text  = $"{total} {resLabel}";
+        _leftCostText.color = new Color(0.3f, 0.9f, 0.45f, 1f);
+
+        if (_leftUpgradeCostText == null) return;
+        if (!string.IsNullOrEmpty(_selectedStatKey) && _selectedStatSlot == 5)
+        {
+            int curLevel = _loadout.GetWeaponStatLevel(type, _selectedStatKey);
+            if (curLevel < ShipComponentBase.MaxStatLevel)
+            {
+                int upgCost    = StatUpgradeCost(curDef, curLevel);
+                bool canAfford = ResourceInventory.Instance != null &&
+                                 ResourceInventory.Instance.Get(curDef.costResource) >= upgCost;
+                _leftUpgradeCostText.text  = $"(+{upgCost} {resLabel})";
+                _leftUpgradeCostText.color = canAfford
+                    ? new Color(0.3f, 0.9f, 0.45f, 1f)
+                    : new Color(1f, 0.25f, 0.25f, 1f);
+            }
+            else _leftUpgradeCostText.text = "";
+        }
+        else _leftUpgradeCostText.text = "";
+    }
+
+    static string ResourceLabel(ResourceType res) =>
+        res == ResourceType.EnergyCrystal ? "Kristal" : "Ham Madde";
+
     string BuildComponentStatsText(int slotIndex)
     {
         if (slotIndex == 5) return BuildWeaponStatsText();
@@ -1042,8 +1156,10 @@ public class UpgradeUI : MonoBehaviour
         _leftTypeText.color = new Color(0.3f, 0.75f, 0.9f, 1f);
         _leftTierText = MakeLabel(leftCol.transform, "", 24, FontStyle.Normal);
         _leftTierText.color = new Color(1f, 0.85f, 0.2f, 1f);
-        _leftCostText = MakeLabel(leftCol.transform, "", 24, FontStyle.Normal);
+        _leftCostText = MakeLabel(leftCol.transform, "", 22, FontStyle.Normal);
         _leftCostText.color = new Color(0.3f, 0.9f, 0.45f, 1f);
+        _leftUpgradeCostText = MakeLabel(leftCol.transform, "", 22, FontStyle.Normal);
+        _leftUpgradeCostText.color = new Color(1f, 0.25f, 0.25f, 1f);
 
         // Sağ sütun — bileşen istatistikleri
         var rightCol = new GameObject("RightCol", typeof(RectTransform));
@@ -1052,7 +1168,9 @@ public class UpgradeUI : MonoBehaviour
         rightVL.spacing                = 4f;
         rightVL.childForceExpandWidth  = true;
         rightVL.childForceExpandHeight = false;
-        rightCol.AddComponent<LayoutElement>().flexibleWidth = 1f;
+        var rightLE = rightCol.AddComponent<LayoutElement>();
+        rightLE.flexibleWidth = 1f;
+        rightLE.minWidth      = 220f;
 
         var statsGo = new GameObject("StatsText", typeof(RectTransform));
         statsGo.transform.SetParent(rightCol.transform, false);
@@ -1170,8 +1288,8 @@ public class UpgradeUI : MonoBehaviour
         n.text  = def.componentName;
         ty.text = TypeLabel(def.componentType);
         ti.text = $"Tier {def.tier}";
-        string resLabel = def.costResource == ResourceType.EnergyCrystal ? "Kristal" : "Ham Madde";
-        c.text  = $"{def.cost} {resLabel}";
+        // Maliyet UpdateCostDisplay() tarafından ayrıca set edilir
+        if (c != null) c.text = "";
     }
 
     static void ClearBox(Text n, Text ty, Text ti, Text c)
