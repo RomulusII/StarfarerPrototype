@@ -47,6 +47,10 @@ public class EnemyTypeData : ScriptableObject
     public float           fireRate     = 4f;
     public float           bulletSpeed  = 3f;
 
+    [Header("Enkaz Kaynağı")]
+    [Tooltip("Ölünce bırakılan kaynak tipi. threatScore × 4 metal/kristal düşer.")]
+    public ResourceType debrisResourceType = ResourceType.RawMaterial;
+
     [Header("Hull Dirençleri")]
     public DamageModifier[] hullResistances;
 
@@ -125,6 +129,7 @@ public class EnemyTypeData : ScriptableObject
         d.orbitRadius   = 3.5f; d.engageDuration = 5f;
         d.weaponKind    = EnemyWeaponKind.Laser;
         d.fireDamage    = 6f;   d.fireRate      = 3f;   d.bulletSpeed = 3.5f;
+        d.debrisResourceType = ResourceType.EnergyCrystal;
         d.shieldResistances = new[]
         {
             new DamageModifier { weaponType = WeaponType.Kinetic, multiplier = 1.5f  },

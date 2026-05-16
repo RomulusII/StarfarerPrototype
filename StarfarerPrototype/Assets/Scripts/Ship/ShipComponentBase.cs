@@ -23,7 +23,7 @@ public abstract class ShipComponentBase : MonoBehaviour
     // ── Stat upgrade sistemi ──────────────────────────────────────────────────
     // key → seviye (0-5). 0 = upgrade yapılmamış.
     public readonly Dictionary<string, int> StatLevels = new();
-    public const int MaxStatLevel = 5;
+    public const int MaxStatLevel = 8;
 
     /// <summary>Verilen stat key'i için upgrade çarpanını döner. Seviye başına ×1.5.</summary>
     public float GetMultiplier(string key) =>

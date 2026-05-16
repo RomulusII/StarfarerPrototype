@@ -21,14 +21,17 @@ public class Debris : MonoBehaviour
         resourceType   = type;
     }
 
-    void Awake() => BuildVisual();
+    void Awake()
+    {
+        BuildVisual();
+        // Toplanmayan enkaz 3 dakika sonra yok olur — oyuncunun geri kalmasını önler
+        Destroy(gameObject, 180f);
+    }
 
     void Update()
     {
         if (UpgradeUI.IsPaused) return;
         transform.position += (Vector3)(_velocity * Time.deltaTime);
-        if (Mathf.Abs(transform.position.x) > 22f || Mathf.Abs(transform.position.y) > 16f)
-            Destroy(gameObject);
     }
 
     /// <summary>İstenen miktarı tüketir; gerçekte tüketilen miktarı döner.</summary>

@@ -642,8 +642,9 @@ public class UpgradeUI : MonoBehaviour
 
     static int StatUpgradeCost(ComponentDefinition def, int currentLevel)
     {
-        int baseCost = Mathf.Max(1, Mathf.RoundToInt(def.cost * 0.2f));
-        return Mathf.RoundToInt(baseCost * Mathf.Pow(2f, currentLevel));
+        // Lv1 = komponent fiyatı kadar; her seviye 2.5× artar
+        int baseCost = Mathf.Max(5, def.cost);
+        return Mathf.RoundToInt(baseCost * Mathf.Pow(2.5f, currentLevel));
     }
 
     static (string key, string label)[] GetStatsForType(ComponentType type)
@@ -1052,18 +1053,18 @@ public class UpgradeUI : MonoBehaviour
         shield.componentType = ComponentType.Shield;
         shield.tier          = 1;
         shield.costResource  = ResourceType.RawMaterial;
-        shield.cost          = 10;
-        shield.sellValue     = 5;
-        shield.maxShield     = 100f;   // Bug fix: katalog tanımında değer eksikti
-        shield.rechargeRate  = 1.5f;   // Bug fix: katalog tanımında değer eksikti
+        shield.cost          = 200;
+        shield.sellValue     = 100;
+        shield.maxShield     = 150f;
+        shield.rechargeRate  = 3f;
 
         var repair = ScriptableObject.CreateInstance<ComponentDefinition>();
         repair.componentName = "Onarım Birimi Mk1";
         repair.componentType = ComponentType.RepairUnit;
         repair.tier          = 1;
         repair.costResource  = ResourceType.RawMaterial;
-        repair.cost          = 8;
-        repair.sellValue     = 4;
+        repair.cost          = 30;
+        repair.sellValue     = 15;
         repair.repairRate    = 8f;
 
         var gen = ScriptableObject.CreateInstance<ComponentDefinition>();
@@ -1071,16 +1072,16 @@ public class UpgradeUI : MonoBehaviour
         gen.componentType    = ComponentType.Generator;
         gen.tier             = 1;
         gen.costResource     = ResourceType.RawMaterial;
-        gen.cost             = 15;
-        gen.sellValue        = 7;
-        gen.productionAmount = 10f;
+        gen.cost             = 60;
+        gen.sellValue        = 30;
+        gen.productionAmount = 12f;
 
         // 3 temel turret — uzmanlaşma upgrade ekranından yapılır
-        var kinetic = TB("Kinetik Turret", TurretBaseType.Kinetic, ResourceType.RawMaterial, 12,
+        var kinetic = TB("Kinetik Turret", TurretBaseType.Kinetic, ResourceType.RawMaterial, 15,
             fireRate:2f,  damage:6f,  speed:9f,  life:3f,  energy:0.5f);
-        var energy  = TB("Enerji Turret",  TurretBaseType.Energy,  ResourceType.RawMaterial, 18,
+        var energy  = TB("Enerji Turret",  TurretBaseType.Energy,  ResourceType.RawMaterial, 22,
             fireRate:5f,  damage:10f, speed:14f, life:4f,  energy:3f);
-        var missile = TB("Füze Turret",    TurretBaseType.Missile, ResourceType.RawMaterial, 22,
+        var missile = TB("Füze Turret",    TurretBaseType.Missile, ResourceType.RawMaterial, 28,
             fireRate:30f, damage:35f, speed:7f,  life:5f,  energy:0.5f);
 
         _catalogDefs = new[] { shield, repair, gen, kinetic, energy, missile };
@@ -1141,15 +1142,15 @@ public class UpgradeUI : MonoBehaviour
     {
         return spec switch
         {
-            TurretSpecType.Gatling      => MakeSpecDef(baseDef, spec, specCost:8,
+            TurretSpecType.Gatling      => MakeSpecDef(baseDef, spec, specCost:20,
                 fireRate:1f,  damage:5f,  speed:9f,  life:3f,  energy:0.5f, mag:10, reload:3f),
-            TurretSpecType.PointDefence => MakeSpecDef(baseDef, spec, specCost:10,
+            TurretSpecType.PointDefence => MakeSpecDef(baseDef, spec, specCost:25,
                 fireRate:1f,  damage:4f,  speed:8f,  life:0.8f,energy:1f),
-            TurretSpecType.Laser        => MakeSpecDef(baseDef, spec, specCost:10,
+            TurretSpecType.Laser        => MakeSpecDef(baseDef, spec, specCost:30,
                 fireRate:5f,  damage:15f, speed:14f, life:4f,  energy:3f),
-            TurretSpecType.Plasma       => MakeSpecDef(baseDef, spec, specCost:15,
+            TurretSpecType.Plasma       => MakeSpecDef(baseDef, spec, specCost:40,
                 fireRate:20f, damage:25f, speed:5f,  life:4f,  energy:4f),
-            TurretSpecType.HomingRocket => MakeSpecDef(baseDef, spec, specCost:10,
+            TurretSpecType.HomingRocket => MakeSpecDef(baseDef, spec, specCost:35,
                 fireRate:30f, damage:50f, speed:4.5f, life:6f,  energy:0.5f),
             _ => baseDef,
         };

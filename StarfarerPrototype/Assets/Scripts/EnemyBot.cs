@@ -459,14 +459,23 @@ public class EnemyBot : MonoBehaviour
 
     void SpawnDebris()
     {
-        int count = Random.Range(2, 5);
-        for (int i = 0; i < count; i++)
+        // Toplam miktar = tehdit puanı × 4 birim — wave bütçesiyle orantılı, deterministik
+        float total       = (data != null ? data.threatScore : 1) * 4f;
+        var   resType     = data != null ? data.debrisResourceType : ResourceType.RawMaterial;
+        int   pieceCount  = Random.Range(2, 5);
+
+        // Toplam miktarı rastgele boyutlarda parçalara böl
+        float[] weights = new float[pieceCount];
+        float   wSum    = 0f;
+        for (int i = 0; i < pieceCount; i++) { weights[i] = Random.value + 0.1f; wSum += weights[i]; }
+
+        for (int i = 0; i < pieceCount; i++)
         {
-            var go = new GameObject("Debris");
+            float amount = total * (weights[i] / wSum);
+            var   go     = new GameObject("Debris");
             go.transform.position = transform.position;
             var d = go.AddComponent<Debris>();
-            d.Init(Random.insideUnitCircle.normalized * Random.Range(0.3f, 1.2f),
-                   Random.Range(5f, 15f));
+            d.Init(Random.insideUnitCircle.normalized * Random.Range(0.3f, 1.2f), amount, resType);
         }
     }
 
