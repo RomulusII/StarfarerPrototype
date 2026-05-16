@@ -14,8 +14,17 @@ public class TurretBullet : MonoBehaviour
     public EnemyBot   guidedTarget;
     [Tooltip("Saniyede derece — roketin maksimum dönüş hızı.")]
     public float      turnRate    = 120f;
+    [Tooltip("0 = vurulabilir değil. Roketler için ayarlanır.")]
+    public float      hp         = 0f;
 
     Vector2 _dir;
+
+    public void TakeDamage(float amount)
+    {
+        if (hp <= 0f) return;
+        hp -= amount;
+        if (hp <= 0f) Destroy(gameObject);
+    }
 
     void Awake()
     {
@@ -89,7 +98,7 @@ public class TurretBullet : MonoBehaviour
         var bomb = other.GetComponent<Bomb>();
         if (bomb != null)
         {
-            Destroy(bomb.gameObject);
+            bomb.TakeDamage(damage);
             Destroy(gameObject);
             return;
         }

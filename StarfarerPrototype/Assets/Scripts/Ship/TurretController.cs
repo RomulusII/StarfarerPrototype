@@ -153,7 +153,7 @@ public class TurretController : ShipComponentBase
         tb.weaponType   = BulletWeaponType();
         tb.isGuided     = turretType == TurretType.Rocket;
         tb.guidedTarget = turretType == TurretType.Rocket ? target?.GetComponent<EnemyBot>() : null;
-        if (turretType == TurretType.Rocket) tb.turnRate = 60f;
+        if (turretType == TurretType.Rocket) { tb.turnRate = 60f; tb.hp = 3f; }
 
         tb.SetDirection(transform.right);
 

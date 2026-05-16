@@ -8,6 +8,7 @@ public class Bomb : MonoBehaviour
 {
     public float speed  = 2.5f;
     public float damage = 30f;
+    public float hp     = 1f;
 
     Vector2 _dir;
 
@@ -32,6 +33,12 @@ public class Bomb : MonoBehaviour
     }
 
     public void SetDirection(Vector2 dir) => _dir = dir.normalized;
+
+    public void TakeDamage(float amount)
+    {
+        hp -= amount;
+        if (hp <= 0f) Destroy(gameObject);
+    }
 
     void Update()
     {
