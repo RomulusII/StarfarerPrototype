@@ -7,7 +7,7 @@ public class ResourceInventory : MonoBehaviour
 {
     public static ResourceInventory Instance { get; private set; }
 
-    public float metal      = 100f;
+    public float metal      = 20f;
     public float crystal    = 20f;
     public float energyScrap = 0f;
 
@@ -18,6 +18,12 @@ public class ResourceInventory : MonoBehaviour
     void Awake()
     {
         Instance = this;
+        metal = DifficultyManager.Current switch
+        {
+            Difficulty.Easy => 40f,
+            Difficulty.Hard => 0f,
+            _               => 20f,
+        };
     }
 
     public void AddMetal(float amount)      => metal      = Mathf.Min(metal      + amount, maxMetal);
