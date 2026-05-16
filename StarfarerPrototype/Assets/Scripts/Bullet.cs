@@ -33,11 +33,7 @@ public class Bullet : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D other)
     {
-        EnemyBot enemy = other.GetComponent<EnemyBot>();
-        if (enemy != null)
-        {
-            enemy.TakeDamage(damage, weaponType);
+        if (DamageUtil.TryDamage(other, damage, weaponType))
             Destroy(gameObject);
-        }
     }
 }

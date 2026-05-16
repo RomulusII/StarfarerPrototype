@@ -59,9 +59,7 @@ public class TurretBullet : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D other)
     {
-        var enemy = other.GetComponent<EnemyBot>();
-        if (enemy == null) return;
-        enemy.TakeDamage(damage, weaponType);
-        Destroy(gameObject);
+        if (DamageUtil.TryDamage(other, damage, weaponType))
+            Destroy(gameObject);
     }
 }

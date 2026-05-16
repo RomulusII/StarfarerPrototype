@@ -108,16 +108,21 @@ public class PlasmaBeam : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            var enemy = _buffer[i].GetComponent<EnemyBot>();
-            if (enemy == null) continue;
+            var col = _buffer[i];
 
-            int id = enemy.GetInstanceID();
+            // Beam yalnızca düşman objelerine hasar verir
+            bool isEnemy = col.GetComponent<EnemyBot>()   != null
+                        || col.GetComponent<BossHardpoint>() != null
+                        || col.GetComponent<BossShip>()    != null;
+            if (!isEnemy) continue;
+
+            int id = col.gameObject.GetInstanceID();
             if (!_hitSet.Add(id)) continue;  // bu frame zaten hasar aldı
 
             float tickDmg = Mathf.Min(dps * Time.deltaTime, totalEnergy);
             if (tickDmg <= 0f) break;
 
-            enemy.TakeDamage(tickDmg, weaponType);
+            DamageUtil.TryDamage(col, tickDmg, weaponType);
             totalEnergy -= tickDmg;
 
             if (totalEnergy <= 0f)
