@@ -26,7 +26,7 @@ public class TurretController : ShipComponentBase
     Transform _barrel;
 
     // Point Defence menzili (dünya birimi)
-    const float PDRange = 3.5f;
+    const float PDRange = 5.5f;
 
     // -------------------------------------------------------------------------
 
@@ -48,7 +48,7 @@ public class TurretController : ShipComponentBase
         var target = FindTarget();
 
         if (target != null)
-            AimAt(target.transform.position);
+            AimAt(target.position);
 
         _fireTimer -= Time.deltaTime;
         float effectiveFireRate = fireRate / GetMultiplier("fireRate");
@@ -65,9 +65,23 @@ public class TurretController : ShipComponentBase
     // Hedefleme
     // -------------------------------------------------------------------------
 
-    EnemyBot FindTarget()
+    Transform FindTarget()
     {
-        var all = FindObjectsByType<EnemyBot>(FindObjectsSortMode.None);
+        // Point Defence: önce menzildeki bombaları kontrol et
+        if (turretType == TurretType.PointDefence)
+        {
+            var bombs = FindObjectsByType<Bomb>(FindObjectsSortMode.None);
+            Transform nearestBomb  = null;
+            float     nearestBombD = float.MaxValue;
+            foreach (var b in bombs)
+            {
+                float d = Vector2.Distance(transform.position, b.transform.position);
+                if (d <= PDRange && d < nearestBombD) { nearestBombD = d; nearestBomb = b.transform; }
+            }
+            if (nearestBomb != null) return nearestBomb;
+        }
+
+        var all   = FindObjectsByType<EnemyBot>(FindObjectsSortMode.None);
         EnemyBot best  = null;
         float    bestD = float.MaxValue;
 
@@ -78,23 +92,25 @@ public class TurretController : ShipComponentBase
             if (turretType == TurretType.PointDefence && d > PDRange)
                 continue;
 
-            // Point Defence: Bomber öncelik (Approach hareketi = Bomber tipi)
-            if (turretType == TurretType.PointDefence &&
-                e.data?.movementKind == EnemyMovementKind.Approach && best?.data?.movementKind != EnemyMovementKind.Approach)
+            // Point Defence: Approach/BombRun tiplerine öncelik
+            bool ePriority    = e.data?.movementKind == EnemyMovementKind.Approach
+                             || e.data?.movementKind == EnemyMovementKind.BombRun;
+            bool bestPriority = best?.data?.movementKind == EnemyMovementKind.Approach
+                             || best?.data?.movementKind == EnemyMovementKind.BombRun;
+
+            if (turretType == TurretType.PointDefence && ePriority && !bestPriority)
             {
-                best  = e;
-                bestD = d;
+                best = e; bestD = d;
                 continue;
             }
 
-            if (d < bestD)
+            if (d < bestD && (!bestPriority || ePriority))
             {
-                bestD = d;
-                best  = e;
+                bestD = d; best = e;
             }
         }
 
-        return best;
+        return best?.transform;
     }
 
     void AimAt(Vector3 worldPos)
@@ -110,7 +126,7 @@ public class TurretController : ShipComponentBase
     // Ateş etme
     // -------------------------------------------------------------------------
 
-    void Fire(EnemyBot target, float effectiveFireRate)
+    void Fire(Transform target, float effectiveFireRate)
     {
         _fireTimer = effectiveFireRate;
 
@@ -124,7 +140,7 @@ public class TurretController : ShipComponentBase
         SpawnBullet(target);
     }
 
-    void SpawnBullet(EnemyBot target)
+    void SpawnBullet(Transform target)
     {
         Vector3 spawnPos = transform.position + transform.right * 0.25f;
 
@@ -132,11 +148,11 @@ public class TurretController : ShipComponentBase
         go.transform.position = spawnPos;
 
         var tb = go.AddComponent<TurretBullet>();
-        tb.damage      = damage * GetMultiplier("damage");
-        tb.speed       = bulletSpeed;
-        tb.weaponType  = BulletWeaponType();
-        tb.isGuided    = turretType == TurretType.Rocket;
-        tb.guidedTarget = turretType == TurretType.Rocket ? target : null;
+        tb.damage       = damage * GetMultiplier("damage");
+        tb.speed        = bulletSpeed;
+        tb.weaponType   = BulletWeaponType();
+        tb.isGuided     = turretType == TurretType.Rocket;
+        tb.guidedTarget = turretType == TurretType.Rocket ? target?.GetComponent<EnemyBot>() : null;
         if (turretType == TurretType.Rocket) tb.turnRate = 60f;
 
         tb.SetDirection(transform.right);

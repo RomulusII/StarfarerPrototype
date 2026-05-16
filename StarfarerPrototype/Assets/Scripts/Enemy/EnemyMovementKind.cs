@@ -5,4 +5,5 @@ public enum EnemyMovementKind
     Approach,    // Yaklaş → bekle → burst → geri çekil (Bomber)
     Strafe,      // Hedefe paralel kayma
     Stationary,  // Hareket etmez
+    BombRun,     // Düz çizgide geçer, bomba atar — Point Defence'in öncelikli hedefi
 }

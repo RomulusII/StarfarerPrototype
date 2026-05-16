@@ -49,6 +49,10 @@ public class EnemyBot : MonoBehaviour
     const float   ApproachHoverX  = 2.0f;
     const int     ApproachShotMax = 3;
 
+    // BombRun state
+    float       _bombRunFireTimer;
+    const float BombRunSpeed = 1.5f;
+
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
     void Awake()
@@ -84,7 +88,8 @@ public class EnemyBot : MonoBehaviour
 
         bool needsBarrel = data.weaponKind != EnemyWeaponKind.None
                         && data.weaponKind != EnemyWeaponKind.ComponentBurst
-                        && data.movementKind != EnemyMovementKind.Approach;
+                        && data.movementKind != EnemyMovementKind.Approach
+                        && data.movementKind != EnemyMovementKind.BombRun;
         if (needsBarrel)
             BuildBarrel(data.barrelColor);
 
@@ -146,6 +151,10 @@ public class EnemyBot : MonoBehaviour
 
             case EnemyMovementKind.Stationary:
                 break;
+
+            case EnemyMovementKind.BombRun:
+                _bombRunFireTimer = _fireRateBase * 0.5f;
+                break;
         }
     }
 
@@ -170,6 +179,12 @@ public class EnemyBot : MonoBehaviour
         if (data.movementKind == EnemyMovementKind.Approach)
         {
             UpdateApproach();
+            return;
+        }
+
+        if (data.movementKind == EnemyMovementKind.BombRun)
+        {
+            UpdateBombRun();
             return;
         }
 
@@ -251,6 +266,35 @@ public class EnemyBot : MonoBehaviour
 
         float x = transform.position.x;
         if (x < -15f || x > 20f) Destroy(gameObject);
+    }
+
+    void UpdateBombRun()
+    {
+        transform.Translate(Vector2.left * BombRunSpeed * Time.deltaTime, Space.World);
+
+        _bombRunFireTimer -= Time.deltaTime;
+        if (_bombRunFireTimer <= 0f)
+        {
+            _bombRunFireTimer = _fireRateBase;
+            DropBomb();
+        }
+
+        if (transform.position.x < -15f) Destroy(gameObject);
+    }
+
+    void DropBomb()
+    {
+        var go = new GameObject("Bomb");
+        go.transform.position = transform.position;
+
+        var bomb   = go.AddComponent<Bomb>();
+        bomb.damage = data.fireDamage;
+        bomb.speed  = data.bulletSpeed;
+
+        Vector2 dir = _playerShip != null
+            ? ((Vector2)_playerShip.transform.position - (Vector2)transform.position).normalized
+            : Vector2.left;
+        bomb.SetDirection(dir);
     }
 
     // ── Ateş etme ─────────────────────────────────────────────────────────────

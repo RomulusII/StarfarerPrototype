@@ -150,4 +150,25 @@ public class EnemyTypeData : ScriptableObject
         d.fireDamage    = 18f;  d.fireRate      = 1.8f; d.bulletSpeed = 2.25f;
         return d;
     }
+
+    public static EnemyTypeData CreateBombRunner()
+    {
+        var d = CreateInstance<EnemyTypeData>();
+        d.name          = "BombRunner";
+        d.displayName   = "Bomb Runner";
+        d.role          = EnemyRole.Flank;
+        d.threatScore   = 3;
+        d.maxHP         = 35f;
+        d.mass          = 2f;   d.enginePower   = 5f;
+        d.contactDamage = 0f;
+        d.bodyWidth     = 65;   d.bodyHeight    = 45;
+        d.bodyColor     = new Color(0.85f, 0.45f, 0.05f);
+        d.barrelColor   = new Color(0.70f, 0.35f, 0.05f);
+        d.movementKind  = EnemyMovementKind.BombRun;
+        d.weaponKind    = EnemyWeaponKind.None;
+        d.fireDamage    = 30f;
+        d.fireRate      = 2.5f;
+        d.bulletSpeed   = 2.5f;
+        return d;
+    }
 }

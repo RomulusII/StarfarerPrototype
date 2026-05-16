@@ -25,8 +25,9 @@ public class EnemySpawner : MonoBehaviour
             EnemyTypeData.CreateArmored(),
             EnemyTypeData.CreateShield(),
             EnemyTypeData.CreateBomber(),
+            EnemyTypeData.CreateBombRunner(),
         };
-        _defaultWeights = new[] { 0.55f, 0.23f, 0.15f, 0.07f };
+        _defaultWeights = new[] { 0.50f, 0.20f, 0.15f, 0.07f, 0.08f };
     }
 
     void Update()

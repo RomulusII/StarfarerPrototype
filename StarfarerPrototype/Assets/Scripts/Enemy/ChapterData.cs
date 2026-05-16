@@ -33,10 +33,11 @@ public class ChapterData : ScriptableObject
 
     public static ChapterData[] CreateDefaultChapters()
     {
-        var swarm   = EnemyTypeData.CreateSwarm();
-        var armored = EnemyTypeData.CreateArmored();
-        var shield  = EnemyTypeData.CreateShield();
-        var bomber  = EnemyTypeData.CreateBomber();
+        var swarm       = EnemyTypeData.CreateSwarm();
+        var armored     = EnemyTypeData.CreateArmored();
+        var shield      = EnemyTypeData.CreateShield();
+        var bomber      = EnemyTypeData.CreateBomber();
+        var bombRunner  = EnemyTypeData.CreateBombRunner();
 
         return new ChapterData[]
         {
@@ -61,12 +62,12 @@ public class ChapterData : ScriptableObject
 
             MakeChapter(3,  "Sektör 3: Ağır Metaller",
                 "Zırhlı birimler tespit edildi. Kinetik silahlarınızı gözden geçirin.",
-                new[] { swarm, armored }, interval: 3.5f, hpMult: 1.1f,
+                new[] { swarm, armored, bombRunner }, interval: 3.5f, hpMult: 1.1f,
                 waves: new[]
                 {
                     MakeWave(6, 8,  new[] { swarm }),
-                    MakeWave(6, 9,  new[] { swarm, armored }),
-                    MakeWave(8, 10, new[] { swarm, armored }),
+                    MakeWave(6, 9,  new[] { swarm, armored, bombRunner }),
+                    MakeWave(8, 10, new[] { swarm, armored, bombRunner }),
                 }),
 
             MakeChapter(4,  "Sektör 4: Baskı",
@@ -101,37 +102,37 @@ public class ChapterData : ScriptableObject
                 }),
 
             MakeChapter(7,  "Sektör 7: Bomba Yağmuru",
-                "Yakın mesafe intihar droneları tespit edildi. Bileşenleri koruyun!",
-                new[] { swarm, armored, shield, bomber }, interval: 2.5f, hpMult: 1.5f,
+                "Yakın mesafe intihar droneları ve bomba uçakları tespit edildi. Point Defence kritik!",
+                new[] { swarm, armored, shield, bomber, bombRunner }, interval: 2.5f, hpMult: 1.5f,
                 waves: new[]
                 {
                     MakeWave(12, 16, new[] { swarm, bomber }),
-                    MakeWave(14, 18, new[] { swarm, armored, bomber }),
-                    MakeWave(16, 20, new[] { swarm, armored, shield, bomber }),
-                    MakeWave(18, 22, new[] { swarm, armored, shield, bomber }),
+                    MakeWave(14, 18, new[] { swarm, armored, bomber, bombRunner }),
+                    MakeWave(16, 20, new[] { swarm, armored, shield, bomber, bombRunner }),
+                    MakeWave(18, 22, new[] { swarm, armored, shield, bomber, bombRunner }),
                 }),
 
             MakeChapter(8,  "Sektör 8: Tam Baskı",
                 "Tüm sistemler kritik. Geri çekilme yok.",
-                new[] { swarm, armored, shield, bomber }, interval: 2.2f, hpMult: 1.7f,
+                new[] { swarm, armored, shield, bomber, bombRunner }, interval: 2.2f, hpMult: 1.7f,
                 waves: new[]
                 {
-                    MakeWave(18, 22, new[] { swarm, armored, shield, bomber }),
-                    MakeWave(20, 25, new[] { swarm, armored, shield, bomber }),
-                    MakeWave(22, 27, new[] { swarm, armored, shield, bomber }),
-                    MakeWave(24, 28, new[] { swarm, armored, shield, bomber }),
+                    MakeWave(18, 22, new[] { swarm, armored, shield, bomber, bombRunner }),
+                    MakeWave(20, 25, new[] { swarm, armored, shield, bomber, bombRunner }),
+                    MakeWave(22, 27, new[] { swarm, armored, shield, bomber, bombRunner }),
+                    MakeWave(24, 28, new[] { swarm, armored, shield, bomber, bombRunner }),
                 }),
 
             MakeChapter(9,  "Sektör 9: Son Hazırlık",
                 "Büyük bir sinyal yaklaşıyor. Bu bölümde hazırlıklarınızı tamamlayın.",
-                new[] { swarm, armored, shield, bomber }, interval: 2f, hpMult: 1.8f,
+                new[] { swarm, armored, shield, bomber, bombRunner }, interval: 2f, hpMult: 1.8f,
                 waves: new[]
                 {
-                    MakeWave(20, 26, new[] { swarm, armored, shield, bomber }),
-                    MakeWave(22, 28, new[] { swarm, armored, shield, bomber }),
-                    MakeWave(24, 30, new[] { swarm, armored, shield, bomber }),
-                    MakeWave(26, 32, new[] { swarm, armored, shield, bomber }),
-                    MakeWave(28, 34, new[] { swarm, armored, shield, bomber }),
+                    MakeWave(20, 26, new[] { swarm, armored, shield, bomber, bombRunner }),
+                    MakeWave(22, 28, new[] { swarm, armored, shield, bomber, bombRunner }),
+                    MakeWave(24, 30, new[] { swarm, armored, shield, bomber, bombRunner }),
+                    MakeWave(26, 32, new[] { swarm, armored, shield, bomber, bombRunner }),
+                    MakeWave(28, 34, new[] { swarm, armored, shield, bomber, bombRunner }),
                 }),
 
             MakeBossChapter(10, "Sektör 10: Komuta Taşıyıcısı",
