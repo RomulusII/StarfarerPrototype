@@ -16,6 +16,8 @@ public class TurretController : ShipComponentBase
     public float      energyPerShot  = 1f;
     public int        magazineSize   = 10;
     public float      reloadTime     = 3f;
+    [Tooltip("Saniyede derece — turretin maksimum dönüş hızı.")]
+    public float      turnRate       = 180f;
 
     // Runtime state
     float   _fireTimer;
@@ -35,6 +37,7 @@ public class TurretController : ShipComponentBase
         BuildVisual();
         _currentMag = magazineSize;
         _fireTimer  = Random.Range(0f, fireRate); // ilk atışı staggerla
+        ApplyTypeTurnRate();
     }
 
     void Update()
@@ -96,9 +99,11 @@ public class TurretController : ShipComponentBase
 
     void AimAt(Vector3 worldPos)
     {
-        var dir   = worldPos - transform.position;
-        float ang = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-        transform.rotation = Quaternion.Euler(0f, 0f, ang);
+        var   dir     = worldPos - transform.position;
+        float target  = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        float current = transform.eulerAngles.z;
+        float next    = Mathf.MoveTowardsAngle(current, target, turnRate * Time.deltaTime);
+        transform.rotation = Quaternion.Euler(0f, 0f, next);
     }
 
     // -------------------------------------------------------------------------
@@ -132,6 +137,7 @@ public class TurretController : ShipComponentBase
         tb.weaponType  = BulletWeaponType();
         tb.isGuided    = turretType == TurretType.Rocket;
         tb.guidedTarget = turretType == TurretType.Rocket ? target : null;
+        if (turretType == TurretType.Rocket) tb.turnRate = 60f;
 
         tb.SetDirection(transform.right);
 
@@ -216,6 +222,16 @@ public class TurretController : ShipComponentBase
         }
     }
 
+    void ApplyTypeTurnRate()
+    {
+        switch (turretType)
+        {
+            case TurretType.Rocket: turnRate =  90f; break; // ağır, yavaş döner
+            case TurretType.Laser:  turnRate = 126f; break; // %30 yavaş
+            default:                turnRate = 180f; break;
+        }
+    }
+
     string TurretLabel()
     {
         switch (turretType)
@@ -256,5 +272,6 @@ public class TurretController : ShipComponentBase
 
         componentName  = TurretLabel();
         _currentMag    = magazineSize;
+        ApplyTypeTurnRate();
     }
 }
