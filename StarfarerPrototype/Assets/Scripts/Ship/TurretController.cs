@@ -39,6 +39,8 @@ public class TurretController : ShipComponentBase
         ApplySpecTurnRate();
     }
 
+    Vector3 _aimPos;
+
     void Update()
     {
         if (!IsOperational)     return;
@@ -47,17 +49,29 @@ public class TurretController : ShipComponentBase
         var target = FindTarget();
 
         if (target != null)
-            AimAt(target.position);
+        {
+            _aimPos = specType == TurretSpecType.PointDefence
+                ? PredictIntercept(target)
+                : target.position;
+            AimAt(_aimPos);
+        }
 
         _fireTimer -= Time.deltaTime;
         float effectiveFireRate = fireRate / GetMultiplier("fireRate");
-        if (_fireTimer <= 0f && !_reloading && target != null)
+        if (_fireTimer <= 0f && !_reloading && target != null && IsAimed(_aimPos))
         {
             bool hasEnergy = EnergyBus.Instance == null ||
                              EnergyBus.Instance.RequestEnergy(energyPerShot);
             if (hasEnergy)
                 Fire(target, effectiveFireRate);
         }
+    }
+
+    bool IsAimed(Vector3 worldPos)
+    {
+        var   dir         = worldPos - transform.position;
+        float targetAngle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        return Mathf.Abs(Mathf.DeltaAngle(transform.eulerAngles.z, targetAngle)) < 1f;
     }
 
     // -------------------------------------------------------------------------
@@ -126,13 +140,56 @@ public class TurretController : ShipComponentBase
         return bestTransform;
     }
 
-    void AimAt(Vector3 worldPos)
+    void AimAt(Vector3 worldPos, bool instant = false)
     {
-        var   dir     = worldPos - transform.position;
-        float target  = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-        float current = transform.eulerAngles.z;
-        float next    = Mathf.MoveTowardsAngle(current, target, turnRate * Time.deltaTime);
+        var   dir    = worldPos - transform.position;
+        float angle  = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        float next   = instant
+            ? angle
+            : Mathf.MoveTowardsAngle(transform.eulerAngles.z, angle, turnRate * Time.deltaTime);
         transform.rotation = Quaternion.Euler(0f, 0f, next);
+    }
+
+    // Hedefin mermisiyle buluşacağı noktayı hesaplar
+    Vector3 PredictIntercept(Transform target)
+    {
+        Vector2 toTarget  = (Vector2)(target.position - transform.position);
+        Vector2 targetVel = GetTargetVelocity(target);
+
+        float a = Vector2.Dot(targetVel, targetVel) - bulletSpeed * bulletSpeed;
+        float b = 2f * Vector2.Dot(targetVel, toTarget);
+        float c = Vector2.Dot(toTarget, toTarget);
+
+        float t = 0f;
+        if (Mathf.Abs(a) < 0.001f)
+        {
+            if (Mathf.Abs(b) > 0.001f) t = -c / b;
+        }
+        else
+        {
+            float disc = b * b - 4f * a * c;
+            if (disc < 0f) return target.position;
+            float sq = Mathf.Sqrt(disc);
+            float t1 = (-b + sq) / (2f * a);
+            float t2 = (-b - sq) / (2f * a);
+            if      (t1 > 0f && t2 > 0f) t = Mathf.Min(t1, t2);
+            else if (t1 > 0f)            t = t1;
+            else if (t2 > 0f)            t = t2;
+            else return target.position;
+        }
+
+        return target.position + (Vector3)(targetVel * t);
+    }
+
+    Vector2 GetTargetVelocity(Transform target)
+    {
+        var bomb = target.GetComponent<Bomb>();
+        if (bomb != null) return bomb.Velocity;
+
+        var enemy = target.GetComponent<EnemyBot>();
+        if (enemy != null) return enemy.Velocity;
+
+        return Vector2.zero;
     }
 
     // -------------------------------------------------------------------------

@@ -53,6 +53,10 @@ public class EnemyBot : MonoBehaviour
     float       _bombRunFireTimer;
     const float BombRunSpeed = 1.5f;
 
+    // Velocity tracking
+    Vector2        _prevPos;
+    public Vector2 Velocity { get; private set; }
+
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
     void Awake()
@@ -83,6 +87,7 @@ public class EnemyBot : MonoBehaviour
 
         _fireRateBase = data.fireRate;
         _fireTimer    = Random.Range(0f, _fireRateBase);
+        _prevPos      = transform.position;
 
         InitMovement();
 
@@ -175,6 +180,10 @@ public class EnemyBot : MonoBehaviour
     void Update()
     {
         if (UpgradeUI.IsPaused) return;
+
+        if (Time.deltaTime > 0f)
+            Velocity = ((Vector2)transform.position - _prevPos) / Time.deltaTime;
+        _prevPos = transform.position;
 
         if (data.movementKind == EnemyMovementKind.Approach)
         {

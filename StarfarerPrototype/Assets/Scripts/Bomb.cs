@@ -32,6 +32,8 @@ public class Bomb : MonoBehaviour
         Destroy(gameObject, 8f);
     }
 
+    public Vector2 Velocity => _dir * speed;
+
     public void SetDirection(Vector2 dir) => _dir = dir.normalized;
 
     public void TakeDamage(float amount)
