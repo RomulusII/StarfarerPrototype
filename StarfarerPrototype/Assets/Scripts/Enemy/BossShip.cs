@@ -271,7 +271,10 @@ public class BossShip : MonoBehaviour
         {
             _shieldRechargeTimer -= Time.deltaTime;
             if (_shieldRechargeTimer <= 0f)
+            {
                 _shieldHP = Mathf.Min(_shieldHP + ShieldRechargeRate * Time.deltaTime, _maxShieldHP);
+                SyncShieldBar();
+            }
         }
 
         RefreshShieldVisual();
