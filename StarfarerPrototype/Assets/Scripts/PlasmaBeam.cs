@@ -26,7 +26,7 @@ public class PlasmaBeam : MonoBehaviour
     bool    _headStopped;
 
     SpriteRenderer       _sr;
-    readonly Collider2D[]          _buffer  = new Collider2D[24];
+    readonly List<Collider2D>      _buffer  = new();
     readonly HashSet<int>          _hitSet  = new();  // aynı frame'de çift hasar önleme
 
     void Awake()
@@ -99,10 +99,11 @@ public class PlasmaBeam : MonoBehaviour
         if (totalEnergy <= 0f) return;
 
         _hitSet.Clear();
-        int count = Physics2D.OverlapBoxNonAlloc(
-            transform.position,
+        int count = Physics2D.OverlapBox(
+            (Vector2)transform.position,
             new Vector2(beamWidth, length),
             _rotAngle,
+            ContactFilter2D.noFilter,
             _buffer);
 
         for (int i = 0; i < count; i++)

@@ -55,6 +55,22 @@ public class GameManager : MonoBehaviour
         BuildGameOverUI();
         BuildUpgradeUI();
         BuildBoostHUD();
+        BuildChapterSystem();
+    }
+
+    void BuildChapterSystem()
+    {
+        if (FindFirstObjectByType<ChapterTransitionUI>() == null)
+        {
+            var go = new GameObject("ChapterTransitionUI");
+            go.AddComponent<ChapterTransitionUI>();
+        }
+
+        if (FindFirstObjectByType<ChapterManager>() == null)
+        {
+            var go = new GameObject("ChapterManager");
+            go.AddComponent<ChapterManager>();
+        }
     }
 
     static void EnsureEventSystem()

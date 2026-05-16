@@ -1,18 +1,38 @@
 using UnityEngine;
 
 /// <summary>
-/// Her spawnInterval saniyede bir sağ kenarda rastgele Y pozisyonunda düşman spawn eder.
-/// Tip ağırlıkları: %55 Swarm, %23 Armored, %15 Shield, %7 Bomber.
+/// EnemyTypeData havuzundan ağırlıklı rastgele seçim yaparak düşman spawn eder.
+/// typePool atanmamışsa built-in default tipler ve ağırlıkları kullanılır.
+/// ChapterManager ileride spawnInterval ve typePool'u dinamik olarak güncelleyecek.
 /// </summary>
 public class EnemySpawner : MonoBehaviour
 {
-    public float spawnInterval = 3f;
+    [Tooltip("Editörde atanabilir. Boş bırakılırsa built-in default tipler kullanılır.")]
+    public EnemyTypeData[] typePool;
+    public float[]         typeWeights;
+    public float           spawnInterval = 3f;
+    public bool            spawning      = true;
 
-    float _timer;
+    EnemyTypeData[] _defaultPool;
+    float[]         _defaultWeights;
+    float           _timer;
+
+    void Awake()
+    {
+        _defaultPool = new[]
+        {
+            EnemyTypeData.CreateSwarm(),
+            EnemyTypeData.CreateArmored(),
+            EnemyTypeData.CreateShield(),
+            EnemyTypeData.CreateBomber(),
+        };
+        _defaultWeights = new[] { 0.55f, 0.23f, 0.15f, 0.07f };
+    }
 
     void Update()
     {
-        if (UpgradeUI.IsPaused) return;
+        if (!spawning || UpgradeUI.IsPaused) return;
+
         _timer += Time.deltaTime;
         if (_timer >= spawnInterval)
         {
@@ -23,19 +43,36 @@ public class EnemySpawner : MonoBehaviour
 
     void SpawnEnemy()
     {
-        var go = new GameObject("EnemyBot");
+        var data = RollType();
+        var go   = new GameObject($"EnemyBot_{data.displayName}");
         go.transform.position = new Vector3(12f, Random.Range(-3f, 3f), 0f);
         go.AddComponent<HealthBar>();
-        var bot = go.AddComponent<EnemyBot>();
-        bot.enemyType = RollType();
+        go.AddComponent<EnemyBot>().data = data;
     }
 
-    static EnemyType RollType()
+    EnemyTypeData RollType()
     {
-        float r = Random.value;
-        if (r < 0.55f) return EnemyType.Swarm;
-        if (r < 0.78f) return EnemyType.Armored;
-        if (r < 0.93f) return EnemyType.Shield;
-        return EnemyType.Bomber;
+        var pool    = (typePool != null && typePool.Length > 0) ? typePool    : _defaultPool;
+        var weights = (typePool != null && typePool.Length > 0) ? typeWeights : _defaultWeights;
+
+        float total = 0f;
+        foreach (var w in weights) total += w;
+
+        float r   = Random.value * total;
+        float acc = 0f;
+        for (int i = 0; i < pool.Length; i++)
+        {
+            acc += weights[i];
+            if (r < acc) return pool[i];
+        }
+        return pool[pool.Length - 1];
+    }
+
+    /// ChapterManager tarafından çağrılır: mevcut wave için havuz ve hızı günceller.
+    public void SetWaveConfig(EnemyTypeData[] pool, float[] weights, float interval)
+    {
+        typePool      = pool;
+        typeWeights   = weights;
+        spawnInterval = interval;
     }
 }

@@ -75,9 +75,9 @@ public class TurretController : ShipComponentBase
             if (turretType == TurretType.PointDefence && d > PDRange)
                 continue;
 
-            // Point Defence: Bomber öncelik
+            // Point Defence: Bomber öncelik (Approach hareketi = Bomber tipi)
             if (turretType == TurretType.PointDefence &&
-                e.enemyType == EnemyType.Bomber && best?.enemyType != EnemyType.Bomber)
+                e.data?.movementKind == EnemyMovementKind.Approach && best?.data?.movementKind != EnemyMovementKind.Approach)
             {
                 best  = e;
                 bestD = d;

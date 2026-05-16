@@ -1,44 +1,91 @@
 using UnityEngine;
 
 /// <summary>
-/// Sahnede 200 adet rastgele sabit yıldız oluşturur.
-/// Küçük beyaz noktalar; bir kısmı transparan olarak derinlik hissi verir.
+/// İki katmanlı paralaks yıldız alanı. Gemi sağa ilerliyor, yıldızlar sola kayıyor.
+/// Yıldızlar sol kenardan çıkınca sağdan yeniden girer — sonsuz döngü.
+/// Arka katman (sönük, yavaş) → derinlik, ön katman (parlak, hızlı) → yakınlık hissi.
 /// </summary>
 public class StarField : MonoBehaviour
 {
-    [SerializeField] private int starCount = 400;
-    [SerializeField] private float areaWidth = 30f;
-    [SerializeField] private float areaHeight = 30f;
+    [SerializeField] private int   starCount    = 400;
+    [SerializeField] private float areaWidth    = 36f;
+    [SerializeField] private float areaHeight   = 14f;
+    [SerializeField] private float backSpeed    = 0.4f;   // arka katman
+    [SerializeField] private float frontSpeed   = 1.1f;   // ön katman
+
+    struct StarData
+    {
+        public Transform       tr;
+        public SpriteRenderer  sr;
+        public float           speed;
+        public float           baseAlpha;
+    }
+
+    StarData[] _stars;
+    float      _halfW;
+    float      _halfH;
 
     void Awake()
     {
-        Sprite starSprite = CreateStarSprite();
+        _halfW = areaWidth  * 0.5f;
+        _halfH = areaHeight * 0.5f;
+
+        var sprite = CreateStarSprite();
+        _stars = new StarData[starCount];
 
         for (int i = 0; i < starCount; i++)
         {
-            float x = Random.Range(-areaWidth * 0.5f, areaWidth * 0.5f);
-            float y = Random.Range(-areaHeight * 0.5f, areaHeight * 0.5f);
-            float size = Random.Range(0.02f, 0.05f);
+            bool isFront = i >= starCount / 2;
 
-            // Yıldızların %40'ı transparan (derinlik hissi), geri kalanı tam görünür
-            float alpha = Random.value < 0.4f ? Random.Range(0.3f, 0.6f) : 1f;
+            float x     = Random.Range(-_halfW, _halfW);
+            float y     = Random.Range(-_halfH, _halfH);
+            float size  = isFront
+                ? Random.Range(0.03f, 0.06f)
+                : Random.Range(0.015f, 0.035f);
+            float alpha = isFront
+                ? Random.Range(0.6f, 1.0f)
+                : Random.Range(0.2f, 0.5f);
 
-            GameObject star = new GameObject("Star");
-            star.transform.SetParent(transform, false);
-            star.transform.position = new Vector3(x, y, 0f);
-            star.transform.localScale = Vector3.one * size;
+            var go = new GameObject("Star");
+            go.transform.SetParent(transform, false);
+            go.transform.position   = new Vector3(x, y, 0f);
+            go.transform.localScale = Vector3.one * size;
 
-            SpriteRenderer sr = star.AddComponent<SpriteRenderer>();
-            sr.sprite = starSprite;
-            sr.color = new Color(1f, 1f, 1f, alpha);
-            sr.sortingOrder = -1;
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite       = sprite;
+            sr.color        = new Color(1f, 1f, 1f, alpha);
+            sr.sortingOrder = isFront ? -1 : -2;
+
+            _stars[i] = new StarData
+            {
+                tr        = go.transform,
+                sr        = sr,
+                speed     = isFront ? frontSpeed : backSpeed,
+                baseAlpha = alpha,
+            };
+        }
+    }
+
+    void Update()
+    {
+        float dt = Time.deltaTime;
+        foreach (ref var s in System.MemoryExtensions.AsSpan(_stars))
+        {
+            var pos = s.tr.position;
+            pos.x -= s.speed * dt;
+
+            // Sol sınırı geçince sağdan girer
+            if (pos.x < -_halfW)
+                pos.x += areaWidth;
+
+            s.tr.position = pos;
         }
     }
 
     static Sprite CreateStarSprite()
     {
-        Texture2D tex = new Texture2D(4, 4);
-        Color[] colors = new Color[16];
+        var tex     = new Texture2D(4, 4);
+        var colors  = new Color[16];
         for (int i = 0; i < 16; i++) colors[i] = Color.white;
         tex.SetPixels(colors);
         tex.Apply();
