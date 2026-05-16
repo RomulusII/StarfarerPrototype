@@ -28,14 +28,30 @@ public class TurretBullet : MonoBehaviour
 
     public void SetDirection(Vector2 dir) => _dir = dir.normalized;
 
+    EnemyBot FindClosestEnemy()
+    {
+        var all   = FindObjectsByType<EnemyBot>(FindObjectsSortMode.None);
+        EnemyBot best  = null;
+        float    bestD = float.MaxValue;
+        foreach (var e in all)
+        {
+            float d = Vector2.Distance(e.transform.position, transform.position);
+            if (d < bestD) { bestD = d; best = e; }
+        }
+        return best;
+    }
+
     void Update()
     {
         if (UpgradeUI.IsPaused) return;
 
         if (isGuided)
         {
-            if (guidedTarget == null) { Destroy(gameObject); return; }
-            _dir = ((Vector2)guidedTarget.transform.position - (Vector2)transform.position).normalized;
+            if (guidedTarget == null)
+                guidedTarget = FindClosestEnemy();
+            // Hedef yoksa mevcut yönde serbest uçuş — Destroy'a Destroy(go, bulletLifeTime) halleder
+            if (guidedTarget != null)
+                _dir = ((Vector2)guidedTarget.transform.position - (Vector2)transform.position).normalized;
         }
 
         transform.Translate(_dir * speed * Time.deltaTime, Space.World);
