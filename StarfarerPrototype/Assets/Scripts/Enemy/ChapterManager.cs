@@ -96,26 +96,40 @@ public class ChapterManager : MonoBehaviour
 
         var wave = chapter.waves[_waveIndex];
 
-        // Düşman listesini bütçeye göre doldur
+        // Boss wave ise boss'u hemen spawn et
+        if (wave.bossType != null)
+            SpawnBoss(wave.bossType);
+
+        // Normal düşman bütçesini doldur (boss wave'de escort olabilir)
         var pool = (wave.allowedTypes != null && wave.allowedTypes.Length > 0)
             ? wave.allowedTypes
             : chapter.defaultEnemyPool;
 
         _pendingSpawns.Clear();
-        FillByBudget(_pendingSpawns, pool,
-            Random.Range(wave.budgetMin, wave.budgetMax + 1));
+        if (pool != null && pool.Length > 0 && wave.budgetMax > 0)
+        {
+            FillByBudget(_pendingSpawns, pool,
+                Random.Range(wave.budgetMin, wave.budgetMax + 1));
 
-        // Formasyona göre sırala (aynı roller yan yana spawn olsun)
-        var formation = wave.formation ?? PickFormation(_pendingSpawns, _formations);
-        SortByFormation(_pendingSpawns, formation);
+            var formation = wave.formation ?? PickFormation(_pendingSpawns, _formations);
+            SortByFormation(_pendingSpawns, formation);
+        }
 
         _currentSpawnInterval = wave.spawnInterval > 0f
             ? wave.spawnInterval
             : chapter.defaultSpawnInterval;
 
-        _spawnTimer  = 0f;
-        _allSpawned  = false;
-        _phase       = Phase.Spawning;
+        _spawnTimer = 0f;
+        _allSpawned = _pendingSpawns.Count == 0;
+        _phase      = Phase.Spawning;
+    }
+
+    void SpawnBoss(BossShipData bossData)
+    {
+        var go = new GameObject($"Boss_{bossData.displayName}");
+        go.transform.position = new Vector3(14f, 0f, 0f);
+        var boss = go.AddComponent<BossShip>();
+        boss.data = bossData;
     }
 
     // ── Spawning güncellemesi ─────────────────────────────────────────────────
@@ -168,7 +182,8 @@ public class ChapterManager : MonoBehaviour
 
     void UpdateWaitClear()
     {
-        if (FindFirstObjectByType<EnemyBot>() != null) return;
+        if (FindFirstObjectByType<EnemyBot>()  != null) return;
+        if (FindFirstObjectByType<BossShip>()  != null) return;
 
         _waveIndex++;
         if (_waveIndex < _chapters[_chapterIndex].waves.Length)

@@ -77,14 +77,14 @@ public class UpgradeUI : MonoBehaviour
                 }
                 _canvas.enabled = true;
                 IsPaused        = true;
-                Time.timeScale  = 0f;
+                SpeedController.Instance?.Pause();
             }
             else
             {
                 _canvas.enabled = false;
                 IsPaused        = false;
                 FindFirstObjectByType<CameraController>()?.RestoreFromUpgrade();
-                Time.timeScale  = 1f;
+                SpeedController.Instance?.Resume();
             }
         }
 

@@ -55,7 +55,64 @@ public class GameManager : MonoBehaviour
         BuildGameOverUI();
         BuildUpgradeUI();
         BuildBoostHUD();
+        BuildSpeedHUD();
         BuildChapterSystem();
+    }
+
+    void BuildSpeedHUD()
+    {
+        // SpeedController singleton
+        var scGO = new GameObject("SpeedController");
+        var sc   = scGO.AddComponent<SpeedController>();
+
+        // Canvas — sağ alt köşe
+        var canvasGO = new GameObject("SpeedHUDCanvas");
+        var canvas   = canvasGO.AddComponent<Canvas>();
+        canvas.renderMode  = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 20;
+
+        var scaler = canvasGO.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight  = 0.5f;
+        canvasGO.AddComponent<GraphicRaycaster>();
+
+        string[] labels  = { "1x", "3x", "10x" };
+        var      buttons = new Button[labels.Length];
+        float    btnW    = 70f;
+        float    btnH    = 36f;
+        float    pad     = 6f;
+        float    startX  = -(labels.Length * (btnW + pad) - pad) * 0.5f;
+
+        for (int i = 0; i < labels.Length; i++)
+        {
+            var btnGO  = new GameObject($"Speed_{labels[i]}");
+            btnGO.transform.SetParent(canvasGO.transform, false);
+
+            var img = btnGO.AddComponent<Image>();
+            img.color = new Color(0.15f, 0.18f, 0.22f);
+
+            var btn = btnGO.AddComponent<Button>();
+            btn.targetGraphic = img;
+
+            var r = btnGO.GetComponent<RectTransform>();
+            r.anchorMin        = new Vector2(1f, 0f);
+            r.anchorMax        = new Vector2(1f, 0f);
+            r.pivot            = new Vector2(1f, 0f);
+            r.sizeDelta        = new Vector2(btnW, btnH);
+            r.anchoredPosition = new Vector2(
+                -10f - (labels.Length - 1 - i) * (btnW + pad),
+                10f);
+
+            MakeText(btnGO.transform, "Label", labels[i], 22, Color.white,
+                     Vector2.zero, Vector2.one);
+
+            int captured = i;
+            btn.onClick.AddListener(() => sc.SetSpeed(captured));
+            buttons[i] = btn;
+        }
+
+        sc.RegisterButtons(buttons);
     }
 
     void BuildChapterSystem()
@@ -92,7 +149,7 @@ public class GameManager : MonoBehaviour
     void TriggerGameOver()
     {
         _gameOver = true;
-        Time.timeScale = 0f;
+        SpeedController.Instance?.Pause();
         if (_weaponController != null) _weaponController.enabled = false;
         if (_weaponMount      != null) _weaponMount.enabled      = false;
         _gameOverPanel.SetActive(true);
@@ -100,7 +157,7 @@ public class GameManager : MonoBehaviour
 
     public void Restart()
     {
-        Time.timeScale = 1f;
+        SpeedController.Instance?.Reset();
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 

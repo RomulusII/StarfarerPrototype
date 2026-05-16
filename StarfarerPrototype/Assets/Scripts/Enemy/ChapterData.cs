@@ -133,7 +133,50 @@ public class ChapterData : ScriptableObject
                     MakeWave(26, 32, new[] { swarm, armored, shield, bomber }),
                     MakeWave(28, 34, new[] { swarm, armored, shield, bomber }),
                 }),
+
+            MakeBossChapter(10, "Sektör 10: Komuta Taşıyıcısı",
+                "Sinyal kaynağı tespit edildi. Devasa bir komuta gemisi — tüm saldırıların koordinatörü.",
+                boss: BossShipData.CreateCarrierCommand(),
+                escortTypes: new[] { swarm, armored },
+                escortBudget: 10,
+                hpMult: 2.0f),
         };
+    }
+
+    static ChapterData MakeBossChapter(int num, string title, string story,
+        BossShipData boss, EnemyTypeData[] escortTypes, int escortBudget, float hpMult)
+    {
+        var c = CreateInstance<ChapterData>();
+        c.chapterNumber         = num;
+        c.chapterTitle          = title;
+        c.storyText             = story;
+        c.defaultEnemyPool      = escortTypes;
+        c.defaultSpawnInterval  = 3f;
+        c.enemyHpMultiplier     = hpMult;
+        c.enemyDamageMultiplier = 1f;
+        c.dialogue              = new DialogueLine[0];
+
+        // Wave 1: escort önce gelir
+        // Wave 2: boss + küçük escort
+        c.waves = new[]
+        {
+            new WaveData
+            {
+                budgetMin    = escortBudget,
+                budgetMax    = escortBudget + 4,
+                allowedTypes = escortTypes,
+                spawnSide    = SpawnSide.Right,
+            },
+            new WaveData
+            {
+                budgetMin    = escortBudget / 2,
+                budgetMax    = escortBudget / 2,
+                allowedTypes = escortTypes,
+                spawnSide    = SpawnSide.Right,
+                bossType     = boss,
+            },
+        };
+        return c;
     }
 
     static ChapterData MakeChapter(int num, string title, string story,

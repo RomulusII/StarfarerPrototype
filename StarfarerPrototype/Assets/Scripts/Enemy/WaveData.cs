@@ -22,4 +22,7 @@ public class WaveData
 
     [Tooltip("Wave içindeki spawn aralığı (saniye). 0 = chapter varsayılanı kullanılır.")]
     public float spawnInterval = 0f;
+
+    [Tooltip("Set edilirse bu boss gemi bu wave'de spawn edilir. allowedTypes ile birlikte kullanılabilir (escort).")]
+    public BossShipData bossType;
 }
