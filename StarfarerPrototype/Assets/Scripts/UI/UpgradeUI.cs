@@ -311,7 +311,83 @@ public class UpgradeUI : MonoBehaviour
         if (def.componentType == ComponentType.Hangar)
             BuildHangarStatSection(slotIndex, def);
         else
+        {
+            if (def.componentType == ComponentType.Turret)
+                BuildTurretSpecSection(slotIndex, def);
             BuildStatUpgradeSection(slotIndex, def);
+        }
+    }
+
+    void BuildTurretSpecSection(int slotIndex, ComponentDefinition def)
+    {
+        MakeTextLabel(_popupContent.transform, "── UZMANLAŞMA ──", 20, TextAnchor.MiddleLeft);
+
+        var currentSpec = def.turretSpecType;
+        var availableSpecs = TurretSpecHelper.GetSpecsForBase(def.turretBaseType);
+
+        // "Temel" (uzmanlaşmasız) butonu
+        if (currentSpec != TurretSpecType.None)
+        {
+            int refund = Mathf.RoundToInt(def.specCost * 0.5f);
+            var degradeRow = CreateRow(_popupContent.transform);
+            var capturedSlot = slotIndex;
+            var capturedDef  = def;
+            var btn = AddButton(degradeRow.transform,
+                $"← Temel Tip (+{refund})",
+                () =>
+                {
+                    var baseDef = GetSpecDef(capturedDef, TurretSpecType.None);
+                    // None spec = base def itself
+                    var bd = ScriptableObject.CreateInstance<ComponentDefinition>();
+                    bd.componentName        = TurretSpecHelper.GetBaseTypeName(capturedDef.turretBaseType);
+                    bd.componentType        = ComponentType.Turret;
+                    bd.costResource         = capturedDef.costResource;
+                    bd.cost                 = capturedDef.cost;
+                    bd.sellValue            = capturedDef.sellValue;
+                    bd.turretBaseType       = capturedDef.turretBaseType;
+                    bd.turretSpecType       = TurretSpecType.None;
+                    bd.turretFireRate       = capturedDef.turretFireRate;
+                    bd.turretDamage         = capturedDef.turretDamage;
+                    bd.turretBulletSpeed    = capturedDef.turretBulletSpeed;
+                    bd.turretBulletLifeTime = capturedDef.turretBulletLifeTime;
+                    bd.turretEnergyPerShot  = capturedDef.turretEnergyPerShot;
+                    if (_loadout.SpecializeTurret(capturedSlot, TurretSpecType.None, bd))
+                        OnSlotClicked(capturedSlot);
+                }, 160f);
+        }
+
+        // Mevcut spec'ten farklı seçenekleri göster
+        foreach (var spec in availableSpecs)
+        {
+            if (spec == currentSpec) continue;
+
+            var specDef  = GetSpecDef(def, spec);
+            bool canAfford = ResourceInventory.Instance != null &&
+                             ResourceInventory.Instance.Get(specDef.specCostResource) >= specDef.specCost;
+
+            string costLabel = specDef.specCost > 0 ? $" ({specDef.specCost})" : " (ücretsiz)";
+            string label     = spec == currentSpec
+                ? $"✓ {TurretSpecHelper.GetSpecName(spec)}"
+                : $"{TurretSpecHelper.GetSpecName(spec)}{costLabel}";
+
+            var capturedSpec = spec;
+            var capturedDef  = specDef;
+            var capturedSlot = slotIndex;
+
+            var row = CreateRow(_popupContent.transform);
+            var btn = AddButton(row.transform, label,
+                () =>
+                {
+                    if (_loadout.SpecializeTurret(capturedSlot, capturedSpec, capturedDef))
+                        OnSlotClicked(capturedSlot);
+                }, 200f);
+
+            if (!canAfford)
+            {
+                btn.interactable = false;
+                btn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
+            }
+        }
     }
 
     void BuildStatUpgradeSection(int slotIndex, ComponentDefinition def)
@@ -999,23 +1075,20 @@ public class UpgradeUI : MonoBehaviour
         gen.sellValue        = 7;
         gen.productionAmount = 10f;
 
-        // Turretler — Lazer ve Plazma RawMaterial kullanır (önceden Crystal'dı, kaynak sıkıntısı yaratıyordu)
-        var gatling = T("Gatling Turret",   TurretType.Gatling,      ResourceType.RawMaterial,    12,
-            fireRate:1f,  damage:5f,  speed:9f,  life:3f,  energy:0.5f, mag:10, reload:3f);
-        var plasma  = T("Plazma Turret",    TurretType.Plasma,       ResourceType.RawMaterial,    20,
-            fireRate:20f, damage:25f, speed:5f,  life:4f,  energy:4f);
-        var laser   = T("Lazer Turret",     TurretType.Laser,        ResourceType.RawMaterial,    18,
-            fireRate:5f,  damage:15f, speed:14f, life:4f,  energy:3f);
-        var rocket  = T("Roket Turret",     TurretType.Rocket,       ResourceType.RawMaterial,    22,
-            fireRate:30f, damage:50f, speed:7f,  life:5f, energy:0.5f);
-        var pd      = T("Point Defence",    TurretType.PointDefence, ResourceType.RawMaterial,    15,
-            fireRate:1f,  damage:4f,  speed:8f,  life:0.8f,energy:1f);
+        // 3 temel turret — uzmanlaşma upgrade ekranından yapılır
+        var kinetic = TB("Kinetik Turret", TurretBaseType.Kinetic, ResourceType.RawMaterial, 12,
+            fireRate:2f,  damage:6f,  speed:9f,  life:3f,  energy:0.5f);
+        var energy  = TB("Enerji Turret",  TurretBaseType.Energy,  ResourceType.RawMaterial, 18,
+            fireRate:5f,  damage:10f, speed:14f, life:4f,  energy:3f);
+        var missile = TB("Füze Turret",    TurretBaseType.Missile, ResourceType.RawMaterial, 22,
+            fireRate:30f, damage:35f, speed:7f,  life:5f,  energy:0.5f);
 
-        _catalogDefs = new[] { shield, repair, gen, gatling, plasma, laser, rocket, pd };
+        _catalogDefs = new[] { shield, repair, gen, kinetic, energy, missile };
         return _catalogDefs;
     }
 
-    static ComponentDefinition T(string name, TurretType tt, ResourceType res, int cost,
+    // Temel turret tanımı (uzmanlaşmamış)
+    static ComponentDefinition TB(string name, TurretBaseType bt, ResourceType res, int cost,
         float fireRate, float damage, float speed, float life, float energy,
         int mag = 0, float reload = 0f)
     {
@@ -1026,7 +1099,8 @@ public class UpgradeUI : MonoBehaviour
         d.costResource         = res;
         d.cost                 = cost;
         d.sellValue            = cost / 2;
-        d.turretType           = tt;
+        d.turretBaseType       = bt;
+        d.turretSpecType       = TurretSpecType.None;
         d.turretFireRate       = fireRate;
         d.turretDamage         = damage;
         d.turretBulletSpeed    = speed;
@@ -1035,6 +1109,50 @@ public class UpgradeUI : MonoBehaviour
         d.turretMagazineSize   = mag;
         d.turretReloadTime     = reload;
         return d;
+    }
+
+    // Spec tanımları — her base+spec kombinasyonu için
+    static ComponentDefinition MakeSpecDef(ComponentDefinition baseDef, TurretSpecType spec,
+        int specCost, float fireRate, float damage, float speed, float life, float energy,
+        int mag = 0, float reload = 0f)
+    {
+        var d = ScriptableObject.CreateInstance<ComponentDefinition>();
+        d.componentName        = $"{TurretSpecHelper.GetBaseTypeName(baseDef.turretBaseType)} — {TurretSpecHelper.GetSpecName(spec)}";
+        d.componentType        = ComponentType.Turret;
+        d.tier                 = 1;
+        d.costResource         = baseDef.costResource;
+        d.cost                 = baseDef.cost;
+        d.sellValue            = baseDef.sellValue;
+        d.turretBaseType       = baseDef.turretBaseType;
+        d.turretSpecType       = spec;
+        d.specCost             = specCost;
+        d.specCostResource     = baseDef.costResource;
+        d.turretFireRate       = fireRate;
+        d.turretDamage         = damage;
+        d.turretBulletSpeed    = speed;
+        d.turretBulletLifeTime = life;
+        d.turretEnergyPerShot  = energy;
+        d.turretMagazineSize   = mag;
+        d.turretReloadTime     = reload;
+        return d;
+    }
+
+    static ComponentDefinition GetSpecDef(ComponentDefinition baseDef, TurretSpecType spec)
+    {
+        return spec switch
+        {
+            TurretSpecType.Gatling      => MakeSpecDef(baseDef, spec, specCost:8,
+                fireRate:1f,  damage:5f,  speed:9f,  life:3f,  energy:0.5f, mag:10, reload:3f),
+            TurretSpecType.PointDefence => MakeSpecDef(baseDef, spec, specCost:10,
+                fireRate:1f,  damage:4f,  speed:8f,  life:0.8f,energy:1f),
+            TurretSpecType.Laser        => MakeSpecDef(baseDef, spec, specCost:10,
+                fireRate:5f,  damage:15f, speed:14f, life:4f,  energy:3f),
+            TurretSpecType.Plasma       => MakeSpecDef(baseDef, spec, specCost:15,
+                fireRate:20f, damage:25f, speed:5f,  life:4f,  energy:4f),
+            TurretSpecType.HomingRocket => MakeSpecDef(baseDef, spec, specCost:10,
+                fireRate:30f, damage:50f, speed:7f,  life:5f,  energy:0.5f),
+            _ => baseDef,
+        };
     }
 
     static string TypeLabel(ComponentType type)

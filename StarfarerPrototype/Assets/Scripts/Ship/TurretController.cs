@@ -3,29 +3,28 @@ using UnityEngine;
 
 /// <summary>
 /// Gemi slot'una kurulunca otomatik ateş açan turret.
-/// Hedef seçimi türe göre değişir; barrel transform'u hedef yönüne döner.
-/// Gatling: şarjör + reload. Roket: güdümlü mermi. Point Defence: kısa menzil.
+/// baseType: Kinetic / Energy / Missile — satın alırken belirlenir, değişmez.
+/// specType: uzmanlaşma — Upgrade ekranından değiştirilebilir.
 /// </summary>
 public class TurretController : ShipComponentBase
 {
-    public TurretType turretType     = TurretType.Gatling;
-    public float      fireRate       = 1f;
-    public float      damage         = 5f;
-    public float      bulletSpeed    = 4f;
-    public float      bulletLifeTime = 3f;
-    public float      energyPerShot  = 1f;
-    public int        magazineSize   = 10;
-    public float      reloadTime     = 3f;
+    public TurretBaseType baseType     = TurretBaseType.Kinetic;
+    public TurretSpecType specType     = TurretSpecType.None;
+    public float          fireRate     = 1f;
+    public float          damage       = 5f;
+    public float          bulletSpeed  = 4f;
+    public float          bulletLifeTime = 3f;
+    public float          energyPerShot  = 1f;
+    public int            magazineSize   = 10;
+    public float          reloadTime     = 3f;
     [Tooltip("Saniyede derece — turretin maksimum dönüş hızı.")]
-    public float      turnRate       = 180f;
+    public float          turnRate       = 180f;
 
-    // Runtime state
     float   _fireTimer;
     int     _currentMag;
     bool    _reloading;
     Transform _barrel;
 
-    // Point Defence menzili (dünya birimi)
     const float PDRange = 5.5f;
 
     // -------------------------------------------------------------------------
@@ -33,16 +32,16 @@ public class TurretController : ShipComponentBase
     protected override void Awake()
     {
         base.Awake();
-        componentName = TurretLabel();
+        componentName = BuildLabel();
         BuildVisual();
         _currentMag = magazineSize;
-        _fireTimer  = Random.Range(0f, fireRate); // ilk atışı staggerla
-        ApplyTypeTurnRate();
+        _fireTimer  = Random.Range(0f, fireRate);
+        ApplySpecTurnRate();
     }
 
     void Update()
     {
-        if (!IsOperational)  return;
+        if (!IsOperational)     return;
         if (UpgradeUI.IsPaused) return;
 
         var target = FindTarget();
@@ -67,8 +66,7 @@ public class TurretController : ShipComponentBase
 
     Transform FindTarget()
     {
-        // Point Defence: önce menzildeki bombaları kontrol et
-        if (turretType == TurretType.PointDefence)
+        if (specType == TurretSpecType.PointDefence)
         {
             var bombs = FindObjectsByType<Bomb>(FindObjectsSortMode.None);
             Transform nearestBomb  = null;
@@ -89,16 +87,15 @@ public class TurretController : ShipComponentBase
         {
             float d = Vector2.Distance(transform.position, e.transform.position);
 
-            if (turretType == TurretType.PointDefence && d > PDRange)
+            if (specType == TurretSpecType.PointDefence && d > PDRange)
                 continue;
 
-            // Point Defence: Approach/BombRun tiplerine öncelik
             bool ePriority    = e.data?.movementKind == EnemyMovementKind.Approach
                              || e.data?.movementKind == EnemyMovementKind.BombRun;
             bool bestPriority = best?.data?.movementKind == EnemyMovementKind.Approach
                              || best?.data?.movementKind == EnemyMovementKind.BombRun;
 
-            if (turretType == TurretType.PointDefence && ePriority && !bestPriority)
+            if (specType == TurretSpecType.PointDefence && ePriority && !bestPriority)
             {
                 best = e; bestD = d;
                 continue;
@@ -130,7 +127,7 @@ public class TurretController : ShipComponentBase
     {
         _fireTimer = effectiveFireRate;
 
-        if (turretType == TurretType.Gatling)
+        if (specType == TurretSpecType.Gatling)
         {
             if (_currentMag <= 0) { StartCoroutine(Reload()); return; }
             _currentMag--;
@@ -148,16 +145,18 @@ public class TurretController : ShipComponentBase
         go.transform.position = spawnPos;
 
         var tb = go.AddComponent<TurretBullet>();
-        tb.damage       = damage * GetMultiplier("damage");
-        tb.speed        = bulletSpeed;
-        tb.weaponType   = BulletWeaponType();
-        tb.isGuided     = turretType == TurretType.Rocket;
-        tb.guidedTarget = turretType == TurretType.Rocket ? target?.GetComponent<EnemyBot>() : null;
-        if (turretType == TurretType.Rocket) { tb.turnRate = 60f; tb.hp = 3f; }
+        tb.damage      = damage * GetMultiplier("damage");
+        tb.speed       = bulletSpeed;
+        tb.weaponType  = BulletWeaponType();
+
+        bool isRocket = specType == TurretSpecType.HomingRocket;
+        tb.isGuided     = isRocket;
+        tb.guidedTarget = isRocket ? target?.GetComponent<EnemyBot>() : null;
+        if (isRocket) { tb.turnRate = 60f; tb.hp = 3f; }
 
         tb.SetDirection(transform.right);
 
-        BuildBulletVisual(go, turretType);
+        BuildBulletVisual(go, specType);
         Destroy(go, bulletLifeTime);
     }
 
@@ -171,12 +170,35 @@ public class TurretController : ShipComponentBase
 
     WeaponType BulletWeaponType()
     {
-        switch (turretType)
+        return specType switch
         {
-            case TurretType.Plasma:       return WeaponType.Plasma;
-            case TurretType.Laser:        return WeaponType.Laser;
-            default:                      return WeaponType.Kinetic;
-        }
+            TurretSpecType.Plasma => WeaponType.Plasma,
+            TurretSpecType.Laser  => WeaponType.Laser,
+            TurretSpecType.EMP    => WeaponType.Laser,
+            _                     => WeaponType.Kinetic,
+        };
+    }
+
+    // -------------------------------------------------------------------------
+    // Uzmanlaşma (runtime spec değişimi)
+    // -------------------------------------------------------------------------
+
+    public void Specialize(TurretSpecType newSpec, ComponentDefinition newDef)
+    {
+        specType = newSpec;
+
+        fireRate       = newDef.turretFireRate       > 0 ? newDef.turretFireRate       : fireRate;
+        damage         = newDef.turretDamage         > 0 ? newDef.turretDamage         : damage;
+        bulletSpeed    = newDef.turretBulletSpeed    > 0 ? newDef.turretBulletSpeed    : bulletSpeed;
+        bulletLifeTime = newDef.turretBulletLifeTime > 0 ? newDef.turretBulletLifeTime : bulletLifeTime;
+        energyPerShot  = newDef.turretEnergyPerShot  > 0 ? newDef.turretEnergyPerShot  : energyPerShot;
+        magazineSize   = newDef.turretMagazineSize   > 0 ? newDef.turretMagazineSize   : magazineSize;
+        reloadTime     = newDef.turretReloadTime     > 0 ? newDef.turretReloadTime     : reloadTime;
+
+        _currentMag = magazineSize;
+        ApplySpecTurnRate();
+        componentName = BuildLabel();
+        RebuildVisual();
     }
 
     // -------------------------------------------------------------------------
@@ -187,78 +209,80 @@ public class TurretController : ShipComponentBase
     {
         Color baseColor = TurretColor();
 
-        // Taban dairesi
-        var baseTex = MakeTex(30, 30, baseColor * 0.7f);
-        var baseGo  = new GameObject("Base");
+        var baseGo = new GameObject("Base");
         baseGo.transform.SetParent(transform, false);
-        baseGo.transform.localPosition = Vector3.zero;
-        baseGo.transform.localScale    = Vector3.one;
         var baseSR = baseGo.AddComponent<SpriteRenderer>();
-        baseSR.sprite       = Sprite.Create(baseTex, new Rect(0,0,30,30), new Vector2(0.5f,0.5f), 100f);
+        baseSR.sprite       = Sprite.Create(MakeTex(30, 30, baseColor * 0.7f),
+                                  new Rect(0,0,30,30), new Vector2(0.5f,0.5f), 100f);
         baseSR.sortingOrder = 3;
 
-        // Namlu (sağa doğru, turret dönerken döner)
-        var barrelTex = MakeTex(20, 8, baseColor);
         _barrel = new GameObject("Barrel").transform;
         _barrel.SetParent(transform, false);
         _barrel.localPosition = new Vector3(0.10f, 0f, 0f);
-        _barrel.localScale    = Vector3.one;
         var barrelSR = _barrel.gameObject.AddComponent<SpriteRenderer>();
-        barrelSR.sprite       = Sprite.Create(barrelTex, new Rect(0,0,20,8), new Vector2(0f,0.5f), 100f);
+        barrelSR.sprite       = Sprite.Create(MakeTex(20, 8, TurretColor()),
+                                    new Rect(0,0,20,8), new Vector2(0f,0.5f), 100f);
         barrelSR.sortingOrder = 4;
     }
 
-    static void BuildBulletVisual(GameObject go, TurretType type)
+    void RebuildVisual()
     {
-        Color c = type == TurretType.Plasma      ? new Color(0.4f, 1f, 0.3f) :
-                  type == TurretType.Laser        ? Color.cyan :
-                  type == TurretType.Rocket       ? new Color(1f, 0.5f, 0.1f) :
-                  type == TurretType.PointDefence ? Color.yellow :
-                  Color.white;
+        foreach (Transform child in transform)
+            Destroy(child.gameObject);
+        _barrel = null;
+        BuildVisual();
+    }
 
-        int w = type == TurretType.Rocket ? 14 : 8;
-        int h = type == TurretType.Rocket ? 6  : 4;
+    static void BuildBulletVisual(GameObject go, TurretSpecType spec)
+    {
+        Color c = spec switch
+        {
+            TurretSpecType.Plasma       => new Color(0.4f, 1f, 0.3f),
+            TurretSpecType.Laser        => Color.cyan,
+            TurretSpecType.HomingRocket => new Color(1f, 0.5f, 0.1f),
+            TurretSpecType.PointDefence => Color.yellow,
+            _                           => Color.white,
+        };
 
-        var tex = MakeTex(w, h, c);
-        var sr  = go.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(tex, new Rect(0,0,w,h), new Vector2(0f,0.5f), 100f);
+        int w = spec == TurretSpecType.HomingRocket ? 14 : 8;
+        int h = spec == TurretSpecType.HomingRocket ? 6  : 4;
+
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite       = Sprite.Create(MakeTex(w, h, c), new Rect(0,0,w,h), new Vector2(0f,0.5f), 100f);
         sr.sortingOrder = 3;
     }
 
-    Color TurretColor()
+    Color TurretColor() => specType switch
     {
-        switch (turretType)
+        TurretSpecType.Gatling      => new Color(0.7f, 0.7f, 0.75f),
+        TurretSpecType.PointDefence => new Color(1f,   0.9f, 0.2f),
+        TurretSpecType.Laser        => new Color(0.2f, 0.8f, 1f),
+        TurretSpecType.Plasma       => new Color(0.3f, 0.9f, 0.3f),
+        TurretSpecType.HomingRocket => new Color(1f,   0.5f, 0.1f),
+        _ => baseType switch
         {
-            case TurretType.Gatling:      return new Color(0.7f, 0.7f, 0.75f);
-            case TurretType.Plasma:       return new Color(0.3f, 0.9f, 0.3f);
-            case TurretType.Laser:        return new Color(0.2f, 0.8f, 1f);
-            case TurretType.Rocket:       return new Color(1f,   0.5f, 0.1f);
-            case TurretType.PointDefence: return new Color(1f,   0.9f, 0.2f);
-            default:                      return Color.gray;
+            TurretBaseType.Energy  => new Color(0.4f, 0.8f, 0.9f),
+            TurretBaseType.Missile => new Color(0.9f, 0.6f, 0.2f),
+            _                      => new Color(0.65f, 0.65f, 0.70f),
         }
+    };
+
+    void ApplySpecTurnRate()
+    {
+        turnRate = specType switch
+        {
+            TurretSpecType.HomingRocket => 90f,
+            TurretSpecType.Laser        => 126f,
+            _                           => 180f,
+        };
     }
 
-    void ApplyTypeTurnRate()
+    string BuildLabel()
     {
-        switch (turretType)
-        {
-            case TurretType.Rocket: turnRate =  90f; break; // ağır, yavaş döner
-            case TurretType.Laser:  turnRate = 126f; break; // %30 yavaş
-            default:                turnRate = 180f; break;
-        }
-    }
-
-    string TurretLabel()
-    {
-        switch (turretType)
-        {
-            case TurretType.Gatling:      return "Gatling Turret";
-            case TurretType.Plasma:       return "Plasma Turret";
-            case TurretType.Laser:        return "Laser Turret";
-            case TurretType.Rocket:       return "Rocket Turret";
-            case TurretType.PointDefence: return "Point Defence";
-            default:                      return "Turret";
-        }
+        string baseName = TurretSpecHelper.GetBaseTypeName(baseType);
+        if (specType == TurretSpecType.None)
+            return baseName;
+        return $"{baseName} — {TurretSpecHelper.GetSpecName(specType)}";
     }
 
     static Texture2D MakeTex(int w, int h, Color c)
@@ -277,7 +301,8 @@ public class TurretController : ShipComponentBase
 
     public void Configure(ComponentDefinition def)
     {
-        turretType     = def.turretType;
+        baseType       = def.turretBaseType;
+        specType       = def.turretSpecType;
         fireRate       = def.turretFireRate       > 0 ? def.turretFireRate       : fireRate;
         damage         = def.turretDamage         > 0 ? def.turretDamage         : damage;
         bulletSpeed    = def.turretBulletSpeed    > 0 ? def.turretBulletSpeed    : bulletSpeed;
@@ -286,8 +311,8 @@ public class TurretController : ShipComponentBase
         magazineSize   = def.turretMagazineSize   > 0 ? def.turretMagazineSize   : magazineSize;
         reloadTime     = def.turretReloadTime     > 0 ? def.turretReloadTime     : reloadTime;
 
-        componentName  = TurretLabel();
-        _currentMag    = magazineSize;
-        ApplyTypeTurnRate();
+        componentName = BuildLabel();
+        _currentMag   = magazineSize;
+        ApplySpecTurnRate();
     }
 }

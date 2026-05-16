@@ -18,19 +18,22 @@ public class ComponentDefinition : ScriptableObject
     public WeaponType weaponType;
     public float weaponDamage;
     public float weaponFireRate;
-    public float weaponEnergyCostPerShot; // Laser: her atışta harcanan enerji
-    public float weaponChargeTime;        // Plasma: dolum süresi (saniye)
-    public int   weaponBurstCount;        // Plasma: burst başına mermi sayısı
+    public float weaponEnergyCostPerShot;
+    public float weaponChargeTime;
+    public int   weaponBurstCount;
 
     // Turret alanları
-    public TurretType turretType;
+    public TurretBaseType turretBaseType;
+    public TurretSpecType turretSpecType;
+    public int            specCost;         // Uzmanlaşma maliyeti (base maliyet hariç)
+    public ResourceType   specCostResource;
     public float turretFireRate;
     public float turretDamage;
     public float turretBulletSpeed;
     public float turretBulletLifeTime;
     public float turretEnergyPerShot;
-    public int   turretMagazineSize;   // Gatling: şarjör kapasitesi
-    public float turretReloadTime;     // Gatling: yeniden şarj süresi
+    public int   turretMagazineSize;
+    public float turretReloadTime;
 
     public ComponentDefinition upgradeTo;
 }

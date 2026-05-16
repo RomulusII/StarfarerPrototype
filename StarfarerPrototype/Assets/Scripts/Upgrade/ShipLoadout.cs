@@ -308,6 +308,47 @@ public class ShipLoadout : MonoBehaviour
     public ComponentDefinition GetWeaponDef(WeaponType type) =>
         _unlockedWeapons.TryGetValue(type, out var d) ? d : null;
 
+    /// <summary>
+    /// Turret'in uzmanlaşmasını değiştirir. Stat upgrade seviyeleri korunur.
+    /// refundMultiplier: mevcut spec maliyetinin ne kadarı iade edilir (zorluk derecesine göre).
+    /// </summary>
+    public bool SpecializeTurret(int slotIndex, TurretSpecType newSpec,
+                                 ComponentDefinition newSpecDef, float refundMultiplier = 0.5f)
+    {
+        if (slotIndex < 0 || slotIndex >= slotCount) return false;
+        var currentDef = _installedDefs[slotIndex];
+        if (currentDef == null || currentDef.componentType != ComponentType.Turret) return false;
+        var tc = _slots[slotIndex] as TurretController;
+        if (tc == null) return false;
+
+        // Mevcut spec maliyetini iade et
+        if (currentDef.turretSpecType != TurretSpecType.None && currentDef.specCost > 0)
+        {
+            int refund = Mathf.RoundToInt(currentDef.specCost * refundMultiplier);
+            ResourceInventory.Instance?.Add(currentDef.specCostResource, refund);
+        }
+
+        // Yeni spec için kaynak düş
+        if (newSpecDef.specCost > 0)
+        {
+            if (ResourceInventory.Instance == null ||
+                !ResourceInventory.Instance.TrySpend(newSpecDef.specCostResource, newSpecDef.specCost))
+            {
+                // Ödeme başarısız — iadeyi geri al
+                if (currentDef.turretSpecType != TurretSpecType.None && currentDef.specCost > 0)
+                {
+                    int refund = Mathf.RoundToInt(currentDef.specCost * refundMultiplier);
+                    ResourceInventory.Instance?.TrySpend(currentDef.specCostResource, refund);
+                }
+                return false;
+            }
+        }
+
+        tc.Specialize(newSpec, newSpecDef);
+        _installedDefs[slotIndex] = newSpecDef;
+        return true;
+    }
+
     public ShipComponentBase GetSlotComponent(int slotIndex)
     {
         if (slotIndex < 0 || slotIndex >= slotCount) return null;
