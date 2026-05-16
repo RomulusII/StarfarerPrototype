@@ -57,7 +57,7 @@ public class ChapterManager : MonoBehaviour
         };
 
         _chapters = ChapterData.CreateDefaultChapters();
-        BeginChapter(9); // TEST: Bölüm 10'dan başla
+        BeginChapter(0);
     }
 
     void Update()
