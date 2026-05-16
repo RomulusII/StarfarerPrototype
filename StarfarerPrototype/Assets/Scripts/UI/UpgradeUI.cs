@@ -1007,7 +1007,7 @@ public class UpgradeUI : MonoBehaviour
         var laser   = T("Lazer Turret",     TurretType.Laser,        ResourceType.RawMaterial,    18,
             fireRate:5f,  damage:15f, speed:14f, life:4f,  energy:3f);
         var rocket  = T("Roket Turret",     TurretType.Rocket,       ResourceType.RawMaterial,    22,
-            fireRate:30f, damage:50f, speed:7f,  life:10f, energy:0.5f);
+            fireRate:30f, damage:50f, speed:7f,  life:5f, energy:0.5f);
         var pd      = T("Point Defence",    TurretType.PointDefence, ResourceType.RawMaterial,    15,
             fireRate:1f,  damage:4f,  speed:8f,  life:0.8f,energy:1f);
 

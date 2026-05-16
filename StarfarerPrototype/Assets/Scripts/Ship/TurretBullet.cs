@@ -3,15 +3,17 @@ using UnityEngine;
 /// <summary>
 /// Turret mermisi.
 /// Normal mod: sabit yön, ömür sonunda yok olur.
-/// Güdümlü mod (Roket): her frame hedef EnemyBot'a yönelir.
+/// Güdümlü mod (Roket): sınırlı dönüş hızıyla hedefe yönelir — organik yay çizer.
 /// </summary>
 public class TurretBullet : MonoBehaviour
 {
-    public float     damage;
-    public float     speed;
-    public WeaponType weaponType = WeaponType.Kinetic;
-    public bool      isGuided;
-    public EnemyBot  guidedTarget;
+    public float      damage;
+    public float      speed;
+    public WeaponType weaponType  = WeaponType.Kinetic;
+    public bool       isGuided;
+    public EnemyBot   guidedTarget;
+    [Tooltip("Saniyede derece — roketin maksimum dönüş hızı.")]
+    public float      turnRate    = 120f;
 
     Vector2 _dir;
 
@@ -26,7 +28,11 @@ public class TurretBullet : MonoBehaviour
         rb.gravityScale = 0f;
     }
 
-    public void SetDirection(Vector2 dir) => _dir = dir.normalized;
+    public void SetDirection(Vector2 dir)
+    {
+        _dir = dir.normalized;
+        ApplyRotation();
+    }
 
     EnemyBot FindClosestEnemy()
     {
@@ -49,12 +55,33 @@ public class TurretBullet : MonoBehaviour
         {
             if (guidedTarget == null)
                 guidedTarget = FindClosestEnemy();
-            // Hedef yoksa mevcut yönde serbest uçuş — Destroy'a Destroy(go, bulletLifeTime) halleder
+
             if (guidedTarget != null)
-                _dir = ((Vector2)guidedTarget.transform.position - (Vector2)transform.position).normalized;
+            {
+                Vector2 desired  = ((Vector2)guidedTarget.transform.position
+                                   - (Vector2)transform.position).normalized;
+                float   maxTurn  = turnRate * Time.deltaTime;
+                float   angle    = Vector2.SignedAngle(_dir, desired);
+                float   clamped  = Mathf.Clamp(angle, -maxTurn, maxTurn);
+                _dir = Rotate(_dir, clamped).normalized;
+                ApplyRotation();
+            }
         }
 
         transform.Translate(_dir * speed * Time.deltaTime, Space.World);
+    }
+
+    static Vector2 Rotate(Vector2 v, float degrees)
+    {
+        float rad = degrees * Mathf.Deg2Rad;
+        float cos = Mathf.Cos(rad), sin = Mathf.Sin(rad);
+        return new Vector2(v.x * cos - v.y * sin, v.x * sin + v.y * cos);
+    }
+
+    void ApplyRotation()
+    {
+        float angle = Mathf.Atan2(_dir.y, _dir.x) * Mathf.Rad2Deg;
+        transform.rotation = Quaternion.Euler(0f, 0f, angle);
     }
 
     void OnTriggerEnter2D(Collider2D other)
