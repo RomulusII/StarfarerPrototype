@@ -1150,7 +1150,7 @@ public class UpgradeUI : MonoBehaviour
             TurretSpecType.Plasma       => MakeSpecDef(baseDef, spec, specCost:15,
                 fireRate:20f, damage:25f, speed:5f,  life:4f,  energy:4f),
             TurretSpecType.HomingRocket => MakeSpecDef(baseDef, spec, specCost:10,
-                fireRate:30f, damage:50f, speed:7f,  life:5f,  energy:0.5f),
+                fireRate:30f, damage:50f, speed:4.5f, life:6f,  energy:0.5f),
             _ => baseDef,
         };
     }

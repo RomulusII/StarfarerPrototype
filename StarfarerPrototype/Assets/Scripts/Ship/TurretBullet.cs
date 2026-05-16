@@ -4,6 +4,7 @@ using UnityEngine;
 /// Turret mermisi.
 /// Normal mod: sabit yön, ömür sonunda yok olur.
 /// Güdümlü mod (Roket): sınırlı dönüş hızıyla hedefe yönelir — organik yay çizer.
+/// guidedTarget Transform'dur; EnemyBot ve BossShip dahil her hedefi izler.
 /// </summary>
 public class TurretBullet : MonoBehaviour
 {
@@ -11,7 +12,7 @@ public class TurretBullet : MonoBehaviour
     public float      speed;
     public WeaponType weaponType  = WeaponType.Kinetic;
     public bool       isGuided;
-    public EnemyBot   guidedTarget;
+    public Transform  guidedTarget;
     [Tooltip("Saniyede derece — roketin maksimum dönüş hızı.")]
     public float      turnRate    = 120f;
     [Tooltip("0 = vurulabilir değil. Roketler için ayarlanır.")]
@@ -43,16 +44,24 @@ public class TurretBullet : MonoBehaviour
         ApplyRotation();
     }
 
-    EnemyBot FindClosestEnemy()
+    Transform FindClosestTarget()
     {
-        var all   = FindObjectsByType<EnemyBot>(FindObjectsSortMode.None);
-        EnemyBot best  = null;
-        float    bestD = float.MaxValue;
-        foreach (var e in all)
+        Transform best  = null;
+        float     bestD = float.MaxValue;
+
+        foreach (var e in FindObjectsByType<EnemyBot>(FindObjectsSortMode.None))
         {
             float d = Vector2.Distance(e.transform.position, transform.position);
-            if (d < bestD) { bestD = d; best = e; }
+            if (d < bestD) { bestD = d; best = e.transform; }
         }
+
+        var boss = FindFirstObjectByType<BossShip>();
+        if (boss != null)
+        {
+            float d = Vector2.Distance(boss.transform.position, transform.position);
+            if (d < bestD) best = boss.transform;
+        }
+
         return best;
     }
 
@@ -63,15 +72,15 @@ public class TurretBullet : MonoBehaviour
         if (isGuided)
         {
             if (guidedTarget == null)
-                guidedTarget = FindClosestEnemy();
+                guidedTarget = FindClosestTarget();
 
             if (guidedTarget != null)
             {
-                Vector2 desired  = ((Vector2)guidedTarget.transform.position
-                                   - (Vector2)transform.position).normalized;
-                float   maxTurn  = turnRate * Time.deltaTime;
-                float   angle    = Vector2.SignedAngle(_dir, desired);
-                float   clamped  = Mathf.Clamp(angle, -maxTurn, maxTurn);
+                Vector2 desired = ((Vector2)guidedTarget.position
+                                  - (Vector2)transform.position).normalized;
+                float maxTurn  = turnRate * Time.deltaTime;
+                float angle    = Vector2.SignedAngle(_dir, desired);
+                float clamped  = Mathf.Clamp(angle, -maxTurn, maxTurn);
                 _dir = Rotate(_dir, clamped).normalized;
                 ApplyRotation();
             }

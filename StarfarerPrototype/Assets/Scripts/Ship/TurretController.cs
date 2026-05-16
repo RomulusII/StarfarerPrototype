@@ -79,9 +79,24 @@ public class TurretController : ShipComponentBase
             if (nearestBomb != null) return nearestBomb;
         }
 
-        var all   = FindObjectsByType<EnemyBot>(FindObjectsSortMode.None);
-        EnemyBot best  = null;
-        float    bestD = float.MaxValue;
+        // Boss hedefleme
+        var boss = FindFirstObjectByType<BossShip>();
+        Transform bestTransform = null;
+        float     bestD         = float.MaxValue;
+
+        if (boss != null)
+        {
+            float d = Vector2.Distance(transform.position, boss.transform.position);
+            if (specType != TurretSpecType.PointDefence || d <= PDRange)
+            {
+                bestD         = d;
+                bestTransform = boss.transform;
+            }
+        }
+
+        // Normal düşmanlar
+        var all = FindObjectsByType<EnemyBot>(FindObjectsSortMode.None);
+        EnemyBot bestBot = null;
 
         foreach (var e in all)
         {
@@ -92,22 +107,23 @@ public class TurretController : ShipComponentBase
 
             bool ePriority    = e.data?.movementKind == EnemyMovementKind.Approach
                              || e.data?.movementKind == EnemyMovementKind.BombRun;
-            bool bestPriority = best?.data?.movementKind == EnemyMovementKind.Approach
-                             || best?.data?.movementKind == EnemyMovementKind.BombRun;
+            bool bestPriority = bestBot?.data?.movementKind == EnemyMovementKind.Approach
+                             || bestBot?.data?.movementKind == EnemyMovementKind.BombRun;
 
             if (specType == TurretSpecType.PointDefence && ePriority && !bestPriority)
             {
-                best = e; bestD = d;
+                bestBot = e; bestD = d;
                 continue;
             }
 
             if (d < bestD && (!bestPriority || ePriority))
             {
-                bestD = d; best = e;
+                bestD = d; bestBot = e;
             }
         }
 
-        return best?.transform;
+        if (bestBot != null) return bestBot.transform;
+        return bestTransform;
     }
 
     void AimAt(Vector3 worldPos)
@@ -149,10 +165,11 @@ public class TurretController : ShipComponentBase
         tb.speed       = bulletSpeed;
         tb.weaponType  = BulletWeaponType();
 
-        bool isRocket = specType == TurretSpecType.HomingRocket;
+        bool isRocket = specType == TurretSpecType.HomingRocket ||
+                        (baseType == TurretBaseType.Missile && specType == TurretSpecType.None);
         tb.isGuided     = isRocket;
-        tb.guidedTarget = isRocket ? target?.GetComponent<EnemyBot>() : null;
-        if (isRocket) { tb.turnRate = 60f; tb.hp = 3f; }
+        tb.guidedTarget = isRocket ? target : null;
+        if (isRocket) { tb.turnRate = 150f; tb.hp = 3f; }
 
         tb.SetDirection(transform.right);
 
