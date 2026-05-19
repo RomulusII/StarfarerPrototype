@@ -350,21 +350,53 @@ public class EnemyBot : MonoBehaviour
         if (t == null) return;
 
         var dir = (t.position - transform.position).normalized;
-        var go  = new GameObject("EnemyBullet");
-        go.transform.position = _barrelTransform != null
-            ? _barrelTransform.position + _barrelTransform.right * 0.18f
-            : transform.position;
 
-        var eb    = go.AddComponent<EnemyBullet>();
-        eb.damage = data.fireDamage;
-        eb.speed  = data.bulletSpeed;
-        eb.SetDirection(dir);
+        if (data.weaponKind == EnemyWeaponKind.Laser)
+        {
+            FireLaserBeam(dir);
+        }
+        else
+        {
+            var spawnPos = _barrelTransform != null
+                ? _barrelTransform.position + _barrelTransform.right * 0.18f
+                : transform.position;
+
+            var go = new GameObject("EnemyBullet");
+            go.transform.position = spawnPos;
+
+            var eb    = go.AddComponent<EnemyBullet>();
+            eb.damage = data.fireDamage;
+            eb.speed  = data.bulletSpeed;
+            eb.SetDirection(dir);
+        }
 
         _fireFlash = true;
         if (_reloadFillSR != null)
             _reloadFillSR.color = new Color(1f, 1f, 0.8f, 0.95f);
         if (_reloadFillTransform != null)
             _reloadFillTransform.localScale = new Vector3(1f, 1f, 1f);
+    }
+
+    void FireLaserBeam(Vector3 dir)
+    {
+        // Düşman ile birlikte hareket etmesi için barrel'ın (veya enemy'nin) child'ı olarak spawn et
+        var parent   = _barrelTransform != null ? _barrelTransform : transform;
+        var localOff = _barrelTransform != null ? Vector3.right * 0.18f : Vector3.zero;
+
+        var go = new GameObject("EnemyLaserBeam");
+        go.transform.SetParent(parent, worldPositionStays: false);
+        go.transform.localPosition = localOff;
+        go.transform.up            = dir; // world-space yön; parent pozisyon değişince beam de taşınır
+
+        var beam             = go.AddComponent<LaserBeam>();
+        beam.damage          = data.fireDamage;
+        beam.weaponType      = WeaponType.Laser;
+        beam.continuous      = false;
+        beam.burnDuration    = 0.25f;
+        beam.energyPerSecond = 0f; // düşmanlar enerji sistemi kullanmaz
+        beam.hitsPlayer      = true;
+        beam.maxRange        = data.fireRange + 2f;
+        beam.Init();
     }
 
     void FireAtComponent()

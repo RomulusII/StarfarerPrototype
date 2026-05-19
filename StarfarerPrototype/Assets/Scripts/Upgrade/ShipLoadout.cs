@@ -66,10 +66,10 @@ public class ShipLoadout : MonoBehaviour
     {
         if (_laserChain != null) return;
 
-        // Lazer — ışın sistemi: damage=DPS (burn boyunca), fireRate=beam'ler arası cooldown, energy=enerji/saniye
-        var lm3 = W("Lazer Topu Mk3",   WeaponType.Laser,   3, ResourceType.EnergyCrystal, 60, 25, null,  60f, 0.4f, 30f);
-        var lm2 = W("Lazer Topu Mk2",   WeaponType.Laser,   2, ResourceType.EnergyCrystal, 35, 15, lm3,   40f, 0.6f, 20f);
-        var lm1 = W("Lazer Topu Mk1",   WeaponType.Laser,   1, ResourceType.EnergyCrystal,  0,  0, lm2,   25f, 0.8f, 15f);
+        // Lazer — sürekli ışın: damage=DPS, fireRate kullanılmaz (0 bırakılır), energy=enerji/saniye
+        var lm3 = W("Lazer Topu Mk3",   WeaponType.Laser,   3, ResourceType.EnergyCrystal, 60, 25, null,  60f, 0f, 30f);
+        var lm2 = W("Lazer Topu Mk2",   WeaponType.Laser,   2, ResourceType.EnergyCrystal, 35, 15, lm3,   40f, 0f, 20f);
+        var lm1 = W("Lazer Topu Mk1",   WeaponType.Laser,   1, ResourceType.EnergyCrystal,  0,  0, lm2,   25f, 0f, 15f);
         _laserChain = new[] { lm1, lm2, lm3 };
 
         var km3 = W("Kinetik Top Mk3",  WeaponType.Kinetic, 3, ResourceType.RawMaterial,   50, 20, null,  18f, 0.12f);

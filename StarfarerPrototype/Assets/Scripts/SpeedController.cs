@@ -34,6 +34,7 @@ public class SpeedController : MonoBehaviour
 
     public void SetSpeed(int index)
     {
+        if (GameManager.IsGameOver) return;
         _speedIndex = Mathf.Clamp(index, 0, Speeds.Length - 1);
         if (!_paused) Apply();
         RefreshButtons();

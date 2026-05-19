@@ -12,11 +12,9 @@ public class WeaponController : MonoBehaviour
 {
     public WeaponType weaponType   = WeaponType.Kinetic;
     public float damage            = 10f;
-    public float fireRate          = 0.15f;   // Kinetik/Lazer: atışlar arası, Plazma: atış sonrası bekleme
-    public float energyCostPerShot = 3f;      // Lazer
+    public float fireRate          = 0.15f;   // Kinetik: atışlar arası, Plazma: atış sonrası bekleme
+    public float energyCostPerShot = 3f;      // Lazer: enerji/saniye (beam aktifken)
     public float chargeTime        = 2.0f;    // Plazma: tam şarja ulaşma süresi
-
-    public float burnDuration = 0.1f;  // Lazer: beam yanma süresi (saniye), ileride upgrade'lenebilir
 
     private float      _nextFireTime;
     private float      _chargeStart = -1f;
@@ -32,13 +30,18 @@ public class WeaponController : MonoBehaviour
         _plasmaCircle  = MakeCircleSprite(32, Color.white); // renk runtime'da set edilir
     }
 
-    void OnDestroy() => CancelCharge();
+    void OnDestroy()
+    {
+        CancelCharge();
+        CancelLaserBeam();
+    }
 
     void Update()
     {
         if (UpgradeUI.IsPaused)
         {
             CancelCharge();
+            CancelLaserBeam();
             return;
         }
 
@@ -64,41 +67,44 @@ public class WeaponController : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // Mod: Lazer — anlık ışın sistemi
+    // Mod: Lazer — sürekli ışın, basılı tut = açık, bırak = kapalı
     // -------------------------------------------------------------------------
 
     void UpdateLaser()
     {
-        // Aktif beam varken yeni ateş edilmez (beam bitince null olur)
-        if (_activeLaserBeam != null) return;
-        if (!Mouse.current.leftButton.isPressed) return;
-        if (Time.time < _nextFireTime) return;
+        bool held = Mouse.current.leftButton.isPressed;
 
-        // Enerji yeterliliği kontrolü — beam süresi boyunca tüketeceği miktarın yarısı kadar anlık kontrol
-        float energyMulti    = BoostController.Mode == BoostMode.Shield ? 1f / 3f :
-                               BoostController.Mode == BoostMode.Weapon  ? 3f      : 1f;
-        float minEnergyCheck = energyCostPerShot * energyMulti * burnDuration * 0.5f;
-        if (EnergyBus.Instance != null &&
-            !EnergyBus.Instance.RequestEnergy(minEnergyCheck))
-            return;
+        if (held && _activeLaserBeam == null)
+        {
+            // Child olarak spawn — parent (WeaponMount) döndükçe beam yönü otomatik güncellenir
+            var go = new GameObject("LaserBeam");
+            go.transform.SetParent(transform, false);
+            go.transform.localPosition = Vector3.zero;
+            go.transform.localRotation = Quaternion.identity;
 
-        _nextFireTime = Time.time + fireRate;
-        _activeLaserBeam = FireLaserBeam(energyMulti);
+            float energyMulti    = BoostController.Mode == BoostMode.Shield ? 1f / 3f :
+                                   BoostController.Mode == BoostMode.Weapon  ? 3f      : 1f;
+
+            var beam             = go.AddComponent<LaserBeam>();
+            beam.damage          = damage;
+            beam.weaponType      = WeaponType.Laser;
+            beam.continuous      = true;
+            beam.energyPerSecond = energyCostPerShot * energyMulti;
+            beam.maxRange        = 22f;
+            beam.Init();
+            _activeLaserBeam = beam;
+        }
+        else if (!held)
+        {
+            CancelLaserBeam();
+        }
     }
 
-    LaserBeam FireLaserBeam(float energyMulti)
+    void CancelLaserBeam()
     {
-        var go = new GameObject("LaserBeam");
-        go.transform.SetPositionAndRotation(transform.position, transform.rotation);
-
-        var beam             = go.AddComponent<LaserBeam>();
-        beam.damage          = damage;
-        beam.weaponType      = WeaponType.Laser;
-        beam.burnDuration    = burnDuration;
-        beam.energyPerSecond = energyCostPerShot * energyMulti;
-        beam.maxRange        = 22f;
-        beam.Init();
-        return beam;
+        if (_activeLaserBeam == null) return;
+        Destroy(_activeLaserBeam.gameObject);
+        _activeLaserBeam = null;
     }
 
     // -------------------------------------------------------------------------
@@ -182,8 +188,8 @@ public class WeaponController : MonoBehaviour
 
         // Beam genişliği = şarj anındaki küre çapı
         float beamWidth = Mathf.Lerp(0.10f, 0.65f, chargeRatio) * sclMulti;
-        float maxLen    = beamWidth * 32f;
-        float spd       = Mathf.Lerp(7f, 14f, chargeRatio);
+        float maxLen    = 60f;                                       // sabit, ekranı her zaman aşar
+        float spd       = Mathf.Lerp(14f, 28f, chargeRatio);       // ×2 hız (önceki değişiklikten)
         float totalDmg  = damage * Mathf.Lerp(0.5f, 2.5f, chargeRatio) * dmgMulti;
 
         var go = new GameObject("PlasmaBeam");
@@ -193,13 +199,14 @@ public class WeaponController : MonoBehaviour
             transform.rotation);
 
         var beam = go.AddComponent<PlasmaBeam>();
-        beam.beamWidth   = beamWidth;
-        beam.maxLength   = maxLen;
-        beam.headSpeed   = spd;
-        beam.totalEnergy = totalDmg;
+        beam.beamWidth    = beamWidth;
+        beam.maxLength    = maxLen;
+        beam.headSpeed    = spd;
+        beam.totalEnergy  = totalDmg;
         // Bir düşmanı 0.33 saniyede tüketir; kalabalık grupta daha hızlı
-        beam.dps         = totalDmg * 3f;
-        beam.weaponType  = WeaponType.Plasma;
+        beam.dps          = totalDmg * 3f;
+        beam.weaponType   = WeaponType.Plasma;
+        beam.emitDuration = 0.2f;   // namludan çıkış süresi — sonrası bolt olarak uçar
     }
 
     // -------------------------------------------------------------------------

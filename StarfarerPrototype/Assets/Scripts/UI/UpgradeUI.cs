@@ -61,8 +61,19 @@ public class UpgradeUI : MonoBehaviour
         _canvas.enabled = false;
     }
 
+    /// <summary>GameManager tarafından game over anında çağrılır.</summary>
+    public void ForceClose()
+    {
+        if (_canvas == null) return;
+        _canvas.enabled = false;
+        IsPaused        = false;
+        FindFirstObjectByType<CameraController>()?.RestoreFromUpgrade();
+    }
+
     void Update()
     {
+        if (GameManager.IsGameOver) return;   // game over → hiçbir şey yapma
+
         if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
         {
             bool opening = !_canvas.enabled;
@@ -921,13 +932,25 @@ public class UpgradeUI : MonoBehaviour
                 float sps = tc.GetMultiplier("fireRate") / tc.fireRate;
                 float eng = tc.energyPerShot;
 
-                sb.AppendLine(DeltaLine("Hasar",        dmg, "damage",    false));
-                sb.AppendLine(DeltaLine("Ateş/sn", sps, "fireRate",  false));
-                sb.AppendLine($"Enerji/atış: {eng:0.##}");
-                if (tc.magazineSize > 0)
+                if (tc.specType == TurretSpecType.Laser)
                 {
-                    sb.AppendLine($"Şajör: {tc.magazineSize}");
-                    sb.AppendLine($"Yeniden şarj: {tc.reloadTime:0.#}s");
+                    // Lazer: DPS during beam × burnDuration / fireRate = gerçek DPS
+                    float beamDps      = dmg * tc.burnDuration / tc.fireRate;
+                    sb.AppendLine(DeltaLine("Işın hasarı", dmg, "damage", false));
+                    sb.AppendLine($"Yanma: {tc.burnDuration:0.##}s / {tc.fireRate:0.#}s");
+                    sb.AppendLine($"Etkin DPS: {beamDps:0.##}");
+                    sb.AppendLine($"Enerji/atış: {eng:0.##}");
+                }
+                else
+                {
+                    sb.AppendLine(DeltaLine("Hasar",   dmg, "damage",   false));
+                    sb.AppendLine(DeltaLine("Ateş/sn", sps, "fireRate", false));
+                    sb.AppendLine($"Enerji/atış: {eng:0.##}");
+                    if (tc.magazineSize > 0)
+                    {
+                        sb.AppendLine($"Şajör: {tc.magazineSize}");
+                        sb.AppendLine($"Yeniden şarj: {tc.reloadTime:0.#}s");
+                    }
                 }
                 break;
             }
@@ -1077,12 +1100,13 @@ public class UpgradeUI : MonoBehaviour
         gen.productionAmount = 12f;
 
         // 3 temel turret — uzmanlaşma upgrade ekranından yapılır
-        var kinetic = TB("Kinetik Turret", TurretBaseType.Kinetic, ResourceType.RawMaterial, 15,
-            fireRate:2f,  damage:6f,  speed:9f,  life:3f,  energy:0.5f);
+        // Hedef: TEMEL_DPS = 6 (damage/fireRate)
+        var kinetic = TB("Kinetik Turret", TurretBaseType.Kinetic, ResourceType.RawMaterial, 22,
+            fireRate:2f,  damage:12f, speed:9f,  life:3f,  energy:0.5f);
         var energy  = TB("Enerji Turret",  TurretBaseType.Energy,  ResourceType.RawMaterial, 22,
-            fireRate:5f,  damage:10f, speed:14f, life:4f,  energy:3f);
+            fireRate:3f,  damage:18f, speed:14f, life:4f,  energy:3f);
         var missile = TB("Füze Turret",    TurretBaseType.Missile, ResourceType.RawMaterial, 28,
-            fireRate:30f, damage:35f, speed:7f,  life:5f,  energy:0.5f);
+            fireRate:10f, damage:60f, speed:7f,  life:5f,  energy:0.5f);
 
         _catalogDefs = new[] { shield, repair, gen, kinetic, energy, missile };
         return _catalogDefs;
@@ -1115,7 +1139,7 @@ public class UpgradeUI : MonoBehaviour
     // Spec tanımları — her base+spec kombinasyonu için
     static ComponentDefinition MakeSpecDef(ComponentDefinition baseDef, TurretSpecType spec,
         int specCost, float fireRate, float damage, float speed, float life, float energy,
-        int mag = 0, float reload = 0f)
+        int mag = 0, float reload = 0f, float burnDuration = 0f)
     {
         var d = ScriptableObject.CreateInstance<ComponentDefinition>();
         d.componentName        = $"{TurretSpecHelper.GetBaseTypeName(baseDef.turretBaseType)} — {TurretSpecHelper.GetSpecName(spec)}";
@@ -1135,23 +1159,29 @@ public class UpgradeUI : MonoBehaviour
         d.turretEnergyPerShot  = energy;
         d.turretMagazineSize   = mag;
         d.turretReloadTime     = reload;
+        d.turretBurnDuration   = burnDuration;
         return d;
     }
 
     static ComponentDefinition GetSpecDef(ComponentDefinition baseDef, TurretSpecType spec)
     {
+        // EFEKTİF_DPS = TEMEL_DPS × hedefleme_çarpanı ≈ 6 (hepsi)
+        // Lazer: TEMEL=2.0, çarpan=3.0 → EFEKTİF=6.0  (damage × burnDuration / fireRate = 12×0.5/3 = 2.0)
+        // Gatling: sustained = 10×8/(10×1+3) = 80/13 ≈ 6.15
+        // Roket: TEMEL=4.0, çarpan=1.5 → EFEKTİF=6.0  (60/15=4.0)
+        // PD: TEMEL=9.0 — menzil kısıtlı (5.5u), daha yüksek ham DPS hak ediyor
         return spec switch
         {
             TurretSpecType.Gatling      => MakeSpecDef(baseDef, spec, specCost:20,
-                fireRate:1f,  damage:5f,  speed:9f,  life:3f,  energy:0.5f, mag:10, reload:3f),
+                fireRate:1f,  damage:8f,  speed:9f,  life:3f,  energy:0.5f, mag:10, reload:3f),
             TurretSpecType.PointDefence => MakeSpecDef(baseDef, spec, specCost:25,
-                fireRate:1f,  damage:4f,  speed:8f,  life:0.8f,energy:1f),
+                fireRate:1f,  damage:9f,  speed:8f,  life:0.8f,energy:1f),
             TurretSpecType.Laser        => MakeSpecDef(baseDef, spec, specCost:30,
-                fireRate:5f,  damage:15f, speed:14f, life:4f,  energy:3f),
+                fireRate:3f,  damage:12f, speed:14f, life:4f,  energy:3f, burnDuration:0.5f),
             TurretSpecType.Plasma       => MakeSpecDef(baseDef, spec, specCost:40,
-                fireRate:20f, damage:25f, speed:5f,  life:4f,  energy:4f),
+                fireRate:6f,  damage:36f, speed:5f,  life:4f,  energy:4f),
             TurretSpecType.HomingRocket => MakeSpecDef(baseDef, spec, specCost:35,
-                fireRate:30f, damage:50f, speed:4.5f, life:6f,  energy:0.5f),
+                fireRate:15f, damage:60f, speed:4.5f, life:6f,  energy:0.5f),
             _ => baseDef,
         };
     }

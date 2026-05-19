@@ -15,6 +15,7 @@ public class GameManager : MonoBehaviour
     PlayerShip _playerShip;
     WeaponController _weaponController;
     WeaponMount _weaponMount;
+    public static bool IsGameOver { get; private set; } = false;
     bool _gameOver = false;
     GameObject _gameOverPanel;
     Button _easyBtn, _normalBtn, _hardBtn;
@@ -148,7 +149,17 @@ public class GameManager : MonoBehaviour
 
     void TriggerGameOver()
     {
-        _gameOver = true;
+        _gameOver  = true;
+        IsGameOver = true;
+
+        // UpgradeUI açıksa zorla kapat (Tab ile resume'u engellemek için)
+        if (UpgradeUI.IsPaused)
+        {
+            UpgradeUI.IsPaused = false;
+            if (UpgradeUI.Instance != null)
+                UpgradeUI.Instance.ForceClose();
+        }
+
         SpeedController.Instance?.Pause();
         if (_weaponController != null) _weaponController.enabled = false;
         if (_weaponMount      != null) _weaponMount.enabled      = false;
@@ -157,6 +168,7 @@ public class GameManager : MonoBehaviour
 
     public void Restart()
     {
+        IsGameOver = false;
         SpeedController.Instance?.Reset();
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }

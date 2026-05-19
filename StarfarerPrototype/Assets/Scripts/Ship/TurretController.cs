@@ -17,6 +17,7 @@ public class TurretController : ShipComponentBase
     public float          energyPerShot  = 1f;
     public int            magazineSize   = 10;
     public float          reloadTime     = 3f;
+    public float          burnDuration   = 0.5f; // Lazer spec: beam yanma süresi
     [Tooltip("Saniyede derece — turretin maksimum dönüş hızı.")]
     public float          turnRate       = 180f;
 
@@ -50,9 +51,11 @@ public class TurretController : ShipComponentBase
 
         if (target != null)
         {
-            _aimPos = specType == TurretSpecType.PointDefence
-                ? PredictIntercept(target)
-                : target.position;
+            // Lazer beam anlık (raycast) — lead gereksiz, mevcut pozisyonu hedefle.
+            // Diğer tüm spec'ler (roket dahil) mermi seyahat süresi hesaplayarak
+            // düşmanın buluşma noktasını öngörür.
+            bool isInstant = specType == TurretSpecType.Laser;
+            _aimPos = isInstant ? target.position : PredictIntercept(target);
             AimAt(_aimPos);
         }
 
@@ -212,6 +215,13 @@ public class TurretController : ShipComponentBase
 
     void SpawnBullet(Transform target)
     {
+        // Lazer spec → anlık ışın atar, mermi değil
+        if (specType == TurretSpecType.Laser)
+        {
+            SpawnLaserBeam();
+            return;
+        }
+
         Vector3 spawnPos = transform.position + transform.right * 0.25f;
 
         var go = new GameObject("TurretBullet");
@@ -232,6 +242,27 @@ public class TurretController : ShipComponentBase
 
         BuildBulletVisual(go, specType);
         Destroy(go, bulletLifeTime);
+    }
+
+    void SpawnLaserBeam()
+    {
+        // Child olarak spawn — turret dönerken beam yönü otomatik güncellenir.
+        // Turret transform.right ile nişan alır; LaserBeam transform.up kullanır
+        // → localRotation -90° ile hizalanır (right → up).
+        var go = new GameObject("TurretLaserBeam");
+        go.transform.SetParent(transform, false);
+        go.transform.localPosition = new Vector3(0.25f, 0f, 0f); // namlu ucu
+        go.transform.localRotation = Quaternion.Euler(0f, 0f, -90f);
+
+        var beam             = go.AddComponent<LaserBeam>();
+        beam.damage          = damage * GetMultiplier("damage");
+        beam.weaponType      = WeaponType.Laser;
+        beam.continuous      = false;
+        beam.burnDuration    = burnDuration;
+        beam.energyPerSecond = 0f;   // enerji ateş anında ödendi (TurretController.Update)
+        beam.hitsPlayer      = false;
+        beam.maxRange        = bulletLifeTime * bulletSpeed; // efektif menzil
+        beam.Init();
     }
 
     IEnumerator Reload()
@@ -268,6 +299,7 @@ public class TurretController : ShipComponentBase
         energyPerShot  = newDef.turretEnergyPerShot  > 0 ? newDef.turretEnergyPerShot  : energyPerShot;
         magazineSize   = newDef.turretMagazineSize   > 0 ? newDef.turretMagazineSize   : magazineSize;
         reloadTime     = newDef.turretReloadTime     > 0 ? newDef.turretReloadTime     : reloadTime;
+        burnDuration   = newDef.turretBurnDuration   > 0 ? newDef.turretBurnDuration   : burnDuration;
 
         _currentMag = magazineSize;
         ApplySpecTurnRate();
@@ -384,6 +416,7 @@ public class TurretController : ShipComponentBase
         energyPerShot  = def.turretEnergyPerShot  > 0 ? def.turretEnergyPerShot  : energyPerShot;
         magazineSize   = def.turretMagazineSize   > 0 ? def.turretMagazineSize   : magazineSize;
         reloadTime     = def.turretReloadTime     > 0 ? def.turretReloadTime     : reloadTime;
+        burnDuration   = def.turretBurnDuration   > 0 ? def.turretBurnDuration   : burnDuration;
 
         componentName = BuildLabel();
         _currentMag   = magazineSize;

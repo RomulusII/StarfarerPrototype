@@ -1,22 +1,34 @@
 using UnityEngine;
 
 /// <summary>
-/// Işın tabanlı lazer atışı.
-/// Spawn edildiği anda transform.up yönünde Physics2D raycast yapar;
-/// ilk düşmana çarpar veya maxRange'e kadar uzanır.
-/// burnDuration boyunca her frame hasar × deltaTime ve enerji tüketir.
-/// Enerji biterse veya süre dolarsa beam kesilir.
+/// Işın tabanlı lazer.  Üç kullanım senaryosu:
+///
+/// 1) Oyuncu ana silahı (continuous=true):
+///    WeaponController'ın child'ı olarak spawn edilir; parent döndükçe aim yönü takip eder.
+///    Sol tık basılı olduğu sürece aktif, bırakılınca WeaponController destroy eder.
+///    Enerji biterse kendisi kapanır.
+///
+/// 2) Lazer turret (continuous=false, burnDuration>0):
+///    TurretController'ın child'ı olarak spawn edilir; burnDuration saniye yanar, sonra yok olur.
+///    Enerji ateş anında ödenir, beam.energyPerSecond = 0.
+///
+/// 3) Düşman lazeri (continuous=false, hitsPlayer=true):
+///    Düşman barrelından top-level spawn; transform.up = ateş yönü şeklinde ayarlanır.
+///    burnDuration saniye player'a DPS verir.
 /// </summary>
 public class LaserBeam : MonoBehaviour
 {
-    public float      damage          = 80f;   // hasar/saniye (burn boyunca)
-    public float      burnDuration    = 0.1f;  // yanma süresi (saniye)
-    public float      energyPerSecond = 20f;   // enerji tüketimi/saniye
+    public float      damage          = 80f;   // hasar/saniye
+    public float      burnDuration    = 0.1f;  // continuous=false ise geçerli
+    public float      energyPerSecond = 20f;   // enerji tüketimi/saniye (0 = ücretsiz)
     public WeaponType weaponType      = WeaponType.Laser;
     public float      maxRange        = 22f;
+    public bool       continuous      = false; // true → süre sınırı yok, dışarıdan kapatılır
+    public bool       hitsPlayer      = false; // true → düşman lazeri, player'a hasar verir
 
     float        _remaining;
     Collider2D   _target;
+    PlayerShip   _targetPlayer;
     Vector3      _endPoint;
     LineRenderer _line;
 
@@ -25,6 +37,8 @@ public class LaserBeam : MonoBehaviour
     public void Init()
     {
         _remaining = burnDuration;
+        if (hitsPlayer)
+            _targetPlayer = FindFirstObjectByType<PlayerShip>();
         UpdateRaycast();
         BuildVisual();
     }
@@ -35,29 +49,31 @@ public class LaserBeam : MonoBehaviour
     {
         if (UpgradeUI.IsPaused) return;
 
-        _remaining -= Time.deltaTime;
-
-        float energyMulti = BoostController.Mode == BoostMode.Shield ? 1f / 3f :
-                            BoostController.Mode == BoostMode.Weapon  ? 3f      : 1f;
-        float dmgMulti    = BoostController.Mode == BoostMode.Weapon  ? 2f      :
-                            BoostController.Mode == BoostMode.Shield   ? 1f / 3f : 1f;
-
-        // Enerji kontrolü — yetersizse beam anında kesilir
-        bool hasEnergy = EnergyBus.Instance == null ||
-            EnergyBus.Instance.RequestEnergy(energyPerSecond * energyMulti * Time.deltaTime);
-
-        if (!hasEnergy || _remaining <= 0f)
+        if (!continuous)
         {
-            Destroy(gameObject);
-            return;
+            _remaining -= Time.deltaTime;
+            if (_remaining <= 0f) { Destroy(gameObject); return; }
         }
 
-        // Raycast her frame güncellenir — hareket eden düşmanları yakalar
+        // Enerji tüketimi (0 ise EnergyBus'a dokunmaz)
+        if (energyPerSecond > 0f && EnergyBus.Instance != null)
+        {
+            if (!EnergyBus.Instance.RequestEnergy(energyPerSecond * Time.deltaTime))
+            {
+                Destroy(gameObject);
+                return;
+            }
+        }
+
+        // Boost çarpanları — sadece oyuncu silahları için geçerli
+        float dmgMulti = !hitsPlayer
+            ? (BoostController.Mode == BoostMode.Weapon  ? 2f      :
+               BoostController.Mode == BoostMode.Shield   ? 1f / 3f : 1f)
+            : 1f;
+
         UpdateRaycast();
         UpdateVisual();
-
-        if (_target != null)
-            DamageUtil.TryDamage(_target, damage * dmgMulti * Time.deltaTime, weaponType);
+        ApplyDamage(damage * dmgMulti * Time.deltaTime);
     }
 
     // ── Raycast ───────────────────────────────────────────────────────────────
@@ -65,27 +81,48 @@ public class LaserBeam : MonoBehaviour
     void UpdateRaycast()
     {
         Vector2 origin    = transform.position;
-        Vector2 direction = transform.up; // WeaponMount'un aim yönü
+        Vector2 direction = transform.up;
 
         var hits = Physics2D.RaycastAll(origin, direction, maxRange);
-        // Mesafeye göre sırala — en yakın önce
         System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
-        _target   = null;
-        _endPoint = transform.position + (Vector3)(direction * maxRange);
+        _target       = null;
+        _targetPlayer = hitsPlayer ? _targetPlayer : null;
+        _endPoint     = transform.position + (Vector3)(direction * maxRange);
 
         foreach (var hit in hits)
         {
             var c = hit.collider;
-            if (c.GetComponent<EnemyBot>()      != null ||
-                c.GetComponent<BossHardpoint>() != null ||
-                c.GetComponent<BossShip>()      != null)
+
+            if (hitsPlayer)
             {
-                _target   = c;
-                _endPoint = hit.point;
-                break;
+                if (c.GetComponent<PlayerShip>() != null)
+                {
+                    _targetPlayer = c.GetComponent<PlayerShip>();
+                    _endPoint     = hit.point;
+                    break;
+                }
+            }
+            else
+            {
+                if (c.GetComponent<EnemyBot>()      != null ||
+                    c.GetComponent<BossHardpoint>() != null ||
+                    c.GetComponent<BossShip>()      != null)
+                {
+                    _target   = c;
+                    _endPoint = hit.point;
+                    break;
+                }
             }
         }
+    }
+
+    void ApplyDamage(float amount)
+    {
+        if (hitsPlayer)
+            _targetPlayer?.TakeDamage(amount);
+        else if (_target != null)
+            DamageUtil.TryDamage(_target, amount, weaponType);
     }
 
     // ── Görsel ────────────────────────────────────────────────────────────────
@@ -101,7 +138,6 @@ public class LaserBeam : MonoBehaviour
         _line.receiveShadows    = false;
         _line.sortingOrder      = 5;
         _line.material          = new Material(Shader.Find("Sprites/Default"));
-
         UpdateVisual();
     }
 
@@ -111,10 +147,14 @@ public class LaserBeam : MonoBehaviour
         _line.SetPosition(0, transform.position);
         _line.SetPosition(1, _endPoint);
 
-        // Kalan süreye göre parlaklık azalır — fade out efekti
-        float t = Mathf.Clamp01(_remaining / burnDuration);
-        _line.startColor = new Color(0.3f, 0.9f, 1f, t);
-        _line.endColor   = new Color(0.6f, 1f,   1f, t * 0.3f);
+        // Burst modda fade out; sürekli modda tam parlak
+        float alpha = continuous ? 1f : Mathf.Clamp01(_remaining / Mathf.Max(burnDuration, 0.001f));
+        Color beamColor = hitsPlayer
+            ? new Color(1f, 0.35f, 0.1f)   // düşman lazeri: turuncu-kırmızı
+            : new Color(0.3f, 0.9f, 1f);    // oyuncu/turret lazeri: cyan
+
+        _line.startColor = new Color(beamColor.r, beamColor.g, beamColor.b, alpha);
+        _line.endColor   = new Color(beamColor.r, beamColor.g, beamColor.b, alpha * 0.3f);
     }
 
     void OnDestroy()

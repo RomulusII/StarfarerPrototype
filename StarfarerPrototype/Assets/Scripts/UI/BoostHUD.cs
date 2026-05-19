@@ -40,7 +40,7 @@ public class BoostHUD : MonoBehaviour
 
     void Update()
     {
-        _canvas.enabled = !UpgradeUI.IsPaused;
+        _canvas.enabled = !UpgradeUI.IsPaused && !GameManager.IsGameOver;
         if (!_canvas.enabled) return;
 
         _shieldBtn.GetComponent<Image>().color =

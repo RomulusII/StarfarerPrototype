@@ -34,6 +34,7 @@ public class ComponentDefinition : ScriptableObject
     public float turretEnergyPerShot;
     public int   turretMagazineSize;
     public float turretReloadTime;
+    public float turretBurnDuration;   // Lazer spec: beam yanma süresi (saniye)
 
     public ComponentDefinition upgradeTo;
 }
