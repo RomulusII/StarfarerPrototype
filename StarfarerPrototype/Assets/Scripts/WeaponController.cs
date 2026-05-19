@@ -3,7 +3,8 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// Kinetik  — basılı tutunca otomatik ateş, enerji yok.
-/// Lazer    — basılı tutunca hızlı ateş, her atışta enerji tüketir.
+/// Lazer    — basılı tut → anlık ışın, burnDuration boyunca sürekli DPS + enerji tüketimi.
+///            Her beam bitince fireRate kadar beklenir, sonra yeni beam atılabilir.
 /// Plazma   — basılı tut → namlu ucunda küre büyür, bırak → büyüklüğe göre geniş bolt fırlar.
 ///            Minimum şarj süresi (chargeTime * 0.25) dolmadan bırakılırsa iptal.
 /// </summary>
@@ -15,18 +16,19 @@ public class WeaponController : MonoBehaviour
     public float energyCostPerShot = 3f;      // Lazer
     public float chargeTime        = 2.0f;    // Plazma: tam şarja ulaşma süresi
 
+    public float burnDuration = 0.1f;  // Lazer: beam yanma süresi (saniye), ileride upgrade'lenebilir
+
     private float      _nextFireTime;
     private float      _chargeStart = -1f;
     private GameObject _chargeSphere;
+    private LaserBeam  _activeLaserBeam;  // aktif beam varsa yeni ateş edilmez
 
     private Sprite _kineticSprite;
-    private Sprite _laserSprite;
     private Sprite _plasmaCircle;  // şarj küresi ve bolt için
 
     void Start()
     {
         _kineticSprite = MakeSprite(10, 30, Color.white);
-        _laserSprite   = MakeSprite(4,  44, Color.cyan);
         _plasmaCircle  = MakeCircleSprite(32, Color.white); // renk runtime'da set edilir
     }
 
@@ -62,23 +64,41 @@ public class WeaponController : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // Mod: Lazer
+    // Mod: Lazer — anlık ışın sistemi
     // -------------------------------------------------------------------------
 
     void UpdateLaser()
     {
+        // Aktif beam varken yeni ateş edilmez (beam bitince null olur)
+        if (_activeLaserBeam != null) return;
         if (!Mouse.current.leftButton.isPressed) return;
         if (Time.time < _nextFireTime) return;
 
-        float energyMulti = BoostController.Mode == BoostMode.Shield ? 1f / 3f :
-                            BoostController.Mode == BoostMode.Weapon  ? 3f : 1f;
-
-        if (EnergyBus.Instance == null ||
-            !EnergyBus.Instance.RequestEnergy(energyCostPerShot * energyMulti))
+        // Enerji yeterliliği kontrolü — beam süresi boyunca tüketeceği miktarın yarısı kadar anlık kontrol
+        float energyMulti    = BoostController.Mode == BoostMode.Shield ? 1f / 3f :
+                               BoostController.Mode == BoostMode.Weapon  ? 3f      : 1f;
+        float minEnergyCheck = energyCostPerShot * energyMulti * burnDuration * 0.5f;
+        if (EnergyBus.Instance != null &&
+            !EnergyBus.Instance.RequestEnergy(minEnergyCheck))
             return;
 
         _nextFireTime = Time.time + fireRate;
-        SpawnBullet(_laserSprite, WeaponType.Laser, speed: 8f);
+        _activeLaserBeam = FireLaserBeam(energyMulti);
+    }
+
+    LaserBeam FireLaserBeam(float energyMulti)
+    {
+        var go = new GameObject("LaserBeam");
+        go.transform.SetPositionAndRotation(transform.position, transform.rotation);
+
+        var beam             = go.AddComponent<LaserBeam>();
+        beam.damage          = damage;
+        beam.weaponType      = WeaponType.Laser;
+        beam.burnDuration    = burnDuration;
+        beam.energyPerSecond = energyCostPerShot * energyMulti;
+        beam.maxRange        = 22f;
+        beam.Init();
+        return beam;
     }
 
     // -------------------------------------------------------------------------
