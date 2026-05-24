@@ -98,7 +98,7 @@ public class PlayerShip : MonoBehaviour
 
             var visual          = slotGO.AddComponent<SlotVisual>();
             visual.slotIndex    = i;
-            visual.isWeaponSlot = (i == 5);
+            visual.isWeaponSlot = (i == 1);
         }
 
         var coreGenGO = new GameObject("CoreGenerator");

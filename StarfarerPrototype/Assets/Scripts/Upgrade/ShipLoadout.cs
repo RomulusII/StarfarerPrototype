@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 /// <summary>
@@ -15,13 +16,19 @@ public class ShipLoadout : MonoBehaviour
 
     // Silah switch sistemi
     private readonly Dictionary<WeaponType, ComponentDefinition> _unlockedWeapons = new();
-    private WeaponType _activeWeaponType = WeaponType.Laser;
+    private WeaponType _activeWeaponType = WeaponType.Kinetic;
 
     // Silah stat upgrade seviyeleri — silah tipinden bağımsız, kalıcı
     private readonly Dictionary<WeaponType, Dictionary<string, int>> _weaponStatLevels = new();
 
+    // Tip → slot indeksi haritası (Turret gibi çoklu olabilecek tipler List içinde)
+    private readonly Dictionary<ComponentType, List<int>> _slotsByType = new();
+
     public bool IsWeaponTypeUnlocked(WeaponType type) => _unlockedWeapons.ContainsKey(type);
     public WeaponType GetActiveWeaponType() => _activeWeaponType;
+
+    public IEnumerable<int> GetSlotsByType(ComponentType type) =>
+        _slotsByType.TryGetValue(type, out var list) ? list : Enumerable.Empty<int>();
 
     void Awake()
     {
@@ -33,8 +40,8 @@ public class ShipLoadout : MonoBehaviour
     void Start()
     {
         InitWeaponChains();
-        // Lazer başlangıçta ücretsiz kurulu gelir
-        InstallComponent(_laserChain[0], slotIndex: 5, deductCost: false);
+        // Raylı Top başlangıçta ücretsiz kurulu gelir
+        InstallComponent(_kineticChain[0], slotIndex: 1, deductCost: false);
         // Hangar her zaman slot 6'da kurulu başlar
         InstallComponent(GetHangarDef(), slotIndex: 6, deductCost: false);
     }
@@ -72,9 +79,9 @@ public class ShipLoadout : MonoBehaviour
         var lm1 = W("Lazer Topu Mk1",   WeaponType.Laser,   1, ResourceType.EnergyCrystal,  0,  0, lm2,   25f, 0f, 15f);
         _laserChain = new[] { lm1, lm2, lm3 };
 
-        var km3 = W("Kinetik Top Mk3",  WeaponType.Kinetic, 3, ResourceType.RawMaterial,   50, 20, null,  18f, 0.12f);
-        var km2 = W("Kinetik Top Mk2",  WeaponType.Kinetic, 2, ResourceType.RawMaterial,   28, 10, km3,   14f, 0.13f);
-        var km1 = W("Kinetik Top Mk1",  WeaponType.Kinetic, 1, ResourceType.RawMaterial,   12,  5, km2,   10f, 0.15f);
+        var km3 = W("Raylı Top Mk3",    WeaponType.Kinetic, 3, ResourceType.RawMaterial,   50, 20, null,  18f, 0.12f);
+        var km2 = W("Raylı Top Mk2",    WeaponType.Kinetic, 2, ResourceType.RawMaterial,   28, 10, km3,   14f, 0.13f);
+        var km1 = W("Raylı Top Mk1",    WeaponType.Kinetic, 1, ResourceType.RawMaterial,   12,  5, km2,   10f, 0.15f);
         _kineticChain = new[] { km1, km2, km3 };
 
         // Plazma — Another World tarzı şarj+bırak mekaniği
@@ -189,6 +196,12 @@ public class ShipLoadout : MonoBehaviour
         _slots[slotIndex]         = comp;
         _installedDefs[slotIndex] = def;
         _slotObjects[slotIndex]   = go;
+
+        if (!_slotsByType.ContainsKey(def.componentType))
+            _slotsByType[def.componentType] = new List<int>();
+        if (!_slotsByType[def.componentType].Contains(slotIndex))
+            _slotsByType[def.componentType].Add(slotIndex);
+
         return true;
     }
 
@@ -196,7 +209,9 @@ public class ShipLoadout : MonoBehaviour
     public bool SellComponent(int slotIndex, bool returnResources = true)
     {
         if (slotIndex < 0 || slotIndex >= slotCount) return false;
-        if (slotIndex == 5 || slotIndex == 6) return false; // Weapon + Hangar satılamaz
+        var defToSell = _installedDefs[slotIndex];
+        if (defToSell?.componentType == ComponentType.Weapon ||
+            defToSell?.componentType == ComponentType.Hangar) return false; // Weapon + Hangar satılamaz
         if (_installedDefs[slotIndex] == null) return false;
 
         if (returnResources && ResourceInventory.Instance != null)
@@ -206,9 +221,14 @@ public class ShipLoadout : MonoBehaviour
         if (_slotObjects[slotIndex] != null)
             Destroy(_slotObjects[slotIndex]);
 
+        var removedType = _installedDefs[slotIndex].componentType;
         _slots[slotIndex]         = null;
         _installedDefs[slotIndex] = null;
         _slotObjects[slotIndex]   = null;
+
+        if (_slotsByType.TryGetValue(removedType, out var list))
+            list.Remove(slotIndex);
+
         return true;
     }
 

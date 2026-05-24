@@ -61,7 +61,7 @@ public class ChapterData : ScriptableObject
                 }),
 
             MakeChapter(3,  "Sektör 3: Ağır Metaller",
-                "Zırhlı birimler tespit edildi. Kinetik silahlarınızı gözden geçirin.",
+                "Zırhlı birimler tespit edildi. Raylı toplarınızı gözden geçirin.",
                 new[] { swarm, armored, bombRunner }, interval: 3.5f, hpMult: 1.1f,
                 waves: new[]
                 {

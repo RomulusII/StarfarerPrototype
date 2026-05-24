@@ -44,7 +44,7 @@ public static class TurretSpecHelper
 
     public static string GetBaseTypeName(TurretBaseType bt) => bt switch
     {
-        TurretBaseType.Kinetic => "Kinetik Turret",
+        TurretBaseType.Kinetic => "Raylı Turret",
         TurretBaseType.Energy  => "Enerji Turret",
         TurretBaseType.Missile => "Füze Turret",
         _                      => "Turret",

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
@@ -12,6 +13,8 @@ public class UpgradeUI : MonoBehaviour
 
     private Canvas      _canvas;
     private ShipLoadout _loadout;
+
+    int WeaponSlot => _loadout?.GetSlotsByType(ComponentType.Weapon).DefaultIfEmpty(-1).First() ?? -1;
 
     // Paneller
     private GameObject _generalPanel;
@@ -126,12 +129,12 @@ public class UpgradeUI : MonoBehaviour
         bool empty = _loadout == null || _loadout.IsSlotEmpty(slotIndex);
         ComponentDefinition installed = empty ? null : _loadout.GetSlotDef(slotIndex);
 
-        if (slotIndex == 5)
+        if (slotIndex == WeaponSlot)
         {
             var activeDef = _loadout?.GetWeaponDef(_loadout.GetActiveWeaponType());
             _popupTitle.text = activeDef != null
-                ? $"Slot 5 — {activeDef.componentName}"
-                : "Slot 5 — Ana Silah";
+                ? $"Slot {WeaponSlot} — {activeDef.componentName}"
+                : $"Slot {WeaponSlot} — Ana Silah";
             FillBox(_leftNameText, _leftTypeText, _leftTierText, _leftCostText,
                     activeDef ?? installed);
         }
@@ -292,7 +295,7 @@ public class UpgradeUI : MonoBehaviour
 
     void BuildFilledContent(int slotIndex, ComponentDefinition def)
     {
-        if (slotIndex == 5)
+        if (slotIndex == WeaponSlot)
         {
             BuildWeaponSwitchRows();
             BuildWeaponStatSection();
@@ -465,7 +468,7 @@ public class UpgradeUI : MonoBehaviour
         var weaponTypes = new[]
         {
             (WeaponType.Laser,   "Lazer"),
-            (WeaponType.Kinetic, "Kinetik"),
+            (WeaponType.Kinetic, "Raylı Top"),
             (WeaponType.Plasma,  "Plazma"),
         };
 
@@ -493,7 +496,7 @@ public class UpgradeUI : MonoBehaviour
                 bool canAfford = !maxed && ResourceInventory.Instance != null &&
                                  ResourceInventory.Instance.Get(curDef.costResource) >= cost;
 
-                bool isSelected = !maxed && _selectedStatKey == key && _selectedStatSlot == 5;
+                bool isSelected = !maxed && _selectedStatKey == key && _selectedStatSlot == WeaponSlot;
 
                 var row = CreateRow(_popupContent.transform);
 
@@ -516,7 +519,7 @@ public class UpgradeUI : MonoBehaviour
                 {
                     var click       = lblGo.AddComponent<StatLabelClick>();
                     click.statKey   = key;
-                    click.slotIndex = 5;
+                    click.slotIndex = WeaponSlot;
                 }
 
                 if (!maxed)
@@ -685,7 +688,7 @@ public class UpgradeUI : MonoBehaviour
         if (_loadout == null) return;
         if (!ResourceInventory.Instance.TrySpend(def.costResource, cost)) return;
         _loadout.ApplyWeaponStatUpgrade(type, key);
-        OnSlotClicked(5);
+        OnSlotClicked(WeaponSlot);
     }
 
     void BuildWeaponSwitchRows()
@@ -695,7 +698,7 @@ public class UpgradeUI : MonoBehaviour
         var weaponTypes = new[]
         {
             (WeaponType.Laser,   "Lazer"),
-            (WeaponType.Kinetic, "Kinetik"),
+            (WeaponType.Kinetic, "Raylı Top"),
             (WeaponType.Plasma,  "Plazma"),
         };
 
@@ -761,20 +764,20 @@ public class UpgradeUI : MonoBehaviour
     {
         if (_loadout == null) return;
         if (_loadout.UnlockWeaponType(type))
-            OnSlotClicked(5);
+            OnSlotClicked(WeaponSlot);
     }
 
     void SwitchWeaponAndRefresh(WeaponType type)
     {
         _loadout?.SwitchWeapon(type);
-        OnSlotClicked(5);
+        OnSlotClicked(WeaponSlot);
     }
 
     void UpgradeWeaponTypeAndRefresh(WeaponType type)
     {
         if (_loadout == null) return;
         if (_loadout.UpgradeWeaponType(type))
-            OnSlotClicked(5);
+            OnSlotClicked(WeaponSlot);
     }
 
     void UpgradeAndRefresh(int slotIndex)
@@ -814,7 +817,7 @@ public class UpgradeUI : MonoBehaviour
             return;
         }
 
-        if (slotIndex == 5)
+        if (slotIndex == WeaponSlot)
         {
             UpdateWeaponCostDisplay();
             return;
@@ -891,7 +894,7 @@ public class UpgradeUI : MonoBehaviour
         _leftCostText.color = new Color(0.3f, 0.9f, 0.45f, 1f);
 
         if (_leftUpgradeCostText == null) return;
-        if (!string.IsNullOrEmpty(_selectedStatKey) && _selectedStatSlot == 5)
+        if (!string.IsNullOrEmpty(_selectedStatKey) && _selectedStatSlot == WeaponSlot)
         {
             int curLevel = _loadout.GetWeaponStatLevel(type, _selectedStatKey);
             if (curLevel < ShipComponentBase.MaxStatLevel)
@@ -914,7 +917,7 @@ public class UpgradeUI : MonoBehaviour
 
     string BuildComponentStatsText(int slotIndex)
     {
-        if (slotIndex == 5) return BuildWeaponStatsText();
+        if (slotIndex == WeaponSlot) return BuildWeaponStatsText();
 
         var def  = _loadout?.GetSlotDef(slotIndex);
         var comp = _loadout?.GetSlotComponent(slotIndex);
@@ -1101,7 +1104,7 @@ public class UpgradeUI : MonoBehaviour
 
         // 3 temel turret — uzmanlaşma upgrade ekranından yapılır
         // Hedef: TEMEL_DPS = 6 (damage/fireRate)
-        var kinetic = TB("Kinetik Turret", TurretBaseType.Kinetic, ResourceType.RawMaterial, 22,
+        var kinetic = TB("Raylı Turret", TurretBaseType.Kinetic, ResourceType.RawMaterial, 22,
             fireRate:2f,  damage:12f, speed:9f,  life:3f,  energy:0.5f);
         var energy  = TB("Enerji Turret",  TurretBaseType.Energy,  ResourceType.RawMaterial, 22,
             fireRate:3f,  damage:18f, speed:14f, life:4f,  energy:3f);

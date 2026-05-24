@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -221,10 +222,10 @@ public class ChapterTransitionUI : MonoBehaviour
 
         int slotIndex = speaker switch
         {
-            CrewMember.Captain  => 5,
-            CrewMember.Pilot    => 6,
+            CrewMember.Captain  => FindWeaponSlot(),
+            CrewMember.Pilot    => FindHangarSlot(),
             CrewMember.Engineer => FindGeneratorSlot(),
-            _                   => 5,
+            _                   => FindWeaponSlot(),
         };
 
         var slotVisuals = _loadout.GetComponentsInChildren<SlotVisual>();
@@ -235,15 +236,14 @@ public class ChapterTransitionUI : MonoBehaviour
         return _loadout.transform.position;
     }
 
-    int FindGeneratorSlot()
-    {
-        if (_loadout == null) return 0;
-        var slotVisuals = _loadout.GetComponentsInChildren<SlotVisual>();
-        // Generator en küçük slot indeksinde aranır (0–4 arası)
-        foreach (var sv in slotVisuals)
-            if (sv.slotIndex < 5) return sv.slotIndex;
-        return 0;
-    }
+    int FindWeaponSlot() =>
+        _loadout?.GetSlotsByType(ComponentType.Weapon).DefaultIfEmpty(-1).First() ?? -1;
+
+    int FindHangarSlot() =>
+        _loadout?.GetSlotsByType(ComponentType.Hangar).DefaultIfEmpty(-1).First() ?? -1;
+
+    int FindGeneratorSlot() =>
+        _loadout?.GetSlotsByType(ComponentType.Generator).DefaultIfEmpty(-1).First() ?? -1;
 
     static string SpeakerName(CrewMember m) => m switch
     {
