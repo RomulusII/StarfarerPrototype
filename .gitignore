@@ -74,6 +74,10 @@ Desktop.ini
 *.sln
 *.csproj
 
+# Claude Code geçici worktree dizinleri
+.claude/worktrees/
+StarfarerPrototype/.claude/worktrees/
+
 # ASLA yoksayılmaması gereken dosyalar
 !*.meta
 !*.unity
