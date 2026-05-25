@@ -493,6 +493,10 @@ public class EnemyBot : MonoBehaviour
 
     void SpawnDebris()
     {
+        // Parçalanma görsel efekti
+        if (data != null)
+            DeathEffect.Spawn(transform.position, data.bodyColor, data.bodyWidth, data.bodyHeight);
+
         // Toplam miktar = tehdit puanı × 4 birim — wave bütçesiyle orantılı, deterministik
         float total       = (data != null ? data.threatScore : 1) * 4f;
         var   resType     = data != null ? data.debrisResourceType : ResourceType.RawMaterial;
