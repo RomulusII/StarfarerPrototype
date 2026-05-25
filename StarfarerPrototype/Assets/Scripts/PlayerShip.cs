@@ -44,7 +44,7 @@ public class PlayerShip : MonoBehaviour
 
         SpriteRenderer sr = body.AddComponent<SpriteRenderer>();
         sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 400, 100), new Vector2(0.5f, 0.5f), 100f);
-        sr.sortingOrder = 0;
+        sr.sortingOrder = -10;
 
         // Trigger collider — EnemyBot çarpışma tespiti için (sprite 4x1 birim)
         BoxCollider2D col = gameObject.AddComponent<BoxCollider2D>();
@@ -67,6 +67,7 @@ public class PlayerShip : MonoBehaviour
             shieldGO.transform.localPosition = Vector3.zero;
             var shield = shieldGO.AddComponent<ShieldGeneratorComponent>();
             shield.maxShield          = 50f;
+            shield.currentShield      = 50f;
             shield.rechargeRate       = 0.1f;
             shield.rechargeEnergyCost = 1f;
         }

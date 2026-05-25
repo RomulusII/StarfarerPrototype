@@ -79,9 +79,9 @@ public class ShipLoadout : MonoBehaviour
         var lm1 = W("Lazer Topu Mk1",   WeaponType.Laser,   1, ResourceType.EnergyCrystal,  0,  0, lm2,   25f, 0f, 15f);
         _laserChain = new[] { lm1, lm2, lm3 };
 
-        var km3 = W("Raylı Top Mk3",    WeaponType.Kinetic, 3, ResourceType.RawMaterial,   50, 20, null,  18f, 0.12f);
-        var km2 = W("Raylı Top Mk2",    WeaponType.Kinetic, 2, ResourceType.RawMaterial,   28, 10, km3,   14f, 0.13f);
-        var km1 = W("Raylı Top Mk1",    WeaponType.Kinetic, 1, ResourceType.RawMaterial,   12,  5, km2,   10f, 0.15f);
+        var km3 = W("Raylı Top Mk3",    WeaponType.Kinetic, 3, ResourceType.RawMaterial,   50, 20, null,  18f, 0.40f);
+        var km2 = W("Raylı Top Mk2",    WeaponType.Kinetic, 2, ResourceType.RawMaterial,   28, 10, km3,   14f, 0.65f);
+        var km1 = W("Raylı Top Mk1",    WeaponType.Kinetic, 1, ResourceType.RawMaterial,   12,  5, km2,   10f, 1.00f);
         _kineticChain = new[] { km1, km2, km3 };
 
         // Plazma — Another World tarzı şarj+bırak mekaniği
@@ -162,6 +162,7 @@ public class ShipLoadout : MonoBehaviour
             case ComponentType.Shield:
                 var shield = go.AddComponent<ShieldGeneratorComponent>();
                 shield.maxShield    = def.maxShield;
+                shield.currentShield = def.maxShield;
                 shield.rechargeRate = def.rechargeRate;
                 comp = shield;
                 break;

@@ -34,6 +34,10 @@ public class Bullet : MonoBehaviour
     void OnTriggerEnter2D(Collider2D other)
     {
         if (DamageUtil.TryDamage(other, damage, weaponType))
+        {
+            Vector2 surfaceNormal = ((Vector2)transform.position - (Vector2)other.transform.position).normalized;
+            HitEffect.SpawnSparks(transform.position, transform.up, surfaceNormal);
             Destroy(gameObject);
+        }
     }
 }

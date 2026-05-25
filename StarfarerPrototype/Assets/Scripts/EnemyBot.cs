@@ -150,7 +150,7 @@ public class EnemyBot : MonoBehaviour
                 break;
 
             case EnemyMovementKind.Strafe:
-                SetupBrain(CombatPattern.Orbit,
+                SetupBrain(CombatPattern.Strafe,
                     data.engageRange, data.fireRange, data.orbitRadius, data.engageDuration);
                 break;
 
@@ -362,7 +362,9 @@ public class EnemyBot : MonoBehaviour
                 : transform.position;
 
             var go = new GameObject("EnemyBullet");
-            go.transform.position = spawnPos;
+            go.transform.position   = spawnPos;
+            float bulletScale       = Mathf.Clamp(data.fireDamage / 10f, 0.3f, 1.5f);
+            go.transform.localScale = Vector3.one * bulletScale;
 
             var eb    = go.AddComponent<EnemyBullet>();
             eb.damage = data.fireDamage;
@@ -392,7 +394,7 @@ public class EnemyBot : MonoBehaviour
         beam.damage          = data.fireDamage;
         beam.weaponType      = WeaponType.Laser;
         beam.continuous      = false;
-        beam.burnDuration    = 0.25f;
+        beam.burnDuration    = 1.5f;
         beam.energyPerSecond = 0f; // düşmanlar enerji sistemi kullanmaz
         beam.hitsPlayer      = true;
         beam.maxRange        = data.fireRange + 2f;
@@ -513,9 +515,7 @@ public class EnemyBot : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D other)
     {
-        if (!other.CompareTag("Player") || _contactDamage <= 0f) return;
-        other.GetComponent<PlayerShip>()?.TakeDamage(_contactDamage);
-        Destroy(gameObject);
+        // Oyuncu gemisiyle fiziksel çarpışma yok; düşmanlar üstünden geçer
     }
 
     // ── Görsel kurulum ────────────────────────────────────────────────────────
@@ -527,7 +527,7 @@ public class EnemyBot : MonoBehaviour
         body.transform.SetParent(transform, false);
         var sr = body.AddComponent<SpriteRenderer>();
         sr.sprite       = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
-        sr.sortingOrder = 0;
+        sr.sortingOrder = data.sizeOrder;
     }
 
     void BuildBarrel(Color barrelColor)
@@ -539,7 +539,7 @@ public class EnemyBot : MonoBehaviour
         var barrelSR = root.AddComponent<SpriteRenderer>();
         barrelSR.sprite       = Sprite.Create(MakeTex(18, 3, barrelColor),
                                     new Rect(0, 0, 18, 3), new Vector2(0f, 0.5f), 100f);
-        barrelSR.sortingOrder = 2;
+        barrelSR.sortingOrder = data.sizeOrder + 1;
 
         var fillGO = new GameObject("ReloadFill");
         fillGO.transform.SetParent(root.transform, false);
@@ -550,7 +550,7 @@ public class EnemyBot : MonoBehaviour
         _reloadFillSR = fillGO.AddComponent<SpriteRenderer>();
         _reloadFillSR.sprite       = Sprite.Create(MakeTex(18, 2, Color.white),
                                          new Rect(0, 0, 18, 2), new Vector2(0f, 0.5f), 100f);
-        _reloadFillSR.sortingOrder = 3;
+        _reloadFillSR.sortingOrder = data.sizeOrder + 2;
         _reloadFillSR.color        = ReloadColor(0f);
     }
 
@@ -561,7 +561,7 @@ public class EnemyBot : MonoBehaviour
         var sr = _shieldVisual.AddComponent<SpriteRenderer>();
         sr.sprite       = Sprite.Create(MakeTex(w, h, Color.white),
                               new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
-        sr.sortingOrder = 1;
+        sr.sortingOrder = data.sizeOrder + 1;
         sr.color        = new Color(0.3f, 0.75f, 1f, 0.55f);
     }
 

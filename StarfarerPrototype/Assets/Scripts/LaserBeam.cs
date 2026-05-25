@@ -31,6 +31,8 @@ public class LaserBeam : MonoBehaviour
     PlayerShip   _targetPlayer;
     Vector3      _endPoint;
     LineRenderer _line;
+    Vector2      _hitNormal;
+    float        _sparkTimer;
 
     // ── Başlatma ──────────────────────────────────────────────────────────────
 
@@ -74,6 +76,7 @@ public class LaserBeam : MonoBehaviour
         UpdateRaycast();
         UpdateVisual();
         ApplyDamage(damage * dmgMulti * Time.deltaTime);
+        UpdateSparks();
     }
 
     // ── Raycast ───────────────────────────────────────────────────────────────
@@ -100,6 +103,7 @@ public class LaserBeam : MonoBehaviour
                 {
                     _targetPlayer = c.GetComponent<PlayerShip>();
                     _endPoint     = hit.point;
+                    _hitNormal    = hit.normal;
                     break;
                 }
             }
@@ -109,8 +113,9 @@ public class LaserBeam : MonoBehaviour
                     c.GetComponent<BossHardpoint>() != null ||
                     c.GetComponent<BossShip>()      != null)
                 {
-                    _target   = c;
-                    _endPoint = hit.point;
+                    _target    = c;
+                    _endPoint  = hit.point;
+                    _hitNormal = hit.normal;
                     break;
                 }
             }
@@ -155,6 +160,22 @@ public class LaserBeam : MonoBehaviour
 
         _line.startColor = new Color(beamColor.r, beamColor.g, beamColor.b, alpha);
         _line.endColor   = new Color(beamColor.r, beamColor.g, beamColor.b, alpha * 0.3f);
+    }
+
+    void UpdateSparks()
+    {
+        bool hitting = hitsPlayer ? (_targetPlayer != null) : (_target != null);
+        if (!hitting) return;
+
+        _sparkTimer -= Time.deltaTime;
+        if (_sparkTimer > 0f) return;
+        _sparkTimer = 0.06f; // saniyede ~17 emit → 17-34 parçacık
+
+        Color sparkColor = hitsPlayer
+            ? new Color(1f,  0.45f, 0.1f)  // düşman lazeri: turuncu
+            : new Color(0.4f, 1f,  1f);     // oyuncu/turret lazeri: cyan
+
+        HitEffect.SpawnLaserSparks(_endPoint, transform.up, _hitNormal, sparkColor);
     }
 
     void OnDestroy()

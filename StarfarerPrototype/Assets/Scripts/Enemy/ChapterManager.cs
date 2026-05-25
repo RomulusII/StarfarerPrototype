@@ -38,6 +38,11 @@ public class ChapterManager : MonoBehaviour
     float               _currentSpawnInterval;
     bool                _allSpawned;
 
+    // Formasyon konumlandırması
+    FormationTemplate _currentFormation;
+    Vector3           _baseSpawnPos;
+    int               _spawnSlotIndex;
+
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
     void Start()
@@ -111,9 +116,16 @@ public class ChapterManager : MonoBehaviour
             FillByBudget(_pendingSpawns, pool,
                 Random.Range(wave.budgetMin, wave.budgetMax + 1));
 
-            var formation = wave.formation ?? PickFormation(_pendingSpawns, _formations);
-            SortByFormation(_pendingSpawns, formation);
+            _currentFormation = wave.formation ?? PickFormation(_pendingSpawns, _formations);
+            SortByFormation(_pendingSpawns, _currentFormation);
         }
+        else
+        {
+            _currentFormation = null;
+        }
+
+        _baseSpawnPos   = SpawnPosition(wave.spawnSide);
+        _spawnSlotIndex = 0;
 
         _currentSpawnInterval = wave.spawnInterval > 0f
             ? wave.spawnInterval
@@ -157,6 +169,7 @@ public class ChapterManager : MonoBehaviour
         _pendingSpawns.RemoveAt(0);
 
         SpawnEnemy(data, _chapters[_chapterIndex].waves[_waveIndex]);
+        _spawnSlotIndex++;
     }
 
     void SpawnEnemy(EnemyTypeData data, WaveData wave)
@@ -171,7 +184,18 @@ public class ChapterManager : MonoBehaviour
         d.fireDamage    = data.fireDamage    * chapter.enemyDamageMultiplier;
         d.contactDamage = data.contactDamage * chapter.enemyDamageMultiplier;
 
-        var pos  = SpawnPosition(wave.spawnSide);
+        Vector3 pos;
+        if (_currentFormation != null && _currentFormation.slots.Length > 0)
+        {
+            int   si     = _spawnSlotIndex % _currentFormation.slots.Length;
+            float yOff   = _currentFormation.slots[si].offset.y * 2.5f; // -1..1 → ±2.5 birim
+            pos = new Vector3(_baseSpawnPos.x, Mathf.Clamp(_baseSpawnPos.y + yOff, -4f, 4f), 0f);
+        }
+        else
+        {
+            pos = SpawnPosition(wave.spawnSide);
+        }
+
         var go   = new GameObject($"EnemyBot_{data.displayName}");
         go.transform.position = pos;
         go.AddComponent<HealthBar>();

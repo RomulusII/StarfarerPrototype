@@ -12,7 +12,7 @@ public class WeaponController : MonoBehaviour
 {
     public WeaponType weaponType   = WeaponType.Kinetic;
     public float damage            = 10f;
-    public float fireRate          = 0.15f;   // Kinetik: atışlar arası, Plazma: atış sonrası bekleme
+    public float fireRate          = 1.00f;   // Kinetik: atışlar arası, Plazma: atış sonrası bekleme
     public float energyCostPerShot = 3f;      // Lazer: enerji/saniye (beam aktifken)
     public float chargeTime        = 2.0f;    // Plazma: tam şarja ulaşma süresi
 
@@ -161,7 +161,7 @@ public class WeaponController : MonoBehaviour
 
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite       = _plasmaCircle;
-        sr.sortingOrder = 5;
+        sr.sortingOrder = 15;
         go.transform.localScale = Vector3.one * 0.04f;
         return go;
     }
@@ -226,7 +226,7 @@ public class WeaponController : MonoBehaviour
 
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite       = sprite;
-        sr.sortingOrder = 2;
+        sr.sortingOrder = 20;
 
         var b = go.AddComponent<Bullet>();
         b.speed      = speed;

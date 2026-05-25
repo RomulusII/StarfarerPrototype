@@ -29,7 +29,7 @@ public class EnemyBullet : MonoBehaviour
 
         var sr = gameObject.AddComponent<SpriteRenderer>();
         sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 8, 8), new Vector2(0.5f, 0.5f), 100f);
-        sr.sortingOrder = 3;
+        sr.sortingOrder = 20;
 
         if (!isCompBullet)
         {
@@ -84,6 +84,8 @@ public class EnemyBullet : MonoBehaviour
             var ship = other.GetComponent<PlayerShip>();
             if (ship == null) return;
             ship.TakeDamage(damage);
+            Vector2 surfaceNormal = ((Vector2)transform.position - (Vector2)other.transform.position).normalized;
+            HitEffect.SpawnSparks(transform.position, _dir, surfaceNormal);
             Destroy(gameObject);
             return;
         }

@@ -29,10 +29,12 @@ public class EnemyTypeData : ScriptableObject
     public float contactDamage = 20f;
 
     [Header("Görsel")]
-    public int   bodyWidth  = 60;
-    public int   bodyHeight = 40;
-    public Color bodyColor  = Color.red;
+    public int   bodyWidth   = 60;
+    public int   bodyHeight  = 40;
+    public Color bodyColor   = Color.red;
     public Color barrelColor = new Color(0.5f, 0.1f, 0.1f);
+    [Tooltip("Render sırası: küçük sayı = büyük nesne = arkada. Sprite gelince bu değeri güncelle.")]
+    public int   sizeOrder   = 5;
 
     [Header("Hareket")]
     public EnemyMovementKind movementKind    = EnemyMovementKind.Charge;
@@ -67,17 +69,17 @@ public class EnemyTypeData : ScriptableObject
         d.displayName   = "Swarm";
         d.role          = EnemyRole.Vanguard;
         d.threatScore   = 1;
-        d.maxHP         = 30f;
+        d.maxHP         = 20f;
         d.mass          = 1f;   d.enginePower   = 3f;
         d.contactDamage = 20f;
-        d.bodyWidth     = 60;   d.bodyHeight    = 40;
+        d.bodyWidth     = 60;   d.bodyHeight    = 20;   d.sizeOrder = 8;
         d.bodyColor     = new Color(0.9f, 0.20f, 0.20f);
         d.barrelColor   = new Color(0.7f, 0.15f, 0.15f);
-        d.movementKind  = EnemyMovementKind.Charge;
-        d.engageRange   = 6f;   d.fireRange     = 5.5f;
-        d.orbitRadius   = 4.5f; d.engageDuration = 5f;
-        d.weaponKind    = EnemyWeaponKind.Laser;
-        d.fireDamage    = 8f;   d.fireRate      = 4f;   d.bulletSpeed = 3f;
+        d.movementKind  = EnemyMovementKind.Strafe;
+        d.engageRange   = 6f;   d.fireRange     = 4f;
+        d.orbitRadius   = 3.5f; d.engageDuration = 4f;
+        d.weaponKind    = EnemyWeaponKind.Kinetic;
+        d.fireDamage    = 3f;   d.fireRate      = 5f;   d.bulletSpeed = 6f;
         d.hullResistances = new[]
         {
             new DamageModifier { weaponType = WeaponType.Laser, multiplier = 1.5f },
@@ -91,11 +93,11 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Armored";
         d.displayName   = "Armored";
         d.role          = EnemyRole.Rear;
-        d.threatScore   = 2;
+        d.threatScore   = 4;
         d.maxHP         = 80f;
         d.mass          = 5f;   d.enginePower   = 7.5f;
         d.contactDamage = 25f;
-        d.bodyWidth     = 80;   d.bodyHeight    = 55;
+        d.bodyWidth     = 80;   d.bodyHeight    = 55;   d.sizeOrder = 3;
         d.bodyColor     = new Color(0.42f, 0.45f, 0.50f);
         d.barrelColor   = new Color(0.40f, 0.40f, 0.45f);
         d.movementKind  = EnemyMovementKind.HoverFire;
@@ -117,11 +119,11 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Shield";
         d.displayName   = "Shield";
         d.role          = EnemyRole.Center;
-        d.threatScore   = 3;
+        d.threatScore   = 5;
         d.maxHP         = 50f;  d.maxShield     = 40f;
         d.mass          = 3f;   d.enginePower   = 6f;
         d.contactDamage = 20f;
-        d.bodyWidth     = 70;   d.bodyHeight    = 50;
+        d.bodyWidth     = 70;   d.bodyHeight    = 50;   d.sizeOrder = 5;
         d.bodyColor     = new Color(0.25f, 0.35f, 0.85f);
         d.barrelColor   = new Color(0.15f, 0.20f, 0.70f);
         d.movementKind  = EnemyMovementKind.Charge;
@@ -144,11 +146,11 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Bomber";
         d.displayName   = "Bomber";
         d.role          = EnemyRole.Flank;
-        d.threatScore   = 2;
+        d.threatScore   = 10;
         d.maxHP         = 40f;
         d.mass          = 2f;   d.enginePower   = 7f;
         d.contactDamage = 0f;
-        d.bodyWidth     = 52;   d.bodyHeight    = 52;
+        d.bodyWidth     = 52;   d.bodyHeight    = 52;   d.sizeOrder = 6;
         d.bodyColor     = new Color(0.9f, 0.50f, 0.10f);
         d.movementKind  = EnemyMovementKind.Approach;
         d.weaponKind    = EnemyWeaponKind.ComponentBurst;
@@ -162,11 +164,11 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "BombRunner";
         d.displayName   = "Bomb Runner";
         d.role          = EnemyRole.Flank;
-        d.threatScore   = 3;
+        d.threatScore   = 12;
         d.maxHP         = 35f;
         d.mass          = 2f;   d.enginePower   = 5f;
         d.contactDamage = 0f;
-        d.bodyWidth     = 65;   d.bodyHeight    = 45;
+        d.bodyWidth     = 65;   d.bodyHeight    = 45;   d.sizeOrder = 6;
         d.bodyColor     = new Color(0.85f, 0.45f, 0.05f);
         d.barrelColor   = new Color(0.70f, 0.35f, 0.05f);
         d.movementKind  = EnemyMovementKind.BombRun;

@@ -46,8 +46,8 @@ public class ChapterData : ScriptableObject
                 new[] { swarm }, interval: 4f, hpMult: 1.0f,
                 waves: new[]
                 {
-                    MakeWave(4, 6, new[] { swarm }),
-                    MakeWave(4, 6, new[] { swarm }),
+                    MakeWave(3, 4, new[] { swarm }),
+                    MakeWave(3, 4, new[] { swarm }),
                 }),
 
             MakeChapter(2,  "Sektör 2: Devriye",
@@ -66,8 +66,8 @@ public class ChapterData : ScriptableObject
                 waves: new[]
                 {
                     MakeWave(6, 8,  new[] { swarm }),
-                    MakeWave(6, 9,  new[] { swarm, armored, bombRunner }),
-                    MakeWave(8, 10, new[] { swarm, armored, bombRunner }),
+                    MakeWave(6, 9,  new[] { swarm, armored }),
+                    MakeWave(8, 10, new[] { swarm, armored }),
                 }),
 
             MakeChapter(4,  "Sektör 4: Baskı",
@@ -87,18 +87,18 @@ public class ChapterData : ScriptableObject
                 {
                     MakeWave(8,  11, new[] { swarm, shield }),
                     MakeWave(10, 13, new[] { swarm, armored, shield }),
-                    MakeWave(12, 15, new[] { swarm, armored, shield }),
+                    MakeWave(12, 15, new[] { swarm, armored, shield, bombRunner }),
                 }),
 
             MakeChapter(6,  "Sektör 6: Karma Saldırı",
                 "Tüm bot tipleri koordineli hareket ediyor.",
-                new[] { swarm, armored, shield }, interval: 2.8f, hpMult: 1.4f,
+                new[] { swarm, armored, shield, bombRunner }, interval: 2.8f, hpMult: 1.4f,
                 waves: new[]
                 {
                     MakeWave(10, 14, new[] { swarm, armored, shield }),
-                    MakeWave(12, 16, new[] { swarm, armored, shield }),
-                    MakeWave(13, 17, new[] { swarm, armored, shield }),
-                    MakeWave(14, 18, new[] { swarm, armored, shield }),
+                    MakeWave(12, 16, new[] { swarm, armored, shield, bombRunner }),
+                    MakeWave(13, 17, new[] { swarm, armored, shield, bombRunner }),
+                    MakeWave(14, 18, new[] { swarm, armored, shield, bombRunner }),
                 }),
 
             MakeChapter(7,  "Sektör 7: Bomba Yağmuru",
