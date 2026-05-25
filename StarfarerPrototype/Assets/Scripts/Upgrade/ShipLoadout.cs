@@ -43,7 +43,10 @@ public class ShipLoadout : MonoBehaviour
         // Raylı Top başlangıçta ücretsiz kurulu gelir
         InstallComponent(_kineticChain[0], slotIndex: 1, deductCost: false);
         // Hangar her zaman slot 6'da kurulu başlar
-        InstallComponent(GetHangarDef(), slotIndex: 6, deductCost: false);
+        InstallComponent(GetHangarDef(),        slotIndex: 6, deductCost: false);
+        // Jeneratör ve kalkan üreteci başlangıçta slot'larında kurulu gelir
+        InstallComponent(MakeGeneratorDef(10f), slotIndex: 0, deductCost: false);
+        InstallComponent(MakeShieldDef(50f, 1.5f), slotIndex: 3, deductCost: false);
     }
 
     static ComponentDefinition _hangarDef;
@@ -55,10 +58,37 @@ public class ShipLoadout : MonoBehaviour
         d.componentType = ComponentType.Hangar;
         d.tier          = 1;
         d.costResource  = ResourceType.RawMaterial;
-        d.cost          = 20; // stat upgrade maliyet hesabı için baz değer
+        d.cost          = 20;
         d.sellValue     = 0;
         _hangarDef = d;
         return _hangarDef;
+    }
+
+    static ComponentDefinition MakeGeneratorDef(float production)
+    {
+        var d = ScriptableObject.CreateInstance<ComponentDefinition>();
+        d.componentName    = "Jeneratör";
+        d.componentType    = ComponentType.Generator;
+        d.tier             = 1;
+        d.costResource     = ResourceType.RawMaterial;
+        d.cost             = 15;
+        d.sellValue        = 5;
+        d.productionAmount = production;
+        return d;
+    }
+
+    static ComponentDefinition MakeShieldDef(float maxShield, float rechargeRate)
+    {
+        var d = ScriptableObject.CreateInstance<ComponentDefinition>();
+        d.componentName = "Kalkan Üreteci";
+        d.componentType = ComponentType.Shield;
+        d.tier          = 1;
+        d.costResource  = ResourceType.EnergyCrystal;
+        d.cost          = 15;
+        d.sellValue     = 5;
+        d.maxShield     = maxShield;
+        d.rechargeRate  = rechargeRate;
+        return d;
     }
 
     // -------------------------------------------------------------------------
@@ -258,7 +288,6 @@ public class ShipLoadout : MonoBehaviour
     {
         if (!_unlockedWeapons.TryGetValue(type, out _)) return;
         _activeWeaponType = type;
-        _installedDefs[5] = _unlockedWeapons[type];
         ApplyActiveWeaponStats();
     }
 
@@ -319,10 +348,7 @@ public class ShipLoadout : MonoBehaviour
         }
         _unlockedWeapons[type] = next;
         if (_activeWeaponType == type)
-        {
-            _installedDefs[5] = next;
             GetComponentInChildren<WeaponController>()?.Configure(next);
-        }
         return true;
     }
 

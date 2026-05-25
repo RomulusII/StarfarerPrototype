@@ -141,6 +141,16 @@ public class ChapterData : ScriptableObject
                 escortTypes: new[] { swarm, armored },
                 escortBudget: 10,
                 hpMult: 2.0f),
+
+            // ── TEST LEVEL ────────────────────────────────────────────────────
+            MakeChapter(11, "TEST: Bomber Saldırısı",
+                "Geliştirici test seviyesi — yalnızca Bomber, komponent hedefleme sistemi.",
+                new[] { bomber }, interval: 5f, hpMult: 1.0f,
+                waves: new[]
+                {
+                    MakeWave(10, 10, new[] { bomber }),
+                    MakeWave(20, 20, new[] { bomber }),
+                }),
         };
     }
 

@@ -154,7 +154,7 @@ public class EnemyTypeData : ScriptableObject
         d.bodyColor     = new Color(0.9f, 0.50f, 0.10f);
         d.movementKind  = EnemyMovementKind.Approach;
         d.weaponKind    = EnemyWeaponKind.ComponentBurst;
-        d.fireDamage    = 18f;  d.fireRate      = 1.8f; d.bulletSpeed = 2.25f;
+        d.fireDamage    = 2f;   d.fireRate      = 1.8f; d.bulletSpeed = 2.25f;
         return d;
     }
 

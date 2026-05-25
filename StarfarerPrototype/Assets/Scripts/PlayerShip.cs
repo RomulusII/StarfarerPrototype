@@ -51,27 +51,6 @@ public class PlayerShip : MonoBehaviour
         col.size      = new Vector2(4f, 1f);
         col.isTrigger = true;
 
-        if (FindFirstObjectByType<GeneratorComponent>() == null)
-        {
-            var genGO = new GameObject("Generator_Default");
-            genGO.transform.SetParent(transform);
-            genGO.transform.localPosition = Vector3.zero;
-            var gen = genGO.AddComponent<GeneratorComponent>();
-            gen.Init(15f);
-        }
-
-        if (FindFirstObjectByType<ShieldGeneratorComponent>() == null)
-        {
-            GameObject shieldGO = new GameObject("ShieldGenerator_Default");
-            shieldGO.transform.SetParent(transform);
-            shieldGO.transform.localPosition = Vector3.zero;
-            var shield = shieldGO.AddComponent<ShieldGeneratorComponent>();
-            shield.maxShield          = 50f;
-            shield.currentShield      = 50f;
-            shield.rechargeRate       = 0.1f;
-            shield.rechargeEnergyCost = 1f;
-        }
-
         if (!TryGetComponent<ShipLoadout>(out _))
             gameObject.AddComponent<ShipLoadout>();
 
@@ -102,12 +81,6 @@ public class PlayerShip : MonoBehaviour
             visual.isWeaponSlot = (i == 1);
         }
 
-        var coreGenGO = new GameObject("CoreGenerator");
-        coreGenGO.transform.SetParent(transform);
-        coreGenGO.transform.localPosition = Vector3.zero;
-        coreGenGO.transform.localScale    = Vector3.one;
-        var coreGen = coreGenGO.AddComponent<GeneratorComponent>();
-        coreGen.productionAmount = 8f;
     }
 
     void Start()

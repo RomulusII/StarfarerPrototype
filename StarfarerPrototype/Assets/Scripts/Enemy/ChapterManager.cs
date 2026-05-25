@@ -62,7 +62,7 @@ public class ChapterManager : MonoBehaviour
         };
 
         _chapters = ChapterData.CreateDefaultChapters();
-        BeginChapter(0);
+        BeginChapter(10); // TEST: Ch11 (index 10) — Bomber test level
     }
 
     void Update()

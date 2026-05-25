@@ -18,23 +18,27 @@ public class EnemyBullet : MonoBehaviour
 
     void Awake()
     {
-        bool isCompBullet = targetComponent != null;
-        Color c = isCompBullet ? ColComponent : ColHull;
-
-        var tex    = new Texture2D(8, 8);
-        var pixels = new Color[64];
-        for (int i = 0; i < pixels.Length; i++) pixels[i] = c;
-        tex.SetPixels(pixels);
-        tex.Apply();
-
+        // Awake'de sadece sprite — targetComponent henüz set edilmemiş olabilir.
+        // Collider/Rigidbody ve renk düzeltmesi Start()'ta yapılır.
         var sr = gameObject.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 8, 8), new Vector2(0.5f, 0.5f), 100f);
+        sr.sprite       = MakeSprite(ColHull); // Start'ta gerekirse düzeltilir
         sr.sortingOrder = 20;
+    }
 
-        if (!isCompBullet)
+    void Start()
+    {
+        // targetComponent bu noktada kesin olarak set edilmiştir
+        bool isCompBullet = targetComponent != null;
+
+        if (isCompBullet)
+        {
+            GetComponent<SpriteRenderer>().sprite = MakeSprite(ColComponent);
+            // Komponent mermisi: collider yok — yalnızca proximity ile çarpar
+        }
+        else
         {
             var col    = gameObject.AddComponent<CircleCollider2D>();
-            col.radius = 0.06f;
+            col.radius    = 0.06f;
             col.isTrigger = true;
 
             var rb = gameObject.AddComponent<Rigidbody2D>();
@@ -43,6 +47,16 @@ public class EnemyBullet : MonoBehaviour
         }
 
         Destroy(gameObject, 10f);
+    }
+
+    static Sprite MakeSprite(Color c)
+    {
+        var tex    = new Texture2D(8, 8);
+        var pixels = new Color[64];
+        for (int i = 0; i < pixels.Length; i++) pixels[i] = c;
+        tex.SetPixels(pixels);
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, 8, 8), new Vector2(0.5f, 0.5f), 100f);
     }
 
     /// <summary>Hull modu için hareket yönünü ayarlar.</summary>

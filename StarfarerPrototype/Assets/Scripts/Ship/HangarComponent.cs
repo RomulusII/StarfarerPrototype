@@ -35,6 +35,7 @@ public class HangarComponent : ShipComponentBase
 
     protected override void Awake()
     {
+        _skipVisual = true; // Hangar meta-komponent, halka/HP barı gösterilmez
         base.Awake();
         componentName     = "Hangar";
         energyConsumption = 0f;
