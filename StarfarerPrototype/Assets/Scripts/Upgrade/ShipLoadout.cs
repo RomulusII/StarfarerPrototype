@@ -46,7 +46,7 @@ public class ShipLoadout : MonoBehaviour
         InstallComponent(GetHangarDef(),        slotIndex: 6, deductCost: false);
         // Jeneratör ve kalkan üreteci başlangıçta slot'larında kurulu gelir
         InstallComponent(MakeGeneratorDef(10f), slotIndex: 0, deductCost: false);
-        InstallComponent(MakeShieldDef(50f, 1.5f), slotIndex: 3, deductCost: false);
+        InstallComponent(MakeShieldDef(50f, 0.375f), slotIndex: 3, deductCost: false);
     }
 
     static ComponentDefinition _hangarDef;
@@ -191,9 +191,10 @@ public class ShipLoadout : MonoBehaviour
 
             case ComponentType.Shield:
                 var shield = go.AddComponent<ShieldGeneratorComponent>();
-                shield.maxShield    = def.maxShield;
-                shield.currentShield = def.maxShield;
-                shield.rechargeRate = def.rechargeRate;
+                shield.maxShield     = def.maxShield;
+                shield.rechargeRate  = def.rechargeRate;
+                // Orphan HP varsa kaldığı yerden devam et, yoksa tam dolu başla
+                shield.currentShield = ShieldGeneratorComponent.TakeOrphanShield(def.maxShield);
                 comp = shield;
                 break;
 

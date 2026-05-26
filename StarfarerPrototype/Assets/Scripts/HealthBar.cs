@@ -90,7 +90,15 @@ public class HealthBar : MonoBehaviour
 
         float shieldRatio = 0f;
         bool  hasShield   = false;
-        if (_shield != null && _shield.maxShield > 0f)
+        if (_playerShip != null)
+        {
+            // PlayerShip: static metodlar üzerinden oku — referans kopukluğundan etkilenmez
+            float totalMax = ShieldGeneratorComponent.GetTotalMaxShield();
+            float totalCur = ShieldGeneratorComponent.GetTotalShield();
+            hasShield   = totalMax > 0f || totalCur > 0f;
+            shieldRatio = totalMax > 0f ? Mathf.Clamp01(totalCur / totalMax) : 0f;
+        }
+        else if (_shield != null && _shield.maxShield > 0f)
         {
             shieldRatio = Mathf.Clamp01(_shield.currentShield / _shield.maxShield);
             hasShield   = true;
