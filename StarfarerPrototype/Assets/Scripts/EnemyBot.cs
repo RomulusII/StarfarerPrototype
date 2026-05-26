@@ -42,6 +42,7 @@ public class EnemyBot : MonoBehaviour
 
     // Approach (Bomber tipi) state machine
     enum ApproachPhase { Approaching, Hovering, Retreating }
+    enum ArPhase { Engaging, Disengaging, Braking }
     ApproachPhase _approachPhase;
     float         _approachFireTimer;
     int           _approachShotsLeft;
@@ -54,12 +55,20 @@ public class EnemyBot : MonoBehaviour
     const float BombRunSpeed = 1.5f;
 
     // AttackRun state — kendi fiziği, ShipMovement bypass
-    float   _arFacingAngle;
-    Vector2 _arVelocity;
-    const float ArTurnSpeed = 90f;   // derece/sn
-    const float ArMaxSpeed  = 5f;
-    const float ArThrust    = 8f;    // ivme (birim/sn²)
-    const float ArFireAngle = 20f;   // hedeften bu kadar sapmayla ateş edebilir
+    float             _arFacingAngle;
+    Vector2           _arVelocity;
+    float             _arDisengageTimer;
+    float             _arEscapeAngle;
+    ArPhase           _arPhase;
+    ShipComponentBase _arTarget;
+    const float ArTurnSpeed     = 120f;  // derece/sn
+    const float ArMaxSpeed      = 5f;
+    const float ArThrust        = 8f;    // ivme (birim/sn²)
+    const float ArFireAngle     = 20f;   // ateş için max açı sapması
+    const float ArDisengageTime = 1.0f;  // ateş sonrası düz uçuş süresi (sn)
+    const float ArBrakeRate     = 3f;    // fren ivmesi (birim/sn²)
+    const float ArAimSpeed      = 0.4f;  // saldırıya geçmek için max hız
+    const float ArAimAngle      = 12f;   // saldırıya geçmek için max açı hatası
 
     // Velocity tracking
     Vector2        _prevPos;
@@ -173,12 +182,14 @@ public class EnemyBot : MonoBehaviour
                 break;
 
             case EnemyMovementKind.AttackRun:
-                // Başlangıç yönü: oyuncu gemisine doğru (spawn pozisyonundan hesaplanır)
-                Vector2 initDir = _playerShip != null
-                    ? ((Vector2)_playerShip.transform.position - (Vector2)transform.position).normalized
+                _arTarget         = PickComponentTarget();
+                Vector2 initDir   = _arTarget != null
+                    ? ((Vector2)_arTarget.transform.position - (Vector2)transform.position).normalized
                     : Vector2.left;
-                _arFacingAngle = Mathf.Atan2(initDir.y, initDir.x) * Mathf.Rad2Deg;
-                _arVelocity    = Vector2.zero;
+                _arFacingAngle    = Mathf.Atan2(initDir.y, initDir.x) * Mathf.Rad2Deg;
+                _arVelocity       = Vector2.zero;
+                _arPhase          = ArPhase.Engaging;
+                _arDisengageTimer = 0f;
                 break;
         }
     }
@@ -319,38 +330,107 @@ public class EnemyBot : MonoBehaviour
 
     void UpdateAttackRun()
     {
-        if (_playerShip == null) { Destroy(gameObject); return; }
+        // Hedef component geçersizse yenisini seç
+        if (_arTarget == null || !_arTarget.IsOperational)
+            _arTarget = PickComponentTarget();
+        if (_arTarget == null)
+        {
+            // Operasyonel komponent yok — mevcut yönde süzül, hedef bekle
+            transform.position += (Vector3)(_arVelocity * Time.deltaTime);
+            transform.rotation  = Quaternion.Euler(0f, 0f, _arFacingAngle);
+            if (Vector2.Distance(transform.position, Vector2.zero) > 30f)
+                Destroy(gameObject);
+            return;
+        }
 
-        Vector2 toTarget  = (Vector2)_playerShip.transform.position - (Vector2)transform.position;
-        float   dist      = toTarget.magnitude;
+        Vector2 toTarget  = (Vector2)_arTarget.transform.position - (Vector2)transform.position;
         float   tgtAngle  = Mathf.Atan2(toTarget.y, toTarget.x) * Mathf.Rad2Deg;
+        float   angleDiff = Mathf.Abs(Mathf.DeltaAngle(_arFacingAngle, tgtAngle));
+        float   dist      = toTarget.magnitude;
 
-        // Hedefe doğru dön
-        _arFacingAngle = Mathf.MoveTowardsAngle(_arFacingAngle, tgtAngle, ArTurnSpeed * Time.deltaTime);
+        switch (_arPhase)
+        {
+            case ArPhase.Engaging:
+            {
+                // Hedefe doğru dön
+                _arFacingAngle = Mathf.MoveTowardsAngle(_arFacingAngle, tgtAngle, ArTurnSpeed * Time.deltaTime);
+                float   rad    = _arFacingAngle * Mathf.Deg2Rad;
+                Vector2 facing = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
 
-        // Hız vektörünü gemi yönüyle hizala — yan kayma yok
-        float   rad    = _arFacingAngle * Mathf.Deg2Rad;
-        Vector2 facing = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
-        float   spd    = _arVelocity.magnitude;
-        if (spd > 0.01f) _arVelocity = facing * spd;
+                // Hız vektörünü yönle hizala, ardından it
+                float spd = _arVelocity.magnitude;
+                if (spd > 0.01f) _arVelocity = facing * spd;
+                _arVelocity += facing * ArThrust * Time.deltaTime;
+                if (_arVelocity.magnitude > ArMaxSpeed)
+                    _arVelocity = _arVelocity.normalized * ArMaxSpeed;
 
-        // Baktığı yönde it
-        _arVelocity += facing * ArThrust * Time.deltaTime;
+                // Ateş
+                _fireTimer -= Time.deltaTime;
+                if (dist <= data.fireRange && angleDiff <= ArFireAngle && _fireTimer <= 0f)
+                {
+                    _fireTimer        = _fireRateBase;
+                    _arPhase          = ArPhase.Disengaging;
+                    _arDisengageTimer = ArDisengageTime;
 
-        if (_arVelocity.magnitude > ArMaxSpeed)
-            _arVelocity = _arVelocity.normalized * ArMaxSpeed;
+                    // Kaçış açısını kaydet — Disengaging fazında yavaşça bu açıya dönülür
+                    _arEscapeAngle = _arFacingAngle + Random.Range(-50f, 50f);
+
+                    var go = new GameObject("EnemyBullet_Comp");
+                    go.transform.position = transform.position;
+                    var eb                = go.AddComponent<EnemyBullet>();
+                    eb.damage             = data.fireDamage;
+                    eb.speed              = data.bulletSpeed;
+                    eb.targetComponent    = _arTarget;
+                }
+                break;
+            }
+
+            case ArPhase.Disengaging:
+            {
+                // Kaçış açısına doğru yavaşça dön, hız vektörü de takip eder
+                _arFacingAngle = Mathf.MoveTowardsAngle(_arFacingAngle, _arEscapeAngle, ArTurnSpeed * Time.deltaTime);
+                float   dRad    = _arFacingAngle * Mathf.Deg2Rad;
+                Vector2 dFacing = new Vector2(Mathf.Cos(dRad), Mathf.Sin(dRad));
+                float   dSpd    = _arVelocity.magnitude;
+                if (dSpd > 0.01f) _arVelocity = dFacing * dSpd;
+
+                _arDisengageTimer -= Time.deltaTime;
+                if (_arDisengageTimer <= 0f)
+                {
+                    _arPhase  = ArPhase.Braking;
+                    _arTarget = PickComponentTarget(); // bir sonraki saldırı için yeni hedef
+                }
+                break;
+            }
+
+            case ArPhase.Braking:
+            {
+                // Yeni hedefe dönerken yavaşla — gerekirse tamamen dur
+                _arFacingAngle = Mathf.MoveTowardsAngle(_arFacingAngle, tgtAngle, ArTurnSpeed * Time.deltaTime);
+                float   bRad    = _arFacingAngle * Mathf.Deg2Rad;
+                Vector2 bFacing = new Vector2(Mathf.Cos(bRad), Mathf.Sin(bRad));
+
+                float spd = _arVelocity.magnitude;
+                if (spd > 0.05f)
+                {
+                    // Hız vektörünü yönle hizala — dönünce hız da döner, lateral drift yok
+                    _arVelocity = bFacing * Mathf.Max(0f, spd - ArBrakeRate * Time.deltaTime);
+                }
+                else
+                    _arVelocity = Vector2.zero;
+
+                // Yeterince yavaşladı ve hedef hizalandıysa saldırıya geç
+                if (_arVelocity.magnitude <= ArAimSpeed && angleDiff <= ArAimAngle)
+                {
+                    _arPhase   = ArPhase.Engaging;
+                    _fireTimer = 0f; // her saldırı sortisi ateşe hazır başlar
+                }
+                break;
+            }
+        }
 
         transform.position += (Vector3)(_arVelocity * Time.deltaTime);
         transform.rotation  = Quaternion.Euler(0f, 0f, _arFacingAngle);
-
-        // Yeterince yakın VE hizalıysa ateş et
-        float angleDiff = Mathf.Abs(Mathf.DeltaAngle(_arFacingAngle, tgtAngle));
-        _fireTimer -= Time.deltaTime;
-        if (dist <= data.fireRange && angleDiff <= ArFireAngle && _fireTimer <= 0f)
-        {
-            _fireTimer = _fireRateBase;
-            FireAtComponent();
-        }
 
         if (Vector2.Distance(transform.position, Vector2.zero) > 30f)
             Destroy(gameObject);
@@ -464,6 +544,29 @@ public class EnemyBot : MonoBehaviour
         beam.hitsPlayer      = true;
         beam.maxRange        = data.fireRange + 2f;
         beam.Init();
+    }
+
+    ShipComponentBase PickComponentTarget()
+    {
+        var all         = FindObjectsByType<ShipComponentBase>(FindObjectsSortMode.None);
+        var operational = System.Array.FindAll(all, c => c.IsOperational);
+        if (operational.Length == 0) return null;
+        return operational[Random.Range(0, operational.Length)];
+    }
+
+    /// <summary>AttackRun için: gemi burnuna doğru ilerleyen, kalkan bypass eden mermi.</summary>
+    void FireForward()
+    {
+        float   rad = _arFacingAngle * Mathf.Deg2Rad;
+        Vector2 dir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
+
+        var go = new GameObject("EnemyBullet_AR");
+        go.transform.position = transform.position;
+        var eb = go.AddComponent<EnemyBullet>();
+        eb.damage        = data.fireDamage;
+        eb.speed         = data.bulletSpeed;
+        eb.bypassShields = true;
+        eb.SetDirection(dir);
     }
 
     void FireAtComponent()

@@ -4,12 +4,14 @@ using UnityEngine;
 /// Düşman mermisi. İki mod:
 ///   Hull   — yön vektörüyle hareket eder, PlayerShip tag'ına çarptığında kalkan üzerinden hasar verir.
 ///   Komponent — hedef komponente doğru yönelir, yakına gelince doğrudan TakeDamage çağırır.
+/// bypassShields = true ise hull modunda da kalkanı atlar, doğrudan gövde hasarı verir.
 /// </summary>
 public class EnemyBullet : MonoBehaviour
 {
     public float              speed           = 5f;
     public float              damage          = 8f;
     public ShipComponentBase  targetComponent;     // null → hull modu
+    public bool               bypassShields   = false;
 
     Vector2 _dir;
 
@@ -97,7 +99,7 @@ public class EnemyBullet : MonoBehaviour
         {
             var ship = other.GetComponent<PlayerShip>();
             if (ship == null) return;
-            ship.TakeDamage(damage);
+            ship.TakeDamage(damage, bypassShields);
             Vector2 surfaceNormal = ((Vector2)transform.position - (Vector2)other.transform.position).normalized;
             HitEffect.SpawnSparks(transform.position, _dir, surfaceNormal);
             Destroy(gameObject);
