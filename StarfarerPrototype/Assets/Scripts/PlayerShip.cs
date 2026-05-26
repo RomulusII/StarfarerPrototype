@@ -46,10 +46,19 @@ public class PlayerShip : MonoBehaviour
         sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 400, 100), new Vector2(0.5f, 0.5f), 100f);
         sr.sortingOrder = -10;
 
-        // Trigger collider — EnemyBot çarpışma tespiti için (sprite 4x1 birim)
+        // Trigger collider — gövde hasarı için (sprite 4x1 birim)
         BoxCollider2D col = gameObject.AddComponent<BoxCollider2D>();
         col.size      = new Vector2(4f, 1f);
         col.isTrigger = true;
+
+        // Kalkan küresi — gemiyi tamamen saran daire, EnemyBullet tarafından yakalanır
+        var shieldGO = new GameObject("ShieldSphere");
+        shieldGO.transform.SetParent(transform, false);
+        shieldGO.transform.localPosition = Vector3.zero;
+        var shieldCircle    = shieldGO.AddComponent<CircleCollider2D>();
+        shieldCircle.radius    = ShieldEffect.ShieldRadius;
+        shieldCircle.isTrigger = true;
+        shieldGO.AddComponent<ShieldSphereCollider>();
 
         if (!TryGetComponent<ShipLoadout>(out _))
             gameObject.AddComponent<ShipLoadout>();

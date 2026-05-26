@@ -14,6 +14,7 @@ public class EnemyBullet : MonoBehaviour
     public bool               bypassShields   = false;
 
     Vector2 _dir;
+    bool    _hitHandled; // aynı frame'de çift trigger'ı önler
 
     static readonly Color ColHull      = new Color(1f,   0.35f, 0.1f,  1f); // turuncu
     static readonly Color ColComponent = new Color(0.8f, 0.1f,  0.9f,  1f); // mor
@@ -94,22 +95,47 @@ public class EnemyBullet : MonoBehaviour
     void OnTriggerEnter2D(Collider2D other)
     {
         if (targetComponent != null) return;
+        if (_hitHandled) return;
+
+        // ── Kalkan küresi (gövde kutusundan daha geniş alan) ──────────────────
+        if (other.GetComponent<ShieldSphereCollider>() != null)
+        {
+            // Bypass veya kalkan pasifse geçir — gövde collider'ına ulaşsın
+            if (bypassShields) return;
+            if (!ShieldGeneratorComponent.AnyShieldActive()) return;
+
+            var ship = other.GetComponentInParent<PlayerShip>();
+            if (ship == null) return;
+
+            ShieldEffect.Spawn(transform.position, ship.transform.position);
+            ship.TakeDamage(damage, bypassShields: false);
+            _hitHandled = true;
+            Destroy(gameObject);
+            return;
+        }
 
         if (other.CompareTag("Player"))
         {
             var ship = other.GetComponent<PlayerShip>();
             if (ship == null) return;
+
+            // Kalkan aktifse ve bypass yoksa efekt göster
+            // (gövde box'u kalkan küresini kaçıran mermiler için de güvence)
+            if (!bypassShields && ShieldGeneratorComponent.AnyShieldActive())
+                ShieldEffect.Spawn(transform.position, ship.transform.position);
+
             ship.TakeDamage(damage, bypassShields);
             Vector2 surfaceNormal = ((Vector2)transform.position - (Vector2)other.transform.position).normalized;
             HitEffect.SpawnSparks(transform.position, _dir, surfaceNormal);
+            _hitHandled = true;
             Destroy(gameObject);
             return;
         }
 
         var collector = other.GetComponent<CollectorShip>();
-        if (collector != null) { collector.TakeDamage(damage); Destroy(gameObject); return; }
+        if (collector != null) { collector.TakeDamage(damage); _hitHandled = true; Destroy(gameObject); return; }
 
         var fighter = other.GetComponent<FighterShip>();
-        if (fighter != null) { fighter.TakeDamage(damage); Destroy(gameObject); }
+        if (fighter != null) { fighter.TakeDamage(damage); _hitHandled = true; Destroy(gameObject); }
     }
 }

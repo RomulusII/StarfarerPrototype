@@ -76,7 +76,7 @@ public class EnemyTypeData : ScriptableObject
         d.bodyColor     = new Color(0.9f, 0.20f, 0.20f);
         d.barrelColor   = new Color(0.7f, 0.15f, 0.15f);
         d.movementKind  = EnemyMovementKind.Strafe;
-        d.engageRange   = 6f;   d.fireRange     = 4f;
+        d.engageRange   = 7f;   d.fireRange     = 6.5f;
         d.orbitRadius   = 3.5f; d.engageDuration = 4f;
         d.weaponKind    = EnemyWeaponKind.Kinetic;
         d.fireDamage    = 3f;   d.fireRate      = 5f;   d.bulletSpeed = 6f;

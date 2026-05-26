@@ -2,88 +2,98 @@ using UnityEngine;
 
 /// <summary>
 /// Küresel kalkan üreten gemi komponenti.
-/// Birden fazla örneklenebilir; her biri kendi kalkan havuzunu yönetir.
+///
+/// Yeni davranış:
+///   — Kalkan gecikme olmadan sürekli şarj olur.
+///   — Tamamen boşaldığında currentShield = DepletionPenalty (-10) olarak ayarlanır;
+///     ReactivationThreshold (+10) değerine ulaşana kadar hasar emme işlevsizdir.
+///   — +10'a ulaşınca genişleme animasyonu oynar; animasyon bitince kalkan yeniden aktif olur.
 /// </summary>
 public class ShieldGeneratorComponent : ShipComponentBase
 {
-    public float maxShield        = 0f;
+    public float maxShield          = 0f;
     public float currentShield;
-    public float rechargeRate     = 1.5f;
+    public float rechargeRate       = 1.5f;
     public float rechargeEnergyCost = 5f;
 
-    [SerializeField] float shieldRechargeDelay          = 5f;
-    [SerializeField] private float rechargeDelayAfterDepletion = 10f;
+    const float DepletionPenalty      = -10f;
+    const float ReactivationThreshold =  10f;
 
-    float _timeSinceLastDamage;
-    private bool  _isDepleted    = false;
-    private float _depletedTimer = 0f;
+    bool _reactivating;
 
-    public bool IsShieldFull => currentShield >= maxShield;
+    /// <summary>Kalkana mermi emebilir durumda mı?</summary>
+    public bool IsShieldActive => IsOperational && currentShield > 0f && !_reactivating;
+
+    public bool IsShieldFull
+    {
+        get
+        {
+            float effectiveMax = maxShield * GetMultiplier("maxShield");
+            return currentShield >= effectiveMax;
+        }
+    }
 
     protected override void Awake()
     {
         base.Awake();
-        componentName        = "Shield Generator";
-        energyConsumption    = 0f;
-        currentShield        = maxShield;
-        _timeSinceLastDamage = shieldRechargeDelay; // ready to recharge from start
+        componentName     = "Shield Generator";
+        energyConsumption = 0f;
+        currentShield     = maxShield;
     }
 
     void Update()
     {
-        _timeSinceLastDamage += Time.deltaTime;
-
-        // Flag cleanup: şarj başlayıp currentShield > 0 olduktan sonra flag'i temizle
-        if (_isDepleted && currentShield > 0f)
-            _isDepleted = false;
-
-        // Yeni depletion tespiti: kalkan az önce 0'a düştü
-        if (!_isDepleted && currentShield <= 0f)
-        {
-            _isDepleted    = true;
-            _depletedTimer = 0f;
-        }
-
-        // Depletion timer'ı ilerlet
-        if (_isDepleted)
-            _depletedTimer += Time.deltaTime;
-
         if (!IsOperational) return;
-
-        // Silah boost aktifken kalkan şarjı durur
         if (BoostController.Mode == BoostMode.Weapon) return;
-
-        if (_timeSinceLastDamage < shieldRechargeDelay) return;
-        if (_isDepleted && _depletedTimer < rechargeDelayAfterDepletion) return;
+        if (IsShieldFull) return;
 
         float rechargeMulti = BoostController.Mode == BoostMode.Shield ? 3f : 1f;
         float energyMulti   = BoostController.Mode == BoostMode.Shield ? 5f : 1f;
 
-        float effectiveRate      = rechargeRate * rechargeMulti * GetMultiplier("rechargeRate");
-        float effectiveMaxShield = maxShield * GetMultiplier("maxShield");
-        if (IsShieldFull) return;
+        float effectiveRate = rechargeRate * rechargeMulti * GetMultiplier("rechargeRate");
+        float effectiveMax  = maxShield    * GetMultiplier("maxShield");
 
         if (EnergyBus.Instance != null &&
             EnergyBus.Instance.RequestEnergy(rechargeEnergyCost * energyMulti * Time.deltaTime))
         {
-            currentShield = Mathf.Min(currentShield + effectiveRate * Time.deltaTime, effectiveMaxShield);
+            float prev    = currentShield;
+            currentShield = Mathf.Min(currentShield + effectiveRate * Time.deltaTime, effectiveMax);
+
+            // Yeniden aktivasyon eşiğini ilk kez geçtiyse animasyonu başlat
+            if (!_reactivating && prev < ReactivationThreshold && currentShield >= ReactivationThreshold)
+            {
+                currentShield = ReactivationThreshold;
+                TriggerReactivation();
+            }
         }
     }
 
-    /// <summary>
-    /// Hasar alındığında çağrılır; her iki bekleme sayacını da sıfırlar.
-    /// </summary>
-    public void NotifyDamageTaken()
+    void TriggerDepletion()
     {
-        _timeSinceLastDamage = 0f;
-        _depletedTimer       = 0f;
+        var ship   = GetComponentInParent<PlayerShip>();
+        var center = ship != null ? (Vector2)ship.transform.position : (Vector2)transform.position;
+        ShieldBubbleEffect.SpawnCollapse(center, ShieldEffect.ShieldRadius);
     }
 
-    /// <summary>
-    /// Gelen hasarı kalkana emer. Kalkandan geçen hasarı döner.
-    /// </summary>
+    void TriggerReactivation()
+    {
+        _reactivating = true;
+        var ship   = GetComponentInParent<PlayerShip>();
+        var center = ship != null ? (Vector2)ship.transform.position : (Vector2)transform.position;
+        ShieldBubbleEffect.SpawnExpand(center, ShieldEffect.ShieldRadius, () =>
+        {
+            if (this == null) return; // nesne yok edildiyse güvenli çıkış
+            _reactivating = false;
+        });
+    }
+
+    // ── Hasar emme ────────────────────────────────────────────────────────────
+
+    /// <summary>Gelen hasarı emer; kalkandan geçen miktarı döner.</summary>
     public float AbsorbDamage(float incomingDamage)
     {
+        if (!IsShieldActive) return incomingDamage;
+
         if (currentShield >= incomingDamage)
         {
             currentShield -= incomingDamage;
@@ -91,24 +101,33 @@ public class ShieldGeneratorComponent : ShipComponentBase
         }
 
         float remaining = incomingDamage - currentShield;
-        currentShield = 0f;
+        currentShield = DepletionPenalty;
+        TriggerDepletion();
         return remaining;
     }
 
-    /// <summary>
-    /// Sahnedeki tüm aktif ShieldGeneratorComponent'lerin currentShield toplamı.
-    /// </summary>
+    /// <summary>Uyumluluk için korundu — yeni sistemde gecikme sayacı yok.</summary>
+    public void NotifyDamageTaken() { }
+
+    // ── Statik yardımcılar ────────────────────────────────────────────────────
+
+    /// <summary>Sahnede hasar emebilir aktif kalkan var mı?</summary>
+    public static bool AnyShieldActive()
+    {
+        foreach (var sg in FindObjectsByType<ShieldGeneratorComponent>(FindObjectsSortMode.None))
+            if (sg.IsShieldActive) return true;
+        return false;
+    }
+
+    /// <summary>Tüm kalkanların toplam currentShield değeri (0 veya üzeri olarak kırpılır).</summary>
     public static float GetTotalShield()
     {
         float total = 0f;
         foreach (var sg in FindObjectsByType<ShieldGeneratorComponent>(FindObjectsSortMode.None))
-            total += sg.currentShield;
+            total += Mathf.Max(0f, sg.currentShield);
         return total;
     }
 
-    /// <summary>
-    /// Sahnedeki tüm aktif ShieldGeneratorComponent'lerin maxShield toplamı.
-    /// </summary>
     public static float GetTotalMaxShield()
     {
         float total = 0f;
@@ -117,10 +136,7 @@ public class ShieldGeneratorComponent : ShipComponentBase
         return total;
     }
 
-    /// <summary>
-    /// Gelen hasarı sahnedeki tüm kalkan generatörlerine sırayla dağıtır.
-    /// Kalkandan geçen toplam hasarı döner.
-    /// </summary>
+    /// <summary>Gelen hasarı tüm aktif kalkan generatörlerine sırayla dağıtır.</summary>
     public static float AbsorbDamageAll(float incomingDamage)
     {
         var generators = FindObjectsByType<ShieldGeneratorComponent>(FindObjectsSortMode.None);
