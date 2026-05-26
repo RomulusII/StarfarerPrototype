@@ -147,12 +147,13 @@ public class EnemyTypeData : ScriptableObject
         d.displayName   = "Bomber";
         d.role          = EnemyRole.Flank;
         d.threatScore   = 10;
-        d.maxHP         = 40f;
+        d.maxHP         = 10f;
         d.mass          = 2f;   d.enginePower   = 7f;
         d.contactDamage = 0f;
-        d.bodyWidth     = 52;   d.bodyHeight    = 52;   d.sizeOrder = 6;
+        d.bodyWidth     = 44;   d.bodyHeight    = 12;   d.sizeOrder = 6;
         d.bodyColor     = new Color(0.9f, 0.50f, 0.10f);
-        d.movementKind  = EnemyMovementKind.Approach;
+        d.movementKind  = EnemyMovementKind.AttackRun;
+        d.engageRange   = 8f;   d.fireRange     = 0.8f;
         d.weaponKind    = EnemyWeaponKind.ComponentBurst;
         d.fireDamage    = 2f;   d.fireRate      = 1.8f; d.bulletSpeed = 2.25f;
         return d;

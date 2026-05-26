@@ -53,6 +53,14 @@ public class EnemyBot : MonoBehaviour
     float       _bombRunFireTimer;
     const float BombRunSpeed = 1.5f;
 
+    // AttackRun state — kendi fiziği, ShipMovement bypass
+    float   _arFacingAngle;
+    Vector2 _arVelocity;
+    const float ArTurnSpeed = 90f;   // derece/sn
+    const float ArMaxSpeed  = 5f;
+    const float ArThrust    = 8f;    // ivme (birim/sn²)
+    const float ArFireAngle = 20f;   // hedeften bu kadar sapmayla ateş edebilir
+
     // Velocity tracking
     Vector2        _prevPos;
     public Vector2 Velocity { get; private set; }
@@ -94,11 +102,14 @@ public class EnemyBot : MonoBehaviour
         bool needsBarrel = data.weaponKind != EnemyWeaponKind.None
                         && data.weaponKind != EnemyWeaponKind.ComponentBurst
                         && data.movementKind != EnemyMovementKind.Approach
-                        && data.movementKind != EnemyMovementKind.BombRun;
+                        && data.movementKind != EnemyMovementKind.BombRun
+                        && data.movementKind != EnemyMovementKind.AttackRun;
         if (needsBarrel)
             BuildBarrel(data.barrelColor);
 
-        _movement.Initialize(180f);
+        // AttackRun kendi rotasyonunu yönetir — ShipMovement Initialize atlanır
+        if (data.movementKind != EnemyMovementKind.AttackRun)
+            _movement.Initialize(180f);
     }
 
     void ApplyStats()
@@ -160,6 +171,15 @@ public class EnemyBot : MonoBehaviour
             case EnemyMovementKind.BombRun:
                 _bombRunFireTimer = _fireRateBase * 0.5f;
                 break;
+
+            case EnemyMovementKind.AttackRun:
+                // Başlangıç yönü: oyuncu gemisine doğru (spawn pozisyonundan hesaplanır)
+                Vector2 initDir = _playerShip != null
+                    ? ((Vector2)_playerShip.transform.position - (Vector2)transform.position).normalized
+                    : Vector2.left;
+                _arFacingAngle = Mathf.Atan2(initDir.y, initDir.x) * Mathf.Rad2Deg;
+                _arVelocity    = Vector2.zero;
+                break;
         }
     }
 
@@ -194,6 +214,12 @@ public class EnemyBot : MonoBehaviour
         if (data.movementKind == EnemyMovementKind.BombRun)
         {
             UpdateBombRun();
+            return;
+        }
+
+        if (data.movementKind == EnemyMovementKind.AttackRun)
+        {
+            UpdateAttackRun();
             return;
         }
 
@@ -289,6 +315,45 @@ public class EnemyBot : MonoBehaviour
         }
 
         if (transform.position.x < -15f) Destroy(gameObject);
+    }
+
+    void UpdateAttackRun()
+    {
+        if (_playerShip == null) { Destroy(gameObject); return; }
+
+        Vector2 toTarget  = (Vector2)_playerShip.transform.position - (Vector2)transform.position;
+        float   dist      = toTarget.magnitude;
+        float   tgtAngle  = Mathf.Atan2(toTarget.y, toTarget.x) * Mathf.Rad2Deg;
+
+        // Hedefe doğru dön
+        _arFacingAngle = Mathf.MoveTowardsAngle(_arFacingAngle, tgtAngle, ArTurnSpeed * Time.deltaTime);
+
+        // Hız vektörünü gemi yönüyle hizala — yan kayma yok
+        float   rad    = _arFacingAngle * Mathf.Deg2Rad;
+        Vector2 facing = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
+        float   spd    = _arVelocity.magnitude;
+        if (spd > 0.01f) _arVelocity = facing * spd;
+
+        // Baktığı yönde it
+        _arVelocity += facing * ArThrust * Time.deltaTime;
+
+        if (_arVelocity.magnitude > ArMaxSpeed)
+            _arVelocity = _arVelocity.normalized * ArMaxSpeed;
+
+        transform.position += (Vector3)(_arVelocity * Time.deltaTime);
+        transform.rotation  = Quaternion.Euler(0f, 0f, _arFacingAngle);
+
+        // Yeterince yakın VE hizalıysa ateş et
+        float angleDiff = Mathf.Abs(Mathf.DeltaAngle(_arFacingAngle, tgtAngle));
+        _fireTimer -= Time.deltaTime;
+        if (dist <= data.fireRange && angleDiff <= ArFireAngle && _fireTimer <= 0f)
+        {
+            _fireTimer = _fireRateBase;
+            FireAtComponent();
+        }
+
+        if (Vector2.Distance(transform.position, Vector2.zero) > 30f)
+            Destroy(gameObject);
     }
 
     void DropBomb()
