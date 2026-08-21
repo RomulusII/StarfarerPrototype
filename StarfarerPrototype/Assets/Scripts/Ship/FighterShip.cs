@@ -41,8 +41,11 @@ public class FighterShip : MonoBehaviour
         rb.bodyType     = RigidbodyType2D.Kinematic;
         rb.gravityScale = 0f;
 
-        _movement      = gameObject.AddComponent<ShipMovement>();
-        _movement.mass = Mass;
+        _movement         = gameObject.AddComponent<ShipMovement>();
+        _movement.mass    = Mass;
+        _movement.agility = 1.4f;   // küçük avcı: dar kavis
+        _movement.grip    = 0.94f;
+        _movement.wanderAngle = 12f; // dogfight'ta salınarak uçar
 
         _brain                = gameObject.AddComponent<ShipBrain>();
         _brain.pattern        = CombatPattern.Strafe;

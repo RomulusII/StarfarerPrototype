@@ -46,8 +46,11 @@ public class CollectorShip : MonoBehaviour
         rb.bodyType     = RigidbodyType2D.Kinematic;
         rb.gravityScale = 0f;
 
-        _movement      = gameObject.AddComponent<ShipMovement>();
-        _movement.mass = Mass;
+        _movement         = gameObject.AddComponent<ShipMovement>();
+        _movement.mass    = Mass;
+        _movement.agility = 1.6f;   // iş gemisi: enkaza hassas yanaşabilmeli
+        _movement.grip    = 0.97f;
+        _movement.wanderAngle = 0f;  // kaçamak manevra yok — düz ve verimli gider
     }
 
     public void Init(Transform hangar, float speed, float maxHP, float salvageRate)
@@ -84,7 +87,8 @@ public class CollectorShip : MonoBehaviour
             case Phase.Collecting:
                 if (_target == null || _target.IsEmpty) { _target = null; _phase = Phase.Idle; break; }
                 if (_cargo >= (int)maxCargo)             { _phase = Phase.Returning; break; }
-                // Enkaz ile birlikte sürüklen — ShipMovement bypass, doğrudan pozisyon güncelle
+                // Enkaz ile birlikte sürüklen — motor kapalı, kalan hız sıfırlanır
+                _movement.Halt();
                 transform.position += (Vector3)(_target.Velocity * Time.deltaTime);
                 _accumulator += _target.Collect(salvageRate * Time.deltaTime);
                 while (_accumulator >= 1f)

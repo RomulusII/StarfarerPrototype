@@ -67,6 +67,7 @@ public class BossShip : MonoBehaviour
 
         _movement.mass        = data.mass;
         _movement.enginePower = data.enginePower;
+        _movement.omniThrust  = true;   // taşıyıcı: manevra iticileriyle mevki tutar, kavis çizmez
         _movement.Initialize(180f);
 
         _maxHullHP = data.maxHP;

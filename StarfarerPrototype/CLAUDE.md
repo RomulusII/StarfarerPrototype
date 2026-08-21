@@ -68,6 +68,70 @@ Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 5), Otomatik Turretler, İki
 
 **Gelecek:** Büyük düşman gemilerinin attığı **area-effect bombalar** komponentlere de hasar verebilir (tasarım kararı bekliyor).
 
+### Gemi Hareket Modeli — Tasarım Kararları
+
+Tüm AI gemileri (`EnemyBot`, `FighterShip`, `CollectorShip`) `ShipMovement` üzerindeki
+**roket-itkili uçuş modelini** kullanır. Amaç: gemiler kaymak yerine uçsun.
+
+**Kurallar:**
+
+1. **İtki yalnız burun doğrultusunda.** Gemi yana doğru hızlanamaz — arkasında roket
+   varmış gibi kuyruktan buruna doğru ivmelenir.
+2. **Dönüş hızı ankı hıza bağlıdır.** Dururken kendi ekseninde dönebilir, tam hızda
+   yavaş döner. Kavis yarıçapı = hız / dönüş hızı → hızlıyken geniş çember,
+   yavaşken dar çember.
+3. **Hareket vektörü burnu takip eder** (`grip`). Klasik fizikte böyle olmaz; bilinçli
+   bir tercihtir, uzay gemisi hissini doğal kılar. `grip < 1` ise kavislerde dışa
+   savrulma kalır. Dönmek hız kaybettirmez — sadece yön değiştirir.
+4. **Kalan yanal kayma sönümlenir**, drift her zaman toparlanır.
+5. **Burun saptıkça gaz kesilir** (90°+ sapmada tamamen). 70°'den sonra retro devreye
+   girer. Gemi önce yavaşlar, döner, sonra ivmelenir — U dönüşü bir manevradır.
+6. **Varışta fren.** `MoveToward` fren mesafesini v²/(2a) ile hesaplar. Hedef geminin
+   kavis çemberinin içinde kalıyorsa (`IsInsideTurnCircle`) dönerek ulaşılamaz —
+   gemi yavaşlar, kavis daralır, hedef erişilebilir olur. Bu olmadan ağır gemiler
+   hedefin etrafında sonsuz çember çizer.
+7. **Komut Update'te, entegrasyon LateUpdate'te.** Aynı karede çift ilerleme olmaz.
+   Komut verilmeyen kare = süzülme (coast).
+8. **Nişan alırken net, diğer zamanlarda kaçamak.** Ateş menzilindeyken gemi burnunu
+   hedefe net çevirir. Diğer tüm anlarda burun 1–2 saniyede bir yenilenen küçük
+   rastgele açılarla salınır (`evasive: true`). Sapma anî değildir, yeni hedefine
+   süzülür — rota da burnu takip ettiği için gemi yılankavi bir iz çizer.
+9. **Kaçış radyal değil çapraz.** Hedeften tam ters yönde kaçmak tahmin edilebilir
+   ve nişan almayı kolaylaştırır. Kaçış yönü, uzaklaşma vektörünün 25–55° sağa veya
+   sola döndürülmüş hâlidir; üstüne kaçamak salınım biner.
+
+**Uçuş karakteri parametreleri** (`EnemyTypeData` içinde, tip başına):
+
+| Tip | agility | grip | evasionAngle | Karakter |
+|-----|---------|------|--------------|----------|
+| Swarm | 1.5 | 0.95 | 18° | Küçük, kıvrak — dar kavis, en oynak uçuş |
+| Shield | 0.85 | 0.85 | 12° | Orta sınıf, dengeli |
+| Armored | 0.55 | 0.72 | 6° | Hantal — geniş kavis, rotasını korur |
+| Bomber | 1.15 | 0.93 | 15° | Hızlı avcı — dalışta geniş, frende dar kavis |
+| BombRunner | 0.6 | 0.8 | 0° | Düz hat bomba koşusu — salınım yok |
+| Fighter (oyuncu) | 1.4 | 0.94 | 12° | Kıvrak avcı |
+| Collector (oyuncu) | 1.6 | 0.97 | 0° | İş gemisi — düz ve verimli gider |
+
+`evasionAngle` burnun nişan dışı anlardaki max rastgele sapmasıdır. Ölçülen etki:
+Swarm'da ~30° burun genliği ve 29 birimlik yolda ~1.6 birim yanal salınım.
+
+`agility` dönüş hızı çarpanıdır, kavis yarıçapı ile ters orantılıdır.
+Referans dönüş hızı = `enginePower / mass × 30 × agility` derece/sn.
+
+**İstisna — `omniThrust`:** Boss/taşıyıcı gibi devasa gemiler manevra iticileriyle
+her yöne itebilir, burun yönü hareketten bağımsızdır. Bu gemiler kavis çizmez,
+mevki tutar. 1–5, 8 ve 9 numaralı kurallar onlar için geçerli değildir.
+
+**Taktik AI (`ShipBrain`) ile ilişki:** Brain'in verdiği her yön komutu artık
+"burnunu şuraya çevir ve it" anlamına gelir, anlık hız değişimi değil. Bu yüzden
+`Orbit` yörünge yarıçapı `MinTurnRadius`'un altına inemez, `HoverFire` geri
+çekilirken 180° dönmek yerine burnu hedefte tutup retro ile uzaklaşır.
+
+Kaçamak manevra kararı da Brain'e aittir: `Approaching` ve `Disengaging` her zaman
+kaçamaklıdır, `Engaging` sırasında ise yalnızca ateş menzili dışındayken. Bomber'ın
+`AttackRun`'ında salınım, hedefe `fireRange × 2` mesafesine girene kadar açıktır —
+nişan hattına girdikten sonra kesilir.
+
 ### Komponent HP Sistemi — Tasarım Kararları
 - Her komponent kendi `currentHP / maxHP`'sini `ShipComponentBase`'de tutar
 - Oyuncu komponentlerin HP'sini göremez (UI şimdilik yok; ileride eklenebilir)
@@ -142,6 +206,8 @@ Slot'a kurulunca otomatik ateş açar, oyuncu müdahalesi gerekmez. Enerji tüke
 | WeaponController.cs | Kinetic/Laser/Plasma ateş mantığı, Boost çarpanları |
 | Bullet.cs | Oyuncu mermisi — hareket, trigger collision, 3sn sonra yok |
 | EnemyBot.cs | Swarm/Armored/Shield/Bomber — hareket, ateş, hasar direnci, Bomber state machine |
+| ShipMovement.cs | Roket-itkili uçuş modeli — burun itkisi, hıza bağlı dönüş, grip, fren |
+| ShipBrain.cs | Taktik AI — Orbit/Strafe/HoverFire pattern'ları, ShipMovement'e komut verir |
 | EnemyBullet.cs | Düşman mermisi — hull modu (kalkan üzerinden) veya komponent modu (doğrudan) |
 | EnemySpawner.cs | Ağırlıklı rastgele tip seçimi ile düşman spawn eder |
 | StarField.cs | 400 yıldız, -15/+15 birim arası random pozisyon |
