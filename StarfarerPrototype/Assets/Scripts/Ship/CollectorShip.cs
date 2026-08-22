@@ -6,8 +6,12 @@ using UnityEngine;
 ///
 /// Kurallar:
 ///   - Enkaz hangardan MaxDebrisRange'den uzaksa hedef almaz / bırakır.
-///   - Kargo dolunca Returning'e geçer, hangara varınca boşaltır.
+///   - Tip ayrımı yapmaz: ne bulursa toplar. Kargo tipe göre ayrı sayılır ama
+///     kapasite toplam üzerinden işler; hangara varınca hepsi birden boşaltılır.
+///   - Kargo dolunca Returning'e geçer.
 ///   - Kapasite dolmamışsa aynı seferde birden fazla enkaz toplayabilir.
+///   - Toplanacak enkaz kalmadıysa ve kargoda bir şey varsa boşta beklemez —
+///     ana gemiye dönüp kargoyu boşaltır.
 /// </summary>
 public class CollectorShip : MonoBehaviour
 {
@@ -26,16 +30,22 @@ public class CollectorShip : MonoBehaviour
         (_phase == Phase.GoToDebris || _phase == Phase.Collecting) ? _target : null;
     Transform    _hangar;
     ShipMovement _movement;
-    int          _cargo;        // tam birim kargo
-    float        _accumulator;  // kesirli birikim
     float        _hoverPhase;
+
+    // Kargo tip başına ayrı tutulur; kapasite toplam üzerinden kontrol edilir
+    static readonly int TypeCount = System.Enum.GetValues(typeof(ResourceType)).Length;
+    int[]   _cargo;         // tip başına tam birim kargo
+    float[] _accumulator;   // tip başına kesirli birikim
+    int     _cargoTotal;    // tüm tiplerin toplamı — kapasite bunun üzerinden
 
     const float Mass          = 1.5f;
     const float MaxDebrisRange = 12f;   // hangardan max enkaz takip mesafesi
 
     void Awake()
     {
-        _hoverPhase = Random.Range(0f, Mathf.PI * 2f);
+        _hoverPhase  = Random.Range(0f, Mathf.PI * 2f);
+        _cargo       = new int[TypeCount];
+        _accumulator = new float[TypeCount];
         BuildVisual();
 
         var col       = gameObject.AddComponent<CircleCollider2D>();
@@ -70,9 +80,10 @@ public class CollectorShip : MonoBehaviour
         switch (_phase)
         {
             case Phase.Idle:
-                if (_cargo >= (int)maxCargo) { _phase = Phase.Returning; break; }
+                if (_cargoTotal >= (int)maxCargo) { _phase = Phase.Returning; break; }
                 var d = FindClosestDebris();
                 if (d != null) { _target = d; _phase = Phase.GoToDebris; }
+                else if (_cargoTotal > 0) _phase = Phase.Returning; // toplanacak yok → boşalt
                 else HoverNearHangar();
                 break;
 
@@ -86,17 +97,20 @@ public class CollectorShip : MonoBehaviour
 
             case Phase.Collecting:
                 if (_target == null || _target.IsEmpty) { _target = null; _phase = Phase.Idle; break; }
-                if (_cargo >= (int)maxCargo)             { _phase = Phase.Returning; break; }
+                if (_cargoTotal >= (int)maxCargo)        { _phase = Phase.Returning; break; }
                 // Enkaz ile birlikte sürüklen — motor kapalı, kalan hız sıfırlanır
                 _movement.Halt();
                 transform.position += (Vector3)(_target.Velocity * Time.deltaTime);
-                _accumulator += _target.Collect(salvageRate * Time.deltaTime);
-                while (_accumulator >= 1f)
+
+                int ti = (int)_target.resourceType;
+                _accumulator[ti] += _target.Collect(salvageRate * Time.deltaTime);
+                while (_accumulator[ti] >= 1f)
                 {
-                    _cargo++;
-                    _accumulator -= 1f;
+                    _accumulator[ti] -= 1f;
+                    _cargo[ti]++;
+                    _cargoTotal++;
                 }
-                if (_cargo >= (int)maxCargo) _phase = Phase.Returning;
+                if (_cargoTotal >= (int)maxCargo) _phase = Phase.Returning;
                 break;
 
             case Phase.Returning:
@@ -104,13 +118,24 @@ public class CollectorShip : MonoBehaviour
                 _movement.MoveToward(_hangar.position);
                 if (Vector2.Distance(transform.position, _hangar.position) < 0.6f)
                 {
-                    ResourceInventory.Instance?.Add(ResourceType.RawMaterial, _cargo);
-                    _cargo       = 0;
-                    _accumulator = 0f;
-                    _phase       = Phase.Idle;
+                    UnloadCargo();
+                    _phase = Phase.Idle;
                 }
                 break;
         }
+    }
+
+    /// <summary>Her kaynak tipini kendi envanterine boşaltır.</summary>
+    void UnloadCargo()
+    {
+        for (int i = 0; i < _cargo.Length; i++)
+        {
+            if (_cargo[i] > 0)
+                ResourceInventory.Instance?.Add((ResourceType)i, _cargo[i]);
+            _cargo[i]       = 0;
+            _accumulator[i] = 0f;
+        }
+        _cargoTotal = 0;
     }
 
     bool DebrisTooFar(Debris d)

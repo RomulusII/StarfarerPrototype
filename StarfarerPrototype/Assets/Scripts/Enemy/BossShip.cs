@@ -45,6 +45,9 @@ public class BossShip : MonoBehaviour
     float _droneSpawnTimer;
     bool  _dead;
 
+    // Kalkan kapasitesinin kaçta kaçı kristal olarak düşer — EnemyBot ile aynı kural
+    const float CrystalPerShieldPoint = 0.1f;
+
     // Hareket
     float _targetY;
     float _yChangeTimer;
@@ -379,12 +382,34 @@ public class BossShip : MonoBehaviour
             go.transform.position = transform.position
                 + (Vector3)Random.insideUnitCircle * (data.bodyWidth / 100f * 0.6f);
             var d = go.AddComponent<Debris>();
-            d.Init(Random.insideUnitCircle.normalized * Random.Range(0.5f, 2f),
+            d.Init(Random.insideUnitCircle.normalized * Random.Range(0.4f, 1.2f),
                    Random.Range(8f, 20f));
             yield return new WaitForSeconds(0.18f);
         }
 
+        DropCrystals();
         Destroy(gameObject);
+    }
+
+    /// <summary>
+    /// Kalkanlı gemilerle aynı kural: kalkan kapasitesinin bir kısmı kristal olarak düşer.
+    /// Miktar dengelenmedi — şimdilik kural tutarlı olsun diye aynı katsayı kullanılıyor.
+    /// </summary>
+    void DropCrystals()
+    {
+        float total = _maxShieldHP * CrystalPerShieldPoint;
+        if (total < 1f) return;
+
+        int pieces = Random.Range(2, 4);
+        for (int i = 0; i < pieces; i++)
+        {
+            var go = new GameObject("Debris_Crystal");
+            go.transform.position = transform.position
+                + (Vector3)Random.insideUnitCircle * (data.bodyWidth / 100f * 0.4f);
+            go.AddComponent<Debris>().Init(
+                Random.insideUnitCircle.normalized * Random.Range(0.3f, 0.9f),
+                total / pieces, ResourceType.EnergyCrystal);
+        }
     }
 
     void OnTriggerEnter2D(Collider2D other)

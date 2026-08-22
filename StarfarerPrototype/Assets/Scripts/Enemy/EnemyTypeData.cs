@@ -157,7 +157,6 @@ public class EnemyTypeData : ScriptableObject
         d.escapeAngle   = 40f;
         d.weaponKind    = EnemyWeaponKind.Laser;
         d.fireDamage    = 6f;   d.fireRate      = 3f;   d.bulletSpeed = 3.5f;
-        d.debrisResourceType = ResourceType.EnergyCrystal;
         d.shieldResistances = new[]
         {
             new DamageModifier { weaponType = WeaponType.Kinetic, multiplier = 1.5f  },

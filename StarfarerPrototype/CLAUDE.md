@@ -68,6 +68,79 @@ Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 5), Otomatik Turretler, İki
 
 **Gelecek:** Büyük düşman gemilerinin attığı **area-effect bombalar** komponentlere de hasar verebilir (tasarım kararı bekliyor).
 
+### Kaynak Ekonomisi — Tasarım Kararları
+
+**İki kaynak:** Ham madde (metal) fiziksel sistemler için, Enerji kristali enerji
+sistemleri için.
+
+**Toplama zinciri:** Düşman/asteroit yok olur → `Debris` düşer → `CollectorShip`
+toplar → hangara döner → `ResourceInventory`'ye boşaltır.
+
+**Enkaz (`Debris`) kuralları:**
+- Kısa bir sürüklenmeden sonra **durur** (Drag = 0.9). Sahadan kaçıp gitmez, toplayıcının
+  yetişebileceği yerde kalır.
+- Tipe göre renklenir: ham madde kahverengi, kristal **mavimsi gri**.
+- Ömrü 180 sn. Son 60 saniyede kademeli olarak %30 saydamlığa solar, son 10 saniyede
+  yanıp söner. Sürüklenme durduğu için bu sayaç artık gerçekten işliyor —
+  eskiden enkaz zaten çoktan ekran dışına kaymış oluyordu.
+
+**Toplayıcı kuralları:**
+- Tip ayrımı yapmaz, ne bulursa toplar. Kargo tip başına ayrı sayılır (`_cargo[]`),
+  kapasite toplam üzerinden işler, hangarda hepsi kendi envanterine boşaltılır.
+- Toplanacak enkaz kalmadıysa ve kargoda bir şey varsa boşta beklemez — ana gemiye
+  dönüp boşaltır. Sadece kargo boşken hangar etrafında bekler.
+- Enkaz 180 saniye sonra kaybolur; toplanamayan kaynak yanar.
+
+**Kristal kaynakları:**
+
+| Kaynak | Kristal | Not |
+|--------|---------|-----|
+| Kalkanlı düşman | `maxShield × 0.1` | Kalkan teknolojisi kristal tabanlı. Bölüm HP çarpanı kalkanı da büyüttüğü için getiri bölümle artar. |
+| Asteroit (tam parçalanmış büyük) | ~3.7 | `Asteroid.CrystalChance` = %12, küçük parça başına 5 birim |
+| Boss (komuta gemisi) | `maxShield × 0.1` ≈ 30 | Kalkanlı gemiyle aynı kural, 2–3 parçaya bölünür. Miktar henüz dengelenmedi. |
+
+Kalkanlı düşman ≈ 4 kristal (bölüm 5'te), ≈ 7 kristal (bölüm 9'da). Büyük asteroit
+kabaca bir kalkanlı düşmana denk — ama 205 HP'ye karşılık, yani HP başına daha az
+verimli (0.030 vs 0.044). Asteroit pasif/opsiyonel kaynak olarak tasarlandı.
+
+**Kristal talebi şimdilik arzın altında** (canlı katalogda kristal isteyen tek şey lazer
+zinciri: oyun boyu 80). Bilinçli olarak ertelendi — ileride eklenecek yetenekler kristal
+harcayacak ve fazlalık orada erirken denge kurulacak. Erken müdahale edilmeyecek.
+
+**Metal sıfırdan başlar.** `ResourceInventory.metal = 0`. Önceki 500 değeri test içindi.
+
+### Asteroitler — Tasarım Kararları
+
+`Asteroid` düşman değildir; ateş edilmezse sürüklenip gemiye çarpar.
+
+- Üç boyut: **Large → Medium → Small**. Her boyut yok edilince 2–3 parçaya bölünür.
+- **Hız iki bileşenlidir:** `_drift` (sürüklenme, korunur) + `_separation` (ayrılma itmesi,
+  sönümlenir). Parça, ana parçanın sürüklenmesinin %50'sini miras alır ve küçük bir
+  ayrılma itmesi alır; itme ~0.5 sn'de söner. Sonuç: parçalar dağılıp uzaklaşmaz,
+  ana parçanın yanıbaşında kümelenir.
+- **HP barı var** — düşmanlarla aynı `HealthBar`. HP tamken görünmez, hasar alınca çıkar.
+- **Silah dirençleri:** kinetik **×2.0**, lazer **×0.25**, plazma nötr. Kayaya karşı
+  raylı top; lazer neredeyse işe yaramaz.
+- Yalnızca **Small** enkaz bırakır. Büyük parçalar sadece bölünür — kaynak için
+  zinciri sonuna kadar götürmek gerekir.
+- Gemiye çarparsa hasar verir ve **dağılır** (bölünmez, kaynak bırakmaz). Kalkan
+  aktifse kalkanda dağılır, değilse gövdeye vurur.
+- Hasar `DamageUtil` üzerinden gelir; tüm silahlar ve turretler otomatik işler.
+
+| Boyut | HP | Sprite | Çarpma hasarı | Ölünce |
+|-------|-----|--------|---------------|--------|
+| Large | 60 | 68px | 30 | 2–3 Medium |
+| Medium | 28 | 40px | 18 | 2–3 Small |
+| Small | 12 | 22px | 8 | 1 enkaz (5 birim) |
+
+Bir büyük asteroidin tam zinciri: **205 HP → ~6.2 küçük parça → ~25 metal + ~3.7 kristal**.
+Bu HP kinetik ile ~103'e düşer, lazer ile ~820'ye çıkar.
+
+**Spawn:** `ChapterManager.UpdateAsteroidField()` bölümün `asteroidCount` yoğunluğunu
+korur — sayım parçaları da kapsar, yani bölünen bir asteroit alanı doldurur.
+Asteroitler wave ilerlemesini engellemez (`UpdateWaitClear` onları saymaz).
+Yoğunluk `ChapterData.AsteroidsForChapter()`: bölüm 1–2 → 2, 3–6 → 3, 7+ → 4.
+
 ### Gemi Hareket Modeli — Tasarım Kararları
 
 Tüm AI gemileri (`EnemyBot`, `FighterShip`, `CollectorShip`) `ShipMovement` üzerindeki
@@ -97,23 +170,37 @@ Tüm AI gemileri (`EnemyBot`, `FighterShip`, `CollectorShip`) `ShipMovement` üz
    rastgele açılarla salınır (`evasive: true`). Sapma anî değildir, yeni hedefine
    süzülür — rota da burnu takip ettiği için gemi yılankavi bir iz çizer.
 9. **Kaçış radyal değil çapraz.** Hedeften tam ters yönde kaçmak tahmin edilebilir
-   ve nişan almayı kolaylaştırır. Kaçış yönü, uzaklaşma vektörünün 25–55° sağa veya
-   sola döndürülmüş hâlidir; üstüne kaçamak salınım biner.
+   ve nişan almayı kolaylaştırır. Kaçış yönü, uzaklaşma vektörünün `escapeAngle`
+   kadar (±%40 dağılımla) sağa veya sola döndürülmüş hâlidir; üstüne kaçamak
+   salınım biner.
+10. **Kaçamak davranış bölüme göre ölçeklenir.** `ChapterData.enemyEvasionMultiplier`
+   hem `evasionAngle` hem `escapeAngle` değerlerini çarpar; `ChapterManager`
+   düşmanın runtime kopyasına uygular — `enemyHpMultiplier` ile aynı mekanizma.
 
 **Uçuş karakteri parametreleri** (`EnemyTypeData` içinde, tip başına):
 
-| Tip | agility | grip | evasionAngle | Karakter |
-|-----|---------|------|--------------|----------|
-| Swarm | 1.5 | 0.95 | 18° | Küçük, kıvrak — dar kavis, en oynak uçuş |
-| Shield | 0.85 | 0.85 | 12° | Orta sınıf, dengeli |
-| Armored | 0.55 | 0.72 | 6° | Hantal — geniş kavis, rotasını korur |
-| Bomber | 1.15 | 0.93 | 15° | Hızlı avcı — dalışta geniş, frende dar kavis |
-| BombRunner | 0.6 | 0.8 | 0° | Düz hat bomba koşusu — salınım yok |
-| Fighter (oyuncu) | 1.4 | 0.94 | 12° | Kıvrak avcı |
-| Collector (oyuncu) | 1.6 | 0.97 | 0° | İş gemisi — düz ve verimli gider |
+| Tip | agility | grip | evasionAngle | escapeAngle | Karakter |
+|-----|---------|------|--------------|-------------|----------|
+| Swarm | 1.5 | 0.95 | 18° | 40° | Küçük, kıvrak — dar kavis, en oynak uçuş |
+| Shield | 0.85 | 0.85 | 12° | 40° | Orta sınıf, dengeli |
+| Armored | 0.55 | 0.72 | 6° | 30° | Hantal — geniş kavis, rotasını korur |
+| Bomber | 1.15 | 0.93 | 15° | 40° | Hızlı avcı — dalışta geniş, frende dar kavis |
+| BombRunner | 0.6 | 0.8 | 0° | 0° | Düz hat bomba koşusu — salınım ve kaçış yok |
+| Fighter (oyuncu) | 1.4 | 0.94 | 12° | 40° | Kıvrak avcı |
+| Collector (oyuncu) | 1.6 | 0.97 | 0° | — | İş gemisi — düz ve verimli gider |
 
-`evasionAngle` burnun nişan dışı anlardaki max rastgele sapmasıdır. Ölçülen etki:
-Swarm'da ~30° burun genliği ve 29 birimlik yolda ~1.6 birim yanal salınım.
+`evasionAngle` burnun nişan dışı anlardaki max rastgele sapması, `escapeAngle` ise
+kaçarken radyal yönden sapmasıdır. Tablodaki değerler **tam** seviyedir (bölüm 3+).
+
+**Zorluk eğrisi** — `ChapterData.EvasionForChapter()` = `Mathf.InverseLerp(1f, 8f, bölüm)`.
+1. bölümde kaçamak davranış **tamamen kapalı**, 8. bölümde tam açık, arası doğrusal.
+
+| Bölüm | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8+ |
+|-------|---|---|---|---|---|---|---|----|
+| Çarpan | 0.00 | 0.14 | 0.29 | 0.43 | 0.57 | 0.71 | 0.86 | 1.00 |
+
+Tam açıkken Swarm'da ~27° burun genliği, 29 birimlik yolda ~1.6 birim rota salınımı,
+kaçışta radyal yönden ~26° sapma.
 
 `agility` dönüş hızı çarpanıdır, kavis yarıçapı ile ters orantılıdır.
 Referans dönüş hızı = `enginePower / mass × 30 × agility` derece/sn.
@@ -206,6 +293,8 @@ Slot'a kurulunca otomatik ateş açar, oyuncu müdahalesi gerekmez. Enerji tüke
 | WeaponController.cs | Kinetic/Laser/Plasma ateş mantığı, Boost çarpanları |
 | Bullet.cs | Oyuncu mermisi — hareket, trigger collision, 3sn sonra yok |
 | EnemyBot.cs | Swarm/Armored/Shield/Bomber — hareket, ateş, hasar direnci, Bomber state machine |
+| Asteroid.cs | Parçalanabilir asteroit — Large→Medium→Small, çarpma hasarı, enkaz bırakır |
+| Debris.cs | Enkaz — sürüklenip durur, tipe göre renk, ömür sonunda solup yanıp söner |
 | ShipMovement.cs | Roket-itkili uçuş modeli — burun itkisi, hıza bağlı dönüş, grip, fren |
 | ShipBrain.cs | Taktik AI — Orbit/Strafe/HoverFire pattern'ları, ShipMovement'e komut verir |
 | EnemyBullet.cs | Düşman mermisi — hull modu (kalkan üzerinden) veya komponent modu (doğrudan) |
@@ -271,13 +360,20 @@ float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 - [x] Boost sistemi — Kalkan/Silah boost toggle, BoostHUD, çarpan efektleri
 - [x] Düşman çeşitleri — Swarm/Armored/Shield/Bomber, ateş sistemi, Bomber komponent hedefleme
 - [x] Komponent HP sistemi — Easy deaktivasyon / Normal+Hard yıkım, DifficultyManager
+- [x] Gemi hareket modeli — roket-itkili uçuş, hıza bağlı kavis, grip, kavis-içi hedef freni
+- [x] Kaçamak manevra — nişan dışı burun salınımı + çapraz kaçış, bölüme göre ölçekli
+- [x] Toplayıcı karışık kargo — tip başına sayım, hangarda tipe göre boşaltma
+- [x] Asteroitler — Large→Medium→Small parçalanma, çarpma hasarı, enkaz bırakma
+- [x] Asteroit cilası — HP barı, kinetik ×2 / lazer ×0.25 direnç, parçalar kümelenir
+- [x] Enkaz cilası — sürüklenip durur, kristal mavimsi gri, ömür sonunda solup yanıp söner
+- [x] Boss kristal düşürür; metal sıfırdan başlar; kaçamak eğrisi bölüm 1→8 doğrusal
 
 ---
 
 ## Sıradaki Adımlar (öncelik sırasıyla)
 
 - [x] Otomatik turretler — Gatling/Plazma/Lazer/Roket/Point Defence, slot pozisyonuna kurulur
-- [ ] Toplayıcı gemiler + kaynak toplama sistemi
+- [x] Toplayıcı gemiler + kaynak toplama sistemi — Debris → CollectorShip → ResourceInventory
 - [ ] Stat upgrade sistemi — komponent başına %'lik stat artışları (damage, HP, fire rate vb.)
 - [ ] Bölüm sistemi (8–10 bölüm, wave yapısı, bölüm arası geçiş)
 - [ ] Boss taşıyıcı gemi
@@ -285,6 +381,47 @@ float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 - [ ] Mobil UI
 - [ ] Ses efektleri
 - [ ] Gerçek sprite'lar — görsel iyileştirme
+
+---
+
+## Açık İşler — Kaynak Ekonomisi
+
+Kristal çalışması sırasında çıkan, henüz kapatılmamış maddeler.
+
+**Ertelendi (bilinçli karar):**
+- Kristal talebinin arzın altında kalması. İleride eklenecek yetenekler kristal harcayacak;
+  denge orada kurulacak, şimdi müdahale edilmeyecek.
+
+**Teknik borç:**
+- [ ] **İki ayrı komponent kataloğu var — konuşulacak.** Aynı komponentin (kalkan, jeneratör,
+  hangar) iki yerde birbirinden farklı tanımı duruyor: `ShipLoadout.MakeShieldDef()` vb.
+  kristal fiyatlı sürümü, `UpgradeUI.GetComponentDefs()` ham madde fiyatlı sürümü üretiyor.
+  Oyunda satın alma UI'dan geçtiği için `ShipLoadout` sürümleri hiç kullanılmıyor —
+  ama duruyorlar. Fiyat değiştirmek isteyen kişi yanlış dosyayı düzenleyebilir.
+  Karar: hangisi tek kaynak olacak, diğeri silinecek.
+- [ ] **EnemySpawner bölüm çarpanlarını uygulamıyor — testle netleşecek.**
+  `ChapterManager.SpawnEnemy()` düşmanın kopyasını alıp bölümün HP/hasar/kaçamak
+  çarpanlarını uyguluyor; `EnemySpawner.SpawnEnemy()` ise ham veriyi doğrudan kullanıyor.
+  Normal oyunda `ChapterManager` onu kapattığı için etkisi yok. Sorun sadece
+  EnemySpawner ile test edilirse çıkar: düşmanlar bölüm 1'de bile tam güçte gelir.
+
+---
+
+## Açık İşler — Hareket & Zorluk
+
+- [ ] **Deterministik kaçış manevrası — konuşulacak.** Mevcut kaçamak davranış rastgele;
+  ustalaşmayı ödüllendirmiyor. Öğrenilebilir, tekrarlanabilir kaçış desenleri (tip başına
+  imza manevrası) daha zevkli olabilir. Rastgelelik tamamen kalkmalı mı, yoksa desen
+  seçimi mi rastgele olmalı?
+- [ ] **Kamera kontrolü iyileştirmesi.** Daha uzağa, özellikle yukarı/aşağı bakabilmeli.
+  Mevcut: taban (0,0,-10), size 5, mouse %80'den sonra max 8 birim kayma, %90'dan sonra
+  size 5→7 zoom.
+- [ ] **Enkaz ömrü vs toplayıcı kapasitesi.** Enkaz artık sürüklenip durduğu için 180 sn
+  gerçekten sahada duruyor — bölümün neredeyse tamamı. Asteroitlerle birlikte sahada
+  çok daha fazla enkaz olacak; toplayıcılar yetişmezse kaynak yanar ve ekran kalabalıklaşır.
+  Süre test sonrası kısaltılabilir.
+- [ ] **Sistematik denge çalışması.** Düşman tehdit katsayıları (`threatScore`) deneme
+  sonuçlarına göre belirlenmeli. Teknik borçlar ve eksik mekanikler bittikten sonra.
 
 ---
 

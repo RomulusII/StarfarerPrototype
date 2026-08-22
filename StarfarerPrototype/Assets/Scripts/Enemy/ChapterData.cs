@@ -25,6 +25,16 @@ public class ChapterData : ScriptableObject
     public float enemyHpMultiplier    = 1f;
     [Tooltip("Tüm düşman hasarına uygulanan çarpan.")]
     public float enemyDamageMultiplier = 1f;
+    [Tooltip("Kaçamak manevra ve kaçış açılarına uygulanan çarpan. İlk bölümlerde " +
+             "düşük tutulur ki oyuncu nişan almayı öğrenirken zorlanmasın.")]
+    public float enemyEvasionMultiplier = 1f;
+
+    [Header("Asteroit Alanı")]
+    [Tooltip("Sahada aynı anda tutulmaya çalışılan max asteroit sayısı (parçalar dahil). " +
+             "0 = bu bölümde asteroit yok.")]
+    public int   asteroidCount    = 0;
+    [Tooltip("Yeni büyük asteroit gönderme aralığı (saniye).")]
+    public float asteroidInterval = 12f;
 
     [Header("Genel Düşman Havuzu (wave'de allowedTypes boşsa kullanılır)")]
     public EnemyTypeData[] defaultEnemyPool;
@@ -165,6 +175,8 @@ public class ChapterData : ScriptableObject
         c.defaultSpawnInterval  = 3f;
         c.enemyHpMultiplier     = hpMult;
         c.enemyDamageMultiplier = 1f;
+        c.enemyEvasionMultiplier = EvasionForChapter(num);
+        c.asteroidCount         = AsteroidsForChapter(num);
         c.dialogue              = new DialogueLine[0];
 
         // Wave 1: escort önce gelir
@@ -190,6 +202,25 @@ public class ChapterData : ScriptableObject
         return c;
     }
 
+/// <summary>
+    /// Kaçamak manevra zorluk eğrisi — 1. bölümde sıfır, 8. bölümde tam.
+    /// Aradaki bölümler doğrusal olarak artar, böylece oyuncu kaçamak davranışa
+    /// yavaşça alışır. Bölüm 1: düz uçan hedefler; bölüm 8+: tam kaçamak.
+    /// </summary>
+    static float EvasionForChapter(int chapterNumber)
+        => Mathf.InverseLerp(1f, 8f, chapterNumber);
+
+    /// <summary>
+    /// Asteroit yoğunluğu. Erken bölümlerde seyrek — oyuncu hem kaynak toplamayı
+    /// öğrenir hem de sahada vurulacak zararsız bir hedef bulur.
+    /// </summary>
+    static int AsteroidsForChapter(int chapterNumber)
+    {
+        if (chapterNumber <= 2) return 2;
+        if (chapterNumber <= 6) return 3;
+        return 4;
+    }
+
     static ChapterData MakeChapter(int num, string title, string story,
         EnemyTypeData[] pool, float interval, float hpMult, WaveData[] waves)
     {
@@ -201,6 +232,8 @@ public class ChapterData : ScriptableObject
         c.defaultSpawnInterval   = interval;
         c.enemyHpMultiplier      = hpMult;
         c.enemyDamageMultiplier  = 1f;
+        c.enemyEvasionMultiplier = EvasionForChapter(num);
+        c.asteroidCount          = AsteroidsForChapter(num);
         c.waves                  = waves;
         c.dialogue               = new DialogueLine[0];
         return c;

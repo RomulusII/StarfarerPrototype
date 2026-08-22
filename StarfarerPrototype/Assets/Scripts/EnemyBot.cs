@@ -65,6 +65,8 @@ public class EnemyBot : MonoBehaviour
     const float ArAimSpeed      = 0.4f;  // saldırıya geçmek için max hız
     const float ArAimAngle      = 12f;   // saldırıya geçmek için max açı hatası
     const float ArAimDistanceFactor = 2f; // fireRange × bu mesafede nişana geçer, salınım kesilir
+    const float ArEscapeFactor       = 1.25f; // escapeAngle × bu = AttackRun kaçış sapması
+    const float ApproachEscapeFactor = 1.1f;  // escapeAngle × bu = Approach geri çekilme sapması
 
     // Velocity tracking
     Vector2        _prevPos;
@@ -72,6 +74,9 @@ public class EnemyBot : MonoBehaviour
 
     // Spawn anındaki burun yönü — InitMovement belirler, Initialize uygular
     float _initialFacing = 180f;
+
+    // Kalkan kapasitesinin kaçta kaçı kristal olarak düşer
+    const float CrystalPerShieldPoint = 0.1f;
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
@@ -203,6 +208,7 @@ public class EnemyBot : MonoBehaviour
         _brain.orbitRadius     = orbitRadius;
         _brain.engageDuration  = engageDuration;
         _brain.repositionDelay = 1f;
+        _brain.escapeAngle     = data.escapeAngle;
     }
 
     // ── Update ────────────────────────────────────────────────────────────────
@@ -303,8 +309,9 @@ public class EnemyBot : MonoBehaviour
                     {
                         _approachPhase = ApproachPhase.Retreating;
                         // Düz geri değil, çapraz kaç — nişan alınması zorlaşsın
+                        float ae = data.escapeAngle * ApproachEscapeFactor;
                         _approachEscapeDir = ShipMovement.Rotate(
-                            Vector2.right, Random.Range(-45f, 45f));
+                            Vector2.right, Random.Range(-ae, ae));
                     }
                 }
                 break;
@@ -373,7 +380,8 @@ public class EnemyBot : MonoBehaviour
                     _arDisengageTimer = ArDisengageTime;
 
                     // Kaçış açısını kaydet — Disengaging fazında bu açıya dönülür
-                    _arEscapeAngle = _movement.FacingAngle + Random.Range(-50f, 50f);
+                    float esc = data.escapeAngle * ArEscapeFactor;
+                    _arEscapeAngle = _movement.FacingAngle + Random.Range(-esc, esc);
 
                     var go = new GameObject("EnemyBullet_Comp");
                     go.transform.position = transform.position;
@@ -666,6 +674,27 @@ public class EnemyBot : MonoBehaviour
             var d = go.AddComponent<Debris>();
             d.Init(Random.insideUnitCircle.normalized * Random.Range(0.3f, 1.2f), amount, resType);
         }
+
+        SpawnCrystalDebris();
+    }
+
+    /// <summary>
+    /// Kalkanı olan her gemi, gövde enkazına ek olarak enerji kristali bırakır —
+    /// kalkan teknolojisi kristal tabanlıdır. Miktar kalkan kapasitesiyle orantılıdır,
+    /// yani bölüm HP çarpanı arttıkça kristal getirisi de artar.
+    /// </summary>
+    void SpawnCrystalDebris()
+    {
+        if (data == null || data.maxShield <= 0f) return;
+
+        float amount = data.maxShield * CrystalPerShieldPoint;
+        if (amount < 0.5f) return;
+
+        var go = new GameObject("Debris_Crystal");
+        go.transform.position = transform.position;
+        go.AddComponent<Debris>().Init(
+            Random.insideUnitCircle.normalized * Random.Range(0.3f, 1.2f),
+            amount, ResourceType.EnergyCrystal);
     }
 
     void OnTriggerEnter2D(Collider2D other)

@@ -38,6 +38,9 @@ public class ChapterManager : MonoBehaviour
     float               _currentSpawnInterval;
     bool                _allSpawned;
 
+    // Asteroit alanı
+    float _asteroidTimer;
+
     // Formasyon konumlandırması
     FormationTemplate _currentFormation;
     Vector3           _baseSpawnPos;
@@ -69,11 +72,37 @@ public class ChapterManager : MonoBehaviour
     {
         if (UpgradeUI.IsPaused) return;
 
+        if (_phase != Phase.Done) UpdateAsteroidField();
+
         switch (_phase)
         {
             case Phase.Spawning:   UpdateSpawning();  break;
             case Phase.WaitClear:  UpdateWaitClear(); break;
         }
+    }
+
+    // ── Asteroit alanı ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Bölümün asteroit yoğunluğunu korur. Sayım parçaları da kapsar — bir asteroit
+    /// bölününce alan zaten dolduğu için yenisi gönderilmez.
+    /// Asteroitler wave ilerlemesini engellemez; UpdateWaitClear onları saymaz.
+    /// </summary>
+    void UpdateAsteroidField()
+    {
+        var chapter = _chapters[_chapterIndex];
+        if (chapter.asteroidCount <= 0) return;
+
+        _asteroidTimer -= Time.deltaTime;
+        if (_asteroidTimer > 0f) return;
+        _asteroidTimer = chapter.asteroidInterval;
+
+        if (FindObjectsByType<Asteroid>(FindObjectsSortMode.None).Length >= chapter.asteroidCount)
+            return;
+
+        var pos = new Vector3(15f, Random.Range(-4.5f, 4.5f), 0f);
+        var vel = new Vector2(Random.Range(-1.3f, -0.6f), Random.Range(-0.25f, 0.25f));
+        Asteroid.Spawn(pos, Asteroid.Size.Large, vel);
     }
 
     // ── Bölüm başlangıcı ─────────────────────────────────────────────────────
@@ -183,6 +212,8 @@ public class ChapterManager : MonoBehaviour
         d.maxShield     = data.maxShield     * chapter.enemyHpMultiplier;
         d.fireDamage    = data.fireDamage    * chapter.enemyDamageMultiplier;
         d.contactDamage = data.contactDamage * chapter.enemyDamageMultiplier;
+        d.evasionAngle  = data.evasionAngle  * chapter.enemyEvasionMultiplier;
+        d.escapeAngle   = data.escapeAngle   * chapter.enemyEvasionMultiplier;
 
         Vector3 pos;
         if (_currentFormation != null && _currentFormation.slots.Length > 0)

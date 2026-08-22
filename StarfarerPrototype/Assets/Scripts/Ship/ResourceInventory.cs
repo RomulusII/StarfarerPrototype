@@ -7,7 +7,7 @@ public class ResourceInventory : MonoBehaviour
 {
     public static ResourceInventory Instance { get; private set; }
 
-    public float metal      = 500f;
+    public float metal      = 0f;
     public float crystal    = 20f;
     public float energyScrap = 0f;
 
