@@ -8,7 +8,7 @@ using UnityEngine;
 /// data null ise EnemySpawner tarafından atanmadan önce Start() bekler;
 /// null kalırsa CreateSwarm() ile fallback oluşturulur.
 /// </summary>
-public class EnemyBot : MonoBehaviour
+public class EnemyBot : MonoBehaviour, ITurretTarget
 {
     public EnemyTypeData data;
 
@@ -575,6 +575,51 @@ public class EnemyBot : MonoBehaviour
         eb.damage          = data.fireDamage;
         eb.speed           = data.bulletSpeed;
         eb.targetComponent = target;
+    }
+
+    // ── ITurretTarget ─────────────────────────────────────────────────────────
+
+    public Transform TargetTransform => transform;
+    public Vector2   TargetVelocity  => Velocity;
+    public bool      IsValidTarget   => this != null && isActiveAndEnabled
+                                     && _healthBar != null && _healthBar.currentHealth > 0f;
+
+    public float ThreatValue => data != null ? Mathf.Max(1, data.threatScore) : 1f;
+
+    /// <summary>Kalkanın içine girmiş küçük/yakın saldırganlar PD'nin işi.</summary>
+    public bool IsPointDefencePriority =>
+        data != null && (data.movementKind == EnemyMovementKind.Approach
+                      || data.movementKind == EnemyMovementKind.BombRun
+                      || data.movementKind == EnemyMovementKind.AttackRun);
+
+    /// <summary>
+    /// Kalkan + gövdeyi bu silah tipiyle bitirmek için gereken ham hasar.
+    /// Direnci yüksek katman ham hasarı büyütür, düşük katman küçültür.
+    /// </summary>
+    public float RawDamageToKill(WeaponType weaponType)
+    {
+        float raw = 0f;
+
+        if (data != null && data.maxShield > 0f && _shieldHP > 0f)
+        {
+            var mods = data.shieldResistances != null && data.shieldResistances.Length > 0
+                ? data.shieldResistances
+                : DefaultShieldResistances;
+            raw += _shieldHP / Mathf.Max(MultiplierFor(weaponType, mods), 0.01f);
+        }
+
+        float hull = _healthBar != null ? _healthBar.currentHealth : 0f;
+        raw += hull / Mathf.Max(MultiplierFor(weaponType, data?.hullResistances), 0.01f);
+
+        return raw;
+    }
+
+    static float MultiplierFor(WeaponType wt, DamageModifier[] mods)
+    {
+        if (mods == null) return 1f;
+        foreach (var m in mods)
+            if (m.weaponType == wt) return m.multiplier;
+        return 1f;
     }
 
     // ── Hasar alma ────────────────────────────────────────────────────────────

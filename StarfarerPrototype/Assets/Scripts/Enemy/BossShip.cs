@@ -10,7 +10,7 @@ using UnityEngine;
 /// son fazda hedefe yaklaşmaya çalışır.
 /// Hardpoint'ler yok edildikçe ilgili yetenek devre dışı kalır.
 /// </summary>
-public class BossShip : MonoBehaviour
+public class BossShip : MonoBehaviour, ITurretTarget
 {
     public BossShipData data;
 
@@ -47,6 +47,9 @@ public class BossShip : MonoBehaviour
 
     // Kalkan kapasitesinin kaçta kaçı kristal olarak düşer — EnemyBot ile aynı kural
     const float CrystalPerShieldPoint = 0.1f;
+
+    // Turret puanlamasında boss'un temel tehdit değeri (EnemyTypeData.threatScore ölçeğinde)
+    const float BossThreatValue = 25f;
 
     // Hareket
     float _targetY;
@@ -305,6 +308,36 @@ public class BossShip : MonoBehaviour
 
     // ── Hasar alma ────────────────────────────────────────────────────────────
 
+    // ── ITurretTarget ─────────────────────────────────────────────────────────
+
+    public Transform TargetTransform => transform;
+    public Vector2   TargetVelocity  => _movement != null ? _movement.Velocity : Vector2.zero;
+    public bool      IsValidTarget   => this != null && !_dead && isActiveAndEnabled;
+
+    /// <summary>Komuta gemisi sahnedeki en değerli hedeftir.</summary>
+    public float ThreatValue => BossThreatValue;
+
+    /// <summary>Boss devasa ve yavaş — PD'nin işi değil.</summary>
+    public bool IsPointDefencePriority => false;
+
+    public float RawDamageToKill(WeaponType weaponType)
+    {
+        float raw = 0f;
+
+        if (ShieldGenAlive() && _shieldHP > 0f)
+            raw += _shieldHP / Mathf.Max(ShieldMultiplierFor(weaponType), 0.01f);
+
+        raw += _hullHP;   // gövde nötr — boss hull direnci tanımlamıyor
+        return raw;
+    }
+
+    bool ShieldGenAlive()
+    {
+        foreach (var hp in _hardpoints)
+            if (hp.IsAlive && hp.Type == HardpointType.ShieldGenerator) return true;
+        return false;
+    }
+
     public void TakeDamage(float amount, WeaponType wt = WeaponType.Kinetic)
     {
         if (_dead) return;
@@ -326,11 +359,14 @@ public class BossShip : MonoBehaviour
         if (_hullHP <= 0f) Die();
     }
 
+    /// <summary>Boss kalkanı: kinetik kırar, lazer neredeyse işlemez.</summary>
+    static float ShieldMultiplierFor(WeaponType wt)
+        => wt == WeaponType.Kinetic ? 1.5f :
+           wt == WeaponType.Laser   ? 0.25f : 1f;
+
     float AbsorbShield(float amount, WeaponType wt)
     {
-        float mult = wt == WeaponType.Kinetic ? 1.5f :
-                     wt == WeaponType.Laser   ? 0.25f : 1f;
-        float eff  = amount * mult;
+        float eff = amount * ShieldMultiplierFor(wt);
         _shieldRechargeTimer = ShieldRechargeDelay;
 
         if (_shieldHP >= eff)

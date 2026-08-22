@@ -244,10 +244,43 @@ Slot'a kurulunca otomatik ateş açar, oyuncu müdahalesi gerekmez. Enerji tüke
 | **Roket** | Çok düşük (30f+) | Yüksek | Orta | Düşük | 10s | Güdümlü, hedefi izler |
 | **Point Defence** | Hızlı (1f) | Düşük | Orta | Orta | 0.8s | Gelen roketleri + Bomber/Fighter/Drone hedefler, kısa menzil |
 
-**Hedefleme kuralları:**
-- Gatling / Plazma / Lazer / Roket: en yakın düşman gemisini hedefler
-- Point Defence: önce gelen roketleri, sonra kalkan içine girmiş küçük gemileri (Bomber, Fighter, Drone) hedefler
-- İnce ayarlar (kesin değerler) sonraya bırakıldı
+**Hedefleme — puanlama formülü** (`TurretTargeting`):
+
+    puan = tehdit × aciliyet / (öldürme süresi + mermi uçuş süresi)
+
+- **öldürme süresi** = (bu silahla öldürmek için gereken ham hasar) / (turretin DPS'i).
+  Dirençler burada devrededir — raylı top Armored'ı 44 saniyede bitirir, o yüzden ona
+  yönelmez; asteroidi ×2 ile yarı sürede bitirir.
+- **uçuş süresi** = mesafe / mermi hızı. Uzak hedef hem geç vurulur hem kaçırılır.
+- **aciliyet** = ana gemiye yaklaştıkça 1 → 2.5. Kalkana dayanmış bomber acil,
+  uzaktaki swarm değil.
+
+"En yakın", "en çok zarar vereceğim" ve "en çabuk öldüreceğim" böylece tek bir orana
+iner: *dikkatimin saniyesi başına ne kadar tehdit ortadan kalkar*.
+
+**Kilitlenme:**
+- Hedef her karede değil, `ReevaluateInterval` (0.35 sn) aralıklarla değerlendirilir.
+- Kilitli hedef geçerli ve **menzildeyken** kilit korunur. Menzil =
+  `bulletLifeTime × bulletSpeed` (PD için 5.5 birim).
+- Rakip hedef ancak puanı kilitli hedefin **1.6 katı** olursa kiliti kırar.
+
+Ölçülen davranış (raylı top, DPS 6, tam HP yakın Swarm'a kilitli):
+
+| Rakip hedef | Puan | Kiliti kırar mı? |
+|---|---|---|
+| Kalkana dayanmış Bomber (10 HP) | 9.81 | **kırar** |
+| 3 HP kalmış yakın Swarm | 2.23 | **kırar** |
+| Başka bir tam HP Swarm | 0.51 | kıramaz |
+| Kalkanlı gemi | 0.54 | kıramaz |
+| Büyük asteroit | 0.32 | kıramaz |
+| Armored (kinetiğe dirençli) | 0.13 | kıramaz |
+
+**Hedef tipleri** `ITurretTarget` arayüzünü uygular: `EnemyBot`, `BossShip`,
+`Asteroid`, `Bomb`. Yeni bir hedef tipi eklemek için `TurretController`'a
+dokunmak gerekmez — arayüzü uygulamak yeterlidir.
+
+Point Defence yalnızca `IsPointDefencePriority` olan hedefleri alır: bombalar,
+yakın saldırgan gemiler (Approach / BombRun / AttackRun) ve küçük asteroit parçaları.
 
 ### Bölüm Yapısı
 8-10 bölüm, ortalama 2-3 dakika. Çeşitlilik:
@@ -295,6 +328,8 @@ Slot'a kurulunca otomatik ateş açar, oyuncu müdahalesi gerekmez. Enerji tüke
 | EnemyBot.cs | Swarm/Armored/Shield/Bomber — hareket, ateş, hasar direnci, Bomber state machine |
 | Asteroid.cs | Parçalanabilir asteroit — Large→Medium→Small, çarpma hasarı, enkaz bırakır |
 | Debris.cs | Enkaz — sürüklenip durur, tipe göre renk, ömür sonunda solup yanıp söner |
+| ITurretTarget.cs | Turretlerin nişan alabileceği her şeyin ortak arayüzü |
+| TurretTargeting.cs | Hedef puanlama formülü + kilit histerezisi |
 | ShipMovement.cs | Roket-itkili uçuş modeli — burun itkisi, hıza bağlı dönüş, grip, fren |
 | ShipBrain.cs | Taktik AI — Orbit/Strafe/HoverFire pattern'ları, ShipMovement'e komut verir |
 | EnemyBullet.cs | Düşman mermisi — hull modu (kalkan üzerinden) veya komponent modu (doğrudan) |

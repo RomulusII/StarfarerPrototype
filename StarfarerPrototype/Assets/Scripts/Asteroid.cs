@@ -13,7 +13,7 @@ using UnityEngine;
 ///   - Ana gemiye çarparsa hasar verir ve dağılır — bölünmez, kaynak bırakmaz.
 ///   - Hasar DamageUtil üzerinden gelir; tüm silahlar otomatik olarak işler.
 /// </summary>
-public class Asteroid : MonoBehaviour
+public class Asteroid : MonoBehaviour, ITurretTarget
 {
     public enum Size { Small, Medium, Large }
 
@@ -115,6 +115,25 @@ public class Asteroid : MonoBehaviour
 
         if (transform.position.x < DespawnX) Destroy(gameObject);
     }
+
+    // ── ITurretTarget ─────────────────────────────────────────────────────────
+
+    public Transform TargetTransform => transform;
+    public Vector2   TargetVelocity  => Velocity;
+    public bool      IsValidTarget   => this != null && !_dead && isActiveAndEnabled;
+
+    /// <summary>
+    /// Tehdit = çarpma hasarı ölçeğinde, ama düşmanların altında tutulur:
+    /// asteroit ateş etmez ve çoğu gemiye çarpmadan geçer. Large ≈ 1.5,
+    /// yani tam HP'li bir Swarm'ın biraz üstü.
+    /// </summary>
+    public float ThreatValue => ImpactDamageFor(size) / 20f;
+
+    /// <summary>Küçük parçalar hızlı ve gemiye yakın olabilir — PD onları da alsın.</summary>
+    public bool IsPointDefencePriority => size == Size.Small;
+
+    public float RawDamageToKill(WeaponType weaponType)
+        => hp / Mathf.Max(ResistanceFor(weaponType), 0.01f);
 
     // ── Hasar ─────────────────────────────────────────────────────────────────
 

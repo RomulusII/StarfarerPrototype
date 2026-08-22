@@ -4,7 +4,7 @@ using UnityEngine;
 /// Yavaş hareket eden, Point Defence tarafından vurulabilen bomba mermisi.
 /// BombRunner düşmanı tarafından fırlatılır; düz çizgide ilerler, yüksek hasar verir.
 /// </summary>
-public class Bomb : MonoBehaviour
+public class Bomb : MonoBehaviour, ITurretTarget
 {
     public float speed  = 2.5f;
     public float damage = 30f;
@@ -33,6 +33,18 @@ public class Bomb : MonoBehaviour
     }
 
     public Vector2 Velocity => _dir * speed;
+
+    // ── ITurretTarget ─────────────────────────────────────────────────────────
+    // Bomba tek vuruşta yok olur; öldürme maliyeti sembolik tutulur ki
+    // puanlamada mesafe ve aciliyet belirleyici olsun.
+
+    public Transform TargetTransform        => transform;
+    public Vector2   TargetVelocity         => Velocity;
+    public bool      IsValidTarget          => this != null && isActiveAndEnabled;
+    public float     ThreatValue            => Mathf.Max(1f, damage / 2f);
+    public bool      IsPointDefencePriority => true;
+
+    public float RawDamageToKill(WeaponType weaponType) => 1f;
 
     public void SetDirection(Vector2 dir) => _dir = dir.normalized;
 

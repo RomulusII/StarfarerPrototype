@@ -5,6 +5,10 @@ using UnityEngine;
 /// Gemi slot'una kurulunca otomatik ateş açan turret.
 /// baseType: Kinetic / Energy / Missile — satın alırken belirlenir, değişmez.
 /// specType: uzmanlaşma — Upgrade ekranından değiştirilebilir.
+///
+/// Hedef seçimi TurretTargeting'e devredilmiştir: puanlama formülü ve kilit
+/// histerezisi orada açıklanır. Turret yalnızca kendi menzilini, DPS'ini ve
+/// silah tipini bildirir.
 /// </summary>
 public class TurretController : ShipComponentBase
 {
@@ -26,7 +30,31 @@ public class TurretController : ShipComponentBase
     bool    _reloading;
     Transform _barrel;
 
+    // Hedef kilidi — her karede değil, aralıklarla yeniden değerlendirilir
+    ITurretTarget _lockedTarget;
+    float         _retargetTimer;
+
     const float PDRange = 5.5f;
+
+    /// <summary>Merminin ömrü boyunca gidebildiği mesafe — bunun ötesi vurulamaz.</summary>
+    public float EffectiveRange => specType == TurretSpecType.PointDefence
+        ? PDRange
+        : bulletLifeTime * bulletSpeed;
+
+    /// <summary>Saniyedeki ham hasar. Lazer sürekli ışın olduğu için damage zaten DPS'tir.</summary>
+    public float DamagePerSecond => specType == TurretSpecType.Laser
+        ? damage
+        : (fireRate > 0.001f ? damage / fireRate : damage);
+
+    /// <summary>Mermi tipinin hasar sınıfı — hedef dirençleri buna göre işler.</summary>
+    public WeaponType ProjectileWeaponType
+    {
+        get
+        {
+            if (baseType == TurretBaseType.Energy) return WeaponType.Laser;
+            return WeaponType.Kinetic;
+        }
+    }
 
     // -------------------------------------------------------------------------
 
@@ -47,7 +75,7 @@ public class TurretController : ShipComponentBase
         if (!IsOperational)     return;
         if (UpgradeUI.IsPaused) return;
 
-        var target = FindTarget();
+        var target = AcquireTarget();
 
         if (target != null)
         {
@@ -81,66 +109,42 @@ public class TurretController : ShipComponentBase
     // Hedefleme
     // -------------------------------------------------------------------------
 
-    Transform FindTarget()
+    /// <summary>
+    /// Kilitli hedefi döndürür; kilit düştüyse veya değerlendirme zamanı geldiyse
+    /// TurretTargeting'e yeniden seçtirir. Seçim mantığı ve puanlama orada.
+    /// </summary>
+    Transform AcquireTarget()
     {
-        if (specType == TurretSpecType.PointDefence)
+        // Kilit hâlâ geçerli ve menzilde mi?
+        bool lockValid = _lockedTarget != null
+                      && _lockedTarget.IsValidTarget
+                      && Vector2.Distance(transform.position,
+                             _lockedTarget.TargetTransform.position) <= EffectiveRange;
+
+        if (!lockValid) _lockedTarget = null;
+
+        _retargetTimer -= Time.deltaTime;
+        if (_retargetTimer <= 0f || _lockedTarget == null)
         {
-            var bombs = FindObjectsByType<Bomb>(FindObjectsSortMode.None);
-            Transform nearestBomb  = null;
-            float     nearestBombD = float.MaxValue;
-            foreach (var b in bombs)
-            {
-                float d = Vector2.Distance(transform.position, b.transform.position);
-                if (d <= PDRange && d < nearestBombD) { nearestBombD = d; nearestBomb = b.transform; }
-            }
-            if (nearestBomb != null) return nearestBomb;
+            _retargetTimer = TurretTargeting.ReevaluateInterval;
+
+            Vector3 shipPos = PlayerShipPosition();
+            _lockedTarget = TurretTargeting.Select(
+                transform.position, shipPos,
+                EffectiveRange, DamagePerSecond, bulletSpeed, ProjectileWeaponType,
+                specType == TurretSpecType.PointDefence,
+                _lockedTarget);
         }
 
-        // Boss hedefleme
-        var boss = FindFirstObjectByType<BossShip>();
-        Transform bestTransform = null;
-        float     bestD         = float.MaxValue;
+        return _lockedTarget?.TargetTransform;
+    }
 
-        if (boss != null)
-        {
-            float d = Vector2.Distance(transform.position, boss.transform.position);
-            if (specType != TurretSpecType.PointDefence || d <= PDRange)
-            {
-                bestD         = d;
-                bestTransform = boss.transform;
-            }
-        }
+    static PlayerShip _cachedShip;
 
-        // Normal düşmanlar
-        var all = FindObjectsByType<EnemyBot>(FindObjectsSortMode.None);
-        EnemyBot bestBot = null;
-
-        foreach (var e in all)
-        {
-            float d = Vector2.Distance(transform.position, e.transform.position);
-
-            if (specType == TurretSpecType.PointDefence && d > PDRange)
-                continue;
-
-            bool ePriority    = e.data?.movementKind == EnemyMovementKind.Approach
-                             || e.data?.movementKind == EnemyMovementKind.BombRun;
-            bool bestPriority = bestBot?.data?.movementKind == EnemyMovementKind.Approach
-                             || bestBot?.data?.movementKind == EnemyMovementKind.BombRun;
-
-            if (specType == TurretSpecType.PointDefence && ePriority && !bestPriority)
-            {
-                bestBot = e; bestD = d;
-                continue;
-            }
-
-            if (d < bestD && (!bestPriority || ePriority))
-            {
-                bestD = d; bestBot = e;
-            }
-        }
-
-        if (bestBot != null) return bestBot.transform;
-        return bestTransform;
+    static Vector3 PlayerShipPosition()
+    {
+        if (_cachedShip == null) _cachedShip = FindFirstObjectByType<PlayerShip>();
+        return _cachedShip != null ? _cachedShip.transform.position : Vector3.zero;
     }
 
     void AimAt(Vector3 worldPos, bool instant = false)
@@ -185,15 +189,7 @@ public class TurretController : ShipComponentBase
     }
 
     Vector2 GetTargetVelocity(Transform target)
-    {
-        var bomb = target.GetComponent<Bomb>();
-        if (bomb != null) return bomb.Velocity;
-
-        var enemy = target.GetComponent<EnemyBot>();
-        if (enemy != null) return enemy.Velocity;
-
-        return Vector2.zero;
-    }
+        => _lockedTarget != null ? _lockedTarget.TargetVelocity : Vector2.zero;
 
     // -------------------------------------------------------------------------
     // Ateş etme
