@@ -341,9 +341,30 @@ dolayısıyla arkada düşman spawn olmaz.
 Zorluk seçimi buraya taşındı; daha önce yalnızca Game Over panelindeydi ve oyuncu
 zorluğu ancak öldükten sonra değiştirebiliyordu. Game Over'daki butonlar duruyor.
 
-Serbest modda bölüm çarpanı olmadığı için düşmanlar **ham** gelir. Belirli bir
-bölümün zorluğunu test etmek için `EnemySpawner.debugChapter` Inspector'dan
-doldurulabilir.
+**Serbest modun kendi zorluk rampası vardır** — baştan her tipi boca etmez.
+Geçen süreden bir *seviye* hesaplanır (`levelDuration` = 40 sn) ve dört şey
+birlikte artar:
+
+| | Formül | 0:00 | 2:00 | 4:00 | 5:20+ |
+|---|---|---|---|---|---|
+| Açık tipler | `threatScore ≤ 1 + seviye × 1.5` | Swarm | +Armored, Shield | +Bomber | +BombRunner |
+| Spawn aralığı | 4.5 → 1.0 sn (seviye 8'de) | 4.5 sn | 3.2 sn | 1.9 sn | 1.0 sn |
+| Aynı anda sahada | `3 + seviye × 1.2` (tavan 14) | 3 | 5 | 9 | 11 → 14 |
+| HP / hasar / kaçamak | `1+0.10L` / `1+0.07L` / `L/7` | 1.00 / 1.00 / 0 | 1.30 / 1.21 / 0.43 | 1.60 / 1.42 / 0.86 | 1.80+ / 1.56+ / 1.00 |
+
+Tipler tehdit puanına göre açılır: Armored 1:20, Shield 1:47, Bomber 4:00,
+BombRunner 4:53. Tam zorluğa ~5.5 dakikada varılır.
+
+**"Aynı anda sahada" tavanı** rampanın en önemli parçası: oyuncu temizleyemezse
+spawn durur, yığılma olmaz.
+
+Çarpanlar sentetik bir `ChapterData` üzerinden uygulanır — serbest mod da
+kampanyayla **aynı ölçekleme yolunu** kullanır, ayrı bir formül yoktur.
+`EnemySpawner.debugChapter` doldurulursa rampa devre dışı kalır ve o bölümün
+sabit zorluğu kullanılır.
+
+Serbest modda küçük bir asteroit alanı da kurulur (3 asteroit) — yoksa hiç
+kaynak akmaz ve oyuncu hiçbir şey inşa edemez.
 
 Menü açıkken oyun `SpeedController.Pause()` ile durdurulur — `Time.timeScale`
 doğrudan ezilmez, hız sistemiyle çakışmasın diye. `StartMenuUI.IsOpen` açıkken
