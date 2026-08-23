@@ -68,6 +68,39 @@ Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 5), Otomatik Turretler, İki
 
 **Gelecek:** Büyük düşman gemilerinin attığı **area-effect bombalar** komponentlere de hasar verebilir (tasarım kararı bekliyor).
 
+### Komponent Kataloğu — Tasarım Kararları
+
+Tüm komponent tanımlarının tek sahibi **`ComponentCatalog`**. Önceden tanımlar hem
+`ShipLoadout` hem `UpgradeUI` içinde ayrı ayrı üretiliyordu; aynı kalkanın iki farklı
+adı, statı ve maliyet kaynağı vardı.
+
+**Katman ayrımı:** `ComponentCatalog` ne var → `ShipLoadout` ne kurulu → `UpgradeUI`
+nasıl gösteriliyor.
+
+**Tek kalkan tipi.** Başlangıçta kurulu gelen kalkan mağazadakinin ta kendisidir (Mk1);
+ayrı bir "başlangıç sürümü" yoktur. İkinci bir kalkan almak yine Mk1 almaktır.
+Enerji sistemi olduğu için kristalle alınır.
+
+**Bedava başlangıç komponentleri normal `sellValue` taşır** — oyuncu bedava geleni
+satıp yerine başka bir şey kurabilsin diye bilinçli. Stratejik esneklik.
+
+| Zincir | Kaynak | Mk1 | Mk2 | Mk3 |
+|---|---|---|---|---|
+| Kalkan Jeneratörü | Kristal | 25 → 50 kalkan, 0.8 şarj | 45 → 100, 1.8 | 70 → 170, 3.0 |
+| Enerji Jeneratörü | Metal | 35 → 10 üretim | 65 → 18 | 110 → 28 |
+| Onarım Birimi | Metal | 30 → 2.0 tamir | 55 → 4.0 | 90 → 7.0 |
+| Depo | Metal | 40 → +250 metal / +50 kristal | 80 → +600/+120 | 150 → +1200/+250 |
+
+Onarım Mk1 kasten yavaş (eskiden 8.0'dı) — ilk seviyede tamir savaşın gidişatını
+belirlememeli.
+
+**Depo komponenti.** Kaynak tavanı artık sabit değil: `ResourceInventory` taban
+kapasiteyi (150 metal / 50 kristal) kurulu depoların toplamıyla topluyor. Yıkılan
+veya deaktif olan depo kapasite vermez — hasar almak biriktirdiğin kaynağı da yakar.
+
+Kapasite kilidi bilinçli: kalkan Mk1→Mk2 (35 kristal) taban tavanla yapılabilir,
+Mk2→Mk3 (52 kristal) için önce depo kurmak gerekir.
+
 ### Kaynak Ekonomisi — Tasarım Kararları
 
 **İki kaynak:** Ham madde (metal) fiziksel sistemler için, Enerji kristali enerji
@@ -328,6 +361,8 @@ yakın saldırgan gemiler (Approach / BombRun / AttackRun) ve küçük asteroit 
 | EnemyBot.cs | Swarm/Armored/Shield/Bomber — hareket, ateş, hasar direnci, Bomber state machine |
 | Asteroid.cs | Parçalanabilir asteroit — Large→Medium→Small, çarpma hasarı, enkaz bırakır |
 | Debris.cs | Enkaz — sürüklenip durur, tipe göre renk, ömür sonunda solup yanıp söner |
+| ComponentCatalog.cs | Tüm komponent tanımlarının tek sahibi — ne var, kaça, hangi zincirle |
+| StorageComponent.cs | Depo — kurulu olduğu sürece kaynak tavanını yükseltir |
 | ITurretTarget.cs | Turretlerin nişan alabileceği her şeyin ortak arayüzü |
 | CombatArea.cs | Dogfight sınırları — savaşçılar ekrandan çıkmasın |
 | TurretTargeting.cs | Hedef puanlama formülü + kilit histerezisi |
@@ -409,6 +444,11 @@ float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 - [x] Asteroit cilası — HP barı, kinetik ×2 / lazer ×0.25 direnç, parçalar kümelenir
 - [x] Enkaz cilası — sürüklenip durur, kristal mavimsi gri, ömür sonunda solup yanıp söner
 - [x] Boss kristal düşürür; metal sıfırdan başlar; kaçamak eğrisi bölüm 1→8 doğrusal
+- [x] Turret hedefleme — puanlama formülü, kilit histerezisi, menzil kapısı
+- [x] Kadraj (oran tabanlı) + savaşçılara dogfight sınırı
+- [x] Komponent kataloğu birleştirildi — ComponentCatalog tek sahip, tek kalkan tipi
+- [x] Depo komponenti — kaynak tavanı kurulu depolardan türetiliyor
+- [x] Onarım birimi yavaşlatıldı — Mk1 8.0 → 2.0
 
 ---
 
@@ -435,12 +475,6 @@ Kristal çalışması sırasında çıkan, henüz kapatılmamış maddeler.
   denge orada kurulacak, şimdi müdahale edilmeyecek.
 
 **Teknik borç:**
-- [ ] **İki ayrı komponent kataloğu var — konuşulacak.** Aynı komponentin (kalkan, jeneratör,
-  hangar) iki yerde birbirinden farklı tanımı duruyor: `ShipLoadout.MakeShieldDef()` vb.
-  kristal fiyatlı sürümü, `UpgradeUI.GetComponentDefs()` ham madde fiyatlı sürümü üretiyor.
-  Oyunda satın alma UI'dan geçtiği için `ShipLoadout` sürümleri hiç kullanılmıyor —
-  ama duruyorlar. Fiyat değiştirmek isteyen kişi yanlış dosyayı düzenleyebilir.
-  Karar: hangisi tek kaynak olacak, diğeri silinecek.
 - [ ] **EnemySpawner bölüm çarpanlarını uygulamıyor — testle netleşecek.**
   `ChapterManager.SpawnEnemy()` düşmanın kopyasını alıp bölümün HP/hasar/kaçamak
   çarpanlarını uyguluyor; `EnemySpawner.SpawnEnemy()` ise ham veriyi doğrudan kullanıyor.

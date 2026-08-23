@@ -11,9 +11,14 @@ public class ResourceInventory : MonoBehaviour
     public float crystal    = 20f;
     public float energyScrap = 0f;
 
-    public float maxMetal      = 500f;
-    public float maxCrystal    = 100f;
-    public float maxEnergyScrap = 200f;
+    [Header("Taban Kapasite (depo komponentleri bunun üstüne ekler)")]
+    public float baseMetalCapacity   = 150f;
+    public float baseCrystalCapacity =  50f;
+    public float maxEnergyScrap      = 200f;
+
+    /// <summary>Taban kapasite + kurulu depoların toplamı.</summary>
+    public float maxMetal   => baseMetalCapacity   + StorageComponent.TotalMetalCapacity;
+    public float maxCrystal => baseCrystalCapacity + StorageComponent.TotalCrystalCapacity;
 
     void Awake()
     {

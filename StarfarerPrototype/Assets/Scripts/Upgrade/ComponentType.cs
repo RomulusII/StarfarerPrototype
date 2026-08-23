@@ -1,4 +1,4 @@
-public enum ComponentType { Generator, Shield, RepairUnit, Weapon, Turret, Hangar }
+public enum ComponentType { Generator, Shield, RepairUnit, Weapon, Turret, Hangar, Storage }
 public enum ResourceType { RawMaterial, EnergyCrystal }
 public enum WeaponType { Kinetic, Laser, Plasma }
 

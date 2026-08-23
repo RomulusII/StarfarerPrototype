@@ -39,123 +39,19 @@ public class ShipLoadout : MonoBehaviour
 
     void Start()
     {
-        InitWeaponChains();
         // Raylı Top başlangıçta ücretsiz kurulu gelir
-        InstallComponent(_kineticChain[0], slotIndex: 1, deductCost: false);
-        // Hangar her zaman slot 6'da kurulu başlar
-        InstallComponent(GetHangarDef(),        slotIndex: 6, deductCost: false);
-        // Jeneratör ve kalkan üreteci başlangıçta slot'larında kurulu gelir
-        InstallComponent(MakeGeneratorDef(10f), slotIndex: 0, deductCost: false);
-        InstallComponent(MakeShieldDef(50f, 0.375f), slotIndex: 3, deductCost: false);
-    }
+        InstallComponent(ComponentCatalog.WeaponChain(WeaponType.Kinetic)[0],
+                         slotIndex: 1, deductCost: false);
 
-    static ComponentDefinition _hangarDef;
-    static ComponentDefinition GetHangarDef()
-    {
-        if (_hangarDef != null) return _hangarDef;
-        var d = ScriptableObject.CreateInstance<ComponentDefinition>();
-        d.componentName = "Hangar";
-        d.componentType = ComponentType.Hangar;
-        d.tier          = 1;
-        d.costResource  = ResourceType.RawMaterial;
-        d.cost          = 20;
-        d.sellValue     = 0;
-        _hangarDef = d;
-        return _hangarDef;
-    }
-
-    static ComponentDefinition MakeGeneratorDef(float production)
-    {
-        var d = ScriptableObject.CreateInstance<ComponentDefinition>();
-        d.componentName    = "Jeneratör";
-        d.componentType    = ComponentType.Generator;
-        d.tier             = 1;
-        d.costResource     = ResourceType.RawMaterial;
-        d.cost             = 15;
-        d.sellValue        = 5;
-        d.productionAmount = production;
-        return d;
-    }
-
-    static ComponentDefinition MakeShieldDef(float maxShield, float rechargeRate)
-    {
-        var d = ScriptableObject.CreateInstance<ComponentDefinition>();
-        d.componentName = "Kalkan Üreteci";
-        d.componentType = ComponentType.Shield;
-        d.tier          = 1;
-        d.costResource  = ResourceType.EnergyCrystal;
-        d.cost          = 15;
-        d.sellValue     = 5;
-        d.maxShield     = maxShield;
-        d.rechargeRate  = rechargeRate;
-        return d;
-    }
-
-    // -------------------------------------------------------------------------
-    // Silah zincirleri (statik, oyun ömrü boyunca tek kez oluşturulur)
-    // -------------------------------------------------------------------------
-
-    static ComponentDefinition[] _laserChain;
-    static ComponentDefinition[] _kineticChain;
-    static ComponentDefinition[] _plasmaChain;
-
-    static void InitWeaponChains()
-    {
-        if (_laserChain != null) return;
-
-        // Lazer — sürekli ışın: damage=DPS, fireRate kullanılmaz (0 bırakılır), energy=enerji/saniye
-        var lm3 = W("Lazer Topu Mk3",   WeaponType.Laser,   3, ResourceType.EnergyCrystal, 60, 25, null,  60f, 0f, 30f);
-        var lm2 = W("Lazer Topu Mk2",   WeaponType.Laser,   2, ResourceType.EnergyCrystal, 35, 15, lm3,   40f, 0f, 20f);
-        var lm1 = W("Lazer Topu Mk1",   WeaponType.Laser,   1, ResourceType.EnergyCrystal,  0,  0, lm2,   25f, 0f, 15f);
-        _laserChain = new[] { lm1, lm2, lm3 };
-
-        var km3 = W("Raylı Top Mk3",    WeaponType.Kinetic, 3, ResourceType.RawMaterial,   50, 20, null,  18f, 0.40f);
-        var km2 = W("Raylı Top Mk2",    WeaponType.Kinetic, 2, ResourceType.RawMaterial,   28, 10, km3,   14f, 0.65f);
-        var km1 = W("Raylı Top Mk1",    WeaponType.Kinetic, 1, ResourceType.RawMaterial,   12,  5, km2,   10f, 1.00f);
-        _kineticChain = new[] { km1, km2, km3 };
-
-        // Plazma — Another World tarzı şarj+bırak mekaniği
-        // fireRate = atış sonrası bekleme (cooldown), chargeTime = tam şarj süresi
-        var pm3 = W("Plazma Topu Mk3",  WeaponType.Plasma,  3, ResourceType.RawMaterial,   65, 25, null,  45f, 1.0f, 0f, 1.4f, 0);
-        var pm2 = W("Plazma Topu Mk2",  WeaponType.Plasma,  2, ResourceType.RawMaterial,   38, 15, pm3,   36f, 1.2f, 0f, 1.7f, 0);
-        var pm1 = W("Plazma Topu Mk1",  WeaponType.Plasma,  1, ResourceType.RawMaterial,   20,  8, pm2,   28f, 1.5f, 0f, 2.0f, 0);
-        _plasmaChain = new[] { pm1, pm2, pm3 };
-    }
-
-    static ComponentDefinition W(string name, WeaponType wt, int tier,
-        ResourceType res, int cost, int sell, ComponentDefinition upgTo,
-        float dmg = 10f, float rate = 0.15f, float energy = 0f,
-        float charge = 0.8f, int burst = 3)
-    {
-        var d = ScriptableObject.CreateInstance<ComponentDefinition>();
-        d.componentName             = name;
-        d.componentType             = ComponentType.Weapon;
-        d.weaponType                = wt;
-        d.tier                      = tier;
-        d.costResource              = res;
-        d.cost                      = cost;
-        d.sellValue                 = sell;
-        d.upgradeTo                 = upgTo;
-        d.weaponDamage              = dmg;
-        d.weaponFireRate            = rate;
-        d.weaponEnergyCostPerShot   = energy;
-        d.weaponChargeTime          = charge;
-        d.weaponBurstCount          = burst;
-        return d;
+        // Kalan başlangıç donanımı katalogdan gelir — bunlar mağazadakilerin
+        // ta kendisidir, ayrı bir "başlangıç sürümü" yoktur.
+        foreach (var (def, slot) in ComponentCatalog.StartingLoadout)
+            InstallComponent(def, slot, deductCost: false);
     }
 
     /// <summary>Bir silah tipinin Mk1 tanımını döner (unlock maliyeti dahil).</summary>
     public static ComponentDefinition GetWeaponChainStart(WeaponType type)
-    {
-        InitWeaponChains();
-        return type switch
-        {
-            WeaponType.Laser   => _laserChain[0],
-            WeaponType.Kinetic => _kineticChain[0],
-            WeaponType.Plasma  => _plasmaChain[0],
-            _                  => null,
-        };
-    }
+        => ComponentCatalog.WeaponChain(type)?[0];
 
     // -------------------------------------------------------------------------
     // Public API
@@ -222,6 +118,13 @@ public class ShipLoadout : MonoBehaviour
             case ComponentType.Hangar:
                 var hc = go.AddComponent<HangarComponent>();
                 comp = hc;
+                break;
+
+            case ComponentType.Storage:
+                var st = go.AddComponent<StorageComponent>();
+                st.Init(def.storageMetal, def.storageCrystal);
+                st.componentName = def.componentName;
+                comp = st;
                 break;
         }
 

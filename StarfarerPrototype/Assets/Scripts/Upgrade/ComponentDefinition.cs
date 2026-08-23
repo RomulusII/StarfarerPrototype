@@ -15,6 +15,10 @@ public class ComponentDefinition : ScriptableObject
     public float maxShield;
     public float rechargeRate;
     public float repairRate;
+
+    // Depo alanları — kaynak tavanına eklenen kapasite
+    public float storageMetal;
+    public float storageCrystal;
     public WeaponType weaponType;
     public float weaponDamage;
     public float weaponFireRate;

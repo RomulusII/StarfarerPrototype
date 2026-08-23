@@ -51,7 +51,6 @@ public class UpgradeUI : MonoBehaviour
     private int    _selectedStatSlot = -1;
     private int    _currentSlotIndex = -1;
 
-    private static ComponentDefinition[] _catalogDefs;
 
     // =========================================================================
     // Lifecycle
@@ -985,6 +984,14 @@ public class UpgradeUI : MonoBehaviour
                 sb.AppendLine(DeltaLine("Şarj/sn", recharge, "rechargeRate", false));
                 break;
             }
+            case ComponentType.Storage:
+            {
+                var st = comp as StorageComponent;
+                if (st == null) break;
+                sb.AppendLine($"Metal kapasitesi: +{st.metalCapacity:0}");
+                sb.AppendLine($"Kristal kapasitesi: +{st.crystalCapacity:0}");
+                break;
+            }
             case ComponentType.Hangar:
             {
                 var hc = comp as HangarComponent;
@@ -1068,126 +1075,11 @@ public class UpgradeUI : MonoBehaviour
 
     static ComponentDefinition[] _weaponDefs;
 
-    static ComponentDefinition[] GetCatalogDefs(int slotIndex) => GetComponentDefs();
+    static ComponentDefinition[] GetCatalogDefs(int slotIndex) => ComponentCatalog.Purchasable;
 
-    static ComponentDefinition[] GetComponentDefs()
-    {
-        if (_catalogDefs != null) return _catalogDefs;
-
-        var shield = ScriptableObject.CreateInstance<ComponentDefinition>();
-        shield.componentName = "Kalkan Jeneratörü Mk1";
-        shield.componentType = ComponentType.Shield;
-        shield.tier          = 1;
-        shield.costResource  = ResourceType.RawMaterial;
-        shield.cost          = 200;
-        shield.sellValue     = 100;
-        shield.maxShield     = 150f;
-        shield.rechargeRate  = 3f;
-
-        var repair = ScriptableObject.CreateInstance<ComponentDefinition>();
-        repair.componentName = "Onarım Birimi Mk1";
-        repair.componentType = ComponentType.RepairUnit;
-        repair.tier          = 1;
-        repair.costResource  = ResourceType.RawMaterial;
-        repair.cost          = 30;
-        repair.sellValue     = 15;
-        repair.repairRate    = 8f;
-
-        var gen = ScriptableObject.CreateInstance<ComponentDefinition>();
-        gen.componentName    = "Enerji Jeneratörü Mk1";
-        gen.componentType    = ComponentType.Generator;
-        gen.tier             = 1;
-        gen.costResource     = ResourceType.RawMaterial;
-        gen.cost             = 60;
-        gen.sellValue        = 30;
-        gen.productionAmount = 12f;
-
-        // 3 temel turret — uzmanlaşma upgrade ekranından yapılır
-        // Hedef: TEMEL_DPS = 6 (damage/fireRate)
-        var kinetic = TB("Raylı Turret", TurretBaseType.Kinetic, ResourceType.RawMaterial, 22,
-            fireRate:2f,  damage:12f, speed:9f,  life:3f,  energy:0.5f);
-        var energy  = TB("Enerji Turret",  TurretBaseType.Energy,  ResourceType.RawMaterial, 22,
-            fireRate:3f,  damage:18f, speed:14f, life:4f,  energy:3f);
-        var missile = TB("Füze Turret",    TurretBaseType.Missile, ResourceType.RawMaterial, 28,
-            fireRate:10f, damage:60f, speed:7f,  life:5f,  energy:0.5f);
-
-        _catalogDefs = new[] { shield, repair, gen, kinetic, energy, missile };
-        return _catalogDefs;
-    }
-
-    // Temel turret tanımı (uzmanlaşmamış)
-    static ComponentDefinition TB(string name, TurretBaseType bt, ResourceType res, int cost,
-        float fireRate, float damage, float speed, float life, float energy,
-        int mag = 0, float reload = 0f)
-    {
-        var d = ScriptableObject.CreateInstance<ComponentDefinition>();
-        d.componentName        = name;
-        d.componentType        = ComponentType.Turret;
-        d.tier                 = 1;
-        d.costResource         = res;
-        d.cost                 = cost;
-        d.sellValue            = cost / 2;
-        d.turretBaseType       = bt;
-        d.turretSpecType       = TurretSpecType.None;
-        d.turretFireRate       = fireRate;
-        d.turretDamage         = damage;
-        d.turretBulletSpeed    = speed;
-        d.turretBulletLifeTime = life;
-        d.turretEnergyPerShot  = energy;
-        d.turretMagazineSize   = mag;
-        d.turretReloadTime     = reload;
-        return d;
-    }
-
-    // Spec tanımları — her base+spec kombinasyonu için
-    static ComponentDefinition MakeSpecDef(ComponentDefinition baseDef, TurretSpecType spec,
-        int specCost, float fireRate, float damage, float speed, float life, float energy,
-        int mag = 0, float reload = 0f, float burnDuration = 0f)
-    {
-        var d = ScriptableObject.CreateInstance<ComponentDefinition>();
-        d.componentName        = $"{TurretSpecHelper.GetBaseTypeName(baseDef.turretBaseType)} — {TurretSpecHelper.GetSpecName(spec)}";
-        d.componentType        = ComponentType.Turret;
-        d.tier                 = 1;
-        d.costResource         = baseDef.costResource;
-        d.cost                 = baseDef.cost;
-        d.sellValue            = baseDef.sellValue;
-        d.turretBaseType       = baseDef.turretBaseType;
-        d.turretSpecType       = spec;
-        d.specCost             = specCost;
-        d.specCostResource     = baseDef.costResource;
-        d.turretFireRate       = fireRate;
-        d.turretDamage         = damage;
-        d.turretBulletSpeed    = speed;
-        d.turretBulletLifeTime = life;
-        d.turretEnergyPerShot  = energy;
-        d.turretMagazineSize   = mag;
-        d.turretReloadTime     = reload;
-        d.turretBurnDuration   = burnDuration;
-        return d;
-    }
-
+    /// <summary>Turret uzmanlaşma tanımı — veri ComponentCatalog'da tutulur.</summary>
     static ComponentDefinition GetSpecDef(ComponentDefinition baseDef, TurretSpecType spec)
-    {
-        // EFEKTİF_DPS = TEMEL_DPS × hedefleme_çarpanı ≈ 6 (hepsi)
-        // Lazer: TEMEL=2.0, çarpan=3.0 → EFEKTİF=6.0  (damage × burnDuration / fireRate = 12×0.5/3 = 2.0)
-        // Gatling: sustained = 10×8/(10×1+3) = 80/13 ≈ 6.15
-        // Roket: TEMEL=4.0, çarpan=1.5 → EFEKTİF=6.0  (60/15=4.0)
-        // PD: TEMEL=9.0 — menzil kısıtlı (5.5u), daha yüksek ham DPS hak ediyor
-        return spec switch
-        {
-            TurretSpecType.Gatling      => MakeSpecDef(baseDef, spec, specCost:20,
-                fireRate:1f,  damage:8f,  speed:9f,  life:3f,  energy:0.5f, mag:10, reload:3f),
-            TurretSpecType.PointDefence => MakeSpecDef(baseDef, spec, specCost:25,
-                fireRate:1f,  damage:9f,  speed:8f,  life:0.8f,energy:1f),
-            TurretSpecType.Laser        => MakeSpecDef(baseDef, spec, specCost:30,
-                fireRate:3f,  damage:12f, speed:14f, life:4f,  energy:3f, burnDuration:0.5f),
-            TurretSpecType.Plasma       => MakeSpecDef(baseDef, spec, specCost:40,
-                fireRate:6f,  damage:36f, speed:5f,  life:4f,  energy:4f),
-            TurretSpecType.HomingRocket => MakeSpecDef(baseDef, spec, specCost:35,
-                fireRate:15f, damage:60f, speed:4.5f, life:6f,  energy:0.5f),
-            _ => baseDef,
-        };
-    }
+        => ComponentCatalog.TurretSpec(baseDef, spec);
 
     static string TypeLabel(ComponentType type)
     {
@@ -1199,6 +1091,7 @@ public class UpgradeUI : MonoBehaviour
             case ComponentType.Weapon:     return "Silah";
             case ComponentType.Turret:     return "Turret";
             case ComponentType.Hangar:     return "Hangar";
+            case ComponentType.Storage:    return "Depo";
             default:                       return type.ToString();
         }
     }
