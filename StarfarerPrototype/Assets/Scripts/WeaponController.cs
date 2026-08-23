@@ -79,7 +79,8 @@ public class WeaponController : MonoBehaviour
             // Child olarak spawn — parent (WeaponMount) döndükçe beam yönü otomatik güncellenir
             var go = new GameObject("LaserBeam");
             go.transform.SetParent(transform, false);
-            go.transform.localPosition = Vector3.zero;
+            // Namlu ucundan başlasın — kökten çıkarsa ışın namlunun içinde görünür
+            go.transform.localPosition = new Vector3(0f, WeaponMount.BarrelLength, 0f);
             go.transform.localRotation = Quaternion.identity;
 
             float energyMulti    = BoostController.Mode == BoostMode.Shield ? 1f / 3f :
@@ -155,9 +156,9 @@ public class WeaponController : MonoBehaviour
     {
         var go = new GameObject("PlasmaCharge");
         go.transform.SetParent(transform, false);
-        // Namlu ucu: WeaponMount sprite'ı (20x80px, PPU=100) → 0.8 birim, pivot alt-orta
+        // Namlu ucu — uzunluk WeaponMount.BarrelLength'ten gelir.
         // transform.up = ateş yönü → local Y pozitifi = namlu ucu
-        go.transform.localPosition = new Vector3(0f, 0.8f, 0f);
+        go.transform.localPosition = new Vector3(0f, WeaponMount.BarrelLength, 0f);
 
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite       = _plasmaCircle;
@@ -193,9 +194,9 @@ public class WeaponController : MonoBehaviour
         float totalDmg  = damage * Mathf.Lerp(0.5f, 2.5f, chargeRatio) * dmgMulti;
 
         var go = new GameObject("PlasmaBeam");
-        // Namlu ucundan spawn: local Y = 0.8 → world: transform.up * 0.8
+        // Namlu ucundan spawn — uzunluk WeaponMount'tan gelir
         go.transform.SetPositionAndRotation(
-            transform.position + transform.up * 0.8f,
+            transform.position + transform.up * WeaponMount.BarrelLength,
             transform.rotation);
 
         var beam = go.AddComponent<PlasmaBeam>();
@@ -221,7 +222,10 @@ public class WeaponController : MonoBehaviour
                             BoostController.Mode == BoostMode.Shield  ? 0.6f  : 1f;
 
         var go = new GameObject("Bullet");
-        go.transform.SetPositionAndRotation(transform.position, transform.rotation);
+        // Namlu ucundan çıksın — mount noktası namlunun kökü
+        go.transform.SetPositionAndRotation(
+            transform.position + transform.up * WeaponMount.BarrelLength,
+            transform.rotation);
         go.transform.localScale = Vector3.one * scaleMulti;
 
         var sr = go.AddComponent<SpriteRenderer>();
