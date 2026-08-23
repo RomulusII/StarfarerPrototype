@@ -255,10 +255,9 @@ public class BossShip : MonoBehaviour, ITurretTarget
         var   pos   = (Vector2)transform.position
                     + new Vector2(Random.Range(-1f, 0f), side * (data.bodyHeight / 100f * 0.6f));
 
-        var go = new GameObject($"Drone_{type.displayName}");
-        go.transform.position = pos;
-        go.AddComponent<HealthBar>();
-        go.AddComponent<EnemyBot>().data = type;
+        // Kurulum EnemySpawner'ın işi — drone'lar da bölümün çarpanlarını alır
+        var drone = EnemySpawner.Spawn(type, pos);
+        if (drone != null) drone.gameObject.name = $"Drone_{type.displayName}";
     }
 
     void UpdateShield()

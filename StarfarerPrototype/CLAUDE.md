@@ -327,6 +327,35 @@ dokunmak gerekmez — arayüzü uygulamak yeterlidir.
 Point Defence yalnızca `IsPointDefencePriority` olan hedefleri alır: bombalar,
 yakın saldırgan gemiler (Approach / BombRun / AttackRun) ve küçük asteroit parçaları.
 
+### Spawn Mimarisi — Tasarım Kararları
+
+Sorumluluk ayrımı:
+
+| | Karar | Uygulama |
+|---|---|---|
+| `ChapterManager` | **NE** spawn edilecek — bütçe, dalga, formasyon, hangi bölüm | — |
+| `EnemySpawner` | — | **NASIL** kurulacak: GameObject, HealthBar, bölüm çarpanları |
+| `AsteroidSpawner` | — | Alan yoğunluğunu korur |
+
+**Tek inşa yolu.** Oyunda `AddComponent<EnemyBot>()` çağıran tek yer
+`EnemySpawner.Spawn()`. Bölüm çarpanları (HP / hasar / kaçamak) orada uygulanır,
+dolayısıyla ikinci bir yol sessizce ondan sapamaz. Boss'un drone üretimi de bu
+yoldan geçer.
+
+Çağıran bölümü bilmek zorunda değildir: `Spawn(data, pos)` çarpanları
+`ChapterManager.CurrentChapter`'dan okur. Açıkça `Spawn(data, pos, chapter)`
+denirse o bölüm, `null` denirse çarpansız düşman kurulur.
+
+**Base class yok.** `EnemySpawner` ve `AsteroidSpawner` ortak bir soyutlamadan
+türemiyor; paylaştıkları tek şey "sahne kenarından bir şey üretmek" ve o üç satır.
+Ortaklık gerçekten belirginleşirse sonra çıkarılır.
+
+**Serbest mod** (`EnemySpawner.debugFreeSpawn`) dalga sistemini beklemeden düşman
+akıtır; test içindir, varsayılan kapalıdır ve `ChapterManager` sahnedeyken
+otomatik kapatılır. Aynı `Spawn()` metodunu çağırdığı için gerçek oyundan farklı
+bir düşman üretmesi mümkün değildir — eskiden ayrı bir kod yolu olduğu için
+çarpansız düşman üretiyor ve testi yanıltıyordu.
+
 ### Bölüm Yapısı
 8-10 bölüm, ortalama 2-3 dakika. Çeşitlilik:
 - Asteroid/enkaz bölgesi (kaynak + küçük botlar)
@@ -381,7 +410,8 @@ yakın saldırgan gemiler (Approach / BombRun / AttackRun) ve küçük asteroit 
 | ShipMovement.cs | Roket-itkili uçuş modeli — burun itkisi, hıza bağlı dönüş, grip, fren |
 | ShipBrain.cs | Taktik AI — Orbit/Strafe/HoverFire pattern'ları, ShipMovement'e komut verir |
 | EnemyBullet.cs | Düşman mermisi — hull modu (kalkan üzerinden) veya komponent modu (doğrudan) |
-| EnemySpawner.cs | Ağırlıklı rastgele tip seçimi ile düşman spawn eder |
+| EnemySpawner.cs | Düşmanın TEK inşa yolu — GameObject, HealthBar, bölüm çarpanları. Serbest test modu içerir |
+| AsteroidSpawner.cs | Asteroit alanının yoğunluğunu korur |
 | StarField.cs | 400 yıldız, -15/+15 birim arası random pozisyon |
 | CameraController.cs | Parallax kayma + zoom, power curve (t²) |
 | HealthBar.cs | Can/kalkan barı, SpriteRenderer tabanlı, child olarak eklenir |
@@ -462,6 +492,7 @@ float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 - [x] Depo komponenti — kaynak tavanı kurulu depolardan türetiliyor
 - [x] Onarım birimi yavaşlatıldı — Mk1 8.0 → 2.0
 - [x] Deterministik kaçamak manevra — iki harmonikli desen + imza kaçışı
+- [x] Spawn mimarisi ayrıştırıldı — tek inşa yolu, AsteroidSpawner, serbest test modu
 
 ---
 
@@ -488,11 +519,9 @@ Kristal çalışması sırasında çıkan, henüz kapatılmamış maddeler.
   denge orada kurulacak, şimdi müdahale edilmeyecek.
 
 **Teknik borç:**
-- [ ] **EnemySpawner bölüm çarpanlarını uygulamıyor — testle netleşecek.**
-  `ChapterManager.SpawnEnemy()` düşmanın kopyasını alıp bölümün HP/hasar/kaçamak
-  çarpanlarını uyguluyor; `EnemySpawner.SpawnEnemy()` ise ham veriyi doğrudan kullanıyor.
-  Normal oyunda `ChapterManager` onu kapattığı için etkisi yok. Sorun sadece
-  EnemySpawner ile test edilirse çıkar: düşmanlar bölüm 1'de bile tam güçte gelir.
+- [ ] **Başlangıç menüsü yok.** Oyun doğrudan 1. bölüme giriyor. Serbest mod, zorluk
+  seçimi ve "devam et" için bir giriş ekranı gerekiyor. Zorluk butonları şu an sadece
+  Game Over panelinde (`GameManager.BuildDifficultyButtons`).
 
 ---
 
