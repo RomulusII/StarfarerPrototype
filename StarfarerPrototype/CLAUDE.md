@@ -327,6 +327,29 @@ dokunmak gerekmez — arayüzü uygulamak yeterlidir.
 Point Defence yalnızca `IsPointDefencePriority` olan hedefleri alır: bombalar,
 yakın saldırgan gemiler (Approach / BombRun / AttackRun) ve küçük asteroit parçaları.
 
+### Açılış Menüsü — Tasarım Kararları
+
+Oyun `StartMenuUI` ile başlar; menü kapanana kadar bölüm sistemi **kurulmaz**,
+dolayısıyla arkada düşman spawn olmaz.
+
+| Seçim | Sonuç |
+|---|---|
+| **BAŞLA** | `ChapterManager` kurulur, normal dalga akışı |
+| **SERBEST MOD** | `ChapterManager` kurulmaz, `EnemySpawner.debugFreeSpawn` açılır |
+| **ZORLUK** | `DifficultyManager.Current` — Kolay / Normal / Zor |
+
+Zorluk seçimi buraya taşındı; daha önce yalnızca Game Over panelindeydi ve oyuncu
+zorluğu ancak öldükten sonra değiştirebiliyordu. Game Over'daki butonlar duruyor.
+
+Serbest modda bölüm çarpanı olmadığı için düşmanlar **ham** gelir. Belirli bir
+bölümün zorluğunu test etmek için `EnemySpawner.debugChapter` Inspector'dan
+doldurulabilir.
+
+Menü açıkken oyun `SpeedController.Pause()` ile durdurulur — `Time.timeScale`
+doğrudan ezilmez, hız sistemiyle çakışmasın diye. `StartMenuUI.IsOpen` açıkken
+Tab / upgrade ekranı kilitlidir. Canvas runtime'da kurulur (GameManager deseni),
+ayrı sahne gerekmez.
+
 ### Spawn Mimarisi — Tasarım Kararları
 
 Sorumluluk ayrımı:
@@ -412,6 +435,7 @@ bir düşman üretmesi mümkün değildir — eskiden ayrı bir kod yolu olduğu
 | EnemyBullet.cs | Düşman mermisi — hull modu (kalkan üzerinden) veya komponent modu (doğrudan) |
 | EnemySpawner.cs | Düşmanın TEK inşa yolu — GameObject, HealthBar, bölüm çarpanları. Serbest test modu içerir |
 | AsteroidSpawner.cs | Asteroit alanının yoğunluğunu korur |
+| StartMenuUI.cs | Açılış ekranı — kampanya / serbest mod / zorluk seçimi |
 | StarField.cs | 400 yıldız, -15/+15 birim arası random pozisyon |
 | CameraController.cs | Parallax kayma + zoom, power curve (t²) |
 | HealthBar.cs | Can/kalkan barı, SpriteRenderer tabanlı, child olarak eklenir |
@@ -493,6 +517,7 @@ float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 - [x] Onarım birimi yavaşlatıldı — Mk1 8.0 → 2.0
 - [x] Deterministik kaçamak manevra — iki harmonikli desen + imza kaçışı
 - [x] Spawn mimarisi ayrıştırıldı — tek inşa yolu, AsteroidSpawner, serbest test modu
+- [x] Açılış menüsü — kampanya / serbest mod / zorluk seçimi
 
 ---
 
@@ -519,9 +544,8 @@ Kristal çalışması sırasında çıkan, henüz kapatılmamış maddeler.
   denge orada kurulacak, şimdi müdahale edilmeyecek.
 
 **Teknik borç:**
-- [ ] **Başlangıç menüsü yok.** Oyun doğrudan 1. bölüme giriyor. Serbest mod, zorluk
-  seçimi ve "devam et" için bir giriş ekranı gerekiyor. Zorluk butonları şu an sadece
-  Game Over panelinde (`GameManager.BuildDifficultyButtons`).
+- [ ] **Menüde bölüm seçimi yok.** Test için "şu bölümden başla" faydalı olur;
+  `StartMenuUI`'ya eklenecek doğal yer hazır.
 
 ---
 
@@ -553,5 +577,4 @@ Kristal çalışması sırasında çıkan, henüz kapatılmamış maddeler.
 - [ ] Fighter tipi düşman — Bomber'dan nasıl ayrışır? (tasarım netleşmedi)
 - [ ] Area-effect bombalar — büyük düşman gemilerinden, komponentlere hasar verir mi?
 - [ ] Komponent HP göstergesi — oyuncuya nasıl gösterilecek? (UI tasarımı yok)
-- [ ] Zorluk seçim ekranı — oyun başında mı, menüde mi?
 - [ ] Stat upgrade sistemi detayı — hangi statlar, kaç seviye, maliyet eğrisi

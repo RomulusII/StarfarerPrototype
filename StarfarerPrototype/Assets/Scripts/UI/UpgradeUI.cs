@@ -75,6 +75,7 @@ public class UpgradeUI : MonoBehaviour
     void Update()
     {
         if (GameManager.IsGameOver) return;   // game over → hiçbir şey yapma
+        if (StartMenuUI.IsOpen)      return;   // açılış menüsü → oyun girdileri kilitli
 
         if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
         {

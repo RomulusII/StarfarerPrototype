@@ -57,7 +57,10 @@ public class GameManager : MonoBehaviour
         BuildUpgradeUI();
         BuildBoostHUD();
         BuildSpeedHUD();
-        BuildChapterSystem();
+
+        // Oyun açılış menüsünden başlar; seçim yapılana kadar bölüm sistemi
+        // kurulmaz, dolayısıyla arkada düşman spawn olmaz.
+        StartMenuUI.Show(BeginGame);
     }
 
     void BuildSpeedHUD()
@@ -116,6 +119,18 @@ public class GameManager : MonoBehaviour
         sc.RegisterButtons(buttons);
     }
 
+    /// <summary>Menüdeki seçime göre oyunu başlatır.</summary>
+    void BeginGame(StartMenuUI.GameMode mode)
+    {
+        if (mode == StartMenuUI.GameMode.FreePlay)
+        {
+            BeginFreePlay();
+            return;
+        }
+
+        BuildChapterSystem();
+    }
+
     void BuildChapterSystem()
     {
         if (FindFirstObjectByType<ChapterTransitionUI>() == null)
@@ -129,6 +144,24 @@ public class GameManager : MonoBehaviour
             var go = new GameObject("ChapterManager");
             go.AddComponent<ChapterManager>();
         }
+    }
+
+    /// <summary>
+    /// Serbest mod: bölüm sistemi kurulmaz, EnemySpawner'ın test modu açılır.
+    /// Bölüm çarpanı olmadığı için düşmanlar ham (ölçeklenmemiş) gelir;
+    /// belirli bir bölümün zorluğunu test etmek için spawner'ın debugChapter
+    /// alanı Inspector'dan doldurulabilir.
+    /// </summary>
+    void BeginFreePlay()
+    {
+        var spawner = FindFirstObjectByType<EnemySpawner>();
+        if (spawner == null)
+        {
+            var go  = new GameObject("EnemySpawner");
+            spawner = go.AddComponent<EnemySpawner>();
+        }
+
+        spawner.debugFreeSpawn = true;
     }
 
     static void EnsureEventSystem()
