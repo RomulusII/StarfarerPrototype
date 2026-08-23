@@ -39,6 +39,10 @@ public class ShipBrain : MonoBehaviour
     [Tooltip("Kaçarken uzaklaşma vektöründen sapma açısı (derece). 0 = radyal kaçış.")]
     public float         escapeAngle       = 40f;
 
+    [Tooltip("Açıksa gemi CombatArea dışına çıkınca taktiği bırakıp geri döner. " +
+             "Bizim savaşçılarımız için açık — düşmanı kovalarken ekrandan çıkmasınlar.")]
+    public bool          leashToCombatArea = false;
+
     public bool      HasTarget     => _target != null;
     public bool      InFireRange   => HasTarget &&
                                       Vector2.Distance(transform.position, _target.position) <= fireRange;
@@ -85,6 +89,13 @@ public class ShipBrain : MonoBehaviour
     {
         if (UpgradeUI.IsPaused) return;
         if (_target == null) return;
+
+        // Alan dışına çıktıysa taktik beklesin, önce görüş alanına dön
+        if (leashToCombatArea && !CombatArea.Contains(transform.position))
+        {
+            _movement.MoveToward(CombatArea.ClosestPointInside(transform.position));
+            return;
+        }
 
         float dist = Vector2.Distance(transform.position, _target.position);
 

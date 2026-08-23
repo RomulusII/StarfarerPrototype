@@ -5,10 +5,31 @@ using UnityEngine.InputSystem;
 /// Mouse / dokunmatik pozisyonuna göre kamerayı kaydırır ve zoom yapar.
 /// Merkeze yakın yavaş, kenara yakın hızlı (power curve).
 /// Z pozisyonu -10 sabit, ortographic size 5-7 arası kayar.
+///
+/// KADRAJ: Ana gemi sabit duruyor; kamerayı ona göre konumlandırırız. Hedef,
+/// geminin EKRANDA belirli bir oranda durması: solda ve HUD'dan kalan dikey
+/// bandın ortasında. İleri (sağ) tarafta böylece daha çok alan kalır.
+///
+/// Kayma dünya birimiyle değil ekran oranıyla verilir; Free Aspect'te pencere
+/// en-boy oranı ve zoom değiştiğinde kadraj bozulmasın diye. Gerekli dünya
+/// kayması her karede kameranın o anki yarı genişlik/yüksekliğinden türetilir.
 /// </summary>
 [RequireComponent(typeof(Camera))]
 public class CameraController : MonoBehaviour
 {
+    [Header("Kadraj")]
+    [Tooltip("Gemi ekranın solundan bu oranda dursun. 0.5 = tam orta, 0.29 = solda.")]
+    [Range(0.05f, 0.95f)] public float shipScreenX = 0.29f;
+
+    [Tooltip("Gemi ekranın üstünden bu oranda dursun. Üstteki HUD şeridi hesaba " +
+             "katılarak kalan bandın ortası: 0.52.")]
+    [Range(0.05f, 0.95f)] public float shipScreenY = 0.52f;
+
+    [Tooltip("Mouse ile yatay kaydırma menzili (birim), kadraj tabanının etrafında.")]
+    public float panRange = 8f;
+
+    PlayerShip _ship;
+
     private Camera _cam;
 
     private bool   _isUpgradeMode;
@@ -43,14 +64,37 @@ public class CameraController : MonoBehaviour
         float t = Mathf.Clamp01(delta.magnitude);
         Vector2 direction = delta.normalized;
 
+        Vector2 basePos = FramingBase();
+
         float moveT = Mathf.Clamp01((t - 0.8f) / 0.2f);
         float curvedMoveT = Mathf.Pow(moveT, 2f);
-        Vector3 targetPos = new Vector3(direction.x * curvedMoveT * 8f, 0f, -10f);
+        Vector3 targetPos = new Vector3(
+            basePos.x + direction.x * curvedMoveT * panRange,
+            basePos.y,
+            -10f);
         transform.position = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * 3f);
 
         float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
         float targetSize = Mathf.Lerp(5f, 7f, zoomT);
         _cam.orthographicSize = Mathf.Lerp(_cam.orthographicSize, targetSize, Time.deltaTime * 3f);
+    }
+
+    /// <summary>
+    /// Geminin istenen ekran oranında görünmesi için kameranın olması gereken yer.
+    /// Kayma, o anki ortographic size ve en-boy oranından hesaplanır.
+    /// </summary>
+    Vector2 FramingBase()
+    {
+        if (_ship == null) _ship = FindFirstObjectByType<PlayerShip>();
+        Vector2 shipPos = _ship != null ? (Vector2)_ship.transform.position : Vector2.zero;
+
+        float halfH = _cam.orthographicSize;
+        float halfW = halfH * _cam.aspect;
+
+        // Ekran x'i sola kayarsa kamera sağa gider; ekran y'si aşağı inerse kamera yukarı
+        return new Vector2(
+            shipPos.x + (0.5f - shipScreenX) * 2f * halfW,
+            shipPos.y + (shipScreenY - 0.5f) * 2f * halfH);
     }
 
     public void ZoomToShip(Vector3 shipPosition, System.Action onComplete)

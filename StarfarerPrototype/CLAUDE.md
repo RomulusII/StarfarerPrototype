@@ -329,6 +329,7 @@ yakın saldırgan gemiler (Approach / BombRun / AttackRun) ve küçük asteroit 
 | Asteroid.cs | Parçalanabilir asteroit — Large→Medium→Small, çarpma hasarı, enkaz bırakır |
 | Debris.cs | Enkaz — sürüklenip durur, tipe göre renk, ömür sonunda solup yanıp söner |
 | ITurretTarget.cs | Turretlerin nişan alabileceği her şeyin ortak arayüzü |
+| CombatArea.cs | Dogfight sınırları — savaşçılar ekrandan çıkmasın |
 | TurretTargeting.cs | Hedef puanlama formülü + kilit histerezisi |
 | ShipMovement.cs | Roket-itkili uçuş modeli — burun itkisi, hıza bağlı dönüş, grip, fren |
 | ShipBrain.cs | Taktik AI — Orbit/Strafe/HoverFire pattern'ları, ShipMovement'e komut verir |
@@ -355,7 +356,13 @@ yakın saldırgan gemiler (Approach / BombRun / AttackRun) ve küçük asteroit 
 ---
 
 ## Kamera Sistemi
-- **Temel pozisyon:** (0, 0, -10), Orthographic Size: 5
+- **Kadraj:** Ana gemi (0, -2)'de sabit. Kamera gemiye göre konumlanır ve gemiyi
+  ekranda **soldan %29**, **üstten %52** oranında tutar — yani solda ve HUD şeridinden
+  kalan dikey bandın ortasında. İleri (sağ) tarafta böylece daha çok alan kalır.
+- Kayma dünya birimiyle değil **ekran oranıyla** verilir (`shipScreenX/Y`); Free Aspect'te
+  pencere en-boy oranı ve zoom değişince kadraj bozulmasın diye. Gerekli dünya kayması
+  her karede kameranın o anki yarı genişlik/yüksekliğinden türetilir.
+- **Temel pozisyon:** Orthographic Size: 5
 - **Kayma:** Mouse ekranın %80'inden sonra başlar, maksimum 8 birim, power curve t²
 - **Zoom:** Mouse ekranın %90'ından sonra başlar, Size 5→7
 - **Formül:**
@@ -448,9 +455,14 @@ Kristal çalışması sırasında çıkan, henüz kapatılmamış maddeler.
   ustalaşmayı ödüllendirmiyor. Öğrenilebilir, tekrarlanabilir kaçış desenleri (tip başına
   imza manevrası) daha zevkli olabilir. Rastgelelik tamamen kalkmalı mı, yoksa desen
   seçimi mi rastgele olmalı?
-- [ ] **Kamera kontrolü iyileştirmesi.** Daha uzağa, özellikle yukarı/aşağı bakabilmeli.
-  Mevcut: taban (0,0,-10), size 5, mouse %80'den sonra max 8 birim kayma, %90'dan sonra
-  size 5→7 zoom.
+- [ ] **Kamera dikey kaydırma yok.** `CameraController` yalnızca yatay kayıyor
+  (`direction.x`), dikey kayma hiç uygulanmıyor. Yukarı/aşağı bakabilmek için eklenmeli.
+- [ ] **Otomatik zoom rahatsız edici.** Mouse ekranın %90'ından sonra size 5→7.
+  Alternatif: zoom miktarını azaltıp yatay kaydırmayı artırmak. Test edilecek.
+- [ ] **Yıldız alanı kadrajı karşılamıyor.** `StarField` 36×14 birim (-18..18, -7..7).
+  Yeni kadrajda kamera sağa kaydığı için görünür alan x ekseninde +24'e, y ekseninde
+  -8.7'ye kadar gidiyor — kenarlarda yıldızsız boşluk kalır. Alan büyütülmeli
+  (ve yoğunluk korunacaksa `starCount` da).
 - [ ] **Enkaz ömrü vs toplayıcı kapasitesi.** Enkaz artık sürüklenip durduğu için 180 sn
   gerçekten sahada duruyor — bölümün neredeyse tamamı. Asteroitlerle birlikte sahada
   çok daha fazla enkaz olacak; toplayıcılar yetişmezse kaynak yanar ve ekran kalabalıklaşır.

@@ -54,6 +54,7 @@ public class FighterShip : MonoBehaviour
         _brain.orbitRadius    = 3.5f;
         _brain.engageDuration = 3f;
         _brain.repositionDelay = 0.8f;
+        _brain.leashToCombatArea = true;   // dogfight'ta ekrandan çıkmasın
     }
 
     public void Init(Transform hangar, float speed, float maxHP, float fireRate, float damage)
