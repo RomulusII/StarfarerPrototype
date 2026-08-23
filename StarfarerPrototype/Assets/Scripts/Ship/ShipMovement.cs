@@ -19,9 +19,10 @@ using UnityEngine;
 ///  6. MoveToward fren mesafesini v²/(2a) ile hesaplar, retro itkiyle yavaşlar.
 ///  7. Komutlar Update'te verilir, entegrasyon LateUpdate'te tek sefer yapılır —
 ///     aynı karede çift ilerleme olmaz. Komut verilmezse gemi süzülür (coast).
-///  8. Nişan almadığı anlarda gemi kaçamak manevra yapar: burun 1–2 saniyede bir
-///     yenilenen küçük rastgele açılarla salınır (evasive: true). Nişan alırken
-///     sapma uygulanmaz — gemi hedefine net döner.
+///  8. Nişan almadığı anlarda gemi kaçamak manevra yapar: burun DETERMİNİSTİK bir
+///     desende salınır (evasive: true) — iki sinüsün toplamı, wanderPeriod'da
+///     tekrarlar. Rastgele değil; oyuncu deseni öğrenip lead verebilir.
+///     Nişan alırken sapma uygulanmaz — gemi hedefine net döner.
 ///
 /// API:
 ///   MoveToward(target, evasive)   — hedefe burnu çevirir, hızlanır, varışta frenler
@@ -49,13 +50,13 @@ public class ShipMovement : MonoBehaviour
     public float retroFactor = 0.5f;
 
     [Header("Kaçamak Manevra")]
-    [Tooltip("Nişan almadığı anlarda burnun rastgele saptığı max açı (derece). " +
+    [Tooltip("Nişan almadığı anlarda salınımın tepe açısı (derece). " +
              "0 = kaçamak manevra yok. Ağır gemilerde düşük tutulmalı.")]
     public float wanderAngle = 15f;
 
-    [Tooltip("Yeni rastgele sapma seçme aralığı (saniye).")]
-    public float wanderIntervalMin = 1f;
-    public float wanderIntervalMax = 2f;
+    [Tooltip("Salınımın tam bir döngüyü tamamlama süresi (saniye). Küçük = hızlı " +
+             "titrek uçuş, büyük = uzun yayvan kavisler. Desen bu periyotta tekrarlar.")]
+    public float wanderPeriod = 2f;
 
     [Tooltip("Manevra iticili büyük gemiler (boss, taşıyıcı): itki her yöne " +
              "uygulanabilir ve burun yönü hareketten bağımsızdır. Küçük gemilerde " +
@@ -72,7 +73,13 @@ public class ShipMovement : MonoBehaviour
     const float ReverseAssistMin = 70f;  // bu sapmanın altında retro yok — kavis hız kaybettirmez
     const float ReverseAssistMax = 160f; // bu sapmada tam retro — gemi durup döner
     const float ArrivalDeadZone  = 0.02f; // MoveToward'ın durma toleransı (birim)
-    const float WanderSlewFactor = 1.5f;  // sapmanın yeni hedefe kayma hızı (wanderAngle × bu)
+    // Salınım deseni: iki sinüsün toplamı. Tek sinüs ilk bakışta çözülür; ikinci
+    // harmonik deseni okunması zor ama öğrenilebilir kılar. 2.5 katsayısı deseni
+    // iki temel periyotta tekrarlatır — oyuncunun ezberleyebileceği bir imza.
+    const float WanderHarmonic     = 2.5f;
+    const float WanderHarmonicGain = 0.35f;
+    const float WanderNormalize    = 1f / 1.35f;   // tepe değeri wanderAngle'da tutar
+    const float WanderCycle        = Mathf.PI * 4f; // desenin tam tekrar periyodu
 
     public float MaxSpeed     => enginePower / mass;
     public float Acceleration => enginePower / mass * AccelFactor;
@@ -130,10 +137,10 @@ public class ShipMovement : MonoBehaviour
     bool    _hasCommand;
     bool    _evasive;
 
-    // Kaçamak manevra: hedef sapma 1–2 sn'de bir yenilenir, burun ona doğru süzülür
+    // Kaçamak manevra: deterministik salınım. Faz spawn'da bir kez rastgelelenir
+    // (gemiler senkron uçmasın), sonrası tamamen tekrarlanabilir.
     float _wanderCurrent;
-    float _wanderTarget;
-    float _wanderTimer;
+    float _wanderPhase;
 
     /// <summary>Kaçamak manevranın anki burun sapması (derece).</summary>
     public float WanderOffset => _wanderCurrent;
@@ -147,6 +154,7 @@ public class ShipMovement : MonoBehaviour
 
     public void Initialize(float initialFacingDeg = 180f)
     {
+        _wanderPhase       = Random.Range(0f, WanderCycle);
         _facingAngle       = initialFacingDeg;
         _velocity          = Vector2.zero;
         _hasCommand        = false;
@@ -346,22 +354,29 @@ public class ShipMovement : MonoBehaviour
     }
 
     /// <summary>
-    /// 1–2 saniyede bir yeni bir rastgele sapma hedefi seçer ve mevcut sapmayı
-    /// ona doğru süzer. Ani kırılma değil, yavaşça salınan bir burun hareketi.
+    /// KURAL 8 — Deterministik salınım. Rastgele değil: iki sinüsün toplamıyla
+    /// üretilen, wanderPeriod'da tekrarlayan sabit bir desen. Oyuncu ilk bakışta
+    /// çözemez ama izledikçe öğrenir ve lead vermeyi başarır — rastgelelikte
+    /// olmayan bir ustalaşma alanı.
+    ///
+    /// Tek rastgele öğe spawn'daki başlangıç fazıdır; bu, aynı desendeki gemilerin
+    /// senkron uçmasını engeller, davranışın kendisini öngörülemez yapmaz.
     /// </summary>
     void UpdateWander(float dt)
     {
         if (wanderAngle <= 0.01f) { _wanderCurrent = 0f; return; }
 
-        _wanderTimer -= dt;
-        if (_wanderTimer <= 0f)
-        {
-            _wanderTimer  = Random.Range(wanderIntervalMin, wanderIntervalMax);
-            _wanderTarget = Random.Range(-wanderAngle, wanderAngle);
-        }
+        float period = Mathf.Max(wanderPeriod, 0.1f);
+        _wanderPhase += dt * (Mathf.PI * 2f / period);
 
-        _wanderCurrent = Mathf.MoveTowards(_wanderCurrent, _wanderTarget,
-                                           wanderAngle * WanderSlewFactor * dt);
+        // Desenin gerçek periyodu 4π'dir (harmonik 2.5 = 5/2 olduğu için temel
+        // periyodun iki katı). 2π'de sarmak dalgada kırılma yaratır.
+        if (_wanderPhase > WanderCycle) _wanderPhase -= WanderCycle;
+
+        float wave = Mathf.Sin(_wanderPhase)
+                   + WanderHarmonicGain * Mathf.Sin(_wanderPhase * WanderHarmonic);
+
+        _wanderCurrent = wanderAngle * wave * WanderNormalize;
     }
 
     /// <summary>

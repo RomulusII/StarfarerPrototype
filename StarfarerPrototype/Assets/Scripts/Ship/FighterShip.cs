@@ -45,7 +45,8 @@ public class FighterShip : MonoBehaviour
         _movement.mass    = Mass;
         _movement.agility = 1.4f;   // küçük avcı: dar kavis
         _movement.grip    = 0.94f;
-        _movement.wanderAngle = 12f; // dogfight'ta salınarak uçar
+        _movement.wanderAngle  = 12f;  // dogfight'ta salınarak uçar
+        _movement.wanderPeriod = 1.6f;
 
         _brain                = gameObject.AddComponent<ShipBrain>();
         _brain.pattern        = CombatPattern.Strafe;

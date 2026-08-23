@@ -22,8 +22,11 @@ public enum CombatPattern { Orbit, Strafe, HoverFire }
 /// inemez ve dar dönüş isteyen manevralar önce yavaşlamayı gerektirir.
 ///
 /// Nişan / kaçamak ayrımı: ateş menzilindeyken burun hedefe net döner. Diğer tüm
-/// anlarda evasive salınım açıktır — burun 1–2 saniyede bir yenilenen küçük
-/// rastgele açılarla oynar, kaçış ise radyal yerine 25–55° çapraz yapılır.
+/// anlarda evasive salınım açıktır.
+///
+/// Kaçış DETERMİNİSTİKTİR: açı tipin escapeAngle'ıdır, taraf her kaçışta değişir
+/// (sağ, sol, sağ...). Rastgele değil — oyuncu kalıbı öğrenip önünü kesebilsin.
+/// Yalnızca ilk taraf spawn'da rastgelelenir.
 /// </summary>
 [RequireComponent(typeof(ShipMovement))]
 public class ShipBrain : MonoBehaviour
@@ -59,13 +62,12 @@ public class ShipBrain : MonoBehaviour
     int           _orbitDir = 1;
     bool          _strafeInbound = true;
     float         _escapeOffset;
-
-    // Kaçış açısı escapeAngle etrafında ±%40 dağılır — her kaçış birbirine benzemesin
-    const float EscapeJitter = 0.4f;
+    int           _escapeSide = 1;   // her kaçışta taraf değişir: sağ, sol, sağ...
 
     void Awake()
     {
         _movement      = GetComponent<ShipMovement>();
+        _escapeSide    = Random.Range(0, 2) == 0 ? 1 : -1;  // yalnızca başlangıç tarafı
         _approachAngle = Random.Range(0f, 360f);
         _stateTimer    = Random.Range(0f, repositionDelay); // spawn stagger
     }
@@ -143,10 +145,12 @@ public class ShipBrain : MonoBehaviour
 
         if (_stateTimer <= 0f || dist > engageRange + 4f)
         {
-            _state        = TacticalState.Disengaging;
-            _escapeOffset = Random.Range(escapeAngle * (1f - EscapeJitter),
-                                         escapeAngle * (1f + EscapeJitter))
-                          * (Random.Range(0, 2) == 0 ? 1f : -1f);
+            _state = TacticalState.Disengaging;
+
+            // İmza kaçışı: açı sabit, taraf her seferinde değişir. Oyuncu
+            // "bu tip önce sağa, sonra sola kırar" kalıbını öğrenebilsin.
+            _escapeSide   = -_escapeSide;
+            _escapeOffset = escapeAngle * _escapeSide;
         }
     }
 

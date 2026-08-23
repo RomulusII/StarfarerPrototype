@@ -52,13 +52,17 @@ public class EnemyTypeData : ScriptableObject
              "düşük değer = kavislerde dışa savrulan hantal gemi.")]
     [Range(0f, 1f)] public float grip = 0.9f;
 
-    [Tooltip("Nişan almadığı anlarda burnun rastgele saptığı max açı (derece). " +
-             "Yüksek = tahmin edilmesi zor, düzensiz uçuş. 0 = kaçamak manevra yok.")]
+    [Tooltip("Nişan almadığı anlarda salınımın tepe açısı (derece). Desen rastgele " +
+             "değil, deterministiktir — bu değer genliği belirler. 0 = salınım yok.")]
     public float evasionAngle = 15f;
 
     [Tooltip("Kaçarken uzaklaşma vektöründen sapma açısı (derece). 0 = radyal " +
              "(tam ters) kaçış, yüksek = çapraz kaçış. ChapterData bölüme göre ölçekler.")]
     public float escapeAngle = 40f;
+
+    [Tooltip("Salınım deseninin tekrar periyodu (saniye). Küçük = titrek ve hızlı, " +
+             "büyük = yayvan. Tipin uçuş imzasını belirleyen değer — oyuncu bunu öğrenir.")]
+    public float evasionPeriod = 2f;
 
     [Header("Silah")]
     public EnemyWeaponKind weaponKind   = EnemyWeaponKind.Laser;
@@ -96,7 +100,7 @@ public class EnemyTypeData : ScriptableObject
         d.engageRange   = 7f;   d.fireRange     = 6.5f;
         d.orbitRadius   = 3.5f; d.engageDuration = 4f;
         d.agility       = 1.5f; d.grip          = 0.95f;  // küçük ve kıvrak: dar kavis, savrulmaz
-        d.evasionAngle  = 18f;  // sinek gibi düzensiz — en oynak tip
+        d.evasionAngle  = 18f;  d.evasionPeriod = 1.4f;  // hızlı, titrek imza
         d.escapeAngle   = 40f;
         d.weaponKind    = EnemyWeaponKind.Kinetic;
         d.fireDamage    = 3f;   d.fireRate      = 5f;   d.bulletSpeed = 6f;
@@ -124,7 +128,7 @@ public class EnemyTypeData : ScriptableObject
         d.engageRange   = 5f;   d.fireRange     = 5f;
         d.orbitRadius   = 4f;   d.engageDuration = 8f;
         d.agility       = 0.55f; d.grip         = 0.72f;  // hantal: geniş kavis, belirgin savrulma
-        d.evasionAngle  = 6f;   // ağır gemi kaçamak yapmaz, rotasını korur
+        d.evasionAngle  = 6f;   d.evasionPeriod = 3.4f;  // ağır gemi, yayvan ve az
         d.escapeAngle   = 30f;  // hantal — çaprazı da az
         d.weaponKind    = EnemyWeaponKind.Cannon;
         d.fireDamage    = 15f;  d.fireRate      = 6f;   d.bulletSpeed = 2f;
@@ -153,7 +157,7 @@ public class EnemyTypeData : ScriptableObject
         d.engageRange   = 5.5f; d.fireRange     = 4.5f;
         d.orbitRadius   = 3.5f; d.engageDuration = 5f;
         d.agility       = 0.85f; d.grip         = 0.85f;  // orta sınıf: dengeli kavis
-        d.evasionAngle  = 12f;
+        d.evasionAngle  = 12f;  d.evasionPeriod = 2.2f;
         d.escapeAngle   = 40f;
         d.weaponKind    = EnemyWeaponKind.Laser;
         d.fireDamage    = 6f;   d.fireRate      = 3f;   d.bulletSpeed = 3.5f;
@@ -180,7 +184,7 @@ public class EnemyTypeData : ScriptableObject
         d.movementKind  = EnemyMovementKind.AttackRun;
         d.engageRange   = 8f;   d.fireRange     = 2.5f;
         d.agility       = 1.15f; d.grip         = 0.93f;  // hızlı avcı: dalışta geniş, frende dar kavis
-        d.evasionAngle  = 15f;
+        d.evasionAngle  = 15f;  d.evasionPeriod = 1.7f;  // hızlı avcı
         d.escapeAngle   = 40f;
         d.weaponKind    = EnemyWeaponKind.ComponentBurst;
         d.fireDamage    = 2f;   d.fireRate      = 1.8f; d.bulletSpeed = 2.25f;

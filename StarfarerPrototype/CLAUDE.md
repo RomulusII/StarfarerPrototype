@@ -198,32 +198,44 @@ Tüm AI gemileri (`EnemyBot`, `FighterShip`, `CollectorShip`) `ShipMovement` üz
    hedefin etrafında sonsuz çember çizer.
 7. **Komut Update'te, entegrasyon LateUpdate'te.** Aynı karede çift ilerleme olmaz.
    Komut verilmeyen kare = süzülme (coast).
-8. **Nişan alırken net, diğer zamanlarda kaçamak.** Ateş menzilindeyken gemi burnunu
-   hedefe net çevirir. Diğer tüm anlarda burun 1–2 saniyede bir yenilenen küçük
-   rastgele açılarla salınır (`evasive: true`). Sapma anî değildir, yeni hedefine
-   süzülür — rota da burnu takip ettiği için gemi yılankavi bir iz çizer.
-9. **Kaçış radyal değil çapraz.** Hedeften tam ters yönde kaçmak tahmin edilebilir
-   ve nişan almayı kolaylaştırır. Kaçış yönü, uzaklaşma vektörünün `escapeAngle`
-   kadar (±%40 dağılımla) sağa veya sola döndürülmüş hâlidir; üstüne kaçamak
-   salınım biner.
+8. **Nişan alırken net, diğer zamanlarda kaçamak — ve kaçamak DETERMİNİSTİK.**
+   Ateş menzilindeyken gemi burnunu hedefe net çevirir. Diğer tüm anlarda burun
+   sabit bir desende salınır (`evasive: true`). Desen rastgele değil:
+
+       sapma = evasionAngle × (sin θ + 0.35 · sin 2.5θ) / 1.35
+
+   Tek sinüs ilk bakışta çözülür; ikinci harmonik deseni okunması zor ama
+   **öğrenilebilir** kılar — rastgelelikte olmayan bir ustalaşma alanı açar.
+   Harmonik 2.5 = 5/2 olduğu için desenin gerçek periyodu `evasionPeriod`'un
+   **iki katıdır** (4π); faz bu yüzden 4π'de sarılır, 2π'de sarmak dalgada
+   kırılma yaratır.
+
+   Tek rastgele öğe spawn'daki başlangıç fazıdır — aynı desendeki gemiler senkron
+   uçmasın diye. Davranışın kendisi öngörülebilir kalır.
+9. **Kaçış radyal değil çapraz, ve imzalı.** Hedeften tam ters yönde kaçmak tahmin
+   edilebilir. Kaçış yönü, uzaklaşma vektörünün `escapeAngle` kadar döndürülmüş
+   hâlidir — **açı sabittir, taraf her kaçışta değişir** (sağ, sol, sağ...).
+   Oyuncu "bu tip önce sağa, sonra sola kırar" kalıbını öğrenebilir. Yalnızca ilk
+   taraf spawn'da rastgelelenir.
 10. **Kaçamak davranış bölüme göre ölçeklenir.** `ChapterData.enemyEvasionMultiplier`
    hem `evasionAngle` hem `escapeAngle` değerlerini çarpar; `ChapterManager`
    düşmanın runtime kopyasına uygular — `enemyHpMultiplier` ile aynı mekanizma.
 
 **Uçuş karakteri parametreleri** (`EnemyTypeData` içinde, tip başına):
 
-| Tip | agility | grip | evasionAngle | escapeAngle | Karakter |
-|-----|---------|------|--------------|-------------|----------|
-| Swarm | 1.5 | 0.95 | 18° | 40° | Küçük, kıvrak — dar kavis, en oynak uçuş |
-| Shield | 0.85 | 0.85 | 12° | 40° | Orta sınıf, dengeli |
-| Armored | 0.55 | 0.72 | 6° | 30° | Hantal — geniş kavis, rotasını korur |
-| Bomber | 1.15 | 0.93 | 15° | 40° | Hızlı avcı — dalışta geniş, frende dar kavis |
-| BombRunner | 0.6 | 0.8 | 0° | 0° | Düz hat bomba koşusu — salınım ve kaçış yok |
-| Fighter (oyuncu) | 1.4 | 0.94 | 12° | 40° | Kıvrak avcı |
-| Collector (oyuncu) | 1.6 | 0.97 | 0° | — | İş gemisi — düz ve verimli gider |
+| Tip | agility | grip | evasionAngle | evasionPeriod | escapeAngle | Karakter |
+|-----|---------|------|--------------|---------------|-------------|----------|
+| Swarm | 1.5 | 0.95 | 18° | 1.4 sn | 40° | Küçük, kıvrak — hızlı titrek imza |
+| Shield | 0.85 | 0.85 | 12° | 2.2 sn | 40° | Orta sınıf, dengeli |
+| Armored | 0.55 | 0.72 | 6° | 3.4 sn | 30° | Hantal — yayvan ve az salınım |
+| Bomber | 1.15 | 0.93 | 15° | 1.7 sn | 40° | Hızlı avcı |
+| BombRunner | 0.6 | 0.8 | 0° | — | 0° | Düz hat bomba koşusu — salınım ve kaçış yok |
+| Fighter (oyuncu) | 1.4 | 0.94 | 12° | 1.6 sn | 40° | Kıvrak avcı |
+| Collector (oyuncu) | 1.6 | 0.97 | 0° | — | — | İş gemisi — düz ve verimli gider |
 
-`evasionAngle` burnun nişan dışı anlardaki max rastgele sapması, `escapeAngle` ise
-kaçarken radyal yönden sapmasıdır. Tablodaki değerler **tam** seviyedir (bölüm 3+).
+`evasionAngle` salınımın tepe açısı, `evasionPeriod` tipin **uçuş imzası** — oyuncunun
+öğreneceği şey budur; desenin tam tekrarı bunun iki katında olur (Swarm: 2.8 sn).
+`escapeAngle` kaçarken radyal yönden sapma. Değerler **tam** seviyedir (bölüm 8+).
 
 **Zorluk eğrisi** — `ChapterData.EvasionForChapter()` = `Mathf.InverseLerp(1f, 8f, bölüm)`.
 1. bölümde kaçamak davranış **tamamen kapalı**, 8. bölümde tam açık, arası doğrusal.
@@ -449,6 +461,7 @@ float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 - [x] Komponent kataloğu birleştirildi — ComponentCatalog tek sahip, tek kalkan tipi
 - [x] Depo komponenti — kaynak tavanı kurulu depolardan türetiliyor
 - [x] Onarım birimi yavaşlatıldı — Mk1 8.0 → 2.0
+- [x] Deterministik kaçamak manevra — iki harmonikli desen + imza kaçışı
 
 ---
 
@@ -485,10 +498,10 @@ Kristal çalışması sırasında çıkan, henüz kapatılmamış maddeler.
 
 ## Açık İşler — Hareket & Zorluk
 
-- [ ] **Deterministik kaçış manevrası — konuşulacak.** Mevcut kaçamak davranış rastgele;
-  ustalaşmayı ödüllendirmiyor. Öğrenilebilir, tekrarlanabilir kaçış desenleri (tip başına
-  imza manevrası) daha zevkli olabilir. Rastgelelik tamamen kalkmalı mı, yoksa desen
-  seçimi mi rastgele olmalı?
+- [ ] **Deterministik kaçış — testte doğrulanacak.** Desen ve imza kaçışı yazıldı;
+  oyuncunun kalıbı gerçekten öğrenip öğrenemediği ancak oynayarak anlaşılır.
+  Ayar noktaları: `EnemyTypeData.evasionPeriod` (imza), `WanderHarmonic` /
+  `WanderHarmonicGain` (desenin karmaşıklığı).
 - [ ] **Kamera dikey kaydırma yok.** `CameraController` yalnızca yatay kayıyor
   (`direction.x`), dikey kayma hiç uygulanmıyor. Yukarı/aşağı bakabilmek için eklenmeli.
 - [ ] **Otomatik zoom rahatsız edici.** Mouse ekranın %90'ından sonra size 5→7.

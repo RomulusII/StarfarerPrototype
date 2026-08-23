@@ -75,6 +75,9 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     // Spawn anındaki burun yönü — InitMovement belirler, Initialize uygular
     float _initialFacing = 180f;
 
+    // Kaçış tarafı her sortide değişir — deterministik imza manevrası
+    int _escapeSide = 1;
+
     // Kalkan kapasitesinin kaçta kaçı kristal olarak düşer
     const float CrystalPerShieldPoint = 0.1f;
 
@@ -102,7 +105,8 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         _movement.enginePower = data.enginePower;
         _movement.agility     = data.agility;
         _movement.grip        = data.grip;
-        _movement.wanderAngle = data.evasionAngle;
+        _movement.wanderAngle  = data.evasionAngle;
+        _movement.wanderPeriod = data.evasionPeriod;
 
         ApplyStats();
 
@@ -111,6 +115,7 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 
         _fireRateBase = data.fireRate;
         _fireTimer    = Random.Range(0f, _fireRateBase);
+        _escapeSide   = Random.Range(0, 2) == 0 ? 1 : -1;   // yalnızca başlangıç tarafı
         _prevPos      = transform.position;
 
         InitMovement();
@@ -308,10 +313,11 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
                     if (_approachShotsLeft <= 0)
                     {
                         _approachPhase = ApproachPhase.Retreating;
-                        // Düz geri değil, çapraz kaç — nişan alınması zorlaşsın
-                        float ae = data.escapeAngle * ApproachEscapeFactor;
+                        // Düz geri değil, sabit açıyla çapraz kaç; taraf sortiden
+                        // sortiye değişir — kalıp öğrenilebilir kalsın
+                        _escapeSide = -_escapeSide;
                         _approachEscapeDir = ShipMovement.Rotate(
-                            Vector2.right, Random.Range(-ae, ae));
+                            Vector2.right, data.escapeAngle * ApproachEscapeFactor * _escapeSide);
                     }
                 }
                 break;
@@ -380,8 +386,10 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
                     _arDisengageTimer = ArDisengageTime;
 
                     // Kaçış açısını kaydet — Disengaging fazında bu açıya dönülür
-                    float esc = data.escapeAngle * ArEscapeFactor;
-                    _arEscapeAngle = _movement.FacingAngle + Random.Range(-esc, esc);
+                    // İmza kaçışı: sabit açı, her sortide ters taraf
+                    _escapeSide    = -_escapeSide;
+                    _arEscapeAngle = _movement.FacingAngle
+                                   + data.escapeAngle * ArEscapeFactor * _escapeSide;
 
                     var go = new GameObject("EnemyBullet_Comp");
                     go.transform.position = transform.position;
