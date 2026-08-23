@@ -5,37 +5,44 @@ using UnityEngine;
 /// CollectorShip tarafından toplanır.
 ///
 /// Kurallar:
-///   - Kısa bir sürüklenmeden sonra durur (Drag) — sahadan kaçıp gitmez,
-///     toplayıcının yetişebileceği yerde kalır.
+///   - Hız iki bileşenlidir: saçılma (sönümlenir) + sabit sola sürüklenme (kalıcı).
+///     Patlama itmesi hızla söner ama enkaz durmaz — yavaşça sola kayar ve
+///     vaktinde toplanmazsa sahneden çıkar. Tamamen dursaydı ekranın sağında
+///     kalan enkaz toplayıcının menzili dışında sonsuza dek asılı kalırdı.
 ///   - Kaynak tipine göre renklenir: ham madde kahverengi, kristal mavimsi gri.
-///   - Ömrü dolmadan toplanmazsa kaybolur. Son saniyelerde önce solar,
-///     son 10 saniyede yanıp söner — oyuncu kaçırdığını görebilsin.
+///   - İki şekilde kaybolur: soldan çıkarak (asıl yol) veya ömrü dolarak (emniyet).
+///     Görsel uyarı hangisi önce gelecekse ona göre işler — enkaz kaybolmasına
+///     yaklaşırken solar, son saniyelerde yanıp söner.
 /// </summary>
 public class Debris : MonoBehaviour
 {
     public ResourceType resourceType   = ResourceType.RawMaterial;
     public float        resourceAmount = 10f;
 
-    Vector2        _velocity;
+    Vector2        _scatter;   // patlama itmesi — sönümlenir
     float          _life;
     SpriteRenderer _sr;
 
     const float LifeTime   = 180f;  // toplanmazsa kaybolma süresi
-    const float FadeStart  = 60f;   // kalan bu sürenin altında solmaya başlar
-    const float BlinkStart = 10f;   // kalan bu sürenin altında yanıp söner
+    const float FadeStart  = 25f;   // kaybolmaya bu kadar kala solmaya başlar
+    const float BlinkStart = 8f;    // bu kadar kala yanıp söner
     const float MinAlpha   = 0.3f;  // solmanın indiği taban
     const float BlinkRate  = 4f;    // saniyedeki yanıp sönme sayısı
-    const float Drag       = 0.9f;  // sürüklenmenin sönümlenme hızı (birim/sn²)
+    const float Drag       = 0.9f;  // saçılmanın sönümlenme hızı (birim/sn²)
+    const float DriftSpeed = 0.3f;  // sabit sola kayma (birim/sn) — asla durmaz
+    const float DespawnX   = -17f;  // soldan çıkınca yok olur
 
     static readonly Color MetalColor   = new Color(0.55f, 0.45f, 0.30f);
     static readonly Color CrystalColor = new Color(0.52f, 0.70f, 0.85f);
 
-    public bool    IsEmpty  => resourceAmount <= 0f;
-    public Vector2 Velocity => _velocity;
+    public bool IsEmpty => resourceAmount <= 0f;
+
+    /// <summary>Toplam hız — CollectorShip toplarken enkazla birlikte sürüklenir.</summary>
+    public Vector2 Velocity => _scatter + Vector2.left * DriftSpeed;
 
     public void Init(Vector2 velocity, float amount, ResourceType type = ResourceType.RawMaterial)
     {
-        _velocity      = velocity;
+        _scatter       = velocity;
         resourceAmount = amount;
         resourceType   = type;
         ApplyTint(1f);
@@ -51,17 +58,29 @@ public class Debris : MonoBehaviour
     {
         if (UpgradeUI.IsPaused) return;
 
-        // Sürüklenme sönümlenir — enkaz biraz savrulur, sonra durur
-        if (_velocity.sqrMagnitude > 0.000001f)
-        {
-            _velocity = Vector2.MoveTowards(_velocity, Vector2.zero, Drag * Time.deltaTime);
-            transform.position += (Vector3)(_velocity * Time.deltaTime);
-        }
+        // Saçılma sönümlenir, sola kayma kalıcıdır
+        if (_scatter.sqrMagnitude > 0.000001f)
+            _scatter = Vector2.MoveTowards(_scatter, Vector2.zero, Drag * Time.deltaTime);
+
+        transform.position += (Vector3)(Velocity * Time.deltaTime);
+
+        if (transform.position.x < DespawnX) { Destroy(gameObject); return; }
 
         _life -= Time.deltaTime;
         if (_life <= 0f) { Destroy(gameObject); return; }
 
-        ApplyTint(AlphaForRemaining(_life));
+        ApplyTint(AlphaForRemaining(SecondsLeft()));
+    }
+
+    /// <summary>
+    /// Kaybolmasına kalan süre: ömür sayacı ile soldan çıkışa kalan süreden
+    /// hangisi yakınsa o. Sürüklenme yüzünden enkaz genelde ömrü dolmadan
+    /// sahneden çıkar; uyarı bu yüzden yalnızca sayaca bakamaz.
+    /// </summary>
+    float SecondsLeft()
+    {
+        float toEdge = (transform.position.x - DespawnX) / Mathf.Max(DriftSpeed, 0.001f);
+        return Mathf.Min(_life, toEdge);
     }
 
     /// <summary>Kalan süreye göre görünürlük: önce solar, sonunda yanıp söner.</summary>

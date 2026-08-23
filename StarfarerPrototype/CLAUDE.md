@@ -110,12 +110,17 @@ sistemleri için.
 toplar → hangara döner → `ResourceInventory`'ye boşaltır.
 
 **Enkaz (`Debris`) kuralları:**
-- Kısa bir sürüklenmeden sonra **durur** (Drag = 0.9). Sahadan kaçıp gitmez, toplayıcının
-  yetişebileceği yerde kalır.
+- Hız iki bileşenli: **saçılma** (patlama itmesi, ~1 sn'de söner) + **sabit sola
+  kayma** (0.3 birim/sn, kalıcı). Enkaz asla durmaz; vaktinde toplanmazsa soldan
+  çıkıp kaybolur. Tamamen dursaydı ekranın sağında kalan enkaz toplayıcının
+  menzili (hangardan 12 birim) dışında sonsuza dek asılı kalırdı.
 - Tipe göre renklenir: ham madde kahverengi, kristal **mavimsi gri**.
-- Ömrü 180 sn. Son 60 saniyede kademeli olarak %30 saydamlığa solar, son 10 saniyede
-  yanıp söner. Sürüklenme durduğu için bu sayaç artık gerçekten işliyor —
-  eskiden enkaz zaten çoktan ekran dışına kaymış oluyordu.
+- İki şekilde kaybolur: soldan çıkarak (asıl yol, sahnenin genişliğine göre
+  ~50–107 sn) veya 180 sn'lik ömrü dolarak (emniyet). Görsel uyarı hangisi önce
+  gelecekse ona göre işler: kaybolmasına 25 sn kala solmaya başlar, 8 sn kala
+  yanıp söner.
+- Toplayıcı, topladığı enkaz sola kayarken onunla birlikte sürüklenir; enkaz
+  menzil dışına çıkarsa bırakır — yoksa toplayıcı sahneden dışarı çekilirdi.
 
 **Toplayıcı kuralları:**
 - Tip ayrımı yapmaz, ne bulursa toplar. Kargo tip başına ayrı sayılır (`_cargo[]`),

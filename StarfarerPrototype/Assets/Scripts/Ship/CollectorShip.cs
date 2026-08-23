@@ -97,6 +97,8 @@ public class CollectorShip : MonoBehaviour
 
             case Phase.Collecting:
                 if (_target == null || _target.IsEmpty) { _target = null; _phase = Phase.Idle; break; }
+                // Enkaz sola kayarken toplayıcıyı menzil dışına sürüklemesin
+                if (DebrisTooFar(_target))              { _target = null; _phase = Phase.Idle; break; }
                 if (_cargoTotal >= (int)maxCargo)        { _phase = Phase.Returning; break; }
                 // Enkaz ile birlikte sürüklen — motor kapalı, kalan hız sıfırlanır
                 _movement.Halt();
