@@ -575,6 +575,45 @@ Kristal çalışması sırasında çıkan, henüz kapatılmamış maddeler.
 
 ---
 
+## Açık İşler — Sıradaki Oturum
+
+Sıra kararlaştırıldı: **hitbox ayrımı → denge testleri → skin'ler.**
+
+- [ ] **Hitbox'ları görselden ayır.** `EnemyBot.ApplyStats()` collider'ı doğrudan
+  sprite boyutundan türetiyor:
+  ```csharp
+  GetComponent<BoxCollider2D>().size = new Vector2(data.bodyWidth / 100f, data.bodyHeight / 100f);
+  ```
+  Skin'ler gelince `bodyWidth/bodyHeight` değişecek, collider da onunla değişecek ve
+  vurma zorluğu kayacak — yani skin'den önce yapılan her denge ayarı geçersizleşir.
+  `Asteroid`'de de aynı bağ var (`RadiusFor` → `PxFor`).
+
+  Çözüm: `EnemyTypeData`'ya ayrı `hitboxWidth/hitboxHeight` alanları (varsayılanları
+  şu anki sprite boyutu). Mermilerde bu ayrım zaten var — `Bullet.Awake` collider'ı
+  sabit `(0.1, 0.3)` veriyor, sprite'tan bağımsız. Shmup'larda hitbox genellikle
+  görselden kasten küçük tutulur.
+
+  Bu yapılınca skin ile denge birbirini etkilemez, sıralama sorunu ortadan kalkar.
+
+- [ ] **Denge testleri.** Bu oturumda konan sayıların hiçbiri oyunda denenmedi;
+  hepsi ilk atış. Hitbox'tan **bağımsız** oldukları için skin'i beklemeden
+  ölçülebilirler:
+  - Ekonomi: kristal/metal akışı, komponent fiyatları, depo kapasitesi ve kilidi
+    (kalkan Mk3 için depo zorunluluğu kasıtlıydı — işe yarıyor mu?)
+  - Bölüm temposu: wave bütçeleri, spawn aralıkları, `threatScore` sıralaması
+  - Serbest mod rampası: `levelDuration` çok yavaş/hızlı mı?
+  - Uçuş hissi: `agility` / `grip`, kaçamak deseninin gerçekten öğrenilebilir
+    olup olmadığı
+  - Onarım hızları, enkaz ömrü ve sürüklenme hızı
+
+  Denge testi bazı düşman tiplerinin işe yaramadığını gösterebilir — silinecek
+  veya baştan tasarlanacak bir tipe önce sanat emeği harcamamak için skin sonraya
+  bırakıldı.
+
+- [ ] **Skin'ler.** Gerçek sprite'lar. Hitbox ayrımı yapıldıysa denge etkilenmez.
+
+---
+
 ## Açık İşler — Hareket & Zorluk
 
 - [ ] **Deterministik kaçış — testte doğrulanacak.** Desen ve imza kaçışı yazıldı;
