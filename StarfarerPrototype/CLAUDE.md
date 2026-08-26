@@ -66,6 +66,46 @@ Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 5), Otomatik Turretler, İki
 - Bomber mermileri doğrudan `ShipComponentBase.TakeDamage()` çağırır — kalkan sistemi araya girmez
 - İleride **Fighter** tipi de eklenebilir (tasarım henüz netleşmedi)
 
+**Bölüm 5+ tipleri** — her biri oyuncunun bir sistemine baskı yapar, süs değildir:
+
+| Tip | Tehdit | Davranış | Neyi zorlar |
+|---|---|---|---|
+| **Interceptor** (Avcı) | 6 | Çok hızlı, kırılgan, yüksek kaçamak | Turret hedeflemesi ve isabet |
+| **Artillery** (Obüs) | 9 | Ekran kenarından uzun menzilli yavaş mermi | Menzil; oyuncuyu ilerlemeye zorlar |
+| **Jammer** (Karıştırıcı) | 11 | Menzilindeyken jeneratör üretimini %40 kısar | Enerji — öncelik hedefleme |
+| **Phantom** (Hayalet) | 10 | 4.5 sn'de bir 2 sn vurulamaz | Sürekli DPS yerine burst |
+| **Regenerator** (Onarıcı) | 13 | Çevresini saniyede 6 HP onarır | DPS eşiği — yavaş build duvara çarpar |
+| **Leech** (Sülük) | 8 | Komponentlere yapışır | Point Defence talebi |
+| **Splitter** (Bölünen) | 12 | Ölünce ikiye ayrılır (%50 HP) | Alan hasarı talebi |
+| **Juggernaut** (Kaleci) | 20 | Zırh +12, çok yavaş, 200 HP | Zırh eşiğinin doruk testi |
+
+Jammer `EnergyBus.JamFactor` üzerinden üretimi kısar; Phantom faz sırasında
+`IsValidTarget = false` döner (turretler boşa mermi harcamasın); Splitter
+`EnemySpawner.Spawn` ile iki parça üretir; Regenerator aurası 0.25 sn'de bir tarar.
+
+### Zırh Eşiği — Tasarım Kararları
+
+```
+efektif = max(hasar − zırh, hasar × 0.10)
+```
+
+Zırh **atış başına** ve **dirençlerden önce** uygulanır. Sıra önemli: ters olsaydı
+dirençli düşmanlarda zırh iki kez cezalandırırdı.
+
+Neden var: gemi DPS'i silah ve turretlerin **toplamı**, maliyet ise dışbükey —
+zırh olmadan çok sayıda zayıf silah, az sayıda güçlü silahı her zaman yener.
+Zırh bu eşitliği bozar ve atış başına hasarı ödüllendirir. Zırh 18'e karşı
+10 hasarlı bir atış 1.0, 60 hasarlı bir atış 42 geçirir.
+
+**Turret hedeflemesi zırhı bilir** (`ITurretTarget.ArmorValue`). Zırh
+`RawDamageToKill`'e gömülemez çünkü etkisi turretin atış hasarına bağlıdır;
+turret `EffectiveShotDamage`'ını bildirir, `TurretTargeting` cezayı hesaplar.
+Bu olmadan turret asla vuramayacağı hedefe kilitlenip mermi harcardı.
+
+Zırh iki kaynaktan gelir ve **toplanır**: levelin taban zırhı (`LevelCurve.Armor`)
++ tipin kendi bonusu (`EnemyTypeData.armor`). Çarpılsaydı zırhsız tipler sonsuza
+dek zırhsız kalırdı.
+
 **Gelecek:** Büyük düşman gemilerinin attığı **area-effect bombalar** komponentlere de hasar verebilir (tasarım kararı bekliyor).
 
 ### Komponent Kataloğu — Tasarım Kararları
@@ -100,6 +140,29 @@ veya deaktif olan depo kapasite vermez — hasar almak biriktirdiğin kaynağı 
 
 Kapasite kilidi bilinçli: kalkan Mk1→Mk2 (35 kristal) taban tavanla yapılabilir,
 Mk2→Mk3 (52 kristal) için önce depo kurmak gerekir.
+
+**Yükseltme sistemi kasıtlı olarak bu haliyle duruyor — dokunmadan önce oku.**
+
+Bir oturumda tier zincirleri kaldırılıp komponent başına tek stat eksenine
+geçildi, sonra bu karar geri alındı. Sebep: sistem dengelenmişti ama upgrade
+ekranı ~22 ayrı yükseltme kararından 9 tane tek-butonluk "Yükselt"e inmişti —
+oyunun karar derinliğinin yarısı gitmişti. **Derinlik dengeye tercih edildi.**
+
+Bu yüzden bilinen ama **açık bırakılmış** denge sorunları var:
+
+- Stat çarpanı `1.5^seviye`, 8 seviye → tek stat **25.6×**
+- Turret'in hasar ve ateş hızı ikisi de DPS'e çarpımsal girer → **657×**
+- Tier zinciri bunun üstüne **4.5×** ekler
+- Ölçülen sonuç: oyuncu gücü kampanya boyunca **~115×** büyüyor
+
+Ölçüm notu: doygunluk oranı (harcanabilir kaynak ÷ her şeyi maxlama maliyeti)
+**0.44** — yani sorun kaynak bolluğu değil. Kaynağı kısmak bu farkı kapatmaz;
+oyuncu %44'lük bütçeyle içeriğin talep ettiğinin çok üstünde güce ulaşıyor.
+
+Denge tekrar ele alınırsa **derinliği koruyan** bir yol var: seviye bir *puan
+havuzu* verir, oyuncu puanı statlar arasında dağıtır. Çarpımsal statlarda toplam
+güç dağılımdan bağımsız olur (`1.3¹⁰ = 1.3⁵ × 1.3⁵`), yani seçenekler durur ama
+tavan sabitlenir. Bu yol denendi ve şimdilik ertelendi.
 
 ### Kaynak Ekonomisi — Tasarım Kararları
 
@@ -146,6 +209,32 @@ zinciri: oyun boyu 80). Bilinçli olarak ertelendi — ileride eklenecek yetenek
 harcayacak ve fazlalık orada erirken denge kurulacak. Erken müdahale edilmeyecek.
 
 **Metal sıfırdan başlar.** `ResourceInventory.metal = 0`. Önceki 500 değeri test içindi.
+
+### Gelir Eğrisi — `BalanceConfig`
+
+Gelir artık sabit değil, levelden türer. Sayıların tek sahibi `BalanceConfig`
+(ScriptableObject; `Resources/BalanceConfig.asset` yoksa C# varsayılanları
+kullanılır — `EnemyTypeData` factory'leriyle aynı desen).
+
+Düşman geliri `threatScore × dropPerThreat(level)`. Eskiden çarpan sabit **×4**'tü
+ve gelir yalnızca wave bütçesiyle büyüyordu; 100. levelde gereken kaynağı üretmek
+**125× düşman** spawn etmeyi gerektirirdi. İki eksene ayrıldı:
+
+| Bileşen | Formül | Lv1 → Lv100 |
+|---|---|---|
+| Wave tehdit bütçesi | `7 × 1.018^(n−1)` | 7 → 41 (5.8× daha çok düşman) |
+| Tehdit başına drop | `2.1 × 1.031^(n−1)` | 2.1 → 43 (21× daha değerli düşman) |
+| Asteroit bütçesi | `10 × 1.035^(n−1)` | 10 → 301 |
+| Boss primi | `25 × drop × 3` | bölüm kapanışı |
+
+Kalabalık yavaş, birim değeri hızlı büyür. Kampanya toplam geliri **≈45.700**.
+
+**Asteroit geliri artık süre bazlı bir kaçak değil.** `Asteroid.SmallResourceAmount`
+sabit 5 iken asteroit geliri düşman gelirinin **3 katıydı** ve bölümü uzatarak
+sınırsız farm edilebiliyordu. Artık levelin asteroit bütçesinden türer
+(≈14 büyük asteroit × 6.25 parça varsayımıyla) ve düşman geliriyle birlikte büyür.
+Bu varsayım level süresinin ~3.5 dakika olmasına dayanır — gerçek süre saparsa
+asteroit payı da sapar, ölçülecek.
 
 ### Asteroitler — Tasarım Kararları
 
@@ -405,13 +494,51 @@ otomatik kapatılır. Aynı `Spawn()` metodunu çağırdığı için gerçek oyu
 bir düşman üretmesi mümkün değildir — eskiden ayrı bir kod yolu olduğu için
 çarpansız düşman üretiyor ve testi yanıltıyordu.
 
-### Bölüm Yapısı
-8-10 bölüm, ortalama 2-3 dakika. Çeşitlilik:
-- Asteroid/enkaz bölgesi (kaynak + küçük botlar)
-- Sürü bölümü (çok sayıda hızlı düşman)
-- Pusu bölümü (toplayıcılar tuzağa düşer)
-- Taşıyıcı boss (uzun, aşamalı)
-- Karanlık bölüm (sensörler çalışmıyor)
+### Bölüm Yapısı — 100 Level, 10 Bölüm, 10 Boss
+
+**Bölüm = 10 level. Her bölümün 10. leveli boss levelidir.** Tek gerçek sayı
+`GameProgress.CurrentLevel`'dır (1–100); bölüm ondan türer.
+
+**Zorluk bölümden değil LEVELDEN gelir** (`LevelCurve`). Bölüm sınırı yalnızca
+tema ve yeni bir düşman tipi getirir — zorluk orada sıçramaz, sürekli akar.
+Eskiden her bölümde elle yazılmış `enemyHpMultiplier` ve wave dizileri vardı;
+10 bölüm için idare edilebilirdi, 100 level için edilemez.
+
+| Formül | Değer | Lv100 |
+|---|---|---|
+| `HpMultiplier(n)` | `1.0233^(n−1)` | 9.8× |
+| `DamageMultiplier(n)` | `1.0141^(n−1)` | 4.0× (eskiden sabit 1.0 idi) |
+| `Armor(n)` | `20 × (n/100)^1.6` | 20 |
+| `EvasionMultiplier(n)` | `n = 1..25 arası doğrusal` | 1.0 |
+
+**Wave'ler elle yazılmaz.** `ChapterManager` levelin tehdit bütçesini 2–4 dalgaya
+böler; geç leveller daha çok dalga görür (tek seferde 40 tehdit puanı boca etmek
+yığılma yaratır). Son dalga %25 daha ağırdır — level kendi zirvesiyle bitsin.
+
+**İki özel level tipi:**
+- **Bölümün 1. leveli** yalnızca o bölümün yeni tipini getirir. Oyuncu bir tipin
+  davranışını kalabalık içinde öğrenemez.
+- **Bölümün 10. leveli** boss: önce escort dalgası, sonra boss + refakat.
+
+| Bölüm | Level | Sektör | Yeni tip | Boss | Sınadığı şey |
+|---|---|---|---|---|---|
+| 1 | 1–10 | İlk Temas | Swarm | Nöbetçi | temel mekanik |
+| 2 | 11–20 | Devriye Hattı | Armored | Devriye Lideri | silah tipi seçimi |
+| 3 | 21–30 | Kalkan Duvarı | Shield | Kalkan Matriksi | kalkan katmanı |
+| 4 | 31–40 | Bomba Yağmuru | Bomber | Bombardıman Platformu | Point Defence |
+| 5 | 41–50 | Avcı Sürüsü | Interceptor | Zırhlı Kale | zırh eşiği (zırh 12) |
+| 6 | 51–60 | Uzun Menzil | Artillery | Obüs Hattı | menzil |
+| 7 | 61–70 | Karartma | Jammer, Phantom | Karıştırıcı | enerji |
+| 8 | 71–80 | Onarım Kovanı | Regenerator, Leech | Kovan Anası | DPS eşiği |
+| 9 | 81–90 | Bölünen Sürü | Splitter | İkiz Dreadnought (×2) | hedef bölme |
+| 10 | 91–100 | Kovan Zihni | Juggernaut | Kovan Zihni | hepsi (zırh 20) |
+
+**Boss'lar formülden türer** (`BossShipData.CreateForChapter`): gövde
+`500 × HpMultiplier(n)`, hardpoint sayısı `2 + bölüm/2`, her biri
+`120 × HpMultiplier(n)`. Elle yazılan tek şey mekanik ve isimdir.
+
+Eski `CreateCarrierCommand()` duruyor ama artık çağrılmıyor — referans olarak
+bırakıldı.
 
 ---
 
@@ -448,10 +575,13 @@ bir düşman üretmesi mümkün değildir — eskiden ayrı bir kod yolu olduğu
 | WeaponMount.cs | Mouse'a dönen silah noktası |
 | WeaponController.cs | Kinetic/Laser/Plasma ateş mantığı, Boost çarpanları |
 | Bullet.cs | Oyuncu mermisi — hareket, trigger collision, 3sn sonra yok |
-| EnemyBot.cs | Swarm/Armored/Shield/Bomber — hareket, ateş, hasar direnci, Bomber state machine |
+| EnemyBot.cs | Data-driven düşman — hareket, ateş, direnç, zırh eşiği, faz/bölünme/onarım aurası |
 | Asteroid.cs | Parçalanabilir asteroit — Large→Medium→Small, çarpma hasarı, enkaz bırakır |
 | Debris.cs | Enkaz — sürüklenip durur, tipe göre renk, ömür sonunda solup yanıp söner |
 | ComponentCatalog.cs | Tüm komponent tanımlarının tek sahibi — ne var, kaça, hangi zincirle |
+| BalanceConfig.cs | Gelir ve zırh eğrilerinin tek sahibi (SO; asset yoksa varsayılan) |
+| LevelCurve.cs | Düşman ölçeklemesi: HP, hasar, zırh, kaçamak — levelden türer |
+| GameProgress.cs | Kampanyadaki yer: 100 level, 10 bölüm, bölüm başına 1 boss |
 | StorageComponent.cs | Depo — kurulu olduğu sürece kaynak tavanını yükseltir |
 | ITurretTarget.cs | Turretlerin nişan alabileceği her şeyin ortak arayüzü |
 | CombatArea.cs | Dogfight sınırları — savaşçılar ekrandan çıkmasın |
@@ -459,7 +589,7 @@ bir düşman üretmesi mümkün değildir — eskiden ayrı bir kod yolu olduğu
 | ShipMovement.cs | Roket-itkili uçuş modeli — burun itkisi, hıza bağlı dönüş, grip, fren |
 | ShipBrain.cs | Taktik AI — Orbit/Strafe/HoverFire pattern'ları, ShipMovement'e komut verir |
 | EnemyBullet.cs | Düşman mermisi — hull modu (kalkan üzerinden) veya komponent modu (doğrudan) |
-| EnemySpawner.cs | Düşmanın TEK inşa yolu — GameObject, HealthBar, bölüm çarpanları. Serbest test modu içerir |
+| EnemySpawner.cs | Düşmanın TEK inşa yolu — GameObject, HealthBar, level ölçeklemesi. Serbest test modu içerir |
 | AsteroidSpawner.cs | Asteroit alanının yoğunluğunu korur |
 | StartMenuUI.cs | Açılış ekranı — kampanya / serbest mod / zorluk seçimi |
 | StarField.cs | 400 yıldız, -15/+15 birim arası random pozisyon |
@@ -475,7 +605,7 @@ bir düşman üretmesi mümkün değildir — eskiden ayrı bir kod yolu olduğu
 | ShieldGeneratorComponent.cs | Kalkan üretimi, Boost çarpanları |
 | GeneratorComponent.cs | Enerji üretimi |
 | RepairUnitComponent.cs | En hasarlı komponenti otomatik tamir eder |
-| EnergyBus.cs | Enerji dağıtım sistemi |
+| EnergyBus.cs | Enerji dağıtım sistemi — Jammer düşmanları üretimi kısar (JamFactor) |
 | ResourceInventory.cs | Ham madde + kristal envanteri |
 | UpgradeUI.cs | Tab ile açılan upgrade ekranı, 4 panel layout |
 | SlotVisual.cs | World-space slot göstergesi, tıklama ile UpgradeUI tetiklenir |
@@ -551,13 +681,32 @@ float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 
 - [x] Otomatik turretler — Gatling/Plazma/Lazer/Roket/Point Defence, slot pozisyonuna kurulur
 - [x] Toplayıcı gemiler + kaynak toplama sistemi — Debris → CollectorShip → ResourceInventory
-- [ ] Stat upgrade sistemi — komponent başına %'lik stat artışları (damage, HP, fire rate vb.)
-- [ ] Bölüm sistemi (8–10 bölüm, wave yapısı, bölüm arası geçiş)
-- [ ] Boss taşıyıcı gemi
+- [x] Stat upgrade sistemi — komponent başına çoklu stat, `1.5^seviye`, 8 seviye
+- [x] Bölüm sistemi — 100 level / 10 bölüm / 10 boss, wave'ler bütçeden üretilir
+- [x] Boss taşıyıcı gemi — 10 boss, `BossShipData.CreateForChapter` formülünden türer
+- [x] Gelir eğrisi — `BalanceConfig`, asteroit farm kaçağı kapandı
+- [x] Zırh eşiği — atış başına hasar ödüllendirilir, turret hedeflemesi zırhı bilir
+- [x] Hitbox görselden ayrıldı — skin'ler dengeyi kaydırmayacak
+- [x] 8 yeni düşman tipi — Interceptor / Artillery / Jammer / Phantom /
+      Regenerator / Leech / Splitter / Juggernaut
+- [ ] **Denge testleri** — aşağıdaki listeye bak; sayıların hiçbiri oyunda denenmedi
+- [ ] **Level seçimi** — 100 levellik eğri baştan oynanarak test edilemez
+- [ ] **Kayıt/yükleme** — 100 level tek oturumda oynanamaz
 - [ ] Point defence turretleri — küçük/hızlı hedeflere odaklı otomatik turret
 - [ ] Mobil UI
 - [ ] Ses efektleri
 - [ ] Gerçek sprite'lar — görsel iyileştirme
+
+### Yeniden ele alınabilecekler
+
+- **Enerji bütçesi.** `EnergyBus` üretim/tüketim muhasebesi yazılı ama **kapalı**:
+  her komponent `Awake`'de `energyConsumption = 0f` yapıyor, dolayısıyla
+  `TotalConsumption` her zaman sıfır. Bir oturumda açıldı (tüketim seviyeyle
+  büyüyordu, jeneratör zorunlu bir vergiye dönüşüyordu) ama yükseltme sistemi
+  geri alınınca o da geri alındı — tüketim komponent seviyesine bağlıydı.
+  Açılırsa "her şeyi al" stratejisini kaynaktan bağımsız olarak kapatan tek kaldıraç.
+- **Yükseltme dengesi.** Bkz. *Komponent Kataloğu* altındaki uyarı — bilinen 115×
+  güç patlaması kasıtlı olarak açık bırakıldı.
 
 ---
 
@@ -579,38 +728,30 @@ Kristal çalışması sırasında çıkan, henüz kapatılmamış maddeler.
 
 Sıra kararlaştırıldı: **hitbox ayrımı → denge testleri → skin'ler.**
 
-- [ ] **Hitbox'ları görselden ayır.** `EnemyBot.ApplyStats()` collider'ı doğrudan
-  sprite boyutundan türetiyor:
-  ```csharp
-  GetComponent<BoxCollider2D>().size = new Vector2(data.bodyWidth / 100f, data.bodyHeight / 100f);
-  ```
-  Skin'ler gelince `bodyWidth/bodyHeight` değişecek, collider da onunla değişecek ve
-  vurma zorluğu kayacak — yani skin'den önce yapılan her denge ayarı geçersizleşir.
-  `Asteroid`'de de aynı bağ var (`RadiusFor` → `PxFor`).
+- [x] **Hitbox'ları görselden ayır.** `EnemyTypeData.hitboxWidth/hitboxHeight`
+  eklendi (0 = gövde boyutu kullanılır). `EnemyBot.ApplyStats` artık collider'ı
+  buradan türetiyor. Skin'ler gelip `bodyWidth/bodyHeight` değiştiğinde vurma
+  zorluğu kaymayacak. Avcı, Obüs, Onarıcı, Sülük ve Kaleci görselden küçük
+  hitbox taşıyor.
 
-  Çözüm: `EnemyTypeData`'ya ayrı `hitboxWidth/hitboxHeight` alanları (varsayılanları
-  şu anki sprite boyutu). Mermilerde bu ayrım zaten var — `Bullet.Awake` collider'ı
-  sabit `(0.1, 0.3)` veriyor, sprite'tan bağımsız. Shmup'larda hitbox genellikle
-  görselden kasten küçük tutulur.
+  **Kalan:** `Asteroid`'de aynı bağ hâlâ var (`RadiusFor` → `PxFor`).
 
-  Bu yapılınca skin ile denge birbirini etkilemez, sıralama sorunu ortadan kalkar.
+- [ ] **Denge testleri.** Ölçülecekler:
 
-- [ ] **Denge testleri.** Bu oturumda konan sayıların hiçbiri oyunda denenmedi;
-  hepsi ilk atış. Hitbox'tan **bağımsız** oldukları için skin'i beklemeden
-  ölçülebilirler:
-  - Ekonomi: kristal/metal akışı, komponent fiyatları, depo kapasitesi ve kilidi
-    (kalkan Mk3 için depo zorunluluğu kasıtlıydı — işe yarıyor mu?)
-  - Bölüm temposu: wave bütçeleri, spawn aralıkları, `threatScore` sıralaması
-  - Serbest mod rampası: `levelDuration` çok yavaş/hızlı mı?
-  - Uçuş hissi: `agility` / `grip`, kaçamak deseninin gerçekten öğrenilebilir
-    olup olmadığı
-  - Onarım hızları, enkaz ömrü ve sürüklenme hızı
+  - **Level süresi.** Asteroit geliri ~3.5 dakikalık level varsayımına dayanır;
+    gerçek süre saparsa asteroit payı da sapar.
+  - **İsabet oranı.** Düşman HP eğrisi %100 isabet varsayımıyla kalibre edildi.
+    Gerçek oran %60 ise tüm TTK'lar 1.7× uzar.
+  - **Zırh eşiğinin hissi.** Düşük seviye silahla zırhlı düşman "zor" mu
+    hissettiriyor yoksa "silahım hiç işlemiyor" mu? `armorMinDamageRatio` (0.10)
+    ve `armorExponent` (1.6) ayar noktaları.
+  - **Yükseltme dengesi.** Bilinen 115× patlaması açık bırakıldı — oyunda ne kadar
+    erken hissediliyor, hangi bölümde oyun kolaylaşıyor? Bu ölçüm, dengeyi
+    yeniden ele alırken hangi yolun seçileceğini belirleyecek.
+  - Kristal arz/talep, bölüm temposu, serbest mod rampası, uçuş hissi,
+    onarım hızları, enkaz ömrü.
 
-  Denge testi bazı düşman tiplerinin işe yaramadığını gösterebilir — silinecek
-  veya baştan tasarlanacak bir tipe önce sanat emeği harcamamak için skin sonraya
-  bırakıldı.
-
-- [ ] **Skin'ler.** Gerçek sprite'lar. Hitbox ayrımı yapıldıysa denge etkilenmez.
+- [ ] **Skin'ler.** Gerçek sprite'lar. Hitbox ayrımı yapıldı — denge etkilenmez.
 
 ---
 
@@ -642,4 +783,9 @@ Sıra kararlaştırıldı: **hitbox ayrımı → denge testleri → skin'ler.**
 - [ ] Fighter tipi düşman — Bomber'dan nasıl ayrışır? (tasarım netleşmedi)
 - [ ] Area-effect bombalar — büyük düşman gemilerinden, komponentlere hasar verir mi?
 - [ ] Komponent HP göstergesi — oyuncuya nasıl gösterilecek? (UI tasarımı yok)
-- [ ] Stat upgrade sistemi detayı — hangi statlar, kaç seviye, maliyet eğrisi
+- [ ] Bölüm 9 İkiz Dreadnought: iki boss aynı anda spawn oluyor ama ikisi de aynı
+      `preferredX`'i hedefliyor — üst üste binebilirler, konumlandırma test edilmeli
+- [ ] Yörünge üssü — LEO'da modüler bir üs (docking, kontrol, yaşam birimi, yaşam
+      desteği, depolar, iticiler...). Hikâyeyle çelişiyor (gemi Oort bulutunda,
+      Dünya'ya 1 ışık yılı) — prolog olarak kurgulanabilir. Komponent listesi ve
+      inşa şekli (ızgara/bitişiklik vs sabit slot) henüz kararlaştırılmadı.

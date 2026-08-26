@@ -46,6 +46,8 @@ public class Bomb : MonoBehaviour, ITurretTarget
 
     public float RawDamageToKill(WeaponType weaponType) => 1f;
 
+    public float ArmorValue => 0f;   // bomba zırhsız — her atış tam geçer
+
     public void SetDirection(Vector2 dir) => _dir = dir.normalized;
 
     public void TakeDamage(float amount)

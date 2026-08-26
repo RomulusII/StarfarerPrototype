@@ -3,39 +3,32 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Bölüm ve dalga akışını yönetir.
+/// Kampanya akışını yönetir: 100 level, 10 bölüm, her bölümün 10. leveli boss.
 ///
 /// Akış:
-///   BeginChapter → wave döngüsü (SpawnWave → WaitWaveClear) → BeginTransition
-///   → diyalog + başlık göster → sonraki bölüme geç
+///   BeginLevel → wave döngüsü (SpawnWave → WaitWaveClear) → level biter
+///   → aynı bölümdeyse kısa nefes, bölüm bittiyse geçiş ekranı
 ///
-/// NE spawn edileceğine bu sınıf karar verir: bütçe, dalga, formasyon, bölüm
-/// çarpanları. NASIL kurulacağını bilmez — düşmanı EnemySpawner.Spawn(),
-/// asteroit alanını AsteroidSpawner kurar.
+/// NE spawn edileceğine bu sınıf karar verir. NASIL kurulacağını bilmez —
+/// düşmanı EnemySpawner.Spawn(), asteroit alanını AsteroidSpawner kurar.
 ///
-/// Spawn adedi tükenince veya sahnede hiç EnemyBot/BossShip kalmazsa wave
-/// tamamlanmış sayılır. Asteroitler bu sayıma girmez, ilerlemeyi engellemezler.
+/// Wave'ler ELLE YAZILMAZ. Level bütçesi BalanceConfig.ThreatBudget(n)'den
+/// gelir ve wave'lere bölünür; 100 levelin her birini elle ayarlamak
+/// sürdürülebilir değildi ve zorluk eğrisini bölüm sınırlarında sıçratıyordu.
 /// </summary>
 public class ChapterManager : MonoBehaviour
 {
     // ── Bağımlılıklar ─────────────────────────────────────────────────────────
 
-    AsteroidSpawner       _asteroids;
-    ChapterTransitionUI   _transitionUI;
+    AsteroidSpawner     _asteroids;
+    ChapterTransitionUI _transitionUI;
 
     // ── Veriler ───────────────────────────────────────────────────────────────
 
-    ChapterData[]  _chapters;
+    ChapterData[]       _chapters;
     FormationTemplate[] _formations;
 
-    int _chapterIndex;
-    int _waveIndex;
-
-    /// <summary>
-    /// Oynanmakta olan bölüm. EnemySpawner çarpanları buradan okur, böylece
-    /// bölümü bilmeyen çağıranlar (ör. boss drone üretimi) da doğru ölçekte
-    /// düşman kurar. Bölüm sistemi yoksa null.
-    /// </summary>
+    /// <summary>Oynanmakta olan bölüm. UI ve boss üretimi buradan okur.</summary>
     public static ChapterData CurrentChapter { get; private set; }
 
     // ── Durum ─────────────────────────────────────────────────────────────────
@@ -43,13 +36,14 @@ public class ChapterManager : MonoBehaviour
     enum Phase { Spawning, WaitClear, Transition, Done }
     Phase _phase = Phase.Spawning;
 
-    // Wave spawn sayacı
+    List<WaveData> _levelWaves = new();
+    int            _waveIndex;
+
     List<EnemyTypeData> _pendingSpawns = new();
     float               _spawnTimer;
     float               _currentSpawnInterval;
     bool                _allSpawned;
 
-    // Formasyon konumlandırması
     FormationTemplate _currentFormation;
     Vector3           _baseSpawnPos;
     int               _spawnSlotIndex;
@@ -75,7 +69,9 @@ public class ChapterManager : MonoBehaviour
         };
 
         _chapters = ChapterData.CreateDefaultChapters();
-        BeginChapter(0);
+
+        GameProgress.Reset();
+        BeginLevel();
     }
 
     void Update()
@@ -84,49 +80,113 @@ public class ChapterManager : MonoBehaviour
 
         switch (_phase)
         {
-            case Phase.Spawning:   UpdateSpawning();  break;
-            case Phase.WaitClear:  UpdateWaitClear(); break;
+            case Phase.Spawning:  UpdateSpawning();  break;
+            case Phase.WaitClear: UpdateWaitClear(); break;
         }
     }
 
-    // ── Bölüm başlangıcı ─────────────────────────────────────────────────────
+    // ── Level kurulumu ────────────────────────────────────────────────────────
 
-    void BeginChapter(int index)
+    ChapterData ChapterFor(int chapterNumber)
     {
-        if (index >= _chapters.Length) { _phase = Phase.Done; return; }
+        int idx = Mathf.Clamp(chapterNumber - 1, 0, _chapters.Length - 1);
+        return _chapters[idx];
+    }
 
-        _chapterIndex  = index;
-        _waveIndex     = 0;
-
-        var chapter    = _chapters[index];
+    void BeginLevel()
+    {
+        int level   = GameProgress.CurrentLevel;
+        var chapter = ChapterFor(GameProgress.CurrentChapter);
         CurrentChapter = chapter;
+
         _asteroids?.Configure(chapter.asteroidCount, chapter.asteroidInterval);
 
+        _levelWaves = BuildWaves(level, chapter);
+        _waveIndex  = 0;
+
         BeginWave();
+    }
+
+    /// <summary>
+    /// Levelin tehdit bütçesini wave'lere böler.
+    ///
+    /// İki özel durum var:
+    ///   — Bölümün İLK leveli yalnızca yeni tipi getirir. Oyuncu bir tipin
+    ///     davranışını kalabalık içinde öğrenemez.
+    ///   — Bölümün SON leveli boss levelidir: escort dalgası önce gelir,
+    ///     boss ikinci dalgada girer.
+    /// </summary>
+    List<WaveData> BuildWaves(int level, ChapterData chapter)
+    {
+        var cfg    = BalanceConfig.Instance;
+        var waves  = new List<WaveData>();
+        float budget = cfg.ThreatBudget(level);
+
+        int inChapter = GameProgress.LevelInChapter;
+        var pool      = chapter.enemyPool;
+
+        // Tanıtım leveli — yeni tip yalnız gelsin
+        if (inChapter == 1 && chapter.introducedType != null)
+            pool = new[] { chapter.introducedType };
+
+        if (GameProgress.IsBossLevel)
+        {
+            // Escort dalgası, sonra boss + küçük refakat
+            int escort = Mathf.RoundToInt(budget * 0.6f);
+            waves.Add(Wave(escort, pool, chapter.defaultSpawnInterval));
+
+            var bossWave = Wave(Mathf.RoundToInt(budget * 0.3f), pool,
+                                chapter.defaultSpawnInterval);
+            bossWave.bossType = chapter.boss;
+            waves.Add(bossWave);
+            return waves;
+        }
+
+        // Normal level: bütçe 2–4 dalgaya bölünür. Geç leveller daha çok dalga
+        // görür — tek seferde 40 tehdit puanı boca etmek yığılma yaratır.
+        int waveCount = Mathf.Clamp(2 + level / 34, 2, 4);
+        for (int i = 0; i < waveCount; i++)
+        {
+            // Son dalga biraz daha ağır: level kendi zirvesiyle bitsin
+            float share = (i == waveCount - 1) ? 1.25f : 1f;
+            int   share_ = Mathf.Max(1, Mathf.RoundToInt(budget / waveCount * share));
+            waves.Add(Wave(share_, pool, chapter.defaultSpawnInterval));
+        }
+        return waves;
+    }
+
+    static WaveData Wave(int budget, EnemyTypeData[] pool, float interval)
+    {
+        budget = Mathf.Max(1, budget);
+        return new WaveData
+        {
+            budgetMin     = budget,
+            budgetMax     = budget,
+            allowedTypes  = pool,
+            spawnSide     = SpawnSide.Right,
+            spawnInterval = interval,
+        };
     }
 
     // ── Dalga başlangıcı ─────────────────────────────────────────────────────
 
     void BeginWave()
     {
-        var chapter = _chapters[_chapterIndex];
-
-        if (_waveIndex >= chapter.waves.Length)
+        if (_waveIndex >= _levelWaves.Count)
         {
-            BeginTransition();
+            CompleteLevel();
             return;
         }
 
-        var wave = chapter.waves[_waveIndex];
+        var wave    = _levelWaves[_waveIndex];
+        var chapter = CurrentChapter;
 
-        // Boss wave ise boss'u hemen spawn et
         if (wave.bossType != null)
-            SpawnBoss(wave.bossType);
+            SpawnBossesFor(GameProgress.CurrentChapter, wave.bossType);
 
-        // Normal düşman bütçesini doldur (boss wave'de escort olabilir)
         var pool = (wave.allowedTypes != null && wave.allowedTypes.Length > 0)
             ? wave.allowedTypes
-            : chapter.defaultEnemyPool;
+            : chapter.enemyPool;
 
         _pendingSpawns.Clear();
         if (pool != null && pool.Length > 0 && wave.budgetMax > 0)
@@ -154,12 +214,20 @@ public class ChapterManager : MonoBehaviour
         _phase      = Phase.Spawning;
     }
 
-    void SpawnBoss(BossShipData bossData)
+    /// <summary>
+    /// Boss'u sahneye koyar. 9. bölümde İKİ tane gelir — tek hedefe kilitlenen
+    /// build'i cezalandıran "hedef bölme" sınavı odur.
+    /// </summary>
+    void SpawnBossesFor(int chapter, BossShipData bossData)
     {
-        var go = new GameObject($"Boss_{bossData.displayName}");
-        go.transform.position = new Vector3(14f, 0f, 0f);
-        var boss = go.AddComponent<BossShip>();
-        boss.data = bossData;
+        int count = chapter == 9 ? 2 : 1;
+        for (int i = 0; i < count; i++)
+        {
+            var go = new GameObject($"Boss_{bossData.displayName}");
+            go.transform.position = new Vector3(14f + i * 2f, count == 1 ? 0f : (i == 0 ? 2f : -2f), 0f);
+            var boss = go.AddComponent<BossShip>();
+            boss.data = bossData;
+        }
     }
 
     // ── Spawning güncellemesi ─────────────────────────────────────────────────
@@ -183,10 +251,10 @@ public class ChapterManager : MonoBehaviour
             return;
         }
 
-        var data    = _pendingSpawns[0];
+        var data = _pendingSpawns[0];
         _pendingSpawns.RemoveAt(0);
 
-        SpawnEnemy(data, _chapters[_chapterIndex].waves[_waveIndex]);
+        SpawnEnemy(data, _levelWaves[_waveIndex]);
         _spawnSlotIndex++;
     }
 
@@ -204,68 +272,82 @@ public class ChapterManager : MonoBehaviour
             pos = SpawnPosition(wave.spawnSide);
         }
 
-        // Çarpanlar dahil kurulum EnemySpawner'ın işi — tek inşa yolu orası
-        EnemySpawner.Spawn(data, pos, _chapters[_chapterIndex]);
+        // Ölçekleme dahil kurulum EnemySpawner'ın işi — tek inşa yolu orası
+        EnemySpawner.Spawn(data, pos);
     }
 
     // ── Dalga temizlenme bekleme ──────────────────────────────────────────────
 
     void UpdateWaitClear()
     {
-        if (FindFirstObjectByType<EnemyBot>()  != null) return;
-        if (FindFirstObjectByType<BossShip>()  != null) return;
+        if (FindFirstObjectByType<EnemyBot>() != null) return;
+        if (FindFirstObjectByType<BossShip>() != null) return;
 
         _waveIndex++;
-        if (_waveIndex < _chapters[_chapterIndex].waves.Length)
-        {
-            // Waveler arasında kısa nefes (2 saniye)
-            StartCoroutine(DelayedBeginWave(2f));
-        }
-        else
-        {
-            BeginTransition();
-        }
+        _phase = Phase.Transition;   // geçici duraksatma
 
-        _phase = Phase.Transition; // geçici olarak duraksatır
+        if (_waveIndex < _levelWaves.Count)
+            StartCoroutine(DelayedBeginWave(2f));
+        else
+            CompleteLevel();
     }
 
     IEnumerator DelayedBeginWave(float delay)
     {
         yield return new WaitForSeconds(delay);
-        _phase = Phase.Spawning;
         BeginWave();
     }
 
-    // ── Bölüm geçişi ─────────────────────────────────────────────────────────
+    // ── Level / bölüm geçişi ──────────────────────────────────────────────────
 
-    void BeginTransition()
+    void CompleteLevel()
     {
         _phase = Phase.Transition;
-        var chapter = _chapters[_chapterIndex];
 
-        // Bir sonraki bölümün başlık ve diyalogunu göster
-        int nextIndex = _chapterIndex + 1;
-        if (nextIndex >= _chapters.Length)
+        if (GameProgress.IsLastLevel)
         {
             _transitionUI?.ShowCredits();
+            _phase = Phase.Done;
             return;
         }
 
-        var nextChapter = _chapters[nextIndex];
-        _transitionUI?.Show(nextChapter, () => BeginChapter(nextIndex));
+        bool chapterEnds = GameProgress.IsBossLevel;
+        GameProgress.Advance();
+
+        if (chapterEnds)
+        {
+            // Bölüm değişti — hikâye ve yeni tip tanıtımı için geçiş ekranı
+            var next = ChapterFor(GameProgress.CurrentChapter);
+            if (_transitionUI != null)
+                _transitionUI.Show(next, BeginLevel);
+            else
+                StartCoroutine(DelayedBeginLevel(1f));
+        }
+        else
+        {
+            // Bölüm içi level geçişi sessizdir: her 10 levelde bir tam durak
+            // yeterli, her levelde bir ekran akışı boğar.
+            StartCoroutine(DelayedBeginLevel(2.5f));
+        }
+    }
+
+    IEnumerator DelayedBeginLevel(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        BeginLevel();
     }
 
     // ── Yardımcı metodlar ─────────────────────────────────────────────────────
 
     static void FillByBudget(List<EnemyTypeData> list, EnemyTypeData[] pool, int budget)
     {
-        int safety = 50;
+        int safety = 200;
         while (budget > 0 && safety-- > 0)
         {
             // Bütçeye sığan tipleri filtrele
             var affordable = new List<EnemyTypeData>();
             foreach (var t in pool)
-                if (t.threatScore <= budget) affordable.Add(t);
+                if (t != null && t.threatScore <= budget) affordable.Add(t);
 
             if (affordable.Count == 0) break;
 
@@ -278,11 +360,9 @@ public class ChapterManager : MonoBehaviour
     static FormationTemplate PickFormation(List<EnemyTypeData> enemies,
                                            FormationTemplate[] formations)
     {
-        // Düşman rollerini topla
         var roles = new HashSet<EnemyRole>();
         foreach (var e in enemies) roles.Add(e.role);
 
-        // En çok tercih edilen rolü kapsayan şablonu seç
         FormationTemplate best      = formations[0];
         int               bestScore = -1;
 
@@ -299,7 +379,6 @@ public class ChapterManager : MonoBehaviour
 
     static void SortByFormation(List<EnemyTypeData> list, FormationTemplate formation)
     {
-        // Slot sırasına göre düşmanları sırala: rol önceliği şablondan gelir
         var slotRoles = new List<EnemyRole>();
         foreach (var s in formation.slots) slotRoles.Add(s.role);
 

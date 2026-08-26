@@ -319,6 +319,13 @@ public class BossShip : MonoBehaviour, ITurretTarget
     /// <summary>Boss devasa ve yavaş — PD'nin işi değil.</summary>
     public bool IsPointDefencePriority => false;
 
+    /// <summary>
+    /// Boss zırhı. Geç bölüm boss'ları düşük seviye silahları eler: zırh her
+    /// atıştan sabit miktar düşürdüğü için zayıf atışlı bir build gövdeyi
+    /// makul sürede indiremez.
+    /// </summary>
+    public float ArmorValue => data != null ? data.armor : 0f;
+
     public float RawDamageToKill(WeaponType weaponType)
     {
         float raw = 0f;
@@ -340,6 +347,9 @@ public class BossShip : MonoBehaviour, ITurretTarget
     public void TakeDamage(float amount, WeaponType wt = WeaponType.Kinetic)
     {
         if (_dead) return;
+
+        // Zırh eşiği atış başına, kalkandan önce uygulanır
+        amount = BalanceConfig.Instance.ApplyArmor(amount, ArmorValue);
 
         bool shieldGenAlive = false;
         foreach (var hp in _hardpoints)
@@ -410,15 +420,23 @@ public class BossShip : MonoBehaviour, ITurretTarget
 
     IEnumerator DeathSequence()
     {
-        // Arka arkaya patlama efektleri
-        for (int i = 0; i < 8; i++)
+        // Bölüm kapanış primi: boss'un tehdit puanı × levelin drop oranı × prim
+        // çarpanı. Sabit 8–20 birimlik enkaz geç bölümlerde komik kalıyordu —
+        // 100. levelde bir boss'un getirisi bir wave'in altına düşerdi.
+        var   cfg   = BalanceConfig.Instance;
+        float total = cfg.bossThreatValue
+                    * cfg.DropPerThreat(GameProgress.CurrentLevel)
+                    * cfg.bossRewardMultiplier;
+
+        const int pieces = 8;
+        for (int i = 0; i < pieces; i++)
         {
             var go = new GameObject("Debris");
             go.transform.position = transform.position
                 + (Vector3)Random.insideUnitCircle * (data.bodyWidth / 100f * 0.6f);
             var d = go.AddComponent<Debris>();
             d.Init(Random.insideUnitCircle.normalized * Random.Range(0.4f, 1.2f),
-                   Random.Range(8f, 20f));
+                   total / pieces);
             yield return new WaitForSeconds(0.18f);
         }
 

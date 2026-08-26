@@ -149,7 +149,7 @@ public class GameManager : MonoBehaviour
     /// <summary>
     /// Serbest mod: bölüm sistemi kurulmaz, EnemySpawner'ın test modu açılır.
     /// Bölüm çarpanı olmadığı için düşmanlar ham (ölçeklenmemiş) gelir;
-    /// belirli bir bölümün zorluğunu test etmek için spawner'ın debugChapter
+    /// belirli bir levelin zorluğunu test etmek için spawner'ın debugLevel
     /// alanı Inspector'dan doldurulabilir.
     /// </summary>
     void BeginFreePlay()

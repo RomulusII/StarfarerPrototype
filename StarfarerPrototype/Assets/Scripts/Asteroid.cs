@@ -35,10 +35,28 @@ public class Asteroid : MonoBehaviour, ITurretTarget
     const float SmallDmg = 8f,  MediumDmg = 18f, LargeDmg = 30f;
 
     // Small parçalanınca düşen kaynak ve bunun kristal çıkma olasılığı.
-    // Hedef: tamamen parçalanan bir BÜYÜK asteroit ≈ bir kalkanlı düşman kadar
-    // kristal versin (~4 kristal). Kristal ekonomisinin ayar noktası burasıdır.
-    const float SmallResourceAmount = 5f;
-    const float CrystalChance       = 0.12f;
+    //
+    // Miktar artık SABİT DEĞİL — levelle ölçeklenir. Eskiden sabit 5'ti ve
+    // asteroit geliri süre bazlı olduğu için düşman gelirinin 3 katına çıkıyordu:
+    // oyuncu bölümü uzatarak sınırsız farm edebiliyordu. Artık asteroit toplam
+    // gelirin ~%18'i olacak şekilde levelden türer ve düşman geliriyle birlikte
+    // büyür — ilerlemeden zenginleşmek mümkün değil.
+    //
+    // ~6.25 küçük parça / büyük asteroit varsayımıyla:
+    //   parça başına = levelin asteroit bütçesi / (dakikadaki büyük × 6.25)
+    const float SmallsPerLarge   = 6.25f;
+    const float LargesPerLevel   = 14f;   // ~3.5 dakikalık level, ~4/dk
+    const float CrystalChance    = 0.12f;
+
+    static float SmallResourceAmount
+    {
+        get
+        {
+            float levelBudget = BalanceConfig.Instance
+                .AsteroidYieldPerLevel(GameProgress.CurrentLevel);
+            return Mathf.Max(0.5f, levelBudget / (LargesPerLevel * SmallsPerLarge));
+        }
+    }
 
     // Bölünme
     const int   MinFragments    = 2;
@@ -131,6 +149,8 @@ public class Asteroid : MonoBehaviour, ITurretTarget
 
     /// <summary>Küçük parçalar hızlı ve gemiye yakın olabilir — PD onları da alsın.</summary>
     public bool IsPointDefencePriority => size == Size.Small;
+
+    public float ArmorValue => 0f;   // kaya zırhsız; direnç sistemi zaten var
 
     public float RawDamageToKill(WeaponType weaponType)
         => hp / Mathf.Max(ResistanceFor(weaponType), 0.01f);

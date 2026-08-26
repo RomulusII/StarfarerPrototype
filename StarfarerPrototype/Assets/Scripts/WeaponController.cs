@@ -277,7 +277,7 @@ public class WeaponController : MonoBehaviour
         weaponType        = def.weaponType;
         damage            = def.weaponDamage            > 0 ? def.weaponDamage            : 10f;
         fireRate          = def.weaponFireRate           > 0 ? def.weaponFireRate           : 0.15f;
-        energyCostPerShot = def.weaponEnergyCostPerShot  > 0 ? def.weaponEnergyCostPerShot  : 3f;
+        energyCostPerShot = def.weaponEnergyCostPerShot;   // kinetik enerji yemez — fallback yok
         chargeTime        = def.weaponChargeTime         > 0 ? def.weaponChargeTime         : 2.0f;
     }
 }

@@ -1,21 +1,20 @@
 using UnityEngine;
 
 /// <summary>
-/// Düşman gemisi kurar. Oyundaki TEK düşman inşa yolu burasıdır — bölüm
+/// Düşman gemisi kurar. Oyundaki TEK düşman inşa yolu burasıdır — ölçekleme
 /// çarpanları da burada uygulanır, böylece ikinci bir yol sessizce ondan sapamaz.
 ///
 /// Sorumluluk ayrımı:
-///   ChapterManager — NE spawn edilecek (bütçe, dalga, formasyon, hangi bölüm)
+///   ChapterManager — NE spawn edilecek (bütçe, dalga, formasyon, hangi level)
 ///   EnemySpawner   — NASIL kurulacak (GameObject, HealthBar, çarpanlar)
 ///
-/// Serbest mod (debugFreeSpawn) dalga sistemini beklemeden düşman akıtır. O da
-/// aynı Spawn() metodunu çağırır — gerçek oyundan farklı bir düşman üretmesi
-/// mümkün değildir.
+/// Ölçekleme artık BÖLÜM değil LEVEL bazlıdır. 100 level elle ayarlanamaz;
+/// HP, hasar, zırh ve kaçamak <see cref="LevelCurve"/> formüllerinden gelir.
+/// Bölüm sınırı yalnızca tema ve yeni düşman tipi getirir — zorluk orada
+/// sıçramaz, sürekli akar.
 ///
-/// Serbest modun kendi zorluk rampası vardır: baştan her tipi boca etmez.
-/// Geçen süreye göre bir "seviye" hesaplanır ve dört şey birlikte artar:
-/// hangi tiplerin açık olduğu, spawn sıklığı, aynı anda sahada olabilecek
-/// düşman sayısı ve istatistik çarpanları. Bkz. RampLevel / CurrentRamp.
+/// Serbest mod kendi rampasını üretir ama AYNI <see cref="EnemyScaling"/>
+/// yolundan geçer; ayrı bir formül yoktur.
 /// </summary>
 public class EnemySpawner : MonoBehaviour
 {
@@ -24,9 +23,9 @@ public class EnemySpawner : MonoBehaviour
              "sahnedeyse bunu kapatır — normal oyunda devre dışıdır.")]
     public bool debugFreeSpawn = false;
 
-    [Tooltip("Serbest modda hangi bölümün çarpanlarıyla spawn edilsin. " +
-             "null ise çarpansız (ham) düşman gelir.")]
-    public ChapterData debugChapter;
+    [Tooltip("Serbest modda rampa yerine bu levelin çarpanlarını kullan. " +
+             "0 = rampa çalışsın.")]
+    public int debugLevel = 0;
 
     [Header("Serbest Mod Zorluk Rampası")]
     [Tooltip("Bir zorluk seviyesinin süresi (saniye). Küçük = hızlı sertleşir.")]
@@ -56,9 +55,8 @@ public class EnemySpawner : MonoBehaviour
     float[]         _defaultWeights;
     float           _timer;
 
-    float       _freeElapsed;      // serbest modda geçen süre
-    bool        _freeRunning;
-    ChapterData _rampChapter;      // rampanın çarpanlarını taşıyan sentetik bölüm
+    float _freeElapsed;      // serbest modda geçen süre
+    bool  _freeRunning;
 
     /// <summary>Serbest modun anlık zorluk seviyesi (0'dan başlar, sürekli artar).</summary>
     public float RampLevel => levelDuration > 0.01f ? _freeElapsed / levelDuration : 0f;
@@ -66,17 +64,14 @@ public class EnemySpawner : MonoBehaviour
     // ── Tek inşa yolu ─────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Verilen tipten bir düşman kurar; çarpanlar oynanmakta olan bölümden alınır.
-    /// Çağıranın hangi bölümde olduğunu bilmesi gerekmez.
+    /// Verilen tipten bir düşman kurar; çarpanlar oynanmakta olan levelden alınır.
+    /// Çağıranın hangi levelde olduğunu bilmesi gerekmez.
     /// </summary>
     public static EnemyBot Spawn(EnemyTypeData data, Vector3 position)
-        => Spawn(data, position, ChapterManager.CurrentChapter);
+        => Spawn(data, position, EnemyScaling.ForLevel(GameProgress.CurrentLevel));
 
-    /// <summary>
-    /// Bölümü açıkça vererek kurar. chapter null ise çarpansız (ham) düşman gelir.
-    /// ScriptableObject asset'i bozulmaz — çarpanlar kopya üzerinde uygulanır.
-    /// </summary>
-    public static EnemyBot Spawn(EnemyTypeData data, Vector3 position, ChapterData chapter)
+    /// <summary>Ölçeklemeyi açıkça vererek kurar (serbest mod, testler).</summary>
+    public static EnemyBot Spawn(EnemyTypeData data, Vector3 position, EnemyScaling scaling)
     {
         if (data == null) return null;
 
@@ -85,25 +80,28 @@ public class EnemySpawner : MonoBehaviour
         go.AddComponent<HealthBar>();
 
         var bot = go.AddComponent<EnemyBot>();
-        bot.data = ApplyChapterScaling(data, chapter);
+        bot.data = ApplyScaling(data, scaling);
         return bot;
     }
 
     /// <summary>
-    /// Bölüm zorluk çarpanlarını uygular. Orijinal asset'e dokunmaz — runtime
-    /// kopyası döner. chapter null ise veri olduğu gibi kullanılır.
+    /// Ölçekleme çarpanlarını uygular. Orijinal asset'e dokunmaz — runtime
+    /// kopyası döner.
+    ///
+    /// Zırh ÇARPILMAZ, EKLENİR: levelin taban zırhı tipin kendi zırhının
+    /// üstüne biner. Çarpılsaydı zırhsız tipler sonsuza dek zırhsız kalır ve
+    /// eşiğin geç bölümlerdeki işlevi kaybolurdu.
     /// </summary>
-    static EnemyTypeData ApplyChapterScaling(EnemyTypeData src, ChapterData chapter)
+    static EnemyTypeData ApplyScaling(EnemyTypeData src, EnemyScaling s)
     {
-        if (chapter == null) return src;
-
         var d = Instantiate(src);
-        d.maxHP         = src.maxHP         * chapter.enemyHpMultiplier;
-        d.maxShield     = src.maxShield     * chapter.enemyHpMultiplier;
-        d.fireDamage    = src.fireDamage    * chapter.enemyDamageMultiplier;
-        d.contactDamage = src.contactDamage * chapter.enemyDamageMultiplier;
-        d.evasionAngle  = src.evasionAngle  * chapter.enemyEvasionMultiplier;
-        d.escapeAngle   = src.escapeAngle   * chapter.enemyEvasionMultiplier;
+        d.maxHP         = src.maxHP         * s.hp;
+        d.maxShield     = src.maxShield     * s.hp;
+        d.fireDamage    = src.fireDamage    * s.damage;
+        d.contactDamage = src.contactDamage * s.damage;
+        d.evasionAngle  = src.evasionAngle  * s.evasion;
+        d.escapeAngle   = src.escapeAngle   * s.evasion;
+        d.armor         = src.armor         + s.armor;
         return d;
     }
 
@@ -118,8 +116,19 @@ public class EnemySpawner : MonoBehaviour
             EnemyTypeData.CreateShield(),
             EnemyTypeData.CreateBomber(),
             EnemyTypeData.CreateBombRunner(),
+            EnemyTypeData.CreateInterceptor(),
+            EnemyTypeData.CreateArtillery(),
+            EnemyTypeData.CreatePhantom(),
+            EnemyTypeData.CreateJammer(),
+            EnemyTypeData.CreateSplitter(),
+            EnemyTypeData.CreateRegenerator(),
+            EnemyTypeData.CreateJuggernaut(),
         };
-        _defaultWeights = new[] { 0.50f, 0.20f, 0.15f, 0.07f, 0.08f };
+        _defaultWeights = new[]
+        {
+            0.30f, 0.13f, 0.10f, 0.05f, 0.05f,
+            0.09f, 0.07f, 0.06f, 0.05f, 0.05f, 0.03f, 0.02f,
+        };
     }
 
     void Update()
@@ -146,9 +155,11 @@ public class EnemySpawner : MonoBehaviour
         var type = RollUnlockedType(level);
         if (type == null) return;
 
-        Spawn(type,
-              new Vector3(15f, Random.Range(-4.5f, 4.5f), 0f),
-              debugChapter != null ? debugChapter : CurrentRamp(level));
+        var scaling = debugLevel > 0
+            ? EnemyScaling.ForLevel(debugLevel)
+            : CurrentRamp(level);
+
+        Spawn(type, new Vector3(15f, Random.Range(-4.5f, 4.5f), 0f), scaling);
     }
 
     /// <summary>Serbest mod açıldığında sayaçları sıfırlar, asteroit alanını kurar.</summary>
@@ -174,23 +185,18 @@ public class EnemySpawner : MonoBehaviour
     float ThreatCapAt(float level) => 1f + level * threatPerLevel;
 
     /// <summary>
-    /// Rampanın istatistik çarpanlarını taşıyan sentetik bölüm. Böylece serbest mod
-    /// da kampanyayla aynı ölçekleme yolunu kullanır — ayrı bir formül yoktur.
-    /// Kaçamak eğrisi kampanyadakiyle aynı biçimde 0'dan 1'e çıkar.
+    /// Rampanın ölçekleme çarpanları. Kampanyayla aynı EnemyScaling yapısını
+    /// kullanır — tek fark çarpanların süreden türemesi.
     /// </summary>
-    ChapterData CurrentRamp(float level)
+    EnemyScaling CurrentRamp(float level)
     {
-        if (_rampChapter == null)
+        return new EnemyScaling
         {
-            _rampChapter = ScriptableObject.CreateInstance<ChapterData>();
-            _rampChapter.chapterNumber = 0;
-            _rampChapter.chapterTitle  = "Serbest Mod";
-        }
-
-        _rampChapter.enemyHpMultiplier      = 1f + 0.10f * level;
-        _rampChapter.enemyDamageMultiplier  = 1f + 0.07f * level;
-        _rampChapter.enemyEvasionMultiplier = Mathf.Clamp01(level / (rampFullLevel - 1f));
-        return _rampChapter;
+            hp      = 1f + 0.10f * level,
+            damage  = 1f + 0.07f * level,
+            evasion = Mathf.Clamp01(level / Mathf.Max(1f, rampFullLevel - 1f)),
+            armor   = Mathf.Min(level * 1.2f, LevelCurve.Instance.maxArmor),
+        };
     }
 
     /// <summary>Yalnızca bu seviyede açılmış tipler arasından ağırlıklı seçim.</summary>

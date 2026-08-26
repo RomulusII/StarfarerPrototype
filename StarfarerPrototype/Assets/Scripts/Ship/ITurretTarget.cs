@@ -34,4 +34,12 @@ public interface ITurretTarget
     /// Point Defence'in öncelikli hedefi mi? (bomba, kalkan içine girmiş küçük gemiler)
     /// </summary>
     bool IsPointDefencePriority { get; }
+
+    /// <summary>
+    /// Atış başına sabit hasar düşüşü. Zırhın etkisi turretin ATIŞ hasarına
+    /// bağlıdır: aynı zırh, güçlü tek atışı biraz, zayıf çok atışı tamamen
+    /// yer. Bu yüzden zırh RawDamageToKill'e gömülemez — turret kendi atış
+    /// hasarını bilerek cezayı kendisi hesaplar (bkz. TurretTargeting.Score).
+    /// </summary>
+    float ArmorValue { get; }
 }

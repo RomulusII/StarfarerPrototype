@@ -47,7 +47,7 @@ public static class TurretTargeting
     public static ITurretTarget Select(
         Vector3 turretPos, Vector3 shipPos,
         float range, float dps, float bulletSpeed, WeaponType weaponType,
-        bool pointDefenceOnly, ITurretTarget current)
+        bool pointDefenceOnly, ITurretTarget current, float shotDamage = 0f)
     {
         ITurretTarget best      = null;
         float         bestScore = 0f;
@@ -62,7 +62,7 @@ public static class TurretTargeting
             float dist = Vector2.Distance(turretPos, t.TargetTransform.position);
             if (dist > range) continue;
 
-            float score = Score(t, dist, shipPos, dps, bulletSpeed, weaponType);
+            float score = Score(t, dist, shipPos, dps, bulletSpeed, weaponType, shotDamage);
 
             if (ReferenceEquals(t, current))
             {
@@ -82,12 +82,19 @@ public static class TurretTargeting
 
     /// <summary>Tek bir hedefin puanı — formül sınıf dokümanında açıklanmıştır.</summary>
     public static float Score(ITurretTarget t, float dist, Vector3 shipPos,
-                              float dps, float bulletSpeed, WeaponType weaponType)
+                              float dps, float bulletSpeed, WeaponType weaponType,
+                              float shotDamage = 0f)
     {
         float rawToKill = t.RawDamageToKill(weaponType);
         if (rawToKill <= 0f) return 0f;
 
-        float killTime   = dps > 0.001f ? rawToKill / dps : float.MaxValue;
+        // Zırh, turretin ETKİN DPS'ini düşürür. Zırh 18'e karşı 20 hasarlı bir
+        // atış yalnızca 2 geçirir — ham DPS aynı görünse de öldürme süresi
+        // 10 katına çıkar. Bu düzeltme olmadan turret asla vuramayacağı bir
+        // hedefe kilitlenip mermilerini boşa harcar.
+        float effDps = dps * ArmorEfficiency(t, shotDamage);
+
+        float killTime   = effDps > 0.001f ? rawToKill / effDps : float.MaxValue;
         float flightTime = bulletSpeed > 0.001f ? dist / bulletSpeed : 0f;
         float cost       = Mathf.Max(killTime + flightTime, MinCost);
 
@@ -97,6 +104,21 @@ public static class TurretTargeting
                          * (1f - Mathf.Clamp01(distToShip / UrgencyRange));
 
         return t.ThreatValue * urgency / cost;
+    }
+
+    /// <summary>
+    /// Zırhın bu turretin hasarına etkisi (0–1). shotDamage bilinmiyorsa 1 döner —
+    /// zırh yok sayılır, eski davranış korunur.
+    /// </summary>
+    static float ArmorEfficiency(ITurretTarget t, float shotDamage)
+    {
+        if (shotDamage <= 0.001f) return 1f;
+
+        float armor = t.ArmorValue;
+        if (armor <= 0f) return 1f;
+
+        float effective = BalanceConfig.Instance.ApplyArmor(shotDamage, armor);
+        return effective / shotDamage;
     }
 
     /// <summary>

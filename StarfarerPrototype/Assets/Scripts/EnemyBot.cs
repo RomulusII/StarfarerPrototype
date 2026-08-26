@@ -143,7 +143,13 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
             _healthBar.barOffsetY    = data.bodyHeight / 100f * 0.8f;
         }
 
-        GetComponent<BoxCollider2D>().size = new Vector2(data.bodyWidth / 100f, data.bodyHeight / 100f);
+        // Hitbox görselden AYRIDIR. Sprite'lar gelince bodyWidth/bodyHeight
+        // değişecek; collider buna bağlı kalsaydı vurma zorluğu kayar ve bu
+        // oturumda konan tüm denge sayıları geçersizleşirdi.
+        GetComponent<BoxCollider2D>().size = new Vector2(
+            data.EffectiveHitboxWidth  / 100f,
+            data.EffectiveHitboxHeight / 100f);
+
         BuildBody(data.bodyWidth, data.bodyHeight, data.bodyColor);
     }
 
@@ -225,6 +231,8 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         if (Time.deltaTime > 0f)
             Velocity = ((Vector2)transform.position - _prevPos) / Time.deltaTime;
         _prevPos = transform.position;
+
+        UpdateSpecialBehaviours();
 
         if (data.movementKind == EnemyMovementKind.Approach)
         {
@@ -589,10 +597,14 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 
     public Transform TargetTransform => transform;
     public Vector2   TargetVelocity  => Velocity;
-    public bool      IsValidTarget   => this != null && isActiveAndEnabled
+    // Faz hâlindeki hayalet geçerli hedef değildir — turretler ona kilitlenip
+    // mermilerini boşa harcamasın.
+    public bool      IsValidTarget   => this != null && isActiveAndEnabled && !IsPhased
                                      && _healthBar != null && _healthBar.currentHealth > 0f;
 
     public float ThreatValue => data != null ? Mathf.Max(1, data.threatScore) : 1f;
+
+    public float ArmorValue => EffectiveArmor;
 
     /// <summary>Kalkanın içine girmiş küçük/yakın saldırganlar PD'nin işi.</summary>
     public bool IsPointDefencePriority =>
@@ -603,6 +615,11 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     /// <summary>
     /// Kalkan + gövdeyi bu silah tipiyle bitirmek için gereken ham hasar.
     /// Direnci yüksek katman ham hasarı büyütür, düşük katman küçültür.
+    ///
+    /// Zırh burada hesaba KATILMAZ çünkü zırhın etkisi atış başına hasara
+    /// bağlıdır ve o bilgi çağıran turrette durur; turret kendi atış hasarını
+    /// bilerek <see cref="ArmorPenaltyFor"/> ile çarpar. Zırhı buraya sabit
+    /// gömseydik, zayıf atışlı turretler vuramadıkları hedefe kilitlenirdi.
     /// </summary>
     public float RawDamageToKill(WeaponType weaponType)
     {
@@ -635,17 +652,147 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     public void TakeDamage(float amount, WeaponType weaponType = WeaponType.Kinetic)
     {
         if (_healthBar == null) return;
+        if (IsPhased) return;   // Hayalet: faz sırasında hiçbir şey geçmez
+
+        // Zırh EŞİĞİ dirençlerden ÖNCE, atış başına uygulanır. Sıra önemlidir:
+        // zırh ham atışı budar, dirençler kalanı ölçekler. Ters sırada olsaydı
+        // dirençli düşmanlara karşı zırh iki kez cezalandırırdı.
+        float shot = BalanceConfig.Instance.ApplyArmor(amount, EffectiveArmor);
 
         float hull = data.maxShield > 0f && _shieldHP > 0f
-            ? ApplyShieldLayer(amount, weaponType)
-            : ApplyResistances(amount, weaponType, data.hullResistances);
+            ? ApplyShieldLayer(shot, weaponType)
+            : ApplyResistances(shot, weaponType, data.hullResistances);
 
         _healthBar.TakeDamage(hull);
         if (_healthBar.currentHealth <= 0f)
         {
+            SpawnSplitFragments();
             SpawnDebris();
             Destroy(gameObject);
         }
+    }
+
+    // ── Zırh ve özel davranışlar ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Bu düşmanın toplam zırhı: levelin taban zırhı + tipin bonusu.
+    /// EnemySpawner ölçekleme sırasında data.armor'a zaten leveli eklemiştir.
+    /// </summary>
+    public float EffectiveArmor => data != null ? Mathf.Max(0f, data.armor) : 0f;
+
+    /// <summary>Hayalet fazı — vurulamaz olduğu pencere.</summary>
+    public bool IsPhased => _phaseTimer > 0f;
+
+    float _phaseTimer;      // > 0 iken vurulamaz
+    float _phaseCooldown;   // bir sonraki faza kalan süre
+    float _auraTimer;
+    static float _jamRefreshTimer;
+
+    void UpdateSpecialBehaviours()
+    {
+        if (data == null) return;
+
+        UpdatePhasing();
+        UpdateRepairAura();
+    }
+
+    /// <summary>
+    /// Periyodik vurulamazlık. Sürekli DPS'i cezalandırır, burst'ü ödüllendirir —
+    /// oyuncunun faz penceresini öğrenmesi gerekir.
+    /// </summary>
+    void UpdatePhasing()
+    {
+        if (data.phaseInterval <= 0f) return;
+
+        if (_phaseTimer > 0f)
+        {
+            _phaseTimer -= Time.deltaTime;
+            if (_phaseTimer <= 0f) SetPhaseVisual(false);
+            return;
+        }
+
+        _phaseCooldown -= Time.deltaTime;
+        if (_phaseCooldown > 0f) return;
+
+        _phaseCooldown = data.phaseInterval;
+        _phaseTimer    = Mathf.Max(0.1f, data.phaseDuration);
+        SetPhaseVisual(true);
+    }
+
+    void SetPhaseVisual(bool phased)
+    {
+        foreach (var sr in GetComponentsInChildren<SpriteRenderer>())
+        {
+            var c = sr.color;
+            c.a      = phased ? 0.25f : 1f;
+            sr.color = c;
+        }
+    }
+
+    /// <summary>
+    /// Onarıcı aurası — menzildeki düşmanların HP'sini geri getirir. Oyuncunun
+    /// DPS'i aurayı aşamıyorsa hedefler hiç ölmez; öncelik hedeflemeyi zorunlu kılar.
+    /// </summary>
+    void UpdateRepairAura()
+    {
+        if (data.repairAura <= 0f) return;
+
+        _auraTimer -= Time.deltaTime;
+        if (_auraTimer > 0f) return;
+        _auraTimer = 0.25f;   // her karede tarama yapmaya değmez
+
+        float heal = data.repairAura * 0.25f;
+        float r2   = data.repairAuraRange * data.repairAuraRange;
+
+        foreach (var other in FindObjectsByType<EnemyBot>(FindObjectsSortMode.None))
+        {
+            if (other == this || other._healthBar == null) continue;
+            if (((Vector2)other.transform.position - (Vector2)transform.position).sqrMagnitude > r2)
+                continue;
+            other._healthBar.currentHealth =
+                Mathf.Min(other._healthBar.maxHealth, other._healthBar.currentHealth + heal);
+        }
+    }
+
+    /// <summary>
+    /// Bölünen düşman — ölünce iki küçük parçaya ayrılır. Tek hedefe odaklanan
+    /// yüksek hasarlı build'i cezalandırır, alan hasarı talebi yaratır.
+    /// </summary>
+    void SpawnSplitFragments()
+    {
+        if (data == null || data.splitInto == null) return;
+
+        for (int i = 0; i < 2; i++)
+        {
+            Vector3 offset = new Vector3(Random.Range(-0.4f, 0.4f), Random.Range(-0.4f, 0.4f), 0f);
+            var frag = EnemySpawner.Spawn(data.splitInto, transform.position + offset);
+            if (frag == null) continue;
+
+            // Parçalar zayıflar; yoksa bölünmek düşmanı güçlendirirdi
+            var hb = frag.GetComponent<HealthBar>();
+            if (hb != null)
+            {
+                hb.maxHealth     *= data.splitHpRatio;
+                hb.currentHealth  = hb.maxHealth;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Karıştırıcıların toplam enerji kısıtı (0–1). EnergyBus üretimi bu oranda düşer.
+    /// Statik sorgu: sahada kaç jammer varsa etkileri toplanır, %80'de tavanlanır.
+    /// </summary>
+    public static float TotalEnergyJam(Vector3 shipPos)
+    {
+        float jam = 0f;
+        foreach (var e in FindObjectsByType<EnemyBot>(FindObjectsSortMode.None))
+        {
+            if (e.data == null || e.data.energyDrain <= 0f) continue;
+            float d = Vector2.Distance(shipPos, e.transform.position);
+            if (d > e.data.energyDrainRange) continue;
+            jam += e.data.energyDrain;
+        }
+        return Mathf.Min(jam, 0.8f);
     }
 
     float ApplyShieldLayer(float amount, WeaponType wt)
@@ -709,8 +856,12 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         if (data != null)
             DeathEffect.Spawn(transform.position, data.bodyColor, data.bodyWidth, data.bodyHeight);
 
-        // Toplam miktar = tehdit puanı × 4 birim — wave bütçesiyle orantılı, deterministik
-        float total       = (data != null ? data.threatScore : 1) * 4f;
+        // Toplam miktar = tehdit puanı × levelin drop oranı.
+        // Eskiden sabit ×4'tü; gelir bu yüzden yalnızca wave bütçesiyle büyüyordu
+        // ve 100. levelde 125× düşman spawn etmek gerekirdi. Artık iki bileşen
+        // ayrı: bütçe yavaş (×1.018/level), düşman başına değer hızlı (×1.031).
+        float perThreat   = BalanceConfig.Instance.DropPerThreat(GameProgress.CurrentLevel);
+        float total       = (data != null ? data.threatScore : 1) * perThreat;
         var   resType     = data != null ? data.debrisResourceType : ResourceType.RawMaterial;
         int   pieceCount  = Random.Range(2, 5);
 

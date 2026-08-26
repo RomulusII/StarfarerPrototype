@@ -46,6 +46,13 @@ public class TurretController : ShipComponentBase
         ? damage
         : (fireRate > 0.001f ? damage / fireRate : damage);
 
+    /// <summary>
+    /// Stat upgrade uygulanmış ATIŞ BAŞINA hasar. Zırh eşiği atış başına işlediği
+    /// için hedefleme bunu bilmek zorundadır — DPS yetmez: aynı DPS'i tek güçlü
+    /// atışla üreten turret zırhı deler, çok sayıda zayıf atışla üreten delemez.
+    /// </summary>
+    public float EffectiveShotDamage => damage * GetMultiplier("damage");
+
     /// <summary>Mermi tipinin hasar sınıfı — hedef dirençleri buna göre işler.</summary>
     public WeaponType ProjectileWeaponType
     {
@@ -133,7 +140,10 @@ public class TurretController : ShipComponentBase
                 transform.position, shipPos,
                 EffectiveRange, DamagePerSecond, bulletSpeed, ProjectileWeaponType,
                 specType == TurretSpecType.PointDefence,
-                _lockedTarget);
+                _lockedTarget,
+                // Zırh atış BAŞINA işler; turret kendi atış hasarını bildirmezse
+                // zırhlı hedefleri "kolay" sanıp onlara kilitlenir ve mermi harcar.
+                EffectiveShotDamage);
         }
 
         return _lockedTarget?.TargetTransform;
