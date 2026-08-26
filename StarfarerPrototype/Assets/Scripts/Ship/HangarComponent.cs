@@ -38,7 +38,6 @@ public class HangarComponent : ShipComponentBase
         _skipVisual = true; // Hangar meta-komponent, halka/HP barı gösterilmez
         base.Awake();
         componentName     = "Hangar";
-        energyConsumption = 0f;
         BuildVisual();
     }
 

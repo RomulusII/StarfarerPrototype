@@ -11,6 +11,16 @@ public class ComponentDefinition : ScriptableObject
     public int sellValue;
     public string description;
 
+    [Tooltip("Stat upgrade fiyatlarının dayandığı taban. Zincirin TÜM halkaları " +
+             "aynı değeri taşır (son tier'ın fiyatı). Eskiden stat maliyeti " +
+             "o anki tier'ın fiyatından hesaplanıyordu; Mk1'de stat basıp sonra " +
+             "tier atlamak 4× ucuza geliyordu. 0 ise cost kullanılır.")]
+    public int statCostBase;
+
+    [Tooltip("Sv0 enerji tüketimi. Stat seviyesiyle birlikte büyür — jeneratör " +
+             "yetişemezse yeni yükseltme yapılamaz.")]
+    public float baseEnergyCost;
+
     public float productionAmount;
     public float maxShield;
     public float rechargeRate;

@@ -141,28 +141,105 @@ veya deaktif olan depo kapasite vermez — hasar almak biriktirdiğin kaynağı 
 Kapasite kilidi bilinçli: kalkan Mk1→Mk2 (35 kristal) taban tavanla yapılabilir,
 Mk2→Mk3 (52 kristal) için önce depo kurmak gerekir.
 
-**Yükseltme sistemi kasıtlı olarak bu haliyle duruyor — dokunmadan önce oku.**
+### Yükseltme Sistemi — Tasarım Kararları
 
-Bir oturumda tier zincirleri kaldırılıp komponent başına tek stat eksenine
-geçildi, sonra bu karar geri alındı. Sebep: sistem dengelenmişti ama upgrade
-ekranı ~22 ayrı yükseltme kararından 9 tane tek-butonluk "Yükselt"e inmişti —
-oyunun karar derinliğinin yarısı gitmişti. **Derinlik dengeye tercih edildi.**
+**Yapı korundu, sayılar ayarlandı.** Bir oturumda tier zincirleri kaldırılıp
+komponent başına tek stat eksenine geçildi; sistem dengelenmişti ama upgrade
+ekranı ~22 yükseltme kararından 9 tane tek-butonluk "Yükselt"e inmişti. Geri
+alındı: **derinlik dengeye tercih edildi.** Sonra ölçüldü ve o refactor'ın
+gereksiz olduğu görüldü — bir sabit yeterliymiş.
 
-Bu yüzden bilinen ama **açık bırakılmış** denge sorunları var:
+**İki eksen:** tier zinciri (Mk1→Mk3, mağazadan) + komponent başına stat
+seviyeleri (8 seviye). Sayıların sahibi `BalanceConfig`.
 
-- Stat çarpanı `1.5^seviye`, 8 seviye → tek stat **25.6×**
-- Turret'in hasar ve ateş hızı ikisi de DPS'e çarpımsal girer → **657×**
-- Tier zinciri bunun üstüne **4.5×** ekler
-- Ölçülen sonuç: oyuncu gücü kampanya boyunca **~115×** büyüyor
+| Ayar | Değer | Not |
+|---|---|---|
+| `statStep` | **1.25** | seviye başına güç; eskiden 1.5 idi |
+| `statCostGrowth` | 2.5 | seviye başına maliyet |
+| `sellRefundRatio` | 0.40 | kurulum + stat harcamasının iadesi |
+| `energyGrowth` | 1.30 | seviye başına enerji tüketimi |
 
-Ölçüm notu: doygunluk oranı (harcanabilir kaynak ÷ her şeyi maxlama maliyeti)
-**0.44** — yani sorun kaynak bolluğu değil. Kaynağı kısmak bu farkı kapatmaz;
-oyuncu %44'lük bütçeyle içeriğin talep ettiğinin çok üstünde güce ulaşıyor.
+**Neden 1.5 değil 1.25:** turret ve ana silahta hasar **ve** ateş hızı ikisi de
+DPS'e çarpımsal giriyor. 1.5 ile Lv5/Lv6 demek `1.5^11 = 86×` demekti; ölçülen
+oyuncu üstünlüğü kampanya boyunca 4.5× → 26.5×'e kayıyordu. İlk 25 level
+sağlamdı, kırılma 50'den sonra başlıyordu.
 
-Denge tekrar ele alınırsa **derinliği koruyan** bir yol var: seviye bir *puan
-havuzu* verir, oyuncu puanı statlar arasında dağıtır. Çarpımsal statlarda toplam
-güç dağılımdan bağımsız olur (`1.3¹⁰ = 1.3⁵ × 1.3⁵`), yani seçenekler durur ama
-tavan sabitlenir. Bu yol denendi ve şimdilik ertelendi.
+| Level | 1 | 25 | 50 | 75 | 100 |
+|---|---|---|---|---|---|
+| `statStep = 1.5` (eski) | 4.5 | 3.9 | 11.1 | 21.0 | **26.5** |
+| `statStep = 1.25` (şimdi) | 4.5 | 3.2 | 4.4 | 4.9 | **4.3** |
+
+Simülasyon "en ucuz statı al" davranışı ve %100 isabet varsayar; mutlak
+değerler değil, **eğrinin şekli** güvenilirdir.
+
+**Düzeltilen üç hata:**
+
+- **Stat seviyeleri tier upgrade'de siliniyordu.** `UpgradeComponent` komponenti
+  yok edip yenisini kuruyor, `StatLevels` sıfırlanıyordu — oyuncu binlerce
+  kaynak harcadığı yatırımı Mk2'ye geçerken sessizce kaybediyordu. Artık taşınır.
+- **Mk1'de ucuz stat basma istismarı.** Stat fiyatı o anki tier'ın fiyatından
+  hesaplanıyordu; Mk1'de statları maxlayıp sonra tier atlamak 4× ucuza geliyordu,
+  yani optimal oyun tier'ları geciktirmekti. Fiyat artık zincirin SON tier'ına
+  sabitlenmiştir (`ComponentDefinition.statCostBase`).
+- **UI `Lv x/5` diyordu ama tavan 8'di.** Etiket `MaxStatLevel`'den okunuyor.
+
+**Satış iadesi stat harcamasını da kapsar.** Eskiden yalnızca tier'ın
+`sellValue`'su dönüyordu: Mk3 kalkana binlerce kristal stat basıp satan oyuncu
+28 kristal alıyordu. Artık `(kurulum + stat harcaması) × 0.40`. Sat butonu
+tutarı gösterir.
+
+### Enerji Bütçesi — Tasarım Kararları
+
+`EnergyBus`ın üretim/tüketim muhasebesi uzun süre yazılıydı ama **kapalıydı**:
+her komponent `Awake`'de `energyConsumption = 0f` yapıyordu, dolayısıyla
+`TotalConsumption` her zaman sıfırdı. Artık besleniyor.
+
+```
+tüketim = baseEnergyCost × 1.30^(en yüksek stat seviyesi)
+```
+
+**En yüksek seviye kullanılır, toplam değil.** Toplama bağlansaydı yedi izli
+Hangar, iki izli turretten katbekat fazla enerji yerdi; oysa ikisi de "aynı
+derecede yükseltilmiş". Yan etkisi bilinçli: geride kalan bir izi yükseltmek
+bedavadır, en yüksek izi zorlamak enerji ister.
+
+| Aşama | Üretim | Tüketim | Net |
+|---|---|---|---|
+| Başlangıç (Jen Mk1 + Kalkan + Hangar) | 10.0 | 3.5 | +6.5 |
+| +1 turret | 10.0 | 4.5 | +5.5 |
+| Erken orta (Jen Mk2, 3 turret, onarım) | 18.0 | 17.7 | **+0.3** |
+| Geç (Jen Mk3 + üretim Sv6, hepsi Mk3 Sv6) | 106.8 | 68.5 | +38.3 |
+
+Erken ortada gerçekten sıkar — jeneratöre yatırım yapmak zorunludur ve o yatırım
+silahtan çıkar. Geç oyunda gevşer; sıkmaya devam etmesi isteniyorsa ayar noktası
+`energyGrowth`. **Test edilecek.**
+
+**Enerji yetersizliği kaynak yetersizliğinden AYRI gösterilir** — ikisi aynı gri
+butonla anlatılsaydı oyuncu jeneratörü suçlamayı akıl edemezdi. Yükseltme satırı
+turuncuya döner, ek enerji yükünü (⚡) ve ne kadar eksik olduğunu yazar.
+
+Kapı hem stat hem tier yükseltmesinde, hem de kurulumda uygulanır; kaynak
+kontrolünden ÖNCE — kaynağı harcayıp enerjiye takılmak kötü bir sürpriz olurdu.
+
+### Kayıt ve Level Seçimi — Tasarım Kararları
+
+100 level tek oturumda oynanamaz; kayıt olmadan eğrinin ikinci yarısı test bile
+edilemez.
+
+- **Kayıt yalnızca level sınırlarında alınır** (`ChapterManager.CompleteLevel`).
+  Savaş ortasında kaydetmek yarım kalmış bir dalgayı geri yüklemeye çalışmak
+  demek olurdu. Ölünce o levelin başına değil, son tamamlanan levele dönülür.
+- **PlayerPrefs + JsonUtility, tek slot.** Prototip için yeterli; "kayıt slotu
+  seçme" akışı oynanışa bir şey katmıyor.
+- **Komponent tanımları runtime'da üretildiği için referansları kaydedilemez.**
+  Tip + tier + (turret ise) uzmanlaşma yazılır, `ComponentCatalog.Resolve` ile
+  geri bulunur.
+- **Kaynaklar slotlar kurulduktan SONRA yazılır** — tavan depo komponentlerine
+  bağlı; önce yazılsaydı taban tavana kırpılırdı.
+- **Level seçimi ulaşılmış en yüksek levelle sınırlı** ve bölüm başlarına atlar
+  (1, 11, 21 …). İstenen her levele atlamak testi kolaylaştırırdı ama ilerlemeyi
+  anlamsız kılardı; bölüm ortasından başlamak da o bölümün yeni düşman tipini
+  tanıtan leveli atlamak demek olurdu.
 
 ### Kaynak Ekonomisi — Tasarım Kararları
 
@@ -582,6 +659,7 @@ bırakıldı.
 | BalanceConfig.cs | Gelir ve zırh eğrilerinin tek sahibi (SO; asset yoksa varsayılan) |
 | LevelCurve.cs | Düşman ölçeklemesi: HP, hasar, zırh, kaçamak — levelden türer |
 | GameProgress.cs | Kampanyadaki yer: 100 level, 10 bölüm, bölüm başına 1 boss |
+| SaveSystem.cs | Kampanya kaydı (PlayerPrefs), level sınırlarında yazılır |
 | StorageComponent.cs | Depo — kurulu olduğu sürece kaynak tavanını yükseltir |
 | ITurretTarget.cs | Turretlerin nişan alabileceği her şeyin ortak arayüzü |
 | CombatArea.cs | Dogfight sınırları — savaşçılar ekrandan çıkmasın |
@@ -591,7 +669,7 @@ bırakıldı.
 | EnemyBullet.cs | Düşman mermisi — hull modu (kalkan üzerinden) veya komponent modu (doğrudan) |
 | EnemySpawner.cs | Düşmanın TEK inşa yolu — GameObject, HealthBar, level ölçeklemesi. Serbest test modu içerir |
 | AsteroidSpawner.cs | Asteroit alanının yoğunluğunu korur |
-| StartMenuUI.cs | Açılış ekranı — kampanya / serbest mod / zorluk seçimi |
+| StartMenuUI.cs | Açılış ekranı — kampanya / devam / serbest mod / zorluk / level seçimi |
 | StarField.cs | 400 yıldız, -15/+15 birim arası random pozisyon |
 | CameraController.cs | Parallax kayma + zoom, power curve (t²) |
 | HealthBar.cs | Can/kalkan barı, SpriteRenderer tabanlı, child olarak eklenir |
@@ -605,7 +683,7 @@ bırakıldı.
 | ShieldGeneratorComponent.cs | Kalkan üretimi, Boost çarpanları |
 | GeneratorComponent.cs | Enerji üretimi |
 | RepairUnitComponent.cs | En hasarlı komponenti otomatik tamir eder |
-| EnergyBus.cs | Enerji dağıtım sistemi — Jammer düşmanları üretimi kısar (JamFactor) |
+| EnergyBus.cs | Enerji dağıtım sistemi — üretim/tüketim muhasebesi, Jammer kısar (JamFactor) |
 | ResourceInventory.cs | Ham madde + kristal envanteri |
 | UpgradeUI.cs | Tab ile açılan upgrade ekranı, 4 panel layout |
 | SlotVisual.cs | World-space slot göstergesi, tıklama ile UpgradeUI tetiklenir |
@@ -689,9 +767,12 @@ float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 - [x] Hitbox görselden ayrıldı — skin'ler dengeyi kaydırmayacak
 - [x] 8 yeni düşman tipi — Interceptor / Artillery / Jammer / Phantom /
       Regenerator / Leech / Splitter / Juggernaut
+- [x] Stat adımı 1.5 → 1.25 — oyuncu üstünlüğü kampanya boyunca düz kaldı
+- [x] Enerji bütçesi açıldı — tüketim stat seviyesiyle büyür, jeneratör gerçek bir kapı
+- [x] Satış iadesi stat harcamasını kapsıyor
+- [x] **Level seçimi** — başlangıç menüsünde, ulaşılmış en yüksek levele kadar
+- [x] **Kayıt/yükleme** — SaveSystem, level sınırlarında kaydeder
 - [ ] **Denge testleri** — aşağıdaki listeye bak; sayıların hiçbiri oyunda denenmedi
-- [ ] **Level seçimi** — 100 levellik eğri baştan oynanarak test edilemez
-- [ ] **Kayıt/yükleme** — 100 level tek oturumda oynanamaz
 - [ ] Point defence turretleri — küçük/hızlı hedeflere odaklı otomatik turret
 - [ ] Mobil UI
 - [ ] Ses efektleri
@@ -699,14 +780,14 @@ float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 
 ### Yeniden ele alınabilecekler
 
-- **Enerji bütçesi.** `EnergyBus` üretim/tüketim muhasebesi yazılı ama **kapalı**:
-  her komponent `Awake`'de `energyConsumption = 0f` yapıyor, dolayısıyla
-  `TotalConsumption` her zaman sıfır. Bir oturumda açıldı (tüketim seviyeyle
-  büyüyordu, jeneratör zorunlu bir vergiye dönüşüyordu) ama yükseltme sistemi
-  geri alınınca o da geri alındı — tüketim komponent seviyesine bağlıydı.
-  Açılırsa "her şeyi al" stratejisini kaynaktan bağımsız olarak kapatan tek kaldıraç.
-- **Yükseltme dengesi.** Bkz. *Komponent Kataloğu* altındaki uyarı — bilinen 115×
-  güç patlaması kasıtlı olarak açık bırakıldı.
+- **Enerji geç oyunda gevşiyor.** Erken ortada net akış +0.3'e kadar iniyor ama
+  geç oyunda +38'e çıkıyor; jeneratöre yatırım yapan oyuncu için enerji bir
+  kapı olmaktan çıkıyor. Ayar noktası `BalanceConfig.energyGrowth` (1.30).
+  Önce oynanıp ölçülecek.
+- **Puan havuzu alternatifi.** Denge yeniden ele alınırsa: seviye bir *puan
+  havuzu* verir, oyuncu puanı statlar arasında dağıtır. Çarpımsal statlarda
+  toplam güç dağılımdan bağımsız olur (`1.3¹⁰ = 1.3⁵ × 1.3⁵`), yani seçenekler
+  durur ama tavan sabitlenir. Şu anki ayar yeterliyse gerekmez.
 
 ---
 
@@ -745,9 +826,12 @@ Sıra kararlaştırıldı: **hitbox ayrımı → denge testleri → skin'ler.**
   - **Zırh eşiğinin hissi.** Düşük seviye silahla zırhlı düşman "zor" mu
     hissettiriyor yoksa "silahım hiç işlemiyor" mu? `armorMinDamageRatio` (0.10)
     ve `armorExponent` (1.6) ayar noktaları.
-  - **Yükseltme dengesi.** Bilinen 115× patlaması açık bırakıldı — oyunda ne kadar
-    erken hissediliyor, hangi bölümde oyun kolaylaşıyor? Bu ölçüm, dengeyi
-    yeniden ele alırken hangi yolun seçileceğini belirleyecek.
+  - **Yükseltme dengesi.** `statStep = 1.25` ile üstünlük düz kalıyor (4.5 → 4.3)
+    ama bu simülasyon; gerçekte oyuncu daha odaklı oynar ve üstünlük artar.
+    Hangi bölümde oyun kolaylaşıyor?
+  - **Enerji baskısı.** Erken ortada jeneratöre yatırım zorunluluğu doğru mu
+    hissettiriyor, yoksa "hiçbir şey yükseltemiyorum" duvarı mı?
+  - **Kayıt akışı.** Ölünce son tamamlanan levele dönmek doğru ceza mı?
   - Kristal arz/talep, bölüm temposu, serbest mod rampası, uçuş hissi,
     onarım hızları, enkaz ömrü.
 

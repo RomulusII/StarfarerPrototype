@@ -53,6 +53,29 @@ public class ShipLoadout : MonoBehaviour
     public static ComponentDefinition GetWeaponChainStart(WeaponType type)
         => ComponentCatalog.WeaponChain(type)?[0];
 
+    /// <summary>
+    /// Stat upgrade'lerine harcanan toplam kaynak. Satış iadesi bunu da kapsar —
+    /// eskiden yalnızca tier'ın sellValue'su dönüyordu, yani Mk3 kalkana binlerce
+    /// kristal stat basıp satan oyuncu 28 kristal alıyordu.
+    /// </summary>
+    public static int StatSpent(ComponentDefinition def, ShipComponentBase comp)
+    {
+        if (def == null || comp == null) return 0;
+        int   baseCost = def.statCostBase > 0 ? def.statCostBase : def.cost;
+        var   cfg      = BalanceConfig.Instance;
+        int   total    = 0;
+        foreach (var kv in comp.StatLevels) total += cfg.StatTotalSpent(baseCost, kv.Value);
+        return total;
+    }
+
+    /// <summary>Satışta geri dönen miktar: tier iadesi + stat harcamasının bir kısmı.</summary>
+    public static int SellRefund(ComponentDefinition def, ShipComponentBase comp)
+    {
+        if (def == null) return 0;
+        int statRefund = Mathf.RoundToInt(StatSpent(def, comp) * BalanceConfig.Instance.sellRefundRatio);
+        return def.sellValue + statRefund;
+    }
+
     // -------------------------------------------------------------------------
     // Public API
     // -------------------------------------------------------------------------
@@ -63,6 +86,9 @@ public class ShipLoadout : MonoBehaviour
         if (def == null) return false;
         if (slotIndex < 0 || slotIndex >= slotCount) return false;
         if (!IsSlotEmpty(slotIndex)) return false;
+
+        // Enerji kapısı — kuracak enerji yoksa kaynak da harcanmaz
+        if (deductCost && !HasEnergyHeadroom(def.baseEnergyCost)) return false;
 
         if (deductCost)
         {
@@ -128,6 +154,9 @@ public class ShipLoadout : MonoBehaviour
                 break;
         }
 
+        // Enerji kaydı: Awake/OnEnable sıfırla kaydolur, gerçek değeri burada alır
+        comp?.SetEnergyBase(def.baseEnergyCost);
+
         _slots[slotIndex]         = comp;
         _installedDefs[slotIndex] = def;
         _slotObjects[slotIndex]   = go;
@@ -150,8 +179,8 @@ public class ShipLoadout : MonoBehaviour
         if (_installedDefs[slotIndex] == null) return false;
 
         if (returnResources && ResourceInventory.Instance != null)
-            ResourceInventory.Instance.Add(_installedDefs[slotIndex].costResource,
-                                           _installedDefs[slotIndex].sellValue);
+            ResourceInventory.Instance.Add(defToSell.costResource,
+                                           SellRefund(defToSell, _slots[slotIndex]));
 
         if (_slotObjects[slotIndex] != null)
             Destroy(_slotObjects[slotIndex]);
@@ -175,6 +204,14 @@ public class ShipLoadout : MonoBehaviour
         ComponentDefinition upgradeTo = _installedDefs[slotIndex].upgradeTo;
         if (upgradeTo == null) return false;
 
+        // Enerji kapısı önce: kaynağı harcayıp enerjiye takılmak kötü bir sürpriz
+        var  old       = _slots[slotIndex];
+        int  statLevel = old != null ? old.HighestStatLevel : 0;
+        float oldDraw  = old != null ? old.energyConsumption : 0f;
+        float newDraw  = upgradeTo.baseEnergyCost *
+                         BalanceConfig.Instance.EnergyMultiplier(statLevel);
+        if (!HasEnergyHeadroom(newDraw - oldDraw)) return false;
+
         // Oyuncu sadece farkı öder: yeni maliyet - eski satış değeri
         int diffCost = upgradeTo.cost - _installedDefs[slotIndex].sellValue;
         if (diffCost > 0)
@@ -183,9 +220,46 @@ public class ShipLoadout : MonoBehaviour
             if (!ResourceInventory.Instance.TrySpend(upgradeTo.costResource, diffCost)) return false;
         }
 
+        // Stat seviyelerini taşı. Yükseltme komponenti yok edip yenisini kurduğu
+        // için StatLevels sıfırlanıyordu: oyuncu binlerce kaynak harcadığı stat
+        // yatırımını Mk2'ye geçerken sessizce kaybediyordu.
+        var carried = old != null ? new Dictionary<string, int>(old.StatLevels) : null;
+
         ComponentDefinition upgradeTarget = upgradeTo;
         SellComponent(slotIndex, returnResources: false); // eski komponenti yok et, para iade etme
-        return InstallComponent(upgradeTarget, slotIndex, deductCost: false);
+        if (!InstallComponent(upgradeTarget, slotIndex, deductCost: false)) return false;
+
+        var fresh = _slots[slotIndex];
+        if (fresh != null && carried != null)
+        {
+            foreach (var kv in carried) fresh.StatLevels[kv.Key] = kv.Value;
+            fresh.SetEnergyBase(upgradeTarget.baseEnergyCost);
+            foreach (var key in carried.Keys) fresh.OnStatUpgraded(key);
+        }
+        return true;
+    }
+
+    // -------------------------------------------------------------------------
+    // Enerji kapısı
+    // -------------------------------------------------------------------------
+
+    /// <summary>Ek tüketim jeneratörün üretimine sığıyor mu?</summary>
+    public static bool HasEnergyHeadroom(float additionalDraw)
+        => EnergyShortfall(additionalDraw) <= 0f;
+
+    /// <summary>Ne kadar enerji eksik? 0 = yeterli.</summary>
+    public static float EnergyShortfall(float additionalDraw)
+    {
+        var bus = EnergyBus.Instance;
+        if (bus == null || additionalDraw <= 0f) return 0f;
+        return Mathf.Max(0f, bus.TotalConsumption + additionalDraw - bus.TotalProduction);
+    }
+
+    /// <summary>Bu statı bir seviye yükseltmenin getireceği EK enerji yükü.</summary>
+    public float StatUpgradeEnergyDelta(int slotIndex, string key)
+    {
+        var comp = GetSlotComponent(slotIndex);
+        return comp != null ? comp.NextUpgradeEnergyDelta(key) : 0f;
     }
 
     public void SwitchWeapon(WeaponType type)
@@ -219,8 +293,9 @@ public class ShipLoadout : MonoBehaviour
         if (wc == null) return;
         wc.Configure(def);
         if (!_weaponStatLevels.TryGetValue(_activeWeaponType, out var stats)) return;
-        if (stats.TryGetValue("damage",   out var d)) wc.damage   *= Mathf.Pow(1.5f, d);
-        if (stats.TryGetValue("fireRate", out var f)) wc.fireRate /= Mathf.Pow(1.5f, f);
+        var cfg = BalanceConfig.Instance;
+        if (stats.TryGetValue("damage",   out var d)) wc.damage   *= cfg.StatMultiplier(d);
+        if (stats.TryGetValue("fireRate", out var f)) wc.fireRate /= cfg.StatMultiplier(f);
     }
 
     /// <summary>Yeni bir silah tipini satın alıp açar. Zaten açıksa false döner.</summary>
@@ -300,6 +375,72 @@ public class ShipLoadout : MonoBehaviour
         _installedDefs[slotIndex] = newSpecDef;
         return true;
     }
+
+    // -------------------------------------------------------------------------
+    // Kayıt / yükleme desteği
+    // -------------------------------------------------------------------------
+
+    /// <summary>Kurulu her slotu tanımı ve komponentiyle birlikte gezer.</summary>
+    public IEnumerable<(int slot, ComponentDefinition def, ShipComponentBase comp)> EnumerateSlots()
+    {
+        for (int i = 0; i < slotCount; i++)
+            if (_installedDefs[i] != null)
+                yield return (i, _installedDefs[i], _slots[i]);
+    }
+
+    /// <summary>Tüm slotları boşaltır — yükleme öncesi temiz sayfa.</summary>
+    public void ClearAllSlots()
+    {
+        for (int i = 0; i < slotCount; i++)
+        {
+            if (_slotObjects[i] != null) Destroy(_slotObjects[i]);
+            _slots[i]         = null;
+            _installedDefs[i] = null;
+            _slotObjects[i]   = null;
+        }
+        _slotsByType.Clear();
+        StorageComponent.Invalidate();
+    }
+
+    /// <summary>Kayıttan bir slotu stat seviyeleriyle birlikte geri kurar.</summary>
+    public bool RestoreSlot(int slotIndex, ComponentDefinition def, Dictionary<string, int> stats)
+    {
+        if (!InstallComponent(def, slotIndex, deductCost: false)) return false;
+
+        var comp = _slots[slotIndex];
+        if (comp != null && stats != null)
+        {
+            foreach (var kv in stats) comp.StatLevels[kv.Key] = kv.Value;
+            comp.SetEnergyBase(def.baseEnergyCost);
+            foreach (var key in stats.Keys) comp.OnStatUpgraded(key);
+        }
+        return true;
+    }
+
+    /// <summary>Kayıttan silah durumunu geri kurar.</summary>
+    public void RestoreWeapon(WeaponType type, int tier, int damageLevel, int fireRateLevel)
+    {
+        var def = ComponentCatalog.WeaponChain(type);
+        if (def == null || def.Length == 0) return;
+
+        _unlockedWeapons[type] = def[Mathf.Clamp(tier - 1, 0, def.Length - 1)];
+        _weaponStatLevels[type] = new Dictionary<string, int>
+        {
+            { "damage",   damageLevel   },
+            { "fireRate", fireRateLevel },
+        };
+    }
+
+    /// <summary>Aktif silahı seçer ve statlarını uygular (yükleme sonu).</summary>
+    public void FinishRestore(WeaponType active)
+    {
+        if (_unlockedWeapons.ContainsKey(active)) _activeWeaponType = active;
+        ApplyActiveWeaponStats();
+    }
+
+    /// <summary>Bir silah tipinin şu anki tier'ı (kayıt için).</summary>
+    public int GetWeaponTier(WeaponType type)
+        => _unlockedWeapons.TryGetValue(type, out var d) ? d.tier : 0;
 
     public ShipComponentBase GetSlotComponent(int slotIndex)
     {

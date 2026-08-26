@@ -13,7 +13,6 @@ public class RepairUnitComponent : ShipComponentBase
     {
         base.Awake();
         componentName     = "Repair Unit";
-        energyConsumption = 0f;
     }
 
     void Update()

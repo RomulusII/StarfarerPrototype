@@ -51,6 +51,43 @@ public class BalanceConfig : ScriptableObject
     public float bossThreatValue      = 25f;
     public float bossRewardMultiplier = 3f;
 
+    // ── Yükseltme eğrisi ──────────────────────────────────────────────────────
+
+    [Header("Stat Upgrade")]
+    [Tooltip("Stat seviyesi başına güç çarpanı. 1.5 iken oyuncu üstünlüğü kampanya " +
+             "boyunca 4.5× → 26.5×'e kayıyordu: turret ve silahta hasar VE ateş " +
+             "hızı ikisi de DPS'e çarpımsal giriyor, Lv5/Lv6 demek 1.5^11 = 86× " +
+             "demekti. 1.25'te üstünlük 4.5 → 4.3 arasında düz kalıyor.")]
+    public float statStep = 1.25f;
+
+    [Tooltip("Stat seviyesi başına maliyet çarpanı.")]
+    public float statCostGrowth = 2.5f;
+
+    [Tooltip("Satışta iade oranı — kurulum + stat harcamalarının toplamına uygulanır.")]
+    public float sellRefundRatio = 0.40f;
+
+    [Header("Enerji Bütçesi")]
+    [Tooltip("Komponent enerji tüketiminin stat seviyesi başına büyümesi. " +
+             "Jeneratörün üretim adımından (statStep) YÜKSEK tutulur — böylece " +
+             "jeneratör hep geriden gelir ve kaç komponenti besleyebileceğin " +
+             "ona ne kadar yatırdığına bağlı olur.")]
+    public float energyGrowth = 1.30f;
+
+    public float StatMultiplier(int level) => Mathf.Pow(statStep, Mathf.Max(0, level));
+
+    public int StatUpgradeCost(int baseCost, int currentLevel)
+        => Mathf.RoundToInt(Mathf.Max(5, baseCost) * Mathf.Pow(statCostGrowth, Mathf.Max(0, currentLevel)));
+
+    /// <summary>Bir stat izine o seviyeye kadar harcanan toplam.</summary>
+    public int StatTotalSpent(int baseCost, int level)
+    {
+        int total = 0;
+        for (int L = 0; L < level; L++) total += StatUpgradeCost(baseCost, L);
+        return total;
+    }
+
+    public float EnergyMultiplier(int level) => Mathf.Pow(energyGrowth, Mathf.Max(0, level));
+
     // ── Zırh ──────────────────────────────────────────────────────────────────
 
     [Header("Zırh Eşiği")]

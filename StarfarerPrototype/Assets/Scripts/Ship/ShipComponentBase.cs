@@ -34,21 +34,93 @@ public abstract class ShipComponentBase : MonoBehaviour
     public readonly Dictionary<string, int> StatLevels = new();
     public const int MaxStatLevel = 8;
 
+    /// <summary>
+    /// Seviye başına güç çarpanı. Sabit 1.5 idi; BalanceConfig'e taşındı çünkü
+    /// hasar ve ateş hızı ikisi de DPS'e çarpımsal giriyor ve 1.5 ile oyuncu
+    /// üstünlüğü kampanya boyunca 6× kayıyordu.
+    /// </summary>
     public float GetMultiplier(string key) =>
-        Mathf.Pow(1.5f, StatLevels.TryGetValue(key, out var lvl) ? lvl : 0);
+        BalanceConfig.Instance.StatMultiplier(GetStatLevel(key));
 
     public int GetStatLevel(string key) =>
         StatLevels.TryGetValue(key, out var lvl) ? lvl : 0;
+
+    /// <summary>
+    /// En yüksek stat seviyesi. Enerji tüketimi buna bağlanır — statların
+    /// TOPLAMINA bağlansaydı yedi izli Hangar, iki izli turretten katbekat
+    /// fazla enerji yerdi; oysa ikisi de "aynı derecede yükseltilmiş".
+    /// </summary>
+    public int HighestStatLevel
+    {
+        get
+        {
+            int max = 0;
+            foreach (var lvl in StatLevels.Values) if (lvl > max) max = lvl;
+            return max;
+        }
+    }
 
     public void ApplyStatUpgrade(string key)
     {
         int cur = GetStatLevel(key);
         if (cur >= MaxStatLevel) return;
         StatLevels[key] = cur + 1;
+        RefreshEnergyDraw();
         OnStatUpgraded(key);
     }
 
     public virtual void OnStatUpgraded(string key) { }
+
+    /// <summary>Tüm stat izlerini olduğu gibi kopyalar (tier upgrade'de korunur).</summary>
+    public void CopyStatLevelsFrom(ShipComponentBase other)
+    {
+        if (other == null) return;
+        StatLevels.Clear();
+        foreach (var kv in other.StatLevels) StatLevels[kv.Key] = kv.Value;
+        RefreshEnergyDraw();
+        foreach (var key in StatLevels.Keys) OnStatUpgraded(key);
+    }
+
+    // ── Enerji tüketimi ───────────────────────────────────────────────────────
+    //
+    // EnergyBus'ın üretim/tüketim muhasebesi uzun süre yazılıydı ama kapalıydı:
+    // her komponent Awake'de energyConsumption = 0f yapıyordu, dolayısıyla
+    // TotalConsumption her zaman sıfırdı. Artık besleniyor.
+
+    /// <summary>Sv0 tüketimi — ShipLoadout kurulumda ComponentDefinition'dan verir.</summary>
+    public float baseEnergyCost = 0f;
+
+    public float EnergyDrawAt(int statLevel)
+        => baseEnergyCost * BalanceConfig.Instance.EnergyMultiplier(statLevel);
+
+    /// <summary>Bir sonraki stat seviyesinin getireceği EK enerji yükü.</summary>
+    public float NextUpgradeEnergyDelta(string key)
+    {
+        // Yalnızca EN YÜKSEK izi zorlamak tüketimi artırır; geride kalan bir izi
+        // yükseltmek bedavadır. Tüketim zaten en yüksek seviyeye bağlı.
+        int next = Mathf.Max(HighestStatLevel, GetStatLevel(key) + 1);
+        return EnergyDrawAt(next) - EnergyDrawAt(HighestStatLevel);
+    }
+
+    /// <summary>Taban tüketimi ayarlar ve EnergyBus kaydını tazeler.</summary>
+    public void SetEnergyBase(float value)
+    {
+        baseEnergyCost = value;
+        RefreshEnergyDraw();
+    }
+
+    protected void RefreshEnergyDraw()
+    {
+        float next = EnergyDrawAt(HighestStatLevel);
+        if (Mathf.Approximately(next, energyConsumption)) return;
+
+        if (EnergyBus.Instance != null && IsOperational)
+        {
+            EnergyBus.Instance.UnregisterConsumer(energyConsumption);
+            EnergyBus.Instance.RegisterConsumer(next);
+        }
+        energyConsumption = next;
+    }
 
     // ── Görsel sabitler ───────────────────────────────────────────────────────
 

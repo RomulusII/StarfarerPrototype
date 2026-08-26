@@ -70,7 +70,8 @@ public class ChapterManager : MonoBehaviour
 
         _chapters = ChapterData.CreateDefaultChapters();
 
-        GameProgress.Reset();
+        // GameProgress burada SIFIRLANMAZ: level, GameManager tarafından menüden
+        // (yeni oyun = seçilen level, devam = kayıttaki level) zaten ayarlandı.
         BeginLevel();
     }
 
@@ -313,6 +314,10 @@ public class ChapterManager : MonoBehaviour
 
         bool chapterEnds = GameProgress.IsBossLevel;
         GameProgress.Advance();
+
+        // Kayıt yalnızca level sınırlarında alınır — savaş ortasında kaydetmek
+        // yarım kalmış bir dalgayı geri yüklemeye çalışmak demek olurdu.
+        SaveSystem.Save();
 
         if (chapterEnds)
         {

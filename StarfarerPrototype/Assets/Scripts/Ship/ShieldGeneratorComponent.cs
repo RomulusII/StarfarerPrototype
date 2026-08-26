@@ -68,7 +68,6 @@ public class ShieldGeneratorComponent : ShipComponentBase
     {
         base.Awake();
         componentName     = "Shield Generator";
-        energyConsumption = 0f;
         // currentShield ShipLoadout.InstallComponent tarafından Awake'den SONRA set edilir
     }
 

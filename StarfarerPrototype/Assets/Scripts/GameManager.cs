@@ -128,6 +128,26 @@ public class GameManager : MonoBehaviour
             return;
         }
 
+        // Kaydı uygulamak ShipLoadout.Start()'tan SONRA olmalı — yoksa
+        // başlangıç donanımı kaydın üstüne kurulur. Bir kare beklemek yeterli.
+        StartCoroutine(BeginCampaign(mode));
+    }
+
+    System.Collections.IEnumerator BeginCampaign(StartMenuUI.GameMode mode)
+    {
+        yield return null;   // ShipLoadout.Start() bu karede çalışır
+
+        if (mode == StartMenuUI.GameMode.Continue)
+        {
+            if (!SaveSystem.Apply(SaveSystem.Load()))
+                GameProgress.Reset();   // kayıt bozuksa baştan başla
+        }
+        else
+        {
+            // Yeni oyun: seçilen levelden başla, eski kaydın üstüne yazılacak
+            GameProgress.CurrentLevel = StartMenuUI.SelectedStartLevel;
+        }
+
         BuildChapterSystem();
     }
 

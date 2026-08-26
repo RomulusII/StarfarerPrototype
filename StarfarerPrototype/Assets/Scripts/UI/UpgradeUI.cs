@@ -302,6 +302,8 @@ public class UpgradeUI : MonoBehaviour
             return;
         }
 
+        var installed = _loadout?.GetSlotComponent(slotIndex);
+
         MakeTextLabel(_popupContent.transform, $"Tier {def.tier}", 15, TextAnchor.MiddleLeft);
 
         var btnRow = CreateRow(_popupContent.transform);
@@ -312,15 +314,33 @@ public class UpgradeUI : MonoBehaviour
                              ResourceInventory.Instance.Get(def.upgradeTo.costResource) >=
                              (def.upgradeTo.cost - def.sellValue);
 
+            // Üst tier daha çok enerji yer; kaynak yetse bile jeneratör yetmeyebilir
+            int   statLv   = installed != null ? installed.HighestStatLevel : 0;
+            float oldDraw  = installed != null ? installed.energyConsumption : 0f;
+            float newDraw  = def.upgradeTo.baseEnergyCost *
+                             BalanceConfig.Instance.EnergyMultiplier(statLv);
+            float eShort   = ShipLoadout.EnergyShortfall(newDraw - oldDraw);
+            bool  hasEnergy = eShort <= 0f;
+
             var upgradeBtn = AddButton(btnRow.transform, "Upgrade", () => UpgradeAndRefresh(slotIndex), 100f);
-            if (!canAfford)
+            if (!canAfford || !hasEnergy)
             {
                 upgradeBtn.interactable = false;
                 upgradeBtn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
             }
+
+            if (!hasEnergy)
+            {
+                var warn = MakeTextLabel(_popupContent.transform,
+                    $"⚡ Tier yükseltmesi {newDraw - oldDraw:0.#} enerji daha ister — " +
+                    $"{eShort:0.#} eksik.", 18, TextAnchor.MiddleLeft);
+                warn.color = new Color(1f, 0.60f, 0.2f, 1f);
+            }
         }
 
-        AddButton(btnRow.transform, "Sat", () => SellAndRefresh(slotIndex), 100f);
+        // Satışta ne geri döneceği görünür olmalı: stat yatırımı da iadeye dahil
+        int refund = ShipLoadout.SellRefund(def, installed);
+        AddButton(btnRow.transform, $"Sat ({refund})", () => SellAndRefresh(slotIndex), 130f);
 
         if (def.componentType == ComponentType.Hangar)
             BuildHangarStatSection(slotIndex, def);
@@ -421,6 +441,12 @@ public class UpgradeUI : MonoBehaviour
             bool canAfford = !maxed && ResourceInventory.Instance != null &&
                              ResourceInventory.Instance.Get(def.costResource) >= cost;
 
+            // Enerji kapısı kaynaktan AYRI bir durumdur; ikisi aynı gri butonla
+            // anlatılırsa oyuncu jeneratörü suçlamayı akıl edemez.
+            float eDelta    = maxed || _loadout == null ? 0f : _loadout.StatUpgradeEnergyDelta(slotIndex, key);
+            float eShort    = ShipLoadout.EnergyShortfall(eDelta);
+            bool  hasEnergy = eShort <= 0f;
+
             bool isSelected = !maxed && _selectedStatKey == key && _selectedStatSlot == slotIndex;
 
             var row = CreateRow(_popupContent.transform);
@@ -428,10 +454,14 @@ public class UpgradeUI : MonoBehaviour
             var lblGo = new GameObject("StatLabel", typeof(RectTransform));
             lblGo.transform.SetParent(row.transform, false);
             var lbl       = lblGo.AddComponent<Text>();
-            lbl.text      = maxed ? $"{statLabel} Lv {curLevel}/5 MAX" : $"{statLabel} Lv {curLevel}/5  ({cost})";
+            lbl.text      = maxed
+                ? $"{statLabel} Lv {curLevel}/{ShipComponentBase.MaxStatLevel} MAX"
+                : $"{statLabel} Lv {curLevel}/{ShipComponentBase.MaxStatLevel}  ({cost})"
+                  + (eDelta > 0.01f ? $"  ⚡{eDelta:0.#}" : "");
             lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             lbl.fontSize  = 24;
             lbl.color     = maxed       ? new Color(1f, 0.85f, 0.2f, 1f)   :
+                            !hasEnergy  ? new Color(1f, 0.60f, 0.2f, 1f)   :
                             isSelected  ? new Color(0.5f, 1f, 0.6f, 1f)    :
                                           Color.white;
             lbl.alignment       = TextAnchor.MiddleLeft;
@@ -454,11 +484,19 @@ public class UpgradeUI : MonoBehaviour
                 var capturedDef  = def;
                 var capturedSlot = slotIndex;
                 var btn = AddButton(row.transform, "+", () => StatUpgradeAndRefresh(capturedSlot, capturedKey, capturedDef, capturedCost), 44f);
-                if (!canAfford)
+                if (!canAfford || !hasEnergy)
                 {
                     btn.interactable = false;
                     btn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
                 }
+            }
+
+            if (!maxed && !hasEnergy)
+            {
+                var warn = MakeTextLabel(_popupContent.transform,
+                    $"⚡ Enerji yetersiz — {eShort:0.#} eksik. Jeneratörü yükselt " +
+                    "veya bir komponent sat.", 18, TextAnchor.MiddleLeft);
+                warn.color = new Color(1f, 0.60f, 0.2f, 1f);
             }
         }
     }
@@ -503,7 +541,7 @@ public class UpgradeUI : MonoBehaviour
                 var lblGo = new GameObject("StatLabel", typeof(RectTransform));
                 lblGo.transform.SetParent(row.transform, false);
                 var lbl       = lblGo.AddComponent<Text>();
-                lbl.text      = maxed ? $"{statLabel} Lv {curLevel}/5 MAX" : $"{statLabel} Lv {curLevel}/5  ({cost})";
+                lbl.text      = maxed ? $"{statLabel} Lv {curLevel}/{ShipComponentBase.MaxStatLevel} MAX" : $"{statLabel} Lv {curLevel}/{ShipComponentBase.MaxStatLevel}  ({cost})";
                 lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
                 lbl.fontSize  = 24;
                 lbl.color     = maxed      ? new Color(1f, 0.85f, 0.2f, 1f) :
@@ -571,7 +609,7 @@ public class UpgradeUI : MonoBehaviour
             var lblGo = new GameObject("StatLabel", typeof(RectTransform));
             lblGo.transform.SetParent(row.transform, false);
             var lbl       = lblGo.AddComponent<Text>();
-            lbl.text      = maxed ? $"{label} Lv {curLevel}/5 MAX" : $"{label} Lv {curLevel}/5  ({cost})";
+            lbl.text      = maxed ? $"{label} Lv {curLevel}/{ShipComponentBase.MaxStatLevel} MAX" : $"{label} Lv {curLevel}/{ShipComponentBase.MaxStatLevel}  ({cost})";
             lbl.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             lbl.fontSize  = 24;
             lbl.color     = maxed      ? new Color(1f, 0.85f, 0.2f, 1f) :
@@ -654,11 +692,16 @@ public class UpgradeUI : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Stat fiyatı zincirin SON tier'ına sabitlenmiştir (statCostBase), o anki
+    /// tier'a değil. Eskiden def.cost kullanılıyordu ve "Mk1'deyken statları
+    /// maxla, sonra tier atla" 4× ucuza geliyordu — oyunu optimal oynamak
+    /// tier'ları geciktirmek demekti.
+    /// </summary>
     static int StatUpgradeCost(ComponentDefinition def, int currentLevel)
     {
-        // Lv1 = komponent fiyatı kadar; her seviye 2.5× artar
-        int baseCost = Mathf.Max(5, def.cost);
-        return Mathf.RoundToInt(baseCost * Mathf.Pow(2.5f, currentLevel));
+        int baseCost = def.statCostBase > 0 ? def.statCostBase : def.cost;
+        return BalanceConfig.Instance.StatUpgradeCost(baseCost, currentLevel);
     }
 
     static (string key, string label)[] GetStatsForType(ComponentType type)
@@ -678,6 +721,10 @@ public class UpgradeUI : MonoBehaviour
         if (_loadout == null) return;
         var comp = _loadout.GetSlotComponent(slotIndex);
         if (comp == null) return;
+
+        // Enerji kapısı önce: kaynağı harcayıp enerjiye takılmak kötü bir sürpriz
+        if (!ShipLoadout.HasEnergyHeadroom(_loadout.StatUpgradeEnergyDelta(slotIndex, key))) return;
+
         if (!ResourceInventory.Instance.TrySpend(def.costResource, cost)) return;
         comp.ApplyStatUpgrade(key);
         OnSlotClicked(slotIndex);
@@ -1041,31 +1088,51 @@ public class UpgradeUI : MonoBehaviour
         if (_selectedStatKey != statKey || _selectedStatSlot != _currentSlotIndex)
             return $"{label}: {valStr}";
 
+        float step = BalanceConfig.Instance.statStep;
         float delta;
         string sign;
-        if (!isDecreasing) { delta = current * 0.5f;            sign = "+"; }
-        else               { delta = current * (1f - 1f/1.5f);  sign = "-"; }
+        if (!isDecreasing) { delta = current * (step - 1f);      sign = "+"; }
+        else               { delta = current * (1f - 1f / step); sign = "-"; }
 
         return $"{label}: {valStr}  ({sign}{delta:0.##})";
     }
 
+    /// <summary>
+    /// Stat açıklamaları. Çarpan metni BalanceConfig'ten okunur — sabit "×1.5"
+    /// yazılsaydı denge ayarı değiştiğinde UI yalan söylerdi.
+    /// </summary>
     static string GetStatDescription(string key)
     {
+        var    cfg  = BalanceConfig.Instance;
+        string up   = $"Her seviye ×{cfg.statStep:0.##} çarpanı ekler.";
+        string down = $"Her seviye ÷{cfg.statStep:0.##} azalma sağlar.";
+        string nrg  = $"\n\nEnerji tüketimi de ×{cfg.energyGrowth:0.##} büyür — " +
+                      "jeneratör yetişmezse yükseltme yapılamaz.";
+
         switch (key)
         {
-            case "damage":           return "Turretin verdiği hasarı artırır.\nHer seviye ×1.5 çarpanı ekler.";
-            case "fireRate":         return "Ateş hızını artırır.\nHer seviye ×1.5 çarpanı ekler.";
-            case "repairRate":       return "Saniyede tamir edilen HP miktarını artırır.\nHer seviye ×1.5 çarpanı ekler.";
-            case "energyEfficiency": return "Tamir için harcanan enerji miktarını azaltır.\nHer seviye ÷1.5 azalma sağlar.";
-            case "production":       return "Saniyede üretilen enerji miktarını artırır.\nHer seviye ×1.5 çarpanı ekler.";
-            case "rechargeRate":     return "Kalkan şarj hızını artırır.\nHer seviye ×1.5 çarpanı ekler.";
-            case "maxShield":        return "Maksimum kalkan kapasitesini artırır.\nHer seviye ×1.5 çarpanı ekler.";
-            case "productionSpeed":  return "Toplayıcı/savaşçı üretim hızını artırır.\nHer seviye ×1.5 çarpanı ekler.";
-            case "maxHP":            return "Gemi bileşenlerinin dayanaklılığını artırır.\nHer seviye ×1.5 çarpanı ekler.";
-            case "salvageRate":      return "Enkaz toplama hızını artırır.\nHer seviye ×1.5 çarpanı ekler.";
-            case "speed":            return "Toplayıcı/savaşçı gemi hızını artırır.\nHer seviye ×1.5 çarpanı ekler.";
-            case "maxCollectors":    return "Hangarın maksimum toplayıcı sayısını artırır.\nHer seviye +1 toplayıcı ekler.";
-            case "maxFighters":      return "Hangarın maksimum savaşçı sayısını artırır.\nHer seviye +1 savaşçı ekler.";
+            case "damage":
+                return $"Turretin verdiği hasarını artırır.\n{up}\n\n" +
+                       "Zırhlı düşmanlarda atış başına hasar belirleyicidir: " +
+                       "zırh her atıştan sabit miktar düşer." + nrg;
+            case "fireRate":
+                return $"Ateş hızını artırır.\n{up}\n\n" +
+                       "Zırha karşı hasar kadar iyi değildir — daha çok atış, " +
+                       "her biri zırhtan aynı cezayı yer." + nrg;
+            case "repairRate":       return $"Saniyede tamir edilen HP miktarını artırır.\n{up}{nrg}";
+            case "energyEfficiency": return $"Tamir için harcanan enerji miktarını azaltır.\n{down}";
+            case "production":
+                return $"Saniyede üretilen enerji miktarını artırır.\n{up}\n\n" +
+                       "Diğer tüm yükseltmelerin kapısıdır: üretim yetmezse " +
+                       "hiçbir komponent seviye alamaz.";
+            case "rechargeRate":     return $"Kalkan şarj hızını artırır.\n{up}{nrg}";
+            case "maxShield":        return $"Maksimum kalkan kapasitesini artırır.\n{up}{nrg}";
+            case "productionSpeed":  return $"Toplayıcı/savaşçı üretim hızını artırır.\n{up}{nrg}";
+            case "maxHP":            return $"Gemi bileşenlerinin dayanaklılığını artırır.\n{up}{nrg}";
+            case "salvageRate":      return $"Enkaz toplama hızını artırır.\n{up}{nrg}";
+            case "speed":            return $"Toplayıcı/savaşçı gemi hızını artırır.\n{up}{nrg}";
+            case "maxCollectors":    return $"Hangarın maksimum toplayıcı sayısını artırır.\nHer seviye +1 toplayıcı ekler.{nrg}";
+            case "maxFighters":      return $"Hangarın maksimum savaşçı sayısını artırır.\nHer seviye +1 savaşçı ekler.{nrg}";
             default:                 return key;
         }
     }
@@ -1366,7 +1433,7 @@ public class UpgradeUI : MonoBehaviour
         return go;
     }
 
-    static void MakeTextLabel(Transform parent, string text, int fontSize, TextAnchor alignment)
+    static Text MakeTextLabel(Transform parent, string text, int fontSize, TextAnchor alignment)
     {
         var go = new GameObject("Label", typeof(RectTransform));
         go.transform.SetParent(parent, false);
@@ -1381,6 +1448,8 @@ public class UpgradeUI : MonoBehaviour
         var le = go.AddComponent<LayoutElement>();
         le.preferredHeight = fontSize + 8f;
         le.flexibleWidth   = 1f;
+
+        return t;
     }
 
     static Button AddButton(Transform parent, string label, UnityAction onClick, float width = 80f)
