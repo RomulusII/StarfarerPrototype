@@ -29,13 +29,14 @@ public class BossHardpoint : MonoBehaviour
         var col    = gameObject.AddComponent<BoxCollider2D>();
         col.size   = new Vector2(definition.width / 100f, definition.height / 100f);
         col.isTrigger = false;
+        // Skin varsa hitbox sprite siluetinden türer; yoksa yukarıdaki kutu kalır
+        SkinLibrary.TryApplyCollider(gameObject, SkinId.ForHardpoint(definition.type));
 
         // Görsel
-        var tex = MakeTex(definition.width, definition.height, definition.color);
         _sr = gameObject.AddComponent<SpriteRenderer>();
-        _sr.sprite       = Sprite.Create(tex,
-                               new Rect(0, 0, definition.width, definition.height),
-                               new Vector2(0.5f, 0.5f), 100f);
+        _sr.sprite       = SkinLibrary.Get(SkinId.ForHardpoint(definition.type),
+                               SkinId.BossHardpoint,
+                               definition.width, definition.height, definition.color);
         _sr.sortingOrder = 2;
 
         // HP barı
@@ -90,14 +91,5 @@ public class BossHardpoint : MonoBehaviour
                    * UnityEngine.Random.Range(0.2f, 0.8f),
                    UnityEngine.Random.Range(3f, 8f));
         }
-    }
-
-    static Texture2D MakeTex(int w, int h, Color c)
-    {
-        var tex = new Texture2D(w, h);
-        var px  = new Color[w * h];
-        for (int i = 0; i < px.Length; i++) px[i] = c;
-        tex.SetPixels(px); tex.Apply();
-        return tex;
     }
 }

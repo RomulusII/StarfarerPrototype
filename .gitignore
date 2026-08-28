@@ -84,3 +84,6 @@ StarfarerPrototype/.claude/worktrees/
 !*.prefab
 !*.mat
 !*.asset
+
+# SkinGen onizleme ciktilari - uretilebilir, repoya girmez
+/StarfarerPrototype/Tools/SkinGen/*.png

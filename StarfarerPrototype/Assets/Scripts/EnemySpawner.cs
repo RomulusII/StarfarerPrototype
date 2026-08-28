@@ -95,6 +95,12 @@ public class EnemySpawner : MonoBehaviour
     static EnemyTypeData ApplyScaling(EnemyTypeData src, EnemyScaling s)
     {
         var d = Instantiate(src);
+
+        // Unity kopyanın adına "(Clone)" ekler; ad ise tipin kimliğidir —
+        // skin anahtarı (SkinId.ForEnemy) buradan türetilir. Geri yazılmazsa
+        // kopya kendi skin'ini bulamaz ve sessizce dikdörtgene döner.
+        d.name = src.name;
+
         d.maxHP         = src.maxHP         * s.hp;
         d.maxShield     = src.maxShield     * s.hp;
         d.fireDamage    = src.fireDamage    * s.damage;

@@ -53,6 +53,14 @@ public class EnemyTypeData : ScriptableObject
     public int EffectiveHitboxWidth  => hitboxWidth  > 0 ? hitboxWidth  : bodyWidth;
     public int EffectiveHitboxHeight => hitboxHeight > 0 ? hitboxHeight : bodyHeight;
 
+    /// <summary>
+    /// Skin anahtarı. Tip adından türer (Swarm -> "enemy.swarm"), böylece yeni
+    /// düşman tipi eklemek skin tarafında kod değişikliği gerektirmez.
+    /// Skin varken hitbox bu sayılardan değil, sprite siluetinden türer —
+    /// bkz. SkinLibrary.TryApplyCollider.
+    /// </summary>
+    public string SkinId => global::SkinId.ForEnemy(name);
+
     [Header("Hareket")]
     public EnemyMovementKind movementKind    = EnemyMovementKind.Charge;
     public float             engageRange     = 6f;

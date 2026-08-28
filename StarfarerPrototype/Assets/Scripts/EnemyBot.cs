@@ -143,12 +143,16 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
             _healthBar.barOffsetY    = data.bodyHeight / 100f * 0.8f;
         }
 
-        // Hitbox görselden AYRIDIR. Sprite'lar gelince bodyWidth/bodyHeight
-        // değişecek; collider buna bağlı kalsaydı vurma zorluğu kayar ve bu
-        // oturumda konan tüm denge sayıları geçersizleşirdi.
-        GetComponent<BoxCollider2D>().size = new Vector2(
-            data.EffectiveHitboxWidth  / 100f,
-            data.EffectiveHitboxHeight / 100f);
+        // Hitbox sprite siluetinden TÜRER — bağımsız değil, kasten daraltılmış
+        // türevidir (SkinEntry.hitboxScale). Skin yoksa aşağıdaki kutuya düşer ve
+        // bu oturumda konan denge sayıları aynen korunur: skin ile hitbox birlikte
+        // açılıp kapanır, yarı yolda kalmış bir durum oluşmaz.
+        if (!SkinLibrary.TryApplyCollider(gameObject, data.SkinId))
+        {
+            GetComponent<BoxCollider2D>().size = new Vector2(
+                data.EffectiveHitboxWidth  / 100f,
+                data.EffectiveHitboxHeight / 100f);
+        }
 
         BuildBody(data.bodyWidth, data.bodyHeight, data.bodyColor);
     }
@@ -910,11 +914,10 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 
     void BuildBody(int w, int h, Color c)
     {
-        var tex = MakeTex(w, h, c);
         var body = new GameObject("Body");
         body.transform.SetParent(transform, false);
         var sr = body.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(data.SkinId, w, h, c);
         sr.sortingOrder = data.sizeOrder;
     }
 
@@ -925,8 +928,8 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         _barrelTransform = root.transform;
 
         var barrelSR = root.AddComponent<SpriteRenderer>();
-        barrelSR.sprite       = Sprite.Create(MakeTex(18, 3, barrelColor),
-                                    new Rect(0, 0, 18, 3), new Vector2(0f, 0.5f), 100f);
+        barrelSR.sprite       = SkinLibrary.Get(data.SkinId + ".barrel", SkinId.EnemyBarrel,
+                                    18, 3, barrelColor, new Vector2(0f, 0.5f));
         barrelSR.sortingOrder = data.sizeOrder + 1;
 
         var fillGO = new GameObject("ReloadFill");
@@ -935,9 +938,9 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         _reloadFillTransform = fillGO.transform;
         _reloadFillTransform.localScale = new Vector3(0f, 1f, 1f);
 
+        // Reload göstergesi bir HUD öğesidir, skin'e tabi değil — hep prosedürel
         _reloadFillSR = fillGO.AddComponent<SpriteRenderer>();
-        _reloadFillSR.sprite       = Sprite.Create(MakeTex(18, 2, Color.white),
-                                         new Rect(0, 0, 18, 2), new Vector2(0f, 0.5f), 100f);
+        _reloadFillSR.sprite       = SkinLibrary.Rect(18, 2, Color.white, new Vector2(0f, 0.5f));
         _reloadFillSR.sortingOrder = data.sizeOrder + 2;
         _reloadFillSR.color        = ReloadColor(0f);
     }
@@ -947,10 +950,11 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         _shieldVisual = new GameObject("ShieldVisual");
         _shieldVisual.transform.SetParent(transform, false);
         var sr = _shieldVisual.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(MakeTex(w, h, Color.white),
-                              new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.ShieldBubble, w, h, Color.white);
         sr.sortingOrder = data.sizeOrder + 1;
         sr.color        = new Color(0.3f, 0.75f, 1f, 0.55f);
+
+        SkinLibrary.FitToSize(_shieldVisual.transform, sr.sprite, w, h);
     }
 
     void RefreshShieldVisual()
@@ -961,15 +965,5 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         var sr = _shieldVisual.GetComponent<SpriteRenderer>();
         if (sr != null)
             sr.color = new Color(0.3f, 0.75f, 1f, (_shieldHP / _maxShieldHP) * 0.55f);
-    }
-
-    static Texture2D MakeTex(int w, int h, Color c)
-    {
-        var tex = new Texture2D(w, h);
-        var px  = new Color[w * h];
-        for (int i = 0; i < px.Length; i++) px[i] = c;
-        tex.SetPixels(px);
-        tex.Apply();
-        return tex;
     }
 }

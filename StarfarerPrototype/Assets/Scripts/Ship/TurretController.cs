@@ -324,16 +324,16 @@ public class TurretController : ShipComponentBase
         var baseGo = new GameObject("Base");
         baseGo.transform.SetParent(transform, false);
         var baseSR = baseGo.AddComponent<SpriteRenderer>();
-        baseSR.sprite       = Sprite.Create(MakeTex(30, 30, baseColor * 0.7f),
-                                  new Rect(0,0,30,30), new Vector2(0.5f,0.5f), 100f);
+        baseSR.sprite       = SkinLibrary.Get(SkinId.TurretBase + "." + specType.ToString().ToLowerInvariant(), SkinId.TurretBase,
+                                  30, 30, baseColor * 0.7f);
         baseSR.sortingOrder = 3;
 
         _barrel = new GameObject("Barrel").transform;
         _barrel.SetParent(transform, false);
         _barrel.localPosition = new Vector3(0.10f, 0f, 0f);
         var barrelSR = _barrel.gameObject.AddComponent<SpriteRenderer>();
-        barrelSR.sprite       = Sprite.Create(MakeTex(20, 8, TurretColor()),
-                                    new Rect(0,0,20,8), new Vector2(0f,0.5f), 100f);
+        barrelSR.sprite       = SkinLibrary.Get(SkinId.TurretBarrel + "." + specType.ToString().ToLowerInvariant(), SkinId.TurretBarrel,
+                                    20, 8, TurretColor(), new Vector2(0f, 0.5f));
         barrelSR.sortingOrder = 4;
     }
 
@@ -360,7 +360,8 @@ public class TurretController : ShipComponentBase
         int h = spec == TurretSpecType.HomingRocket ? 6  : 4;
 
         var sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(MakeTex(w, h, c), new Rect(0,0,w,h), new Vector2(0f,0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.TurretBullet + "." + spec.ToString().ToLowerInvariant(), SkinId.TurretBullet,
+                              w, h, c, new Vector2(0f, 0.5f));
         sr.sortingOrder = 3;
     }
 
@@ -395,16 +396,6 @@ public class TurretController : ShipComponentBase
         if (specType == TurretSpecType.None)
             return baseName;
         return $"{baseName} — {TurretSpecHelper.GetSpecName(specType)}";
-    }
-
-    static Texture2D MakeTex(int w, int h, Color c)
-    {
-        var tex = new Texture2D(w, h);
-        var px  = new Color[w * h];
-        for (int i = 0; i < px.Length; i++) px[i] = c;
-        tex.SetPixels(px);
-        tex.Apply();
-        return tex;
     }
 
     // -------------------------------------------------------------------------

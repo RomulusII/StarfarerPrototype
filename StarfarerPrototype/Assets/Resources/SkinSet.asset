@@ -1,0 +1,217 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c30d90c098fbbc740b33327ff4563493, type: 3}
+  m_Name: SkinSet
+  m_EditorClassIdentifier: Assembly-CSharp::SkinSet
+  enabled: 1
+  showHitboxOverlay: 0
+  entries:
+  - id: enemy.swarm
+    sprite: {fileID: 21300000, guid: 70ee47fe72dae253d237c74a381b0950, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 23
+      y: 8
+      width: 188
+      height: 64
+    hitboxScale: 1
+  - id: enemy.armored
+    sprite: {fileID: 21300000, guid: 59affe891e5920640a5d89b7b4ce380a, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 45
+      y: 42
+      width: 252
+      height: 136
+    hitboxScale: 1
+  - id: enemy.shield
+    sprite: {fileID: 21300000, guid: a976469318585194b9c6f947b624730c, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 41
+      y: 27
+      width: 221
+      height: 146
+    hitboxScale: 1
+  - id: enemy.bomber
+    sprite: {fileID: 21300000, guid: 875f0aaeb2e8ee94a9a63e29190c064d, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 20
+      y: 3
+      width: 137
+      height: 42
+    hitboxScale: 1
+  - id: enemy.bombrunner
+    sprite: {fileID: 21300000, guid: a3e542e78cd2c0947b18abf36ded084e, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 36
+      y: 19
+      width: 186
+      height: 142
+    hitboxScale: 1
+  - id: enemy.interceptor
+    sprite: {fileID: 21300000, guid: b765254521220e34683a23cc434e3f6d, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 16
+      y: 8
+      width: 165
+      height: 56
+    hitboxScale: 1
+  - id: enemy.artillery
+    sprite: {fileID: 21300000, guid: fd71c5e1debb90a4492ec41477eb5651, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 33
+      y: 17
+      width: 277
+      height: 150
+    hitboxScale: 1
+  - id: enemy.jammer
+    sprite: {fileID: 21300000, guid: 1324ba759a25c0f43ba29edfc9d74d02, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 39
+      y: 28
+      width: 208
+      height: 152
+    hitboxScale: 1
+  - id: enemy.phantom
+    sprite: {fileID: 21300000, guid: db2181b551ad7dd43b1b8b87b765b50c, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 20
+      y: 29
+      width: 187
+      height: 62
+    hitboxScale: 1
+  - id: enemy.regenerator
+    sprite: {fileID: 21300000, guid: fcc3fd0686ba97948a9d32381b895345, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 36
+      y: 34
+      width: 255
+      height: 164
+    hitboxScale: 1
+  - id: enemy.leech
+    sprite: {fileID: 21300000, guid: ca639ec3a1324db439b9413e9591809a, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 20
+      y: 13
+      width: 125
+      height: 62
+    hitboxScale: 1
+  - id: enemy.splitter
+    sprite: {fileID: 21300000, guid: b504bca8ebdf7b947b18df17583326cb, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 38
+      y: 33
+      width: 198
+      height: 150
+    hitboxScale: 1
+  - id: enemy.juggernaut
+    sprite: {fileID: 21300000, guid: 59442c98838ec784c90f53c25d3fc43c, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 57
+      y: 45
+      width: 351
+      height: 198
+    hitboxScale: 1
+  - id: player.body
+    sprite: {fileID: 21300000, guid: 7e66a84fbaaf63c47bbf55c71b87c460, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 65
+      y: 74
+      width: 1404
+      height: 252
+    hitboxScale: 1
+  - id: player.barrel
+    sprite: {fileID: 21300000, guid: 865cdc03b6f089b4299edfa8f020d6e1, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 18
+      y: 4
+      width: 44
+      height: 312
+    hitboxScale: 1
+  - id: component.generator
+    sprite: {fileID: 21300000, guid: 1f0d85734f96f084c855d758511d2211, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 7
+      y: 7
+      width: 114
+      height: 114
+    hitboxScale: 1
+  - id: component.shieldgenerator
+    sprite: {fileID: 21300000, guid: 2fc79b7d6c01e0f41bcd70302ba2278d, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 7
+      y: 7
+      width: 114
+      height: 114
+    hitboxScale: 1
+  - id: component.repairunit
+    sprite: {fileID: 21300000, guid: 5ffddad56ba407b449d277b99225ef50, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 7
+      y: 7
+      width: 114
+      height: 114
+    hitboxScale: 1
+  - id: component.storage
+    sprite: {fileID: 21300000, guid: 97612e17538d4334d86d4127c077fa0a, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 7
+      y: 7
+      width: 114
+      height: 114
+    hitboxScale: 1
+  - id: component.capacitor
+    sprite: {fileID: 21300000, guid: ae63bcdc91624c24d80e0a9901f5064f, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 6
+      y: 6
+      width: 116
+      height: 116
+    hitboxScale: 1

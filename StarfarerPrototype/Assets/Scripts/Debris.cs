@@ -40,11 +40,18 @@ public class Debris : MonoBehaviour
     /// <summary>Toplam hız — CollectorShip toplarken enkazla birlikte sürüklenir.</summary>
     public Vector2 Velocity => _scatter + Vector2.left * DriftSpeed;
 
+    /// <summary>Kaynak tipine göre skin anahtarı — ham madde ve kristal ayrı görsel.</summary>
+    string SkinKey => resourceType == ResourceType.EnergyCrystal
+                    ? SkinId.DebrisCrystal : SkinId.DebrisMetal;
+
     public void Init(Vector2 velocity, float amount, ResourceType type = ResourceType.RawMaterial)
     {
         _scatter       = velocity;
         resourceAmount = amount;
         resourceType   = type;
+
+        // resourceType Awake'den SONRA belli olur — sprite burada kesinleşir
+        if (_sr != null) _sr.sprite = SkinLibrary.Get(SkinKey, 12, 10, Color.white);
         ApplyTint(1f);
     }
 
@@ -104,7 +111,8 @@ public class Debris : MonoBehaviour
         if (_sr == null) return;
         Color c = resourceType == ResourceType.EnergyCrystal ? CrystalColor : MetalColor;
         c.a     = alpha;
-        _sr.color = c;
+        // Skin varken sprite kendi rengini taşır; tip rengi yerine yalnızca alfa geçer
+        _sr.color = SkinLibrary.Tint(SkinKey, c);
     }
 
     /// <summary>İstenen miktarı tüketir; gerçekte tüketilen miktarı döner.</summary>
@@ -119,15 +127,10 @@ public class Debris : MonoBehaviour
 
     void BuildVisual()
     {
-        // Doku beyaz; renk sr.color ile verilir — tip rengi ve solma tek yerden yönetilir
-        var tex = new Texture2D(12, 10);
-        var px  = new Color[12 * 10];
-        for (int i = 0; i < px.Length; i++) px[i] = Color.white;
-        tex.SetPixels(px);
-        tex.Apply();
-
+        // Prosedürel doku beyazdır; renk sr.color ile verilir — tip rengi ve solma
+        // tek yerden yönetilir. Skin varken sprite kendi rengini taşır.
         _sr = gameObject.AddComponent<SpriteRenderer>();
-        _sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 12, 10), new Vector2(0.5f, 0.5f), 100f);
+        _sr.sprite       = SkinLibrary.Get(SkinKey, 12, 10, Color.white);
         _sr.sortingOrder = -1;
         ApplyTint(1f);
     }

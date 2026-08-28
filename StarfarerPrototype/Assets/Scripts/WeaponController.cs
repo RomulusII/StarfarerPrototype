@@ -26,8 +26,12 @@ public class WeaponController : MonoBehaviour
 
     void Start()
     {
-        _kineticSprite = MakeSprite(10, 30, Color.white);
-        _plasmaCircle  = MakeCircleSprite(32, Color.white); // renk runtime'da set edilir
+        _kineticSprite = SkinLibrary.Get(SkinId.PlayerBulletKinetic, 10, 30, Color.white);
+
+        // Plazma küresi yumuşak kenarlıdır; skin yoksa prosedürel daire kullanılır
+        _plasmaCircle  = SkinLibrary.Has(SkinId.PlayerBulletPlasma)
+                       ? SkinLibrary.Get(SkinId.PlayerBulletPlasma, 32, 32, Color.white)
+                       : MakeCircleSprite(32, Color.white); // renk runtime'da set edilir
     }
 
     void OnDestroy()
@@ -236,16 +240,6 @@ public class WeaponController : MonoBehaviour
         b.speed      = speed;
         b.damage     = damage * damageMulti;
         b.weaponType = type;
-    }
-
-    static Sprite MakeSprite(int w, int h, Color color)
-    {
-        var tex    = new Texture2D(w, h);
-        var pixels = new Color[w * h];
-        for (int i = 0; i < pixels.Length; i++) pixels[i] = color;
-        tex.SetPixels(pixels);
-        tex.Apply();
-        return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
     }
 
     // Dairesel (alpha kenar kesen) sprite — plazma küre ve bolt için

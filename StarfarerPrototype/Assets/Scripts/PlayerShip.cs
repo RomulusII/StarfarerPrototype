@@ -30,26 +30,23 @@ public class PlayerShip : MonoBehaviour
         }
 
         // 400x100 px → ppu 100 → dünya boyutu 4 x 1 birim
-        Texture2D tex    = new Texture2D(400, 100);
-        Color[]   pixels = new Color[400 * 100];
-        Color shipColor  = new Color(0.3f, 0.3f, 0.4f);
-        for (int i = 0; i < pixels.Length; i++) pixels[i] = shipColor;
-        tex.SetPixels(pixels);
-        tex.Apply();
-
         GameObject body = new GameObject("Body");
         body.transform.SetParent(transform, false);
         body.transform.localPosition = Vector3.zero;
         body.transform.localScale    = Vector3.one;
 
         SpriteRenderer sr = body.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 400, 100), new Vector2(0.5f, 0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.PlayerBody, 400, 100,
+                              new Color(0.3f, 0.3f, 0.4f));
         sr.sortingOrder = -10;
 
-        // Trigger collider — gövde hasarı için (sprite 4x1 birim)
+        // Trigger collider — gövde hasarı için (sprite 4x1 birim).
+        // Oyuncu tarafında hitbox siluetten KÜÇÜK olmalı: ana gemi kaçamadığı
+        // için kıl payı ıskalar oyuncunun lehine yorumlanır. Oran SkinEntry'de.
         BoxCollider2D col = gameObject.AddComponent<BoxCollider2D>();
         col.size      = new Vector2(4f, 1f);
         col.isTrigger = true;
+        SkinLibrary.TryApplyCollider(gameObject, SkinId.PlayerBody, isTrigger: true);
 
         // Kalkan küresi — gemiyi tamamen saran daire, EnemyBullet tarafından yakalanır
         var shieldGO = new GameObject("ShieldSphere");

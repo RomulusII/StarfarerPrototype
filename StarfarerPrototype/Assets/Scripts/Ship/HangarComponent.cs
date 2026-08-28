@@ -98,16 +98,13 @@ public class HangarComponent : ShipComponentBase
 
     void BuildVisual()
     {
-        var tex = new Texture2D(36, 24);
-        var px  = new Color[36 * 24];
-        for (int i = 0; i < px.Length; i++) px[i] = new Color(0.30f, 0.45f, 0.60f);
-        tex.SetPixels(px); tex.Apply();
         var body = new GameObject("Body");
         body.transform.SetParent(transform, false);
         body.transform.localPosition = Vector3.zero;
         body.transform.localScale    = Vector3.one;
         var sr = body.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(tex, new Rect(0,0,36,24), new Vector2(0.5f,0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.Hangar, 36, 24,
+                              new Color(0.30f, 0.45f, 0.60f));
         sr.sortingOrder = 3;
     }
 }

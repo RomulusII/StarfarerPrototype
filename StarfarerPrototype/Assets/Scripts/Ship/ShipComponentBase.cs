@@ -133,6 +133,25 @@ public abstract class ShipComponentBase : MonoBehaviour
     static readonly Color k_ringNormal      = new Color(0.45f, 0.85f, 1f,  0.25f);
     static readonly Color k_ringDeactivated = new Color(0.80f, 0.12f, 0.1f, 0.40f);
 
+    /// <summary>
+    /// Komponentin skin anahtari - sinif adindan turer
+    /// (GeneratorComponent -> "component.generator").
+    /// </summary>
+    protected virtual string SkinKey => SkinId.ForComponent(GetType().Name);
+
+    /// <summary>
+    /// Halka rengi. Prosedurel halka BEYAZ dokudur, rengini buradan alir ve
+    /// kasten soluktur (yalnizca konum gostergesi). Skin varsa sprite kendi
+    /// rengini tasir, o yuzden normalde tam beyaz gecilir - yoksa ikon soluklasir.
+    /// Deaktif durum her iki yolda da kirmiziya doner.
+    /// </summary>
+    Color RingColor(bool deactivated)
+    {
+        bool skinned = SkinLibrary.Has(SkinKey);
+        if (deactivated) return skinned ? new Color(1f, 0.35f, 0.30f, 1f) : k_ringDeactivated;
+        return skinned ? Color.white : k_ringNormal;
+    }
+
     SpriteRenderer _ringRenderer;
     Transform      _hpBg;
     Transform      _hpFill;
@@ -195,7 +214,7 @@ public abstract class ShipComponentBase : MonoBehaviour
         if (_deactivated && currentHP >= maxHP)
         {
             _deactivated = false;
-            if (_ringRenderer != null) _ringRenderer.color = k_ringNormal;
+            if (_ringRenderer != null) _ringRenderer.color = RingColor(deactivated: false);
             if (EnergyBus.Instance != null)
                 EnergyBus.Instance.RegisterConsumer(energyConsumption);
         }
@@ -206,7 +225,7 @@ public abstract class ShipComponentBase : MonoBehaviour
         if (DifficultyManager.Current == Difficulty.Easy)
         {
             _deactivated = true;
-            if (_ringRenderer != null) _ringRenderer.color = k_ringDeactivated;
+            if (_ringRenderer != null) _ringRenderer.color = RingColor(deactivated: true);
             if (EnergyBus.Instance != null)
                 EnergyBus.Instance.UnregisterConsumer(energyConsumption);
         }
@@ -240,8 +259,8 @@ public abstract class ShipComponentBase : MonoBehaviour
         ringGo.transform.localPosition = Vector3.zero;
         ringGo.transform.localScale    = Vector3.one * k_ringSize;
         _ringRenderer              = ringGo.AddComponent<SpriteRenderer>();
-        _ringRenderer.sprite       = GetRingSprite();
-        _ringRenderer.color        = k_ringNormal;
+        _ringRenderer.sprite       = SkinLibrary.GetOrNull(SkinKey) ?? GetRingSprite();
+        _ringRenderer.color        = RingColor(deactivated: false);
         _ringRenderer.sortingOrder = -5;
 
         // HP barı — zemin (kırmızı), başlangıçta gizli

@@ -158,9 +158,9 @@ public class FighterShip : MonoBehaviour
         tb.isGuided   = false;
         tb.SetDirection(dir);
 
-        var tex = MakeTex(8, 4, Color.yellow);
         var sr  = go.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 8, 4), new Vector2(0f, 0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.FighterBullet, 8, 4, Color.yellow,
+                              new Vector2(0f, 0.5f));
         sr.sortingOrder = 3;
 
         Destroy(go, 1.5f);
@@ -179,21 +179,9 @@ public class FighterShip : MonoBehaviour
 
     void BuildVisual()
     {
-        var tex = new Texture2D(22, 10);
-        var px  = new Color[22 * 10];
-        for (int i = 0; i < px.Length; i++) px[i] = new Color(0.85f, 0.75f, 0.20f);
-        tex.SetPixels(px); tex.Apply();
         var sr        = gameObject.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 22, 10), new Vector2(0.5f, 0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.Fighter, 22, 10,
+                              new Color(0.85f, 0.75f, 0.20f));
         sr.sortingOrder = 5;
-    }
-
-    static Texture2D MakeTex(int w, int h, Color c)
-    {
-        var tex = new Texture2D(w, h);
-        var px  = new Color[w * h];
-        for (int i = 0; i < px.Length; i++) px[i] = c;
-        tex.SetPixels(px); tex.Apply();
-        return tex;
     }
 }

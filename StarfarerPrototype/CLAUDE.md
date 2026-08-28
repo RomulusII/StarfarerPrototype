@@ -687,6 +687,10 @@ bırakıldı.
 | ResourceInventory.cs | Ham madde + kristal envanteri |
 | UpgradeUI.cs | Tab ile açılan upgrade ekranı, 4 panel layout |
 | SlotVisual.cs | World-space slot göstergesi, tıklama ile UpgradeUI tetiklenir |
+| SkinLibrary.cs | TÜM görsel üretiminin tek giriş noktası — skin varsa sprite, yoksa prosedürel dikdörtgen |
+| SkinSet.cs | Skin'lerin tek sahibi (SO; Resources/SkinSet.asset). Ana aç/kapa anahtarı burada |
+| SkinId.cs | Skin anahtarları. Düşman/boss anahtarları tip adından türer |
+| HitboxOverlay.cs | Teşhis aracı — collider sınırlarını sprite üstüne çizer |
 
 ---
 
@@ -707,6 +711,124 @@ float moveT = Mathf.Clamp01((t - 0.8f) / 0.2f);
 float curvedMoveT = Mathf.Pow(moveT, 2f);
 float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 ```
+
+---
+
+## Skin Sistemi
+
+Tüm görsel üretimi `SkinLibrary` üzerinden geçer. Eskiden 12 dosyaya dağılmış
+53 ayrı `MakeTex`/`Sprite.Create` çağrısı vardı; hepsi tek imzada toplandı.
+
+### Aç / kapa
+
+`Assets/Resources/SkinSet.asset` içindeki `enabled` alanı. **Bu bir asset
+alanıdır — değiştirmek derleme TETİKLEMEZ**, Play sırasında bile kapatılabilir.
+Asset hiç yoksa da sistem kapalı sayılır ve oyun prosedürel dikdörtgenlere döner.
+
+Aç/kapa anahtar bazında da çalışır: SkinSet'te yalnızca `enemy.swarm` doluysa
+sadece Swarm gerçek görselle çıkar, gerisi dikdörtgen kalır. Tip tip göç edilebilir.
+
+### Hitbox — sprite'tan TÜRER
+
+Sprite şeklin tek kaynağıdır. Hitbox onun `SkinEntry.hitboxScale` ile
+daraltılmış halidir (`SkinLibrary.TryApplyCollider`):
+
+    collider = sprite'ın physics shape'i (veya sınırları) × hitboxScale
+
+Bağımsız değil, **türev**. Neden daraltma var: itki alevi, anten, glow gibi
+dekoratif parçalar bounding box'ı şişirir ama vurulabilir olmamalı.
+
+Yön asimetrisi kasıtlıdır:
+- **Oyuncunun VURDUĞU** hedeflerde (düşman, boss, hardpoint) hitbox siluete
+  yakın olmalı — `hitboxScale` 0.85'in altına inmemeli, yoksa "vurdum ama
+  saymadı" hissi oluşur.
+- **Oyuncuya GELEN** hedeflerde (PlayerShip, savaşçı) hitbox daha küçük
+  olabilir — kıl payı kurtuluş becerikli hissettirir.
+
+Skin yokken `EnemyTypeData.EffectiveHitboxWidth/Height` kutusuna düşülür, yani
+mevcut denge sayıları aynen korunur. Skin ile hitbox **birlikte** açılıp kapanır.
+
+### Sanat spec'i
+
+1. Opak gövde kütlesi `bodyWidth × bodyHeight` kutusunun içinde kalacak
+2. Burun **sağa (+X)** bakacak. Oyunda `Euler(0,0,facingAngle)` uygulanır ve
+   düşmanların varsayılan facing'i 180°'dir — sağa bakan sprite oyuncuya döner
+3. Alev / anten / glow kutunun dışına taşabilir, vurulmaz sayılır
+4. Siluet dışbükeye yakın olacak. İçbükey siluet (X, halka, çatal kanat) box
+   collider'da boşluğu doldurur — poligon moduna geçilmeli
+5. Export `bodyWidth × bodyHeight`'ın **4 katı** piksel, import'ta **PPU 400**.
+   Dünya boyutu birebir aynı kalır, piksel yoğunluğu 4× olur (zoom ve mobil için)
+6. Import'ta **Mesh Type = Full Rect**. Tight, saydam kenarları kırpar ve
+   `sprite.bounds` küçülür — hitbox ofset hesabı kayar
+
+### Doluluk: hangi sayıya bakılır
+
+Önceki not "siluet kutuyu %70 doldurmalı" diyordu; **bu kural yanlıştı**.
+Sivri burunlu hiçbir gemi bunu tutturamaz — Swarm'ın sınırlayıcı kutu doluluğu
+%44 ve bu normaldir. Doğru ölçü, kutunun değil **hitbox'ın içindeki** doluluktur:
+
+> Hitbox dikdörtgeninin içindeki opak piksel oranı **%60'ın altına düşmemeli.**
+
+Altına düşüyorsa hitbox kütlenin olmadığı yeri kaplıyor demektir ve o boşluğa
+atılan mermi hiçbir şeye çarpmaz. `SkinEntry.hitboxRect` bu yüzden var: hitbox
+sınırlayıcı kutuya değil, siluetin gövdesine oturur. Değerleri üreteç ölçer.
+
+### Üreteç — `Tools/SkinGen/`
+
+Sprite'lar poligon tanımlarından üretilir (Node, dış bağımlılık yok):
+
+```
+node Tools/SkinGen/gen.js
+```
+
+| Dosya | İçerik |
+|---|---|
+| `raster.js` | Poligon rasterleştirici — 4×4 alt-örnekleme, `mode: "erase"` ile delik |
+| `palette.js` | Gövde/kanat renginden gölge-ışık-lens tonlarını türetir |
+| `enemies.js` | 12 düşman tipi |
+| `player.js` | Ana gemi gövdesi + namlu |
+| `components.js` | Komponent slot ikonları |
+| `ships.js` | Swarm + hepsini toplayan liste |
+| `gen.js` | PNG'leri yazar, `hitboxRect` ölçer, doluluk basar |
+| `install.js` | `.meta` ve `SkinSet.asset`'i yazar |
+| `sheet.js` | Tüm gemileri tek kontakt sayfasında dizer |
+
+**Import ayarlarının sahibi `install.js`'tir, Unity değil.** Unity bir PNG'yi
+önce görürse kendi varsayılanlarıyla import eder — PPU 100, Sprite Mode
+**Multiple**, Mesh Type **Tight**. Üçü de yanlıştır: gövde 4 kat büyük çıkar,
+`fileID: 21300000` çözülmeyebilir ve Tight saydam kenarları kırptığı için
+`sprite.bounds` küçülüp hitbox ofseti kayar. `install.js` her çalıştırmada
+meta'yı yeniden yazar ama **GUID'i korur** — GUID değişseydi SkinSet
+referansları kopar ve sprite alanları None'a düşerdi.
+
+Akış: `node Tools/SkinGen/gen.js` (çiz) → `node Tools/SkinGen/install.js`
+(meta + SkinSet). İkincisi `hitboxRect`'i yeniden ölçtüğü için siluet
+değiştiğinde elle bir şey güncellemek gerekmez.
+
+`Tools/` klasörü `Assets/` dışında olduğu için Unity onu derlemez.
+
+Göz kontrolü (dama zemin + hitbox çerçevesi):
+
+```
+node Tools/SkinGen/preview.js Assets/Art/Enemies/Swarm.png 5 out.png --rect=23,8,188,64
+```
+
+### Doğrulama
+
+`SkinSet.showHitboxOverlay` açıldığında collider sınırları sprite'ın üstüne
+çizilir (yeşil = kutu, sarı = poligon). Örtüşmeyi tablodan hesaplamak yerine
+gözle görmek için. Çağrı noktalarına dokunmaz, skin sistemine henüz girmemiş
+nesnelerde de çalışır.
+
+### Performans notu
+
+Prosedürel dikdörtgenler artık önbelleğe alınıyor — aynı (boyut, renk, pivot)
+tek sprite paylaşıyor. Eskiden her düşman/mermi doğuşunda yeni bir `Texture2D`
+ayrılıyordu. Renk animasyonu `SpriteRenderer.color` üzerinden yapıldığı için
+paylaşım güvenli.
+
+`PolygonCollider2D`, `BoxCollider2D`'den pahalıdır. Basit siluetlerde
+`SkinEntry.colliderMode = Box` tercih edilmeli.
 
 ---
 
@@ -776,7 +898,10 @@ float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 - [ ] Point defence turretleri — küçük/hızlı hedeflere odaklı otomatik turret
 - [ ] Mobil UI
 - [ ] Ses efektleri
-- [ ] Gerçek sprite'lar — görsel iyileştirme
+- [x] **Skin altyapısı** — SkinLibrary/SkinSet/SkinId, 53 çağrı tek imzada toplandı,
+      hitbox sprite siluetinden türer, tek bool ile aç/kapa
+- [~] Gerçek sprite'lar — 13 düşman + ana gemi + namlu + 5 komponent ikonu çizildi.
+      Kalan: boss + hardpoint, asteroit, enkaz, mermiler, savaşçı, toplayıcı, turret
 
 ### Yeniden ele alınabilecekler
 
@@ -835,7 +960,27 @@ Sıra kararlaştırıldı: **hitbox ayrımı → denge testleri → skin'ler.**
   - Kristal arz/talep, bölüm temposu, serbest mod rampası, uçuş hissi,
     onarım hızları, enkaz ömrü.
 
-- [ ] **Skin'ler.** Gerçek sprite'lar. Hitbox ayrımı yapıldı — denge etkilenmez.
+- [x] **Skin altyapısı kuruldu.** `SkinLibrary` tek giriş noktası; skin yoksa
+  bugünkü prosedürel dikdörtgenlere düşer, görüntü birebir korunur. Hitbox artık
+  sprite siluetinden türer (`hitboxScale`), skin ile birlikte açılıp kapanır.
+  Ayrıntı: "Skin Sistemi" bölümü.
+
+  `Assets/Resources/SkinSet.asset` oluşturuldu ve `enemy.swarm` girdisi işlendi.
+
+- [~] **Skin'ler — çizim.** 20 sprite çizildi ve SkinSet'e işlendi: 13 düşman tipi,
+  ana gemi gövdesi, ana silah namlusu, 5 komponent ikonu (jeneratör, kalkan,
+  onarım, depo, kapasitör).
+
+  Swarm oyunda doğrulandı. **Kalan 19'u oyunda görülmedi** — bakılacaklar:
+  boyut (PPU 400/128 tuttu mu), ana geminin yönü ve namlu pivotu (0.5, 0 —
+  namlu mount noktasından yukarı uzanmalı), komponent ikonlarının slot
+  ızgarasında okunurluğu.
+
+  **Bilerek skin verilmeyenler:** Hangar ve Turret halkaları. İkisinin de kendi
+  gövde görseli var; halkaya da ikon konsaydı üst üste binerdi.
+
+  **Hâlâ prosedürel dikdörtgen:** boss + hardpoint, asteroit, enkaz, tüm
+  mermiler, savaşçı, toplayıcı, hangar gövdesi, turret taban/namlu, kalkan kabuğu.
 
 ---
 

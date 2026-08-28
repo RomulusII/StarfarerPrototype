@@ -21,22 +21,16 @@ public class WeaponMount : MonoBehaviour
     void Awake()
     {
         // 20x80 px → ppu 100 → dünya boyutu 0.2 x 0.8 birim (ince, uzun namlu)
-        Texture2D tex = new Texture2D(20, BarrelPx);
-        Color[] pixels = new Color[20 * BarrelPx];
-        Color barrelColor = new Color(1f, 0.92f, 0f); // sarı
-        for (int i = 0; i < pixels.Length; i++) pixels[i] = barrelColor;
-        tex.SetPixels(pixels);
-        tex.Apply();
-
         GameObject visual = new GameObject("WeaponVisual");
         visual.transform.SetParent(transform, false);
         visual.transform.localPosition = Vector3.zero;
         visual.transform.localScale = Vector3.one;
 
         SpriteRenderer sr = visual.AddComponent<SpriteRenderer>();
-        // Pivot alt-merkez: namlu WeaponMount noktasından yukarı uzanır
-        sr.sprite = Sprite.Create(tex, new Rect(0, 0, 20, BarrelPx),
-                                  new Vector2(0.5f, 0f), BarrelPpu);
+        // Pivot alt-merkez: namlu WeaponMount noktasından yukarı uzanır.
+        // Skin gelirse de bu pivotu korumalı — BarrelLength buna bağlı.
+        sr.sprite = SkinLibrary.Get(SkinId.PlayerBarrel, 20, BarrelPx,
+                        new Color(1f, 0.92f, 0f), new Vector2(0.5f, 0f), BarrelPpu);
         sr.sortingOrder = 1;
     }
 

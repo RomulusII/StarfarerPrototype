@@ -188,12 +188,9 @@ public class CollectorShip : MonoBehaviour
 
     void BuildVisual()
     {
-        var tex = new Texture2D(24, 12);
-        var px  = new Color[24 * 12];
-        for (int i = 0; i < px.Length; i++) px[i] = new Color(0.30f, 0.75f, 0.40f);
-        tex.SetPixels(px); tex.Apply();
         var sr        = gameObject.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 24, 12), new Vector2(0.5f, 0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.Collector, 24, 12,
+                              new Color(0.30f, 0.75f, 0.40f));
         sr.sortingOrder = 5;
     }
 }

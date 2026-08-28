@@ -286,7 +286,21 @@ public class Asteroid : MonoBehaviour, ITurretTarget
 
     void BuildVisual()
     {
-        int px  = PxFor(size);
+        int px = PxFor(size);
+
+        // Skin varsa onu kullan. Yoksa her asteroide özgü rastgele kaya üretilir —
+        // bu üretim ÖNBELLEĞE ALINMAZ, çeşitlilik kasıtlıdır.
+        if (SkinLibrary.Has(SkinId.Asteroid))
+        {
+            var skinBody = new GameObject("Body");
+            skinBody.transform.SetParent(transform, false);
+            var skinSR = skinBody.AddComponent<SpriteRenderer>();
+            skinSR.sprite       = SkinLibrary.Get(SkinId.Asteroid, px, px, RockColor);
+            skinSR.sortingOrder = 1;
+            SkinLibrary.FitToSize(skinBody.transform, skinSR.sprite, px, px);
+            return;
+        }
+
         var tex = new Texture2D(px, px);
         tex.filterMode = FilterMode.Point;
         var buf = new Color[px * px];

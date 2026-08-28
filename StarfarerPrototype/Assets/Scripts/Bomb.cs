@@ -17,8 +17,7 @@ public class Bomb : MonoBehaviour, ITurretTarget
     void Awake()
     {
         var sr = gameObject.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(MakeTex(14, 14, BombColor),
-                              new Rect(0, 0, 14, 14), new Vector2(0.5f, 0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.Bomb, 14, 14, BombColor);
         sr.sortingOrder = 3;
 
         var col    = gameObject.AddComponent<CircleCollider2D>();
@@ -73,15 +72,5 @@ public class Bomb : MonoBehaviour, ITurretTarget
 
         var collector = other.GetComponent<CollectorShip>();
         if (collector != null) { collector.TakeDamage(damage); Destroy(gameObject); }
-    }
-
-    static Texture2D MakeTex(int w, int h, Color c)
-    {
-        var tex = new Texture2D(w, h);
-        var px  = new Color[w * h];
-        for (int i = 0; i < px.Length; i++) px[i] = c;
-        tex.SetPixels(px);
-        tex.Apply();
-        return tex;
     }
 }

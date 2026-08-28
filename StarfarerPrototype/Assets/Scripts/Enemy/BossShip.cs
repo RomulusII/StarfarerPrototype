@@ -94,6 +94,8 @@ public class BossShip : MonoBehaviour, ITurretTarget
         // Collider
         var col    = gameObject.AddComponent<BoxCollider2D>();
         col.size   = new Vector2(data.bodyWidth / 100f, data.bodyHeight / 100f);
+        // Skin varsa hitbox sprite siluetinden türer; yoksa yukarıdaki kutu kalır
+        SkinLibrary.TryApplyCollider(gameObject, SkinId.ForBoss(data.name));
 
         // HP barı
         _healthBar               = gameObject.AddComponent<HealthBar>();
@@ -103,13 +105,11 @@ public class BossShip : MonoBehaviour, ITurretTarget
         _healthBar.barOffsetY    = data.bodyHeight / 100f * 0.9f;
 
         // Görsel gövde
-        var tex  = MakeTex(data.bodyWidth, data.bodyHeight, data.bodyColor);
         var body = new GameObject("Body");
         body.transform.SetParent(transform, false);
         var sr = body.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(tex,
-                              new Rect(0, 0, data.bodyWidth, data.bodyHeight),
-                              new Vector2(0.5f, 0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.ForBoss(data.name), SkinId.BossBody,
+                              data.bodyWidth, data.bodyHeight, data.bodyColor);
         sr.sortingOrder = 0;
     }
 
@@ -481,10 +481,10 @@ public class BossShip : MonoBehaviour, ITurretTarget
         _shieldVisual = new GameObject("ShieldVisual");
         _shieldVisual.transform.SetParent(transform, false);
         var sr = _shieldVisual.AddComponent<SpriteRenderer>();
-        sr.sprite = Sprite.Create(MakeTex(sw, sh, Color.white),
-                        new Rect(0, 0, sw, sh), new Vector2(0.5f, 0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.ShieldBubble, sw, sh, Color.white);
         sr.sortingOrder = 1;
         sr.color        = new Color(0.3f, 0.75f, 1f, 0.45f);
+        SkinLibrary.FitToSize(_shieldVisual.transform, sr.sprite, sw, sh);
     }
 
     void RefreshShieldVisual()
@@ -494,14 +494,5 @@ public class BossShip : MonoBehaviour, ITurretTarget
         var sr = _shieldVisual.GetComponent<SpriteRenderer>();
         if (sr != null)
             sr.color = new Color(0.3f, 0.75f, 1f, (_shieldHP / _maxShieldHP) * 0.45f);
-    }
-
-    static Texture2D MakeTex(int w, int h, Color c)
-    {
-        var tex = new Texture2D(w, h);
-        var px  = new Color[w * h];
-        for (int i = 0; i < px.Length; i++) px[i] = c;
-        tex.SetPixels(px); tex.Apply();
-        return tex;
     }
 }

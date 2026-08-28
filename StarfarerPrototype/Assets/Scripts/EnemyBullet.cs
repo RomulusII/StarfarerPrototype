@@ -24,7 +24,7 @@ public class EnemyBullet : MonoBehaviour
         // Awake'de sadece sprite — targetComponent henüz set edilmemiş olabilir.
         // Collider/Rigidbody ve renk düzeltmesi Start()'ta yapılır.
         var sr = gameObject.AddComponent<SpriteRenderer>();
-        sr.sprite       = MakeSprite(ColHull); // Start'ta gerekirse düzeltilir
+        sr.sprite       = SkinLibrary.Get(SkinId.EnemyBullet, 8, 8, ColHull); // Start'ta gerekirse düzeltilir
         sr.sortingOrder = 20;
     }
 
@@ -35,7 +35,8 @@ public class EnemyBullet : MonoBehaviour
 
         if (isCompBullet)
         {
-            GetComponent<SpriteRenderer>().sprite = MakeSprite(ColComponent);
+            GetComponent<SpriteRenderer>().sprite =
+                SkinLibrary.Get(SkinId.EnemyBulletComponent, 8, 8, ColComponent);
             // Komponent mermisi: collider yok — yalnızca proximity ile çarpar
         }
         else
@@ -50,16 +51,6 @@ public class EnemyBullet : MonoBehaviour
         }
 
         Destroy(gameObject, 10f);
-    }
-
-    static Sprite MakeSprite(Color c)
-    {
-        var tex    = new Texture2D(8, 8);
-        var pixels = new Color[64];
-        for (int i = 0; i < pixels.Length; i++) pixels[i] = c;
-        tex.SetPixels(pixels);
-        tex.Apply();
-        return Sprite.Create(tex, new Rect(0, 0, 8, 8), new Vector2(0.5f, 0.5f), 100f);
     }
 
     /// <summary>Hull modu için hareket yönünü ayarlar.</summary>
