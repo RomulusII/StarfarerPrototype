@@ -32,11 +32,15 @@ public class CollectorShip : MonoBehaviour
     ShipMovement _movement;
     float        _hoverPhase;
 
-    // Kargo tip başına ayrı tutulur; kapasite toplam üzerinden kontrol edilir
+    // Kargo tip başına ayrı tutulur; kapasite toplam üzerinden kontrol edilir.
+    //
+    // Miktarlar KESİRLİDİR. Eskiden kargo tam birime yuvarlanıyor, artan kesir
+    // ayrı bir birikeçte bekliyor ve boşaltmada SIFIRLANIYORDU. Level 1'de bir
+    // asteroit parçası 0.5 kaynak düşürür — yani kristalin tamamı, metalin de
+    // her seferin artığı yuvarlamada yanıyordu.
     static readonly int TypeCount = System.Enum.GetValues(typeof(ResourceType)).Length;
-    int[]   _cargo;         // tip başına tam birim kargo
-    float[] _accumulator;   // tip başına kesirli birikim
-    int     _cargoTotal;    // tüm tiplerin toplamı — kapasite bunun üzerinden
+    float[] _cargo;         // tip başına kargo
+    float   _cargoTotal;    // tüm tiplerin toplamı — kapasite bunun üzerinden
 
     const float Mass          = 1.5f;
     const float MaxDebrisRange = 12f;   // hangardan max enkaz takip mesafesi
@@ -44,8 +48,7 @@ public class CollectorShip : MonoBehaviour
     void Awake()
     {
         _hoverPhase  = Random.Range(0f, Mathf.PI * 2f);
-        _cargo       = new int[TypeCount];
-        _accumulator = new float[TypeCount];
+        _cargo       = new float[TypeCount];
         BuildVisual();
 
         var col       = gameObject.AddComponent<CircleCollider2D>();
@@ -80,10 +83,10 @@ public class CollectorShip : MonoBehaviour
         switch (_phase)
         {
             case Phase.Idle:
-                if (_cargoTotal >= (int)maxCargo) { _phase = Phase.Returning; break; }
+                if (_cargoTotal >= maxCargo) { _phase = Phase.Returning; break; }
                 var d = FindClosestDebris();
                 if (d != null) { _target = d; _phase = Phase.GoToDebris; }
-                else if (_cargoTotal > 0) _phase = Phase.Returning; // toplanacak yok → boşalt
+                else if (_cargoTotal > 0f) _phase = Phase.Returning; // toplanacak yok → boşalt
                 else HoverNearHangar();
                 break;
 
@@ -99,20 +102,18 @@ public class CollectorShip : MonoBehaviour
                 if (_target == null || _target.IsEmpty) { _target = null; _phase = Phase.Idle; break; }
                 // Enkaz sola kayarken toplayıcıyı menzil dışına sürüklemesin
                 if (DebrisTooFar(_target))              { _target = null; _phase = Phase.Idle; break; }
-                if (_cargoTotal >= (int)maxCargo)        { _phase = Phase.Returning; break; }
+                if (_cargoTotal >= maxCargo)            { _phase = Phase.Returning; break; }
                 // Enkaz ile birlikte sürüklen — motor kapalı, kalan hız sıfırlanır
                 _movement.Halt();
                 transform.position += (Vector3)(_target.Velocity * Time.deltaTime);
 
-                int ti = (int)_target.resourceType;
-                _accumulator[ti] += _target.Collect(salvageRate * Time.deltaTime);
-                while (_accumulator[ti] >= 1f)
-                {
-                    _accumulator[ti] -= 1f;
-                    _cargo[ti]++;
-                    _cargoTotal++;
-                }
-                if (_cargoTotal >= (int)maxCargo) _phase = Phase.Returning;
+                int   ti   = (int)_target.resourceType;
+                float take = Mathf.Min(salvageRate * Time.deltaTime, maxCargo - _cargoTotal);
+                float got  = _target.Collect(take);
+                _cargo[ti]  += got;
+                _cargoTotal += got;
+
+                if (_cargoTotal >= maxCargo) _phase = Phase.Returning;
                 break;
 
             case Phase.Returning:
@@ -132,12 +133,11 @@ public class CollectorShip : MonoBehaviour
     {
         for (int i = 0; i < _cargo.Length; i++)
         {
-            if (_cargo[i] > 0)
+            if (_cargo[i] > 0f)
                 ResourceInventory.Instance?.Add((ResourceType)i, _cargo[i]);
-            _cargo[i]       = 0;
-            _accumulator[i] = 0f;
+            _cargo[i] = 0f;
         }
-        _cargoTotal = 0;
+        _cargoTotal = 0f;
     }
 
     bool DebrisTooFar(Debris d)

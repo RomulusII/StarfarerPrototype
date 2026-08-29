@@ -268,13 +268,28 @@ toplar → hangara döner → `ResourceInventory`'ye boşaltır.
 - Toplanacak enkaz kalmadıysa ve kargoda bir şey varsa boşta beklemez — ana gemiye
   dönüp boşaltır. Sadece kargo boşken hangar etrafında bekler.
 - Enkaz 180 saniye sonra kaybolur; toplanamayan kaynak yanar.
+- **Kargo KESİRLİ tutulur.** Eskiden kargo tam birime yuvarlanıyor, artan kesir
+  ayrı bir birikeçte bekliyor ve hangarda boşaltılırken sıfırlanıyordu. Level 1'de
+  bir asteroit parçası 0.5 kaynak düşürür — yani asteroitten gelen kristalin
+  TAMAMI, metalin de her seferin artığı sessizce yanıyordu. Kristal ayrıca
+  parça başına %12 olasılıkla düştüğü için neredeyse hep tek başına kalıyor
+  ve tam birime hiç ulaşamıyordu: oyuncu asteroitlerden hiç kristal alamıyordu.
+  `ResourceInventory.Add` de artık `float` alır.
 
 **Kristal kaynakları:**
+
+**Kristal parçası KENDİ tabanını taşır.** Metal ve kristal aynı miktarı
+paylaşıyordu ama bu hiç gerekçelendirilmemişti — tek bir kod yolunu
+paylaşmalarından düşmüştü. Level 1'de parça başına 0.5 kaynak × %12 düşme
+olasılığı, yani tam parçalanmış bir büyük asteroit **0.37 kristal** veriyordu;
+sayaç kıpırdamıyordu. Nadir düşen şey İRİ düşmeli: `CrystalMinAmount = 3`.
+Enkaz da parlak camgöbeği ve daha iri çizilir (eski mavimsi gri ~7 pikselde
+kahverengi metalden ayırt edilemiyordu).
 
 | Kaynak | Kristal | Not |
 |--------|---------|-----|
 | Kalkanlı düşman | `maxShield × 0.1` | Kalkan teknolojisi kristal tabanlı. Bölüm HP çarpanı kalkanı da büyüttüğü için getiri bölümle artar. |
-| Asteroit (tam parçalanmış büyük) | ~3.7 | `Asteroid.CrystalChance` = %12, küçük parça başına 5 birim |
+| Asteroit (tam parçalanmış büyük) | ~2.3 | `CrystalChance` = %12, kristal parça başına en az 3 birim |
 | Boss (komuta gemisi) | `maxShield × 0.1` ≈ 30 | Kalkanlı gemiyle aynı kural, 2–3 parçaya bölünür. Miktar henüz dengelenmedi. |
 
 Kalkanlı düşman ≈ 4 kristal (bölüm 5'te), ≈ 7 kristal (bölüm 9'da). Büyük asteroit
@@ -805,6 +820,15 @@ Akış: `node Tools/SkinGen/gen.js` (çiz) → `node Tools/SkinGen/install.js`
 (meta + SkinSet). İkincisi `hitboxRect`'i yeniden ölçtüğü için siluet
 değiştiğinde elle bir şey güncellemek gerekmez.
 
+**Çalıştırınca doğan iki gürültü — commit'e alınmamalı:**
+- `gen.js` TÜM PNG'leri yeniden yazar. Pikseller birebir aynıdır; değişen
+  yalnızca zlib çıktısıdır (Node sürümü). Dokunulmayan sprite'lar geri alınmalı.
+- `install.js`'in meta şablonu Unity 6.3'ün gerisinde: Unity'nin eklediği
+  Standalone/Android/WebGL override bloklarını siler ve `ignoreMipmapLimit`
+  alanını eski adına (`ignoreMasterTextureLimit`) döndürür. Unity import'ta
+  hepsini yeniden yazar, yani zararsız ama her seferinde 22 dosya kirlenir.
+  Şablon güncellenene kadar meta'lar `git checkout` ile geri alınıyor.
+
 `Tools/` klasörü `Assets/` dışında olduğu için Unity onu derlemez.
 
 Göz kontrolü (dama zemin + hitbox çerçevesi):
@@ -829,6 +853,71 @@ paylaşım güvenli.
 
 `PolygonCollider2D`, `BoxCollider2D`'den pahalıdır. Basit siluetlerde
 `SkinEntry.colliderMode = Box` tercih edilmeli.
+
+---
+
+## Ana Gemi Siluet ve Slot Düzeni — Tasarım Kararları
+
+Gemi **4.0 × 2.4 birim** (tuval 1600×960, PPU 400). Eskiden 4×1'di.
+
+**Neden büyüdü:** slot ızgarası dünya `y = ±0.8`'deydi ve komponent ikonu
+0.35 birim çapında (`ShipComponentBase.k_ringSize`), yani `0.975`'e kadar
+uzanıyordu. Gövde `0.5`'te bittiği için komponentler geminin **tamamen dışında,
+boşlukta asılı** duruyordu.
+
+**Üst sınır kalkan küresi:** `ShieldEffect.ShieldRadius = 2.5`, gövdenin
+yarı-köşegeni `√(2.0² + 1.2²) = 2.33`. Daha büyük bir gemi kalkanın dışına taşar.
+
+**Slotlar gövdeyi takip eder, ızgara değildir.** Izgarayı koruyup gemiyi
+büyütmek denendi: slotları kapsamak gövdenin dört köşede de tam yükseklikte
+olmasını gerektiriyor, yani siluet zorunlu olarak tuğlaya dönüyor — pruva
+kaması, kıç basamağı, yükselen güverte hattı hiçbiri yapılamıyor. Çözüm ters
+yönden geldi.
+
+| Yapı | Slotlar | Not |
+|---|---|---|
+| Kıç makine bloğu (kalın, tam yükseklik) | 0, 3, 7 | 4 itici arkasında; jeneratör ve kalkan burada başlar |
+| Sırt kulesi (gövdeden yükselir) | 1, 4 | Slot 1 **ana silah** — namlu kuleden yukarı uzanır |
+| Bel gövdesi (dar, iki omuzla bağlanır) | 5, 8 | |
+| Karın hangar modülü | 6 | Bindirme ağızları — hangar burada başlar |
+| Baş kesimi (köprü + kamalı pruva) | 2, 9 | |
+
+`PlayerShip.slotPositions` ile `Tools/SkinGen/player.js` **birebir eşleşir**;
+biri değişirse diğeri de değişmeli. Dönüşüm: `canvas = (800 + 400x, 480 + 400y)`.
+`ComponentCatalog.StartingLoadout`'un slot numaraları (0, 3, 6) bilinçli olarak
+korundu — makine bloğu ve hangar modülü zaten doğru yerler.
+
+**HealthBar geometrisi gövdeden türer.** Sahnede `barOffsetY = 0.7` yazıyordu
+ve bu 4×1'lik eski gövdeye göreydi; yeni gövdede bar hull'un içinde kalırdı.
+`PlayerShip.Start` artık sprite bounds'undan hesaplıyor.
+
+**Hitbox bir denge değişikliğidir.** Ölçülen dikdörtgen ~4×2.2 birime çıktı
+(eskiden 4×0.63); `hitboxScale = 0.90` ile siluetin bir tık içinde kalıyor.
+Görünür gövdesine isabet eden merminin saymaması daha kötü olurdu. Kalkan
+açıkken fark yok — `EnemyBullet` önce 2.5 birimlik kalkan küresine çarpıyor,
+gövde collider'ına hiç ulaşmıyor. **Kalkan kapalıyken gövdenin kesit alanı ~3×
+büyüdü; test edilecek.**
+
+### Yan profil — denenip bırakılanlar
+
+İlk sürüm iki ucu da sivrilen bir mercekti ve üstünde baştan başa geniş bir açık
+band vardı; ikisi de bir gövdenin **plan görünümünün** işaretidir ve gemi deniz
+gemisi gibi okunuyordu. Yandan bakan bir gemi dikeyde simetrik değildir.
+
+- **Güvertede dikilen radyatör kanatçıkları ve dik sensör direği** → BACA gibi
+  okunup tam kaçınılmak istenen deniz gemisi işaretini geri getiriyordu.
+- **Tüm gövdeyi kaplayan dikey çerçeve ızgarası + yatay dikiş çizgileri** →
+  silueti konteynere/çite çeviriyordu. Pencere sıraları uzunluğu zaten veriyor.
+- **Kulenin koyu iç paneli** → yükselen bir yapı değil, gövdede delik gibi
+  okunuyordu. İç panel gövde tonunda: açık çerçeve içinde içeri çekilmiş yüzey.
+- **Kulenin `p.light` iç paneli** → kule gemideki en parlak şeye dönüp köprüyle
+  yarışıyordu. Parlak olan tek yer köprü olmalı.
+- **Açık tonlu burun plakası** → gövdenin devamı gibi okunup kama etkisini
+  yiyordu. Mahmuz gövdeden **koyu**: dövülmüş zırh plakası.
+
+Pencere ve ışık sıraları slot bantlarının **arasına** konur (tuvalde
+`y = 90..250 / 350..550 / 730..900` şeritleri komponent ikonlarıyla dolar);
+aksi halde ikonların altında kaybolurlar.
 
 ---
 
@@ -971,10 +1060,11 @@ Sıra kararlaştırıldı: **hitbox ayrımı → denge testleri → skin'ler.**
   ana gemi gövdesi, ana silah namlusu, 5 komponent ikonu (jeneratör, kalkan,
   onarım, depo, kapasitör).
 
-  Swarm oyunda doğrulandı. **Kalan 19'u oyunda görülmedi** — bakılacaklar:
-  boyut (PPU 400/128 tuttu mu), ana geminin yönü ve namlu pivotu (0.5, 0 —
-  namlu mount noktasından yukarı uzanmalı), komponent ikonlarının slot
-  ızgarasında okunurluğu.
+  Swarm oyunda doğrulandı. **Kalan 18'i oyunda görülmedi** — bakılacaklar:
+  boyut (PPU 400/128 tuttu mu), namlu pivotu (0.5, 0 — namlu mount noktasından
+  yukarı uzanmalı), komponent ikonlarının slot ızgarasında okunurluğu.
+
+  **Ana gemi yeniden çizildi** — ayrıntı: "Ana Gemi Siluet ve Slot Düzeni".
 
   **Bilerek skin verilmeyenler:** Hangar ve Turret halkaları. İkisinin de kendi
   gövde görseli var; halkaya da ikon konsaydı üst üste binerdi.

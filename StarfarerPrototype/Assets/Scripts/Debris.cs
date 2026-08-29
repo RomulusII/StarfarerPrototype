@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>
 /// Düşman gemisi veya asteroit parçalandığında geride kalan enkaz.
@@ -9,7 +9,8 @@ using UnityEngine;
 ///     Patlama itmesi hızla söner ama enkaz durmaz — yavaşça sola kayar ve
 ///     vaktinde toplanmazsa sahneden çıkar. Tamamen dursaydı ekranın sağında
 ///     kalan enkaz toplayıcının menzili dışında sonsuza dek asılı kalırdı.
-///   - Kaynak tipine göre renklenir: ham madde kahverengi, kristal mavimsi gri.
+///   - Kaynak tipine göre renklenir: ham madde kahverengi, kristal parlak camgöbeği.
+///     Kristal daha nadir düştüğü için daha da iri çizilir.
 ///   - İki şekilde kaybolur: soldan çıkarak (asıl yol) veya ömrü dolarak (emniyet).
 ///     Görsel uyarı hangisi önce gelecekse ona göre işler — enkaz kaybolmasına
 ///     yaklaşırken solar, son saniyelerde yanıp söner.
@@ -33,7 +34,16 @@ public class Debris : MonoBehaviour
     const float DespawnX   = -17f;  // soldan çıkınca yok olur
 
     static readonly Color MetalColor   = new Color(0.55f, 0.45f, 0.30f);
-    static readonly Color CrystalColor = new Color(0.52f, 0.70f, 0.85f);
+
+    // Kristal PARLAK camgöbeği, mavimsi gri değil. Eski ton (0.52, 0.70, 0.85)
+    // ekranda ~7 pikselken kahverengi metalden ayırt edilemiyordu; oyuncu kristal
+    // düştüğünü göremiyordu. Skin'lerdeki sensör lensiyle aynı renk dili — oyunda
+    // camgöbeği "enerji" demek.
+    static readonly Color CrystalColor = new Color(0.35f, 0.88f, 1.00f);
+
+    // Kristal daha nadir düşer, o yüzden daha iri çizilir — kaçırılmamalı.
+    int PxW => resourceType == ResourceType.EnergyCrystal ? 16 : 12;
+    int PxH => resourceType == ResourceType.EnergyCrystal ? 14 : 10;
 
     public bool IsEmpty => resourceAmount <= 0f;
 
@@ -51,7 +61,7 @@ public class Debris : MonoBehaviour
         resourceType   = type;
 
         // resourceType Awake'den SONRA belli olur — sprite burada kesinleşir
-        if (_sr != null) _sr.sprite = SkinLibrary.Get(SkinKey, 12, 10, Color.white);
+        if (_sr != null) _sr.sprite = SkinLibrary.Get(SkinKey, PxW, PxH, Color.white);
         ApplyTint(1f);
     }
 
@@ -130,7 +140,7 @@ public class Debris : MonoBehaviour
         // Prosedürel doku beyazdır; renk sr.color ile verilir — tip rengi ve solma
         // tek yerden yönetilir. Skin varken sprite kendi rengini taşır.
         _sr = gameObject.AddComponent<SpriteRenderer>();
-        _sr.sprite       = SkinLibrary.Get(SkinKey, 12, 10, Color.white);
+        _sr.sprite       = SkinLibrary.Get(SkinKey, PxW, PxH, Color.white);
         _sr.sortingOrder = -1;
         ApplyTint(1f);
     }

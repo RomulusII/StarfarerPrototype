@@ -48,6 +48,19 @@ public class Asteroid : MonoBehaviour, ITurretTarget
     const float LargesPerLevel   = 14f;   // ~3.5 dakikalık level, ~4/dk
     const float CrystalChance    = 0.12f;
 
+    // Kristal parçası KENDİ tabanını taşır, metalinkini değil.
+    //
+    // İkisi aynı miktarı paylaşıyordu ama bu hiç gerekçelendirilmemişti — tek
+    // bir kod yolunu paylaşmalarından düşmüştü. Sonuç: level 1'de parça başına
+    // 0.5 kaynak × %12 düşme olasılığı, yani tam parçalanmış bir büyük asteroit
+    // 0.37 kristal veriyordu. Sayaç kıpırdamıyordu; oyuncu için asteroitler
+    // kristal DÜŞÜRMÜYOR demekti.
+    //
+    // Nadir düşen şey İRİ düşmeli: %12'lik bir olay, gerçekleştiğinde görünür
+    // olmalı. 3 birimlik taban, tam parçalanmış büyük asteroidi ~2.3 kristale
+    // çıkarır — dokümante edilen ~3.7 hedefinin mertebesinde.
+    const float CrystalMinAmount = 3f;
+
     static float SmallResourceAmount
     {
         get
@@ -202,15 +215,17 @@ public class Asteroid : MonoBehaviour, ITurretTarget
 
     void DropDebris()
     {
-        var type = Random.value < CrystalChance
-            ? ResourceType.EnergyCrystal
-            : ResourceType.RawMaterial;
+        bool crystal = Random.value < CrystalChance;
+        var  type    = crystal ? ResourceType.EnergyCrystal : ResourceType.RawMaterial;
+        float amount = crystal
+            ? Mathf.Max(CrystalMinAmount, SmallResourceAmount)
+            : SmallResourceAmount;
 
-        var go = new GameObject(type == ResourceType.EnergyCrystal ? "Debris_Crystal" : "Debris");
+        var go = new GameObject(crystal ? "Debris_Crystal" : "Debris");
         go.transform.position = transform.position;
         go.AddComponent<Debris>().Init(
             Velocity * 0.4f + Random.insideUnitCircle.normalized * Random.Range(0.15f, 0.4f),
-            SmallResourceAmount, type);
+            amount, type);
     }
 
     // ── Gemiye çarpma ─────────────────────────────────────────────────────────

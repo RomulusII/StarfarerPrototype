@@ -66,7 +66,12 @@ public class ResourceInventory : MonoBehaviour
         }
     }
 
-    public void Add(ResourceType type, int amount)
+    /// <summary>
+    /// Miktar KESİRLİ tutulur. Eskiden int'ti ve toplayıcı kargosunu tam birime
+    /// yuvarlamak zorundaydı: level 1'de asteroit parçası 0.5 kaynak düşürdüğü
+    /// için kristalin tamamı yuvarlamada kayboluyordu.
+    /// </summary>
+    public void Add(ResourceType type, float amount)
     {
         switch (type)
         {

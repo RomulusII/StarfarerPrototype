@@ -15,8 +15,9 @@ public class PlayerShip : MonoBehaviour
 
     public List<MountSlot> mountSlots { get; private set; }
 
-    Vector3  _fixedPosition;
-    HealthBar _healthBar;
+    Vector3        _fixedPosition;
+    HealthBar      _healthBar;
+    SpriteRenderer _bodyRenderer;
 
     void Awake()
     {
@@ -29,22 +30,23 @@ public class PlayerShip : MonoBehaviour
             busGO.AddComponent<EnergyBus>();
         }
 
-        // 400x100 px → ppu 100 → dünya boyutu 4 x 1 birim
+        // 400x240 px → ppu 100 → dünya boyutu 4 x 2.4 birim
         GameObject body = new GameObject("Body");
         body.transform.SetParent(transform, false);
         body.transform.localPosition = Vector3.zero;
         body.transform.localScale    = Vector3.one;
 
         SpriteRenderer sr = body.AddComponent<SpriteRenderer>();
-        sr.sprite       = SkinLibrary.Get(SkinId.PlayerBody, 400, 100,
+        sr.sprite       = SkinLibrary.Get(SkinId.PlayerBody, 400, 240,
                               new Color(0.3f, 0.3f, 0.4f));
         sr.sortingOrder = -10;
+        _bodyRenderer   = sr;
 
-        // Trigger collider — gövde hasarı için (sprite 4x1 birim).
+        // Trigger collider — gövde hasarı için (sprite 4x2.4 birim).
         // Oyuncu tarafında hitbox siluetten KÜÇÜK olmalı: ana gemi kaçamadığı
         // için kıl payı ıskalar oyuncunun lehine yorumlanır. Oran SkinEntry'de.
         BoxCollider2D col = gameObject.AddComponent<BoxCollider2D>();
-        col.size      = new Vector2(4f, 1f);
+        col.size      = new Vector2(4f, 2.4f);
         col.isTrigger = true;
         SkinLibrary.TryApplyCollider(gameObject, SkinId.PlayerBody, isTrigger: true);
 
@@ -60,19 +62,32 @@ public class PlayerShip : MonoBehaviour
         if (!TryGetComponent<ShipLoadout>(out _))
             gameObject.AddComponent<ShipLoadout>();
 
-        // World-space slot objeleri — gemi 4x1 birim koordinat sistemine göre
+        // World-space slot objeleri.
+        //
+        // Konumlar geminin YAPILARINI takip eder, düzgün bir ızgara değildir.
+        // Eskiden 3x3+1 ızgaraydı (y = ±0.8) ve gemi 4x1 birim olduğu için
+        // komponentler gövdenin tamamen DIŞINDA, boşlukta duruyordu. Izgarayı
+        // koruyup gemiyi büyütmek denendi: slotları kapsamak gövdenin dört
+        // köşede de tam yükseklikte olmasını gerektiriyor, yani siluet zorunlu
+        // olarak tuğlaya dönüyordu. Bunun yerine slotlar gövdeye taşındı.
+        //
+        // Her konum Tools/SkinGen/player.js'teki bir yapıya oturur; biri
+        // değişirse diğeri de değişmeli. Tuval ↔ dünya: canvas = (800+400x, 480+400y).
+        //
+        // Başlangıç donanımının slot numaraları ComponentCatalog.StartingLoadout'ta:
+        // jeneratör 0, kalkan 3, hangar 6 — yani makine bloğu ve hangar modülü.
         Vector2[] slotPositions = new Vector2[]
         {
-            new Vector2(-1.5f,  0.8f),  // 0 — Üst Sol
-            new Vector2( 0f,    0.8f),  // 1 — Üst Orta
-            new Vector2( 1.5f,  0.8f),  // 2 — Üst Sağ
-            new Vector2(-1.5f,  0f),    // 3 — Orta Sol
-            new Vector2(-0.5f,  0f),    // 4 — Orta OrtaSol
-            new Vector2( 0.5f,  0f),    // 5 — Orta OrtaSağ (Weapon)
-            new Vector2( 1.5f,  0f),    // 6 — Orta Sağ
-            new Vector2(-1.5f, -0.8f),  // 7 — Alt Sol
-            new Vector2( 0f,   -0.8f),  // 8 — Alt Orta
-            new Vector2( 1.5f, -0.8f),  // 9 — Alt Sağ
+            new Vector2(-1.29f,  0.75f), // 0 — Kıç makine bloğu, üst   (jeneratör)
+            new Vector2( 0.20f,  0.87f), // 1 — Sırt kulesi, ön         (ANA SİLAH)
+            new Vector2( 1.10f,  0.38f), // 2 — Baş, üst
+            new Vector2(-1.29f,  0.00f), // 3 — Kıç makine bloğu, orta  (kalkan)
+            new Vector2(-0.40f,  0.87f), // 4 — Sırt kulesi, arka
+            new Vector2(-0.45f, -0.15f), // 5 — Bel gövdesi, sol
+            new Vector2(-0.40f, -0.87f), // 6 — Karın hangar modülü     (hangar)
+            new Vector2(-1.29f, -0.75f), // 7 — Kıç makine bloğu, alt
+            new Vector2( 0.25f, -0.15f), // 8 — Bel gövdesi, sağ
+            new Vector2( 1.10f, -0.45f), // 9 — Baş, alt
         };
 
         for (int i = 0; i < slotPositions.Length; i++)
@@ -93,6 +108,17 @@ public class PlayerShip : MonoBehaviour
     {
         mountSlots = GetComponentsInChildren<MountSlot>().ToList();
         _healthBar = GetComponent<HealthBar>();
+
+        // Bar geometrisi GÖVDEDEN türer, sahnedeki sabitten değil. Sahnede
+        // barOffsetY = 0.7 yazıyor ve bu 4x1 birimlik eski gövdeye göreydi;
+        // gövde 2.4 birime çıkınca bar hull'un İÇİNDE kalırdı. Türetilmiş
+        // olması, görsel bir daha değiştiğinde elle güncelleme gerektirmez.
+        if (_healthBar != null && _bodyRenderer != null && _bodyRenderer.sprite != null)
+        {
+            Vector2 size = _bodyRenderer.sprite.bounds.size;
+            _healthBar.barWidth   = size.x * 0.55f;
+            _healthBar.barOffsetY = size.y * 0.5f + 0.15f;
+        }
     }
 
     public void TakeDamage(float amount, bool bypassShields = false)

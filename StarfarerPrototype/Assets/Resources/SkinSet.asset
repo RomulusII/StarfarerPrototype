@@ -150,11 +150,11 @@ MonoBehaviour:
     colliderMode: 1
     hitboxRect:
       serializedVersion: 2
-      x: 65
-      y: 74
-      width: 1404
-      height: 252
-    hitboxScale: 1
+      x: 50
+      y: 79
+      width: 1430
+      height: 802
+    hitboxScale: 0.9
   - id: player.barrel
     sprite: {fileID: 21300000, guid: 865cdc03b6f089b4299edfa8f020d6e1, type: 3}
     colliderMode: 1
