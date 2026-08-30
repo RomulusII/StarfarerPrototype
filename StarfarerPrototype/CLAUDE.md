@@ -1026,6 +1026,28 @@ bırakıldı.
 ---
 
 ## Kamera Sistemi
+
+**Upgrade kadrajı ayrı hesaplanır.** `ZoomToShip` kamerayı gemiye ORTALIYORDU,
+yani gemi ekranın tam ortasına geliyordu — ama ekranın ortası boş değil: üstte
+SLOT BİLGİSİ paneli (üstten %5–33), solda GENEL şeridi (0.11'e kadar), sağda
+opsiyon detayı ve bileşen listesi (0.785'ten sonra). Geminin sırt kulesi panelin
+arkasında kalıyordu.
+
+Oyun içi kadrajla AYNI formül kullanılır (`shipScreenX/Y` mantığı), yalnızca
+oranlar panellere göredir: `upgradeShipScreenX = 0.45` (boş bandın ortası,
+ekranın ortası değil), `upgradeShipScreenY = 0.60` (panel şeridinin altı).
+
+Ölçülen sonuç — gemi 4×2.4 birim, zoom size 2.5:
+
+| | Değer |
+|---|---|
+| Gemi ekran yüksekliğinin | %48'i |
+| Üst kenar (üstten) | 0.360 — panel 0.33'te bitiyor, %3 pay |
+| Yatay kapladığı | %33–45 (en-boy oranına göre) |
+| Sol / sağ kenar | 0.23–0.28 / 0.62–0.68 — iki panel arasında |
+
+Dikey hesap en-boy oranından bağımsızdır (`orthographicSize` yarı yüksekliktir);
+yatayda 16:9'dan 2.4'e kadar test edildi, hepsinde panellerin dışında kalıyor.
 - **Kadraj:** Ana gemi (0, -2)'de sabit. Kamera gemiye göre konumlanır ve gemiyi
   ekranda **soldan %29**, **üstten %52** oranında tutar — yani solda ve HUD şeridinden
   kalan dikey bandın ortasında. İleri (sağ) tarafta böylece daha çok alan kalır.
