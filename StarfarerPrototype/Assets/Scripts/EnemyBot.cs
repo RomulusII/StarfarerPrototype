@@ -7,6 +7,12 @@ using UnityEngine;
 ///
 /// data null ise EnemySpawner tarafından atanmadan önce Start() bekler;
 /// null kalırsa CreateSwarm() ile fallback oluşturulur.
+///
+/// ÇARPIŞMA HASARI YOKTUR — düşmanlar ana geminin üstünden geçer. Ana gemi
+/// kaçamıyor, dolayısıyla temas hasarı kaçınılamaz bir sızıntı olurdu:
+/// oyuncunun hiçbir kararı onu engelleyemezdi. Tehdit menzilli silahlardan
+/// gelir. (Asteroitler ayrı: onlar VURULABİLİR, yani çarpmaları engellenebilir
+/// bir olaydır ve hasar verirler.)
 /// </summary>
 public class EnemyBot : MonoBehaviour, ITurretTarget
 {
@@ -16,8 +22,6 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     HealthBar    _healthBar;
     ShipMovement _movement;
     ShipBrain    _brain;
-
-    float _contactDamage;
 
     // Kalkan
     float      _shieldHP;
@@ -39,6 +43,17 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 
     // Hedef tarama
     float _targetScanTimer;
+
+    // Hareket hedefi (_brain) ile ateş hedefi AYRI tutulur. Ağır bir gemi ana
+    // gemiye yönelmeye devam ederken, menziline giren bir savaşçıya ateş
+    // edebilmeli — ama onun peşine düşmemeli.
+    Transform _fireTarget;
+    float     _fireScanTimer;
+
+    // Ateş hedefi sahne taraması gerektirir; her karede yapılmaz. 0.25 sn,
+    // en hızlı ateş eden tipin (Sülük, 1.4 sn) çok altında kalır — yani
+    // hedef seçimi hiçbir atışı geciktirmez.
+    const float FireScanInterval = 0.25f;
 
     // Approach (Bomber tipi) state machine
     enum ApproachPhase { Approaching, Hovering, Retreating }
@@ -133,8 +148,6 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 
     void ApplyStats()
     {
-        _contactDamage = data.contactDamage;
-
         if (_healthBar != null)
         {
             _healthBar.maxHealth     = data.maxHP;
@@ -264,8 +277,18 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
             if (threat != null) _brain?.SetTarget(threat);
         }
 
+        // Tarama YALNIZCA sayaçla yapılır. "_fireTarget == null ise hemen tekrar
+        // tara" eklemek cazip ama tuzak: menzilde hiçbir şey olmaması normal
+        // durumdur ve o hâlde her düşman her karede sahneyi taramaya başlar.
+        _fireScanTimer -= Time.deltaTime;
+        if (_fireScanTimer <= 0f)
+        {
+            _fireScanTimer = FireScanInterval;
+            _fireTarget    = SelectFireTarget();
+        }
+
         _fireTimer -= Time.deltaTime;
-        if (_brain != null && _brain.InFireRange && _fireTimer <= 0f)
+        if (_fireTarget != null && _fireTimer <= 0f)
         {
             _fireTimer = _fireRateBase;
             FireAtTarget();
@@ -280,22 +303,65 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
             Destroy(gameObject);
     }
 
+    /// <summary>
+    /// HAREKET hedefi. Yalnızca kıvrak ve hafif gemiler savaşçı kovalar
+    /// (bkz. EnemyTypeData.PursuesFighters); ağır olanlar ana gemide kalır.
+    ///
+    /// Eskiden burada tip ayrımı yoktu ve en yakın tehdit ne ise ona kilitleniliyordu.
+    /// Bir avuç savaşçı, bir Kaleci'yi sahnenin dışına kadar çekebiliyordu:
+    /// düşman gemisi kavis üstüne kavis çizip ana gemiden uzaklaşıyor, oyuncu
+    /// hiç baskı hissetmiyordu.
+    /// </summary>
     Transform FindClosestThreat()
     {
-        Transform best  = null;
-        float     bestD = float.MaxValue;
+        Transform ship = _playerShip != null ? _playerShip.transform : null;
+        if (data == null || !data.PursuesFighters) return ship;
 
-        if (_playerShip != null)
-        {
-            float d = Vector2.Distance(transform.position, _playerShip.transform.position);
-            if (d < bestD) { bestD = d; best = _playerShip.transform; }
-        }
+        Transform best  = ship;
+        float     bestD = ship != null
+            ? Vector2.Distance(transform.position, ship.position)
+            : float.MaxValue;
 
-        var fighters = FindObjectsByType<FighterShip>(FindObjectsSortMode.None);
-        foreach (var f in fighters)
+        foreach (var f in FindObjectsByType<FighterShip>(FindObjectsSortMode.None))
         {
             float d = Vector2.Distance(transform.position, f.transform.position);
             if (d < bestD) { bestD = d; best = f.transform; }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// ATEŞ hedefi. Ana hedef menzildeyse odur; silahı küçük hedefe uygunsa
+    /// (bkz. EnemyTypeData.CanEngageFighters) menzildeki daha yakın bir savaşçı
+    /// önceliği alır.
+    ///
+    /// Kovalamamak ile ateş etmemek AYRI şeyler: hantal bir lazer gemisi
+    /// dibindeki avcıyı görmezden gelmemeli, ama peşinden de gitmemeli. Öte
+    /// yandan bir bombardıman topunu tek bir avcıya harcamak, o atışın ana
+    /// gemiye gitmemesi demektir — o yüzden ağır silahlar savaşçıyı hiç
+    /// hedeflemez.
+    /// </summary>
+    Transform SelectFireTarget()
+    {
+        float     range = data != null ? data.fireRange : 0f;
+        Transform best  = null;
+        float     bestD = range;
+
+        var brainTarget = _brain != null ? _brain.TargetTransform : null;
+        if (brainTarget != null)
+        {
+            float d = Vector2.Distance(transform.position, brainTarget.position);
+            if (d <= bestD) { bestD = d; best = brainTarget; }
+        }
+
+        if (data != null && data.CanEngageFighters)
+        {
+            foreach (var f in FindObjectsByType<FighterShip>(FindObjectsSortMode.None))
+            {
+                float d = Vector2.Distance(transform.position, f.transform.position);
+                if (d <= bestD) { bestD = d; best = f.transform; }
+            }
         }
 
         return best;
@@ -478,7 +544,7 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
                 _reloadFillTransform.localScale = new Vector3(0f, 1f, 1f);
         }
 
-        Transform target = _brain?.TargetTransform;
+        Transform target = _fireTarget != null ? _fireTarget : _brain?.TargetTransform;
         if (target != null)
         {
             var   dir   = (target.position - _barrelTransform.position).normalized;
@@ -503,7 +569,7 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 
     void FireAtTarget()
     {
-        Transform t = _brain?.TargetTransform ?? _playerShip?.transform;
+        Transform t = _fireTarget ?? _brain?.TargetTransform ?? _playerShip?.transform;
         if (t == null) return;
 
         var dir = (t.position - transform.position).normalized;
@@ -596,6 +662,16 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         eb.speed           = data.bulletSpeed;
         eb.targetComponent = target;
     }
+
+    // ── Teşhis / HUD erişimi ──────────────────────────────────────────────────
+    // EnemyInfoHUD bu değerleri okur. Alanlar private kalır; dışarıya yalnızca
+    // okunur bir görünüm verilir.
+
+    public EnemyTypeData Data          => data;
+    public float         CurrentHP     => _healthBar != null ? _healthBar.currentHealth : 0f;
+    public float         MaxHP         => _healthBar != null ? _healthBar.maxHealth     : 0f;
+    public float         CurrentShield => _shieldHP;
+    public float         MaxShield     => _maxShieldHP;
 
     // ── ITurretTarget ─────────────────────────────────────────────────────────
 
@@ -903,11 +979,6 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         go.AddComponent<Debris>().Init(
             Random.insideUnitCircle.normalized * Random.Range(0.3f, 1.2f),
             amount, ResourceType.EnergyCrystal);
-    }
-
-    void OnTriggerEnter2D(Collider2D other)
-    {
-        // Oyuncu gemisiyle fiziksel çarpışma yok; düşmanlar üstünden geçer
     }
 
     // ── Görsel kurulum ────────────────────────────────────────────────────────

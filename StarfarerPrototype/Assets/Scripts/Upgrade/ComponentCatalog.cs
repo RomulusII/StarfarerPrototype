@@ -5,15 +5,22 @@ using UnityEngine;
 /// cevabı buradadır.
 ///
 /// Katman ayrımı:
-///   ComponentCatalog — ne var, kaça, hangi zincirle yükselir
-///   ShipLoadout      — oyuncuda ne kurulu (10 slot, kur/sat/upgrade)
+///   ComponentCatalog — ne var, kaça
+///   ShipLoadout      — oyuncuda ne kurulu (10 slot, kur/sat)
 ///   UpgradeUI        — bunlar nasıl gösteriliyor
 ///
-/// Daha önce tanımlar hem ShipLoadout hem UpgradeUI içinde ayrı ayrı üretiliyordu;
-/// aynı kalkanın iki farklı adı, statı ve maliyet kaynağı vardı. Artık tek yer.
+/// TIER ZİNCİRLERİ KALDIRILDI. Her komponentin tek sürümü vardır; ilerleme
+/// yalnızca stat seviyelerinden gelir (0–10). Değerler eski zincirin ORTA
+/// halkasından (Mk2) alınmıştır — böylece tavan neredeyse aynı yerde kalır:
 ///
-/// Değerler C# içinde sabit; oturduktan sonra ScriptableObject asset'lerine
-/// taşınabilir (ComponentDefinition zaten CreateAssetMenu'ya sahip).
+///   eski: Mk3 statı × 1.25^8  =  Mk3 × 5.96
+///   yeni: Mk2 statı × 1.25^10 =  Mk2 × 9.31
+///
+/// Kalkanda 1013 → 931, jeneratörde 167 → 168. Tier'ların taşıdığı güç stat
+/// eğrisine devredildi, kaybolmadı.
+///
+/// Silah TİPLERİ ve turret uzmanlaşmaları tier değildir — duruyorlar, çünkü
+/// güç değil KARAKTER seçtiriyorlar.
 /// </summary>
 public static class ComponentCatalog
 {
@@ -21,7 +28,7 @@ public static class ComponentCatalog
 
     static ComponentDefinition[] _purchasable;
 
-    /// <summary>Upgrade ekranında satılan komponentler (her zincirin ilk halkası).</summary>
+    /// <summary>Upgrade ekranında satılan komponentler.</summary>
     public static ComponentDefinition[] Purchasable
     {
         get
@@ -29,10 +36,10 @@ public static class ComponentCatalog
             if (_purchasable != null) return _purchasable;
             _purchasable = new[]
             {
-                ShieldChain[0],
-                GeneratorChain[0],
-                RepairChain[0],
-                StorageChain[0],
+                Shield,
+                Generator,
+                Repair,
+                Storage,
                 TurretKinetic,
                 TurretEnergy,
                 TurretMissile,
@@ -51,143 +58,104 @@ public static class ComponentCatalog
     /// </summary>
     public static (ComponentDefinition def, int slot)[] StartingLoadout => new[]
     {
-        (Hangar,            6),
-        (GeneratorChain[0], 0),
-        (ShieldChain[0],    3),
+        (Hangar,    6),
+        (Generator, 0),
+        (Shield,    3),
     };
 
+    /// <summary>
+    /// Stat maliyet tabanı komponentin kendi fiyatından türer. Tier'lar varken
+    /// taban zincirin SON halkasına sabitlenmişti (yoksa "Mk1'de statları maxla,
+    /// sonra tier atla" 4× ucuza geliyordu). Zincir kalkınca o istismar da
+    /// kalktı; taban artık tek bir orandır.
+    /// </summary>
+    const float StatBaseFactor = 1.5f;
+
+    static int StatBase(int cost) => Mathf.RoundToInt(cost * StatBaseFactor);
+
     // ── Kalkan ────────────────────────────────────────────────────────────────
-    // Tek tip, üç kademe. Başlangıçtaki kalkan Mk1'dir; ikinci bir kalkan almak
-    // demek yine Mk1 almak demektir. Enerji sistemi olduğu için kristalle alınır.
+    // Enerji sistemi olduğu için kristalle alınır.
 
-    static ComponentDefinition[] _shieldChain;
+    static ComponentDefinition _shield;
 
-    public static ComponentDefinition[] ShieldChain
+    public static ComponentDefinition Shield
     {
         get
         {
-            if (_shieldChain != null) return _shieldChain;
-            var mk3 = Shield("Kalkan Jeneratörü Mk3", 3, cost: 70, sell: 28, maxShield: 170f, recharge: 3.0f, next: null);
-            var mk2 = Shield("Kalkan Jeneratörü Mk2", 2, cost: 45, sell: 18, maxShield: 100f, recharge: 1.8f, next: mk3);
-            var mk1 = Shield("Kalkan Jeneratörü Mk1", 1, cost: 25, sell: 10, maxShield:  50f, recharge: 0.8f, next: mk2);
-            _shieldChain = new[] { mk1, mk2, mk3 };
-            return _shieldChain;
+            if (_shield != null) return _shield;
+            _shield = New("Kalkan Jeneratörü", ComponentType.Shield,
+                          ResourceType.EnergyCrystal, cost: 45, sell: 18);
+            _shield.maxShield      = 100f;
+            _shield.rechargeRate   = 1.8f;
+            _shield.baseEnergyCost = 3.5f;
+            return _shield;
         }
     }
-
-    static ComponentDefinition Shield(string name, int tier, int cost, int sell,
-                                      float maxShield, float recharge, ComponentDefinition next)
-    {
-        var d = New(name, ComponentType.Shield, tier, ResourceType.EnergyCrystal, cost, sell);
-        d.maxShield      = maxShield;
-        d.rechargeRate   = recharge;
-        d.upgradeTo      = next;
-        d.statCostBase   = ShieldStatBase;
-        d.baseEnergyCost = EnergyShield[tier - 1];
-        return d;
-    }
-
-    // Stat maliyeti zincirin SON tier'ına sabitlenir — hangi tier'da olursan ol
-    // aynı fiyat. Eskiden o anki tier'ın fiyatı kullanılıyordu ve "Mk1'de statları
-    // maxla, sonra tier atla" 4× ucuza geliyordu.
-    const int ShieldStatBase = 70;
-    static readonly float[] EnergyShield = { 2f, 3.5f, 5f };
 
     // ── Jeneratör ─────────────────────────────────────────────────────────────
 
-    static ComponentDefinition[] _generatorChain;
+    static ComponentDefinition _generator;
 
-    public static ComponentDefinition[] GeneratorChain
+    public static ComponentDefinition Generator
     {
         get
         {
-            if (_generatorChain != null) return _generatorChain;
-            var mk3 = Generator("Enerji Jeneratörü Mk3", 3, cost: 110, sell: 45, production: 28f, next: null);
-            var mk2 = Generator("Enerji Jeneratörü Mk2", 2, cost:  65, sell: 28, production: 18f, next: mk3);
-            var mk1 = Generator("Enerji Jeneratörü Mk1", 1, cost:  35, sell: 15, production: 10f, next: mk2);
-            _generatorChain = new[] { mk1, mk2, mk3 };
-            return _generatorChain;
+            if (_generator != null) return _generator;
+            _generator = New("Enerji Jeneratörü", ComponentType.Generator,
+                             ResourceType.RawMaterial, cost: 65, sell: 28);
+            _generator.productionAmount = 18f;
+            _generator.baseEnergyCost   = 0f;   // üreticidir, tüketmez
+            return _generator;
         }
     }
-
-    static ComponentDefinition Generator(string name, int tier, int cost, int sell,
-                                         float production, ComponentDefinition next)
-    {
-        var d = New(name, ComponentType.Generator, tier, ResourceType.RawMaterial, cost, sell);
-        d.productionAmount = production;
-        d.upgradeTo        = next;
-        d.statCostBase     = GeneratorStatBase;
-        d.baseEnergyCost   = 0f;   // üreticidir, tüketmez
-        return d;
-    }
-
-    const int GeneratorStatBase = 110;
 
     // ── Onarım birimi ─────────────────────────────────────────────────────────
-    // Mk1 kasten yavaş: ilk seviyede tamir savaşın gidişatını belirlememeli.
 
-    static ComponentDefinition[] _repairChain;
+    static ComponentDefinition _repair;
 
-    public static ComponentDefinition[] RepairChain
+    public static ComponentDefinition Repair
     {
         get
         {
-            if (_repairChain != null) return _repairChain;
-            var mk3 = Repair("Onarım Birimi Mk3", 3, cost: 90, sell: 38, rate: 7.0f, next: null);
-            var mk2 = Repair("Onarım Birimi Mk2", 2, cost: 55, sell: 22, rate: 4.0f, next: mk3);
-            var mk1 = Repair("Onarım Birimi Mk1", 1, cost: 30, sell: 12, rate: 2.0f, next: mk2);
-            _repairChain = new[] { mk1, mk2, mk3 };
-            return _repairChain;
+            if (_repair != null) return _repair;
+            _repair = New("Onarım Birimi", ComponentType.RepairUnit,
+                          ResourceType.RawMaterial, cost: 55, sell: 22);
+            _repair.repairRate     = 4f;
+            _repair.baseEnergyCost = 2.5f;
+            return _repair;
         }
     }
-
-    static ComponentDefinition Repair(string name, int tier, int cost, int sell,
-                                      float rate, ComponentDefinition next)
-    {
-        var d = New(name, ComponentType.RepairUnit, tier, ResourceType.RawMaterial, cost, sell);
-        d.repairRate     = rate;
-        d.upgradeTo      = next;
-        d.statCostBase   = RepairStatBase;
-        d.baseEnergyCost = EnergyRepair[tier - 1];
-        return d;
-    }
-
-    const int RepairStatBase = 90;
-    static readonly float[] EnergyRepair = { 1.5f, 2.5f, 3.5f };
 
     // ── Depo ──────────────────────────────────────────────────────────────────
-    // Kaynak tavanını yükseltir. Upgrade'ler "daha kompakt depolama" — aynı
-    // slotta çok daha fazla kapasite.
+    // Kaynak tavanını yükseltir. "Kapasite" statı ZORUNLU bir eksendir: geç
+    // seviyelerde tek bir stat yükseltmesi binlerce kaynak tutuyor ve taban
+    // tavan (150 metal / 50 kristal) o parayı tutamaz. Tier'lar kalkınca
+    // kapasite ilerlemesinin tek yolu bu stat oldu.
+    //
+    // Taban kapasiteler zincirin ORTA halkasından DEĞİL, üstünden alındı:
+    // tavan en pahalı yükseltmeyi tutabilmek ZORUNDA. Sv10 kalkan yükseltmesi
+    // 6.164 kristal; 200 tabanlı bir depo maxlansa bile 1.912 tutuyordu, yani
+    // sistem kilitleniyordu — para birikiyor ama tavana çarpıp yanıyordu.
+    // 350 tabanla maxlanmış tek depo 3.259, iki depo 6.568 tutar.
+    //
+    // Depo statı kasten UCUZ: altyapıdır, güç değil. Onu yükseltmek başka bir
+    // şeyi satın alabilmenin ön koşulu, kendi başına bir ödül değil.
 
-    static ComponentDefinition[] _storageChain;
+    static ComponentDefinition _storage;
 
-    public static ComponentDefinition[] StorageChain
+    public static ComponentDefinition Storage
     {
         get
         {
-            if (_storageChain != null) return _storageChain;
-            var mk3 = Storage("Sıkıştırılmış Depo", 3, cost: 150, sell: 60, metal: 1200f, crystal: 250f, next: null);
-            var mk2 = Storage("Kompakt Depo",       2, cost:  80, sell: 32, metal:  600f, crystal: 120f, next: mk3);
-            var mk1 = Storage("Depo",               1, cost:  40, sell: 16, metal:  250f, crystal:  50f, next: mk2);
-            _storageChain = new[] { mk1, mk2, mk3 };
-            return _storageChain;
+            if (_storage != null) return _storage;
+            _storage = New("Depo", ComponentType.Storage,
+                           ResourceType.RawMaterial, cost: 110, sell: 44);
+            _storage.storageMetal   = 900f;
+            _storage.storageCrystal = 350f;
+            _storage.baseEnergyCost = 0.8f;
+            return _storage;
         }
     }
-
-    static ComponentDefinition Storage(string name, int tier, int cost, int sell,
-                                       float metal, float crystal, ComponentDefinition next)
-    {
-        var d = New(name, ComponentType.Storage, tier, ResourceType.RawMaterial, cost, sell);
-        d.storageMetal   = metal;
-        d.storageCrystal = crystal;
-        d.upgradeTo      = next;
-        d.statCostBase   = StorageStatBase;
-        d.baseEnergyCost = EnergyStorage[tier - 1];
-        return d;
-    }
-
-    const int StorageStatBase = 150;
-    static readonly float[] EnergyStorage = { 0.5f, 0.8f, 1.2f };
 
     // ── Hangar ────────────────────────────────────────────────────────────────
 
@@ -198,8 +166,8 @@ public static class ComponentCatalog
         get
         {
             if (_hangar != null) return _hangar;
-            _hangar = New("Hangar", ComponentType.Hangar, 1, ResourceType.RawMaterial, cost: 20, sell: 8);
-            _hangar.statCostBase   = 20;
+            _hangar = New("Hangar", ComponentType.Hangar, ResourceType.RawMaterial,
+                          cost: 20, sell: 8);
             _hangar.baseEnergyCost = 1.5f;
             return _hangar;
         }
@@ -227,8 +195,7 @@ public static class ComponentCatalog
         float fireRate, float damage, float speed, float life, float energy,
         int mag = 0, float reload = 0f)
     {
-        var d = New(name, ComponentType.Turret, 1, ResourceType.RawMaterial, cost, cost / 2);
-        d.statCostBase         = cost;
+        var d = New(name, ComponentType.Turret, ResourceType.RawMaterial, cost, cost / 2);
         d.baseEnergyCost       = EnergyTurret;
         d.turretBaseType       = bt;
         d.turretSpecType       = TurretSpecType.None;
@@ -245,7 +212,7 @@ public static class ComponentCatalog
     /// <summary>
     /// Bir temel turretin verilen uzmanlaşmadaki hâli.
     /// EFEKTİF_DPS = TEMEL_DPS × hedefleme_çarpanı ≈ 6 (hepsi)
-    ///   Lazer:   TEMEL=2.0, çarpan=3.0 → 6.0  (damage × burnDuration / fireRate = 12×0.5/3)
+    ///   Lazer:   TEMEL=4.33, çarpan=1.35 → 5.8 (damage × burnDuration / fireRate = 26×0.5/3)
     ///   Gatling: sustained = 10×8/(10×1+3) = 80/13 ≈ 6.15
     ///   Roket:   TEMEL=4.0, çarpan=1.5 → 6.0  (60/15)
     ///   PD:      TEMEL=9.0 — menzil kısıtlı (5.5u), daha yüksek ham DPS hak ediyor
@@ -258,8 +225,13 @@ public static class ComponentCatalog
                 fireRate: 1f,  damage: 8f,  speed: 9f,   life: 3f,   energy: 0.5f, mag: 10, reload: 3f),
             TurretSpecType.PointDefence => Spec(baseDef, spec, specCost: 25,
                 fireRate: 1f,  damage: 9f,  speed: 8f,   life: 0.8f, energy: 1f),
+            // Lazer 12 hasarla 2.0 EFEKTİF DPS veriyordu — diğerlerinin üçte
+            // biri. Gerekçe "ışın hiç ıskalamaz, çarpanı 3.0" idi ama bu çarpan
+            // hiçbir zaman ölçülmemişti; mermili turretler de çoğu hedefi
+            // vuruyor. Isınma hiç ıskalamamanın gerçek değeri ~1.35; hedefi
+            // 4.33 efektif DPS.
             TurretSpecType.Laser        => Spec(baseDef, spec, specCost: 30,
-                fireRate: 3f,  damage: 12f, speed: 14f,  life: 4f,   energy: 3f, burnDuration: 0.5f),
+                fireRate: 3f,  damage: 26f, speed: 14f,  life: 4f,   energy: 3f, burnDuration: 0.5f),
             TurretSpecType.Plasma       => Spec(baseDef, spec, specCost: 40,
                 fireRate: 6f,  damage: 36f, speed: 5f,   life: 4f,   energy: 4f),
             TurretSpecType.HomingRocket => Spec(baseDef, spec, specCost: 35,
@@ -273,7 +245,7 @@ public static class ComponentCatalog
         int mag = 0, float reload = 0f, float burnDuration = 0f)
     {
         var d = New($"{TurretSpecHelper.GetBaseTypeName(baseDef.turretBaseType)} — {TurretSpecHelper.GetSpecName(spec)}",
-                    ComponentType.Turret, 1, baseDef.costResource, baseDef.cost, baseDef.sellValue);
+                    ComponentType.Turret, baseDef.costResource, baseDef.cost, baseDef.sellValue);
         d.statCostBase         = baseDef.statCostBase;
         d.baseEnergyCost       = baseDef.baseEnergyCost;
         d.turretBaseType       = baseDef.turretBaseType;
@@ -291,13 +263,22 @@ public static class ComponentCatalog
         return d;
     }
 
-    // ── Silah zincirleri ──────────────────────────────────────────────────────
-    // Ana silah slotu. Her tip bağımsız Mk1→Mk2→Mk3 zincirine sahip;
-    // oyun başında Lazer Mk1 ücretsiz kurulu gelir.
+    /// <summary>Bir turret taban tipinin uzmanlaşmasız tanımı.</summary>
+    public static ComponentDefinition TurretBaseOf(TurretBaseType bt) => bt switch
+    {
+        TurretBaseType.Energy  => TurretEnergy,
+        TurretBaseType.Missile => TurretMissile,
+        _                      => TurretKinetic,
+    };
 
-    static ComponentDefinition[] _laser, _kinetic, _plasma;
+    // ── Silahlar ──────────────────────────────────────────────────────────────
+    // Ana silah slotu. Her TİP ayrı bir silahtır; tier zinciri yoktur, güç stat
+    // seviyelerinden gelir. Kinetik oyun başında ücretsiz kurulu gelir; diğer
+    // ikisi karakter satın alır — daha güçlü değil, FARKLI.
 
-    public static ComponentDefinition[] WeaponChain(WeaponType type)
+    static ComponentDefinition _laser, _kinetic, _plasma;
+
+    public static ComponentDefinition Weapon(WeaponType type)
     {
         InitWeapons();
         return type switch
@@ -313,30 +294,31 @@ public static class ComponentCatalog
     {
         if (_laser != null) return;
 
-        // Lazer — sürekli ışın: damage=DPS, fireRate kullanılmaz, energy=enerji/saniye
-        var lm3 = Weapon("Lazer Topu Mk3", WeaponType.Laser, 3, ResourceType.EnergyCrystal, 60, 25, null, 60f, 0f, 30f);
-        var lm2 = Weapon("Lazer Topu Mk2", WeaponType.Laser, 2, ResourceType.EnergyCrystal, 35, 15, lm3,  40f, 0f, 20f);
-        var lm1 = Weapon("Lazer Topu Mk1", WeaponType.Laser, 1, ResourceType.EnergyCrystal,  0,  0, lm2,  25f, 0f, 15f);
-        _laser = new[] { lm1, lm2, lm3 };
+        // Kinetik başlangıç silahı: bedava geldiği için kasten en zayıf taban.
+        // dmg=10 @ 1.0s → 10 DPS. Hem hasar hem ateş hızı statı DPS'e çarpımsal
+        // girdiği için stat yatırımını en çok ödüllendiren silah da budur.
+        _kinetic = MakeWeapon("Raylı Top", WeaponType.Kinetic, ResourceType.RawMaterial,
+                              cost: 12, sell: 5, dmg: 10f, rate: 1.00f);
 
-        var km3 = Weapon("Raylı Top Mk3", WeaponType.Kinetic, 3, ResourceType.RawMaterial, 50, 20, null, 18f, 0.40f);
-        var km2 = Weapon("Raylı Top Mk2", WeaponType.Kinetic, 2, ResourceType.RawMaterial, 28, 10, km3,  14f, 0.65f);
-        var km1 = Weapon("Raylı Top Mk1", WeaponType.Kinetic, 1, ResourceType.RawMaterial, 12,  5, km2,  10f, 1.00f);
-        _kinetic = new[] { km1, km2, km3 };
+        // Lazer — sürekli ışın: damage = DPS, fireRate KULLANILMAZ,
+        // energy = enerji/saniye.
+        _laser = MakeWeapon("Lazer Topu", WeaponType.Laser, ResourceType.EnergyCrystal,
+                            cost: 35, sell: 15, dmg: 46f, rate: 0f, energy: 20f);
 
-        // Plazma — şarj + bırak mekaniği: fireRate = atış sonrası bekleme, charge = tam şarj süresi
-        var pm3 = Weapon("Plazma Topu Mk3", WeaponType.Plasma, 3, ResourceType.RawMaterial, 65, 25, null, 45f, 1.0f, 0f, 1.4f, 0);
-        var pm2 = Weapon("Plazma Topu Mk2", WeaponType.Plasma, 2, ResourceType.RawMaterial, 38, 15, pm3,  36f, 1.2f, 0f, 1.7f, 0);
-        var pm1 = Weapon("Plazma Topu Mk1", WeaponType.Plasma, 1, ResourceType.RawMaterial, 20,  8, pm2,  28f, 1.5f, 0f, 2.0f, 0);
-        _plasma = new[] { pm1, pm2, pm3 };
+        // Plazma — şarj + bırak: fireRate = atış sonrası bekleme,
+        // charge = tam şarj süresi.
+        _plasma = MakeWeapon("Plazma Topu", WeaponType.Plasma, ResourceType.RawMaterial,
+                             cost: 38, sell: 15, dmg: 36f, rate: 1.2f, charge: 1.7f, burst: 0);
     }
 
-    static ComponentDefinition Weapon(string name, WeaponType wt, int tier,
-        ResourceType res, int cost, int sell, ComponentDefinition next,
-        float dmg = 10f, float rate = 0.15f, float energy = 0f,
-        float charge = 0.8f, int burst = 3)
+    static ComponentDefinition MakeWeapon(string name, WeaponType wt, ResourceType res,
+        int cost, int sell, float dmg, float rate,
+        float energy = 0f, float charge = 0.8f, int burst = 3)
     {
-        var d = New(name, ComponentType.Weapon, tier, res, cost, sell);
+        var d = New(name, ComponentType.Weapon, res, cost, sell);
+        // Silah statı gemi DPS'inin ana ekseni; tabanı komponentin kendi
+        // fiyatından DEĞİL sabit bir değerden alır — yoksa bedava kinetik
+        // sonsuza dek en ucuz yükseltme olurdu.
         d.statCostBase            = WeaponStatBase(wt);
         d.baseEnergyCost          = 0f;   // ana silah atış başına enerji yer, pasif değil
         d.weaponType              = wt;
@@ -345,17 +327,15 @@ public static class ComponentCatalog
         d.weaponEnergyCostPerShot = energy;
         d.weaponChargeTime        = charge;
         d.weaponBurstCount        = burst;
-        d.upgradeTo               = next;
         return d;
     }
 
-    /// <summary>Silah stat maliyetinin dayandığı taban — zincirin Mk3 fiyatı.</summary>
     static int WeaponStatBase(WeaponType wt) => wt switch
     {
-        WeaponType.Laser   => 60,
-        WeaponType.Kinetic => 50,
-        WeaponType.Plasma  => 65,
-        _                  => 50,
+        WeaponType.Laser   => 55,
+        WeaponType.Kinetic => 45,
+        WeaponType.Plasma  => 60,
+        _                  => 45,
     };
 
     const float EnergyTurret = 1f;
@@ -364,54 +344,43 @@ public static class ComponentCatalog
 
     /// <summary>
     /// Kaydedilmiş bir komponenti tanımına geri çevirir. Tanımlar runtime'da
-    /// üretildiği için referansları kaydetmek mümkün değil; tip + tier + (turret
-    /// ise) uzmanlaşma üzerinden yeniden bulunur.
+    /// üretildiği için referansları kaydetmek mümkün değil; tip + (turret ise)
+    /// uzmanlaşma + (silah ise) silah tipi üzerinden yeniden bulunur.
     /// </summary>
-    public static ComponentDefinition Resolve(ComponentType type, int tier,
+    public static ComponentDefinition Resolve(ComponentType type,
                                               TurretBaseType turretBase, TurretSpecType spec,
                                               WeaponType weapon)
     {
         switch (type)
         {
-            case ComponentType.Shield:     return Pick(ShieldChain,    tier);
-            case ComponentType.Generator:  return Pick(GeneratorChain, tier);
-            case ComponentType.RepairUnit: return Pick(RepairChain,    tier);
-            case ComponentType.Storage:    return Pick(StorageChain,   tier);
+            case ComponentType.Shield:     return Shield;
+            case ComponentType.Generator:  return Generator;
+            case ComponentType.RepairUnit: return Repair;
+            case ComponentType.Storage:    return Storage;
             case ComponentType.Hangar:     return Hangar;
-            case ComponentType.Weapon:     return Pick(WeaponChain(weapon), tier);
+            case ComponentType.Weapon:     return Weapon(weapon);
 
             case ComponentType.Turret:
             {
-                var baseDef = turretBase switch
-                {
-                    TurretBaseType.Energy  => TurretEnergy,
-                    TurretBaseType.Missile => TurretMissile,
-                    _                      => TurretKinetic,
-                };
+                var baseDef = TurretBaseOf(turretBase);
                 return spec == TurretSpecType.None ? baseDef : TurretSpec(baseDef, spec);
             }
         }
         return null;
     }
 
-    static ComponentDefinition Pick(ComponentDefinition[] chain, int tier)
-    {
-        if (chain == null || chain.Length == 0) return null;
-        return chain[Mathf.Clamp(tier - 1, 0, chain.Length - 1)];
-    }
-
     // ── Ortak kurucu ──────────────────────────────────────────────────────────
 
-    static ComponentDefinition New(string name, ComponentType type, int tier,
+    static ComponentDefinition New(string name, ComponentType type,
                                    ResourceType res, int cost, int sell)
     {
         var d = ScriptableObject.CreateInstance<ComponentDefinition>();
         d.componentName = name;
         d.componentType = type;
-        d.tier          = tier;
         d.costResource  = res;
         d.cost          = cost;
         d.sellValue     = sell;
+        d.statCostBase  = StatBase(cost);
         return d;
     }
 }

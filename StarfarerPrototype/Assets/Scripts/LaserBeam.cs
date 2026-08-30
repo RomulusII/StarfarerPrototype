@@ -26,9 +26,38 @@ public class LaserBeam : MonoBehaviour
     public bool       continuous      = false; // true → süre sınırı yok, dışarıdan kapatılır
     public bool       hitsPlayer      = false; // true → düşman lazeri, player'a hasar verir
 
+    /// <summary>
+    /// Sürekli ışının hasar uygulama aralığı (saniye) — yani ışının "atışı".
+    ///
+    /// Zırh eşiği atış başına sabit hasar düşürür (bkz. BalanceConfig.ApplyArmor).
+    /// Hasar her KAREDE uygulandığında tek seferlik miktar dps/60 oluyordu:
+    /// 46 DPS'lik bir ışın için 0.77 hasar, zırhı 6 olan bir hedefte %10'a
+    /// kırpılıyordu — ışın gücünün %90'ını zırha kaptırıyordu. Daha kötüsü sonuç
+    /// KARE HIZINA bağlıydı: 120 fps'te oyuncu yarı hasar veriyordu.
+    ///
+    /// 0.25 sn'lik tik ışını "saniyede 4 atış yapan bir silah" yapar; atış
+    /// başına ~11 hasar, yani kinetik bir mermiyle aynı mertebede.
+    /// </summary>
+    const float ContinuousTick = 0.25f;
+
+    /// <summary>
+    /// Bu ışın için bir "atış" ne kadar sürer?
+    ///
+    /// Patlama modunda (turret lazeri, düşman lazeri) yanmanın TAMAMI tek bir
+    /// atıştır — tetiğe bir kez basılmıştır. Turret lazeri böylece 0.5 sn'lik
+    /// yanmasını 13 hasarlık tek vuruş olarak indirir; kinetik turretin 12
+    /// hasarlık mermisiyle aynı ligde ve zırha karşı aynı muameleyi görür.
+    /// Bölünseydi zırh aynı yanmadan üç kez pay alırdı.
+    /// </summary>
+    float TickInterval => continuous ? ContinuousTick : Mathf.Max(burnDuration, 0.05f);
+
+    float        _tickTimer;
+    float        _pendingDamage;
     float        _remaining;
     Collider2D   _target;
     PlayerShip   _targetPlayer;
+    FighterShip  _targetFighter;
+    CollectorShip _targetCollector;
     Vector3      _endPoint;
     LineRenderer _line;
     Vector2      _hitNormal;
@@ -39,8 +68,6 @@ public class LaserBeam : MonoBehaviour
     public void Init()
     {
         _remaining = burnDuration;
-        if (hitsPlayer)
-            _targetPlayer = FindFirstObjectByType<PlayerShip>();
         UpdateRaycast();
         BuildVisual();
     }
@@ -54,7 +81,7 @@ public class LaserBeam : MonoBehaviour
         if (!continuous)
         {
             _remaining -= Time.deltaTime;
-            if (_remaining <= 0f) { Destroy(gameObject); return; }
+            if (_remaining <= 0f) { Flush(); Destroy(gameObject); return; }
         }
 
         // Enerji tüketimi (0 ise EnergyBus'a dokunmaz)
@@ -62,6 +89,7 @@ public class LaserBeam : MonoBehaviour
         {
             if (!EnergyBus.Instance.RequestEnergy(energyPerSecond * Time.deltaTime))
             {
+                Flush();
                 Destroy(gameObject);
                 return;
             }
@@ -75,7 +103,7 @@ public class LaserBeam : MonoBehaviour
 
         UpdateRaycast();
         UpdateVisual();
-        ApplyDamage(damage * dmgMulti * Time.deltaTime);
+        AccumulateDamage(damage * dmgMulti * Time.deltaTime);
         UpdateSparks();
     }
 
@@ -89,9 +117,15 @@ public class LaserBeam : MonoBehaviour
         var hits = Physics2D.RaycastAll(origin, direction, maxRange);
         System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
-        _target       = null;
-        _targetPlayer = hitsPlayer ? _targetPlayer : null;
-        _endPoint     = transform.position + (Vector3)(direction * maxRange);
+        // Işın her karede yeniden atılır; hedefler de her karede SIFIRLANIR.
+        // Düşman lazerinde _targetPlayer korunuyordu ve Init() zaten sahnedeki
+        // gemiyi yazıyordu: ışın nereye bakarsa baksın, hatta hiçbir şeye
+        // değmese bile, oyuncu hasar alıyordu.
+        _target          = null;
+        _targetPlayer    = null;
+        _targetFighter   = null;
+        _targetCollector = null;
+        _endPoint        = transform.position + (Vector3)(direction * maxRange);
 
         foreach (var hit in hits)
         {
@@ -99,11 +133,18 @@ public class LaserBeam : MonoBehaviour
 
             if (hitsPlayer)
             {
-                if (c.GetComponent<PlayerShip>() != null)
+                // Düşman ışını oyuncu tarafında ne bulursa onu yakar —
+                // savaşçılar ve toplayıcılar dahil.
+                var ship      = c.GetComponent<PlayerShip>();
+                var fighter   = c.GetComponent<FighterShip>();
+                var collector = c.GetComponent<CollectorShip>();
+                if (ship != null || fighter != null || collector != null)
                 {
-                    _targetPlayer = c.GetComponent<PlayerShip>();
-                    _endPoint     = hit.point;
-                    _hitNormal    = hit.normal;
+                    _targetPlayer    = ship;
+                    _targetFighter   = fighter;
+                    _targetCollector = collector;
+                    _endPoint        = hit.point;
+                    _hitNormal       = hit.normal;
                     break;
                 }
             }
@@ -122,12 +163,43 @@ public class LaserBeam : MonoBehaviour
         }
     }
 
-    void ApplyDamage(float amount)
+    /// <summary>
+    /// Hasarı biriktirir ve DamageTick aralıklarında topluca uygular.
+    /// Işın bir şeye değmiyorsa birikim de durur — beklerken şarj olup ilk
+    /// temasta boşalan bir "hasar deposu" olmamalı.
+    /// </summary>
+    void AccumulateDamage(float amount)
     {
+        bool hitting = hitsPlayer
+            ? (_targetPlayer != null || _targetFighter != null || _targetCollector != null)
+            : (_target != null);
+
+        if (!hitting) { _pendingDamage = 0f; _tickTimer = 0f; return; }
+
+        _pendingDamage += amount;
+        _tickTimer     += Time.deltaTime;
+        if (_tickTimer < TickInterval) return;
+
+        _tickTimer = 0f;
+        Flush();
+    }
+
+    void Flush()
+    {
+        if (_pendingDamage <= 0f) return;
+        float amount   = _pendingDamage;
+        _pendingDamage = 0f;
+
         if (hitsPlayer)
+        {
             _targetPlayer?.TakeDamage(amount);
+            _targetFighter?.TakeDamage(amount);
+            _targetCollector?.TakeDamage(amount);
+        }
         else if (_target != null)
+        {
             DamageUtil.TryDamage(_target, amount, weaponType);
+        }
     }
 
     // ── Görsel ────────────────────────────────────────────────────────────────
@@ -164,7 +236,9 @@ public class LaserBeam : MonoBehaviour
 
     void UpdateSparks()
     {
-        bool hitting = hitsPlayer ? (_targetPlayer != null) : (_target != null);
+        bool hitting = hitsPlayer
+            ? (_targetPlayer != null || _targetFighter != null || _targetCollector != null)
+            : (_target != null);
         if (!hitting) return;
 
         _sparkTimer -= Time.deltaTime;
@@ -183,4 +257,7 @@ public class LaserBeam : MonoBehaviour
         if (_line != null && _line.material != null)
             Destroy(_line.material);
     }
+
+    /// <summary>WeaponController ışını dışarıdan kapatırken artığı işletir.</summary>
+    void OnDisable() => Flush();
 }

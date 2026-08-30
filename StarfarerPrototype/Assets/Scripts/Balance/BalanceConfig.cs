@@ -3,11 +3,11 @@ using UnityEngine;
 /// <summary>
 /// Gelir ve zırh eğrilerinin TEK sahibi.
 ///
-/// Kapsam notu: yükseltme eğrisi buraya AİT DEĞİLDİR. Yükseltme sistemi
-/// (tier zincirleri + komponent başına çoklu stat) <see cref="ComponentCatalog"/>
-/// ve <see cref="UpgradeUI"/> içinde kendi kurallarıyla yaşar. Bu dosya yalnızca
-/// oyuncunun ne kadar kaynak KAZANDIĞINI ve düşmanların ne kadar sert olduğunu
-/// belirler.
+/// Kapsam notu: yükseltme SİSTEMİ buraya ait değildir — hangi komponentin hangi
+/// statı var sorusu <see cref="ComponentCatalog"/> ve <see cref="UpgradeUI"/>
+/// içinde yaşar. Burada yalnızca EĞRİLER durur: oyuncunun ne kadar kaynak
+/// kazandığı, bir stat seviyesinin ne kadar güç ve ne kadar para ettiği, ve
+/// düşmanların ne kadar sert olduğu.
 ///
 /// Neden ayrı bir dosya: eskiden gelir tek bir sabitti — düşman ölünce
 /// <c>threatScore × 4</c>. Gelir yalnızca wave bütçesiyle büyüdüğü için 100.
@@ -60,8 +60,20 @@ public class BalanceConfig : ScriptableObject
              "demekti. 1.25'te üstünlük 4.5 → 4.3 arasında düz kalıyor.")]
     public float statStep = 1.25f;
 
-    [Tooltip("Stat seviyesi başına maliyet çarpanı.")]
-    public float statCostGrowth = 2.5f;
+    [Tooltip("Stat seviyesi başına maliyet çarpanı. Tier'lar kaldırılıp tavan 8'den " +
+             "10'a çıkınca 2.5 tutulamazdı: taban 60 ile 10. seviye tek başına " +
+             "230.000 kaynak eder, kampanyanın TOPLAM geliri ise ~45.700. Yani son " +
+             "seviyeler var ama alınamaz olurdu. 1.65'te bir izi sonuna kadar " +
+             "yükseltmek ~9.100 tutuyor (kampanya gelirinin ~%20'si) ve son " +
+             "seviye ~3.600, yani geç bir levelin iki katı gelir. Fayda seviye " +
+             "başına sabit ×1.25 olduğu için maliyet faydadan hâlâ çok daha " +
+             "hızlı büyür — istenen buydu.")]
+    public float statCostGrowth = 1.65f;
+
+    [Tooltip("Zırh (gövde HP) statının maliyet çarpanı. Onarım biriminin diğer " +
+             "izleriyle aynı tabandan başlasaydı, doğrudan hayatta kalma satın " +
+             "alan bir iz olarak açık ara en verimli yükseltme olurdu.")]
+    public float armorStatCostFactor = 3f;
 
     [Tooltip("Satışta iade oranı — kurulum + stat harcamalarının toplamına uygulanır.")]
     public float sellRefundRatio = 0.40f;
@@ -75,14 +87,21 @@ public class BalanceConfig : ScriptableObject
 
     public float StatMultiplier(int level) => Mathf.Pow(statStep, Mathf.Max(0, level));
 
-    public int StatUpgradeCost(int baseCost, int currentLevel)
-        => Mathf.RoundToInt(Mathf.Max(5, baseCost) * Mathf.Pow(statCostGrowth, Mathf.Max(0, currentLevel)));
+    /// <summary>
+    /// Statın kendi maliyet çarpanı. Çoğu iz 1.0'dır; ayrıcalıklı izler (zırh)
+    /// aynı komponentin tabanını paylaşmak yerine burada pahalılaşır.
+    /// </summary>
+    public float StatCostFactor(string key) => key == "armor" ? armorStatCostFactor : 1f;
+
+    public int StatUpgradeCost(int baseCost, int currentLevel, string key = null)
+        => Mathf.RoundToInt(Mathf.Max(5, baseCost) * StatCostFactor(key)
+                            * Mathf.Pow(statCostGrowth, Mathf.Max(0, currentLevel)));
 
     /// <summary>Bir stat izine o seviyeye kadar harcanan toplam.</summary>
-    public int StatTotalSpent(int baseCost, int level)
+    public int StatTotalSpent(int baseCost, int level, string key = null)
     {
         int total = 0;
-        for (int L = 0; L < level; L++) total += StatUpgradeCost(baseCost, L);
+        for (int L = 0; L < level; L++) total += StatUpgradeCost(baseCost, L, key);
         return total;
     }
 

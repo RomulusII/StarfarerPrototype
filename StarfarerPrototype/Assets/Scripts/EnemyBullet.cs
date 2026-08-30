@@ -72,6 +72,9 @@ public class EnemyBullet : MonoBehaviour
             if (toTarget.magnitude < 0.22f)
             {
                 targetComponent.TakeDamage(damage);
+                HitEffect.SpawnImpact(transform.position, toTarget.normalized,
+                                      targetComponent.transform.position,
+                                      ImpactSurface.Component, damage);
                 Destroy(gameObject);
                 return;
             }
@@ -99,6 +102,10 @@ public class EnemyBullet : MonoBehaviour
             if (ship == null) return;
 
             ShieldEffect.Spawn(transform.position, ship.transform.position);
+            // Kalkan küresinin merkezi geminin merkezidir; normal doğrudan
+            // küre yüzeyinin normali olur, kıvılcım kabuktan sekiyormuş gibi çıkar.
+            HitEffect.SpawnImpact(transform.position, _dir, ship.transform.position,
+                                  ImpactSurface.Shield, damage);
             ship.TakeDamage(damage, bypassShields: false);
             _hitHandled = true;
             Destroy(gameObject);
@@ -112,21 +119,36 @@ public class EnemyBullet : MonoBehaviour
 
             // Kalkan aktifse ve bypass yoksa efekt göster
             // (gövde box'u kalkan küresini kaçıran mermiler için de güvence)
-            if (!bypassShields && ShieldGeneratorComponent.AnyShieldActive())
+            bool onShield = !bypassShields && ShieldGeneratorComponent.AnyShieldActive();
+            if (onShield)
                 ShieldEffect.Spawn(transform.position, ship.transform.position);
 
             ship.TakeDamage(damage, bypassShields);
-            Vector2 surfaceNormal = ((Vector2)transform.position - (Vector2)other.transform.position).normalized;
-            HitEffect.SpawnSparks(transform.position, _dir, surfaceNormal);
+            HitEffect.SpawnImpact(transform.position, _dir, ship.transform.position,
+                                  onShield ? ImpactSurface.Shield : ImpactSurface.Hull,
+                                  damage);
             _hitHandled = true;
             Destroy(gameObject);
             return;
         }
 
         var collector = other.GetComponent<CollectorShip>();
-        if (collector != null) { collector.TakeDamage(damage); _hitHandled = true; Destroy(gameObject); return; }
+        if (collector != null) { collector.TakeDamage(damage); HitSmallCraft(other); return; }
 
         var fighter = other.GetComponent<FighterShip>();
-        if (fighter != null) { fighter.TakeDamage(damage); _hitHandled = true; Destroy(gameObject); }
+        if (fighter != null) { fighter.TakeDamage(damage); HitSmallCraft(other); }
+    }
+
+    /// <summary>
+    /// Toplayıcı/savaşçı vuruşunun ortak kuyruğu: kıvılcım, çift-vuruş kilidi,
+    /// mermiyi yok et. Hasar ÇAĞIRANDA kalır — ikisinin ortak bir tipi yok ve
+    /// tek ortak nokta bu üç satır.
+    /// </summary>
+    void HitSmallCraft(Collider2D other)
+    {
+        HitEffect.SpawnImpact(transform.position, _dir, other.transform.position,
+                              ImpactSurface.Hull, damage);
+        _hitHandled = true;
+        Destroy(gameObject);
     }
 }

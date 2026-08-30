@@ -36,6 +36,22 @@ public class PlasmaBeam : MonoBehaviour
     readonly List<Collider2D> _buffer = new();
     readonly HashSet<int>     _hitSet = new();
 
+    // Plazma alan hasarını HER KARE uyguluyor; kıvılcımı da her kare çıkarmak
+    // tek bir bolt için saniyede yüzlerce parçacık demek olurdu. Lazerle aynı
+    // yaklaşım: emisyon sayaçla kısılır.
+    float       _sparkTimer;
+    const float SparkInterval = 0.05f;
+
+    /// <summary>
+    /// Hasar tiki — LaserBeam.DamageTick ile aynı gerekçe: zırh eşiği atış
+    /// başına işlediği için kare başına hasar uygulamak plazmanın gücünü
+    /// kare hızına bağlıyor ve zırha karşı yok ediyordu.
+    /// </summary>
+    const float DamageTick = 0.2f;
+    float       _damageTimer;
+
+    static readonly Color PlasmaSparkColor = new Color(0.55f, 1f, 0.4f);
+
     // ── Başlatma ──────────────────────────────────────────────────────────────
 
     void Awake()
@@ -125,6 +141,13 @@ public class PlasmaBeam : MonoBehaviour
         // ── Alan hasarı (Fading'de de kuyruk geçerken hasar verebilir) ────────
         if (totalEnergy <= 0f) return;
 
+        _sparkTimer  -= Time.deltaTime;
+        _damageTimer += Time.deltaTime;
+        if (_damageTimer < DamageTick) return;
+
+        float tickSeconds = _damageTimer;
+        _damageTimer = 0f;
+
         _hitSet.Clear();
         int count = Physics2D.OverlapBox(
             (Vector2)transform.position,
@@ -145,11 +168,15 @@ public class PlasmaBeam : MonoBehaviour
             int id = col.gameObject.GetInstanceID();
             if (!_hitSet.Add(id)) continue;
 
-            float tickDmg = Mathf.Min(dps * Time.deltaTime, totalEnergy);
+            float tickDmg = Mathf.Min(dps * tickSeconds, totalEnergy);
             if (tickDmg <= 0f) break;
 
             DamageUtil.TryDamage(col, tickDmg, weaponType);
             totalEnergy -= tickDmg;
+
+            if (_sparkTimer <= 0f)
+                HitEffect.SpawnLaserSparks(col.transform.position, _firingDir,
+                                           -(Vector2)_firingDir, PlasmaSparkColor);
 
             if (totalEnergy <= 0f)
             {
@@ -157,5 +184,9 @@ public class PlasmaBeam : MonoBehaviour
                 break;
             }
         }
+
+        // Sayaç döngüden SONRA sıfırlanır: aynı karede birden fazla hedefi
+        // yakan bir bolt hepsinde kıvılcım çıkarsın, yalnızca ilkinde değil.
+        if (_sparkTimer <= 0f) _sparkTimer = SparkInterval;
     }
 }

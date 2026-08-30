@@ -108,11 +108,19 @@ public class TurretBullet : MonoBehaviour
         if (bomb != null)
         {
             bomb.TakeDamage(damage);
+            // Bomba tek vuruşta gider: Point Defence'in işini yaptığı görünsün
+            HitEffect.SpawnImpact(transform.position, _dir, other.transform.position,
+                                  ImpactSurface.Hull, damage, lethal: true);
             Destroy(gameObject);
             return;
         }
 
         if (DamageUtil.TryDamage(other, damage, weaponType))
+        {
+            bool lethal = other.GetComponent<HealthBar>()?.currentHealth <= 0f;
+            HitEffect.SpawnImpact(transform.position, _dir, other.transform.position,
+                                  DamageUtil.SurfaceOf(other), damage, lethal);
             Destroy(gameObject);
+        }
     }
 }

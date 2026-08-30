@@ -17,7 +17,6 @@ Gemiye yaklaşır, periyodik ateş eder. Mermileri kalkandan hasar verir.
 | HP | 20 |
 | Kalkan | — |
 | Kütle | 1 · Güç: 3 |
-| Temas hasarı | 20 |
 | Silah | Kinetik |
 | Ateş hasarı | 3 |
 | Ateş hızı | 5 sn |
@@ -44,7 +43,6 @@ Gemiye yaklaşır, periyodik ateş eder. Mermileri kalkandan hasar verir.
 | HP | 80 |
 | Kalkan | — |
 | Kütle | 5 · Güç: 7.5 |
-| Temas hasarı | 25 |
 | Silah | Top (Cannon) |
 | Ateş hasarı | 15 |
 | Ateş hızı | 6 sn |
@@ -72,7 +70,6 @@ Gemiye yaklaşır, periyodik ateş eder. Mermileri kalkandan hasar verir.
 | HP | 50 |
 | Kalkan | 40 |
 | Kütle | 3 · Güç: 6 |
-| Temas hasarı | 20 |
 | Silah | Lazer |
 | Ateş hasarı | 6 |
 | Ateş hızı | 3 sn |
@@ -105,7 +102,6 @@ Kalkan çemberini geçer, doğrudan komponentlere saldırır.
 | HP | 10 |
 | Kalkan | — |
 | Kütle | 2 · Güç: 7 |
-| Temas hasarı | 0 |
 | Silah | Komponent patlaması (ComponentBurst) |
 | Ateş hasarı | 2 (komponent başına) |
 | Ateş hızı | 1.8 sn |
@@ -133,7 +129,6 @@ Kalkan çemberini geçer, doğrudan komponentlere saldırır.
 | HP | 35 |
 | Kalkan | — |
 | Kütle | 2 · Güç: 5 |
-| Temas hasarı | 0 |
 | Silah | Bomba (Bomb.cs) |
 | Bomba hasarı | 30 |
 | Ateş hızı | 2.5 sn |

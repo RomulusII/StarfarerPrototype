@@ -36,6 +36,12 @@ public class TurretController : ShipComponentBase
 
     const float PDRange = 5.5f;
 
+    /// <summary>
+    /// Işın turretinin hızlı hedeflere verdiği öncelik. Işın ıskalamaz;
+    /// mermili turretlerin zorlandığı kaçamak hedefler onun işidir.
+    /// </summary>
+    const float LaserSpeedBias = 1.5f;
+
     /// <summary>Merminin ömrü boyunca gidebildiği mesafe — bunun ötesi vurulamaz.</summary>
     public float EffectiveRange => specType == TurretSpecType.PointDefence
         ? PDRange
@@ -143,7 +149,11 @@ public class TurretController : ShipComponentBase
                 _lockedTarget,
                 // Zırh atış BAŞINA işler; turret kendi atış hasarını bildirmezse
                 // zırhlı hedefleri "kolay" sanıp onlara kilitlenir ve mermi harcar.
-                EffectiveShotDamage);
+                EffectiveShotDamage,
+                // Yalnızca LAZER uzmanlaşması anlıktır. Enerji turretinin
+                // uzmanlaşmamış hâli de WeaponType.Laser hasarı verir ama
+                // MERMİ atar — ona hız tercihi tanımak yanlış olurdu.
+                specType == TurretSpecType.Laser ? LaserSpeedBias : 0f);
         }
 
         return _lockedTarget?.TargetTransform;

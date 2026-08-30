@@ -9,6 +9,10 @@ using UnityEngine;
 /// </summary>
 public class PlayerShip : MonoBehaviour
 {
+    [Tooltip("Zırh yükseltmesi olmadan gövde HP'si. maxHullHP bundan TÜRER — " +
+             "doğrudan yazılmaz, yoksa zırh bonusu yeniden hesaplanınca silinir.")]
+    public float baseMaxHullHP = 200f;
+
     public float maxHullHP     = 200f;
     public float currentHullHP;
     public bool  IsAlive       => currentHullHP > 0f;
@@ -21,6 +25,7 @@ public class PlayerShip : MonoBehaviour
 
     void Awake()
     {
+        maxHullHP      = baseMaxHullHP;
         currentHullHP  = maxHullHP;
         _fixedPosition = transform.position;
 
@@ -99,7 +104,7 @@ public class PlayerShip : MonoBehaviour
 
             var visual          = slotGO.AddComponent<SlotVisual>();
             visual.slotIndex    = i;
-            visual.isWeaponSlot = (i == 1);
+            visual.isWeaponSlot = (i == ShipLoadout.WeaponSlotIndex);
         }
 
     }
@@ -118,6 +123,28 @@ public class PlayerShip : MonoBehaviour
             Vector2 size = _bodyRenderer.sprite.bounds.size;
             _healthBar.barWidth   = size.x * 0.55f;
             _healthBar.barOffsetY = size.y * 0.5f + 0.15f;
+        }
+    }
+
+    /// <summary>
+    /// Gövde tavanını değiştirir (onarım biriminin "Zırh" statı çağırır).
+    /// Artan tavan mevcut HP'ye de eklenir: oyuncu zırhı satın aldığı anda
+    /// faydasını görmeli, onarım biriminin yetişmesini beklememeli. Azalan
+    /// tavanda HP kırpılır — zırhlı onarım birimini satmak gerçek bir kayıptır.
+    /// </summary>
+    public void SetMaxHull(float newMax)
+    {
+        newMax = Mathf.Max(1f, newMax);
+        float delta = newMax - maxHullHP;
+        maxHullHP = newMax;
+        currentHullHP = delta > 0f
+            ? currentHullHP + delta
+            : Mathf.Min(currentHullHP, maxHullHP);
+
+        if (_healthBar != null)
+        {
+            _healthBar.maxHealth     = maxHullHP;
+            _healthBar.currentHealth = currentHullHP;
         }
     }
 

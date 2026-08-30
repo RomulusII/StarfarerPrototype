@@ -243,7 +243,7 @@ public class Asteroid : MonoBehaviour, ITurretTarget
             if (shielded == null) return;
 
             ShieldEffect.Spawn(transform.position, shielded.transform.position);
-            HitShip(shielded);
+            HitShip(shielded, ImpactSurface.Shield);
             return;
         }
 
@@ -253,14 +253,22 @@ public class Asteroid : MonoBehaviour, ITurretTarget
         if (ship == null) ship = other.GetComponentInParent<PlayerShip>();
         if (ship == null) return;
 
-        HitShip(ship);
+        HitShip(ship, ImpactSurface.Hull);
     }
 
-    /// <summary>Çarpma: hasar verir ve dağılır — bölünmez, kaynak bırakmaz.</summary>
-    void HitShip(PlayerShip ship)
+    /// <summary>
+    /// Çarpma: hasar verir ve dağılır — bölünmez, kaynak bırakmaz.
+    /// Kaya enkazının yanına bir de çarpma patlaması gelir; asteroit eskiden
+    /// sessizce hasar veriyordu ve oyuncu vurulduğunu ancak bardan anlıyordu.
+    /// </summary>
+    void HitShip(PlayerShip ship, ImpactSurface surface)
     {
         _dead = true;
-        ship.TakeDamage(ImpactDamageFor(size));
+        float dmg = ImpactDamageFor(size);
+        ship.TakeDamage(dmg);
+
+        HitEffect.SpawnImpact(transform.position, Velocity.normalized,
+                              ship.transform.position, surface, dmg);
         DeathEffect.Spawn(transform.position, RockColor, PxFor(size), PxFor(size));
         Destroy(gameObject);
     }

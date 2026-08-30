@@ -26,7 +26,6 @@ public class EnemyTypeData : ScriptableObject
     public float maxShield     = 0f;
     public float mass          = 1f;
     public float enginePower   = 3f;
-    public float contactDamage = 20f;
 
     [Tooltip("Atış başına sabit hasar düşürür: efektif = max(hasar − zırh, hasar × 0.10). " +
              "Level zırhının ÜSTÜNE eklenen tip bonusudur. Bu eşik atış BAŞINA " +
@@ -95,6 +94,38 @@ public class EnemyTypeData : ScriptableObject
     public float           fireRate     = 4f;
     public float           bulletSpeed  = 3f;
 
+    // ── Savaş uçaklarına karşı tutum ──────────────────────────────────────────
+    //
+    // İki AYRI soru, iki ayrı cevap. Eskiden ikisi de örtük olarak "evet"ti:
+    // her düşman en yakın tehdide (oyuncu gemisi VEYA savaşçı) kilitlenip
+    // peşine düşüyordu. Sonuç, bir avuç savaşçının bir Kaleci'yi sahnenin
+    // dışına kadar çekebilmesiydi — ana gemi hiç ateş almıyordu.
+
+    // Bu kütlenin ÜSTÜ savaşçı kovalamaz: ağır gemi, kıvrak bir avcının peşinde
+    // dönerek zaman kaybeder ve ana gemiden uzaklaşır. Asıl hedefinde kalması
+    // hem daha tehditkâr hem daha akıllıdır.
+    public const float FighterChaseMaxMass = 2.5f;
+
+    // Bu çevikliğin ALTI savaşçı kovalamaz — zaten yakalayamaz.
+    public const float FighterChaseMinAgility = 1.0f;
+
+    /// <summary>
+    /// Savaşçıların peşine düşer mi? Hayır ise HAREKET hedefi ana gemide kalır;
+    /// silahı uygunsa yine de menzile giren savaşçıya ateş eder
+    /// (bkz. <see cref="CanEngageFighters"/>).
+    /// </summary>
+    public bool PursuesFighters =>
+        mass <= FighterChaseMaxMass && agility >= FighterChaseMinAgility;
+
+    /// <summary>
+    /// Silahı küçük ve hızlı bir hedefe uygun mu?
+    /// Ağır top (Cannon) yavaş, iri bir mermi atar — savaşçıyı ıskalar ve o
+    /// atış ana gemiye gitmemiş olur. Bomba ve komponent burst'ü ise zaten
+    /// ana gemiye özgü silahlardır; bir avcıya harcanmaları saçmadır.
+    /// </summary>
+    public bool CanEngageFighters =>
+        weaponKind == EnemyWeaponKind.Kinetic || weaponKind == EnemyWeaponKind.Laser;
+
     [Header("Enkaz Kaynağı")]
     [Tooltip("Ölünce bırakılan kaynak tipi. threatScore × 4 metal/kristal düşer.")]
     public ResourceType debrisResourceType = ResourceType.RawMaterial;
@@ -143,7 +174,6 @@ public class EnemyTypeData : ScriptableObject
         d.threatScore   = 1;
         d.maxHP         = 20f;
         d.mass          = 1f;   d.enginePower   = 3f;
-        d.contactDamage = 20f;
         d.bodyWidth     = 60;   d.bodyHeight    = 20;   d.sizeOrder = 8;
         d.bodyColor     = new Color(0.9f, 0.20f, 0.20f);
         d.barrelColor   = new Color(0.7f, 0.15f, 0.15f);
@@ -171,7 +201,6 @@ public class EnemyTypeData : ScriptableObject
         d.threatScore   = 4;
         d.maxHP         = 80f;
         d.mass          = 5f;   d.enginePower   = 7.5f;
-        d.contactDamage = 25f;
         d.bodyWidth     = 80;   d.bodyHeight    = 55;   d.sizeOrder = 3;
         d.bodyColor     = new Color(0.42f, 0.45f, 0.50f);
         d.barrelColor   = new Color(0.40f, 0.40f, 0.45f);
@@ -200,7 +229,6 @@ public class EnemyTypeData : ScriptableObject
         d.threatScore   = 5;
         d.maxHP         = 50f;  d.maxShield     = 40f;
         d.mass          = 3f;   d.enginePower   = 6f;
-        d.contactDamage = 20f;
         d.bodyWidth     = 70;   d.bodyHeight    = 50;   d.sizeOrder = 5;
         d.bodyColor     = new Color(0.25f, 0.35f, 0.85f);
         d.barrelColor   = new Color(0.15f, 0.20f, 0.70f);
@@ -229,7 +257,6 @@ public class EnemyTypeData : ScriptableObject
         d.threatScore   = 10;
         d.maxHP         = 10f;
         d.mass          = 2f;   d.enginePower   = 8f;
-        d.contactDamage = 0f;
         d.bodyWidth     = 44;   d.bodyHeight    = 12;   d.sizeOrder = 6;
         d.bodyColor     = new Color(0.9f, 0.50f, 0.10f);
         d.movementKind  = EnemyMovementKind.AttackRun;
@@ -256,7 +283,6 @@ public class EnemyTypeData : ScriptableObject
         d.threatScore   = 6;
         d.maxHP         = 25f;
         d.mass          = 0.8f; d.enginePower   = 5.5f;
-        d.contactDamage = 18f;
         d.bodyWidth     = 52;   d.bodyHeight    = 18;   d.sizeOrder = 8;
         d.hitboxWidth   = 40;   d.hitboxHeight  = 14;
         d.bodyColor     = new Color(0.95f, 0.75f, 0.20f);
@@ -283,7 +309,6 @@ public class EnemyTypeData : ScriptableObject
         d.maxHP         = 60f;
         d.armor         = 3f;
         d.mass          = 6f;   d.enginePower   = 6f;
-        d.contactDamage = 20f;
         d.bodyWidth     = 86;   d.bodyHeight    = 46;   d.sizeOrder = 3;
         d.hitboxWidth   = 74;   d.hitboxHeight  = 38;
         d.bodyColor     = new Color(0.35f, 0.42f, 0.30f);
@@ -309,7 +334,6 @@ public class EnemyTypeData : ScriptableObject
         d.threatScore   = 11;
         d.maxHP         = 55f;  d.maxShield     = 30f;
         d.mass          = 3.5f; d.enginePower   = 6f;
-        d.contactDamage = 12f;
         d.bodyWidth     = 66;   d.bodyHeight    = 52;   d.sizeOrder = 5;
         d.bodyColor     = new Color(0.55f, 0.25f, 0.75f);
         d.barrelColor   = new Color(0.40f, 0.18f, 0.60f);
@@ -341,7 +365,6 @@ public class EnemyTypeData : ScriptableObject
         d.threatScore   = 10;
         d.maxHP         = 45f;
         d.mass          = 1.6f; d.enginePower   = 5f;
-        d.contactDamage = 16f;
         d.bodyWidth     = 58;   d.bodyHeight    = 30;   d.sizeOrder = 7;
         d.bodyColor     = new Color(0.45f, 0.80f, 0.78f);
         d.barrelColor   = new Color(0.30f, 0.60f, 0.58f);
@@ -368,7 +391,6 @@ public class EnemyTypeData : ScriptableObject
         d.maxHP         = 90f;
         d.armor         = 4f;
         d.mass          = 5f;   d.enginePower   = 6f;
-        d.contactDamage = 15f;
         d.bodyWidth     = 78;   d.bodyHeight    = 58;   d.sizeOrder = 4;
         d.hitboxWidth   = 68;   d.hitboxHeight  = 50;
         d.bodyColor     = new Color(0.25f, 0.70f, 0.40f);
@@ -396,7 +418,6 @@ public class EnemyTypeData : ScriptableObject
         d.threatScore   = 8;
         d.maxHP         = 30f;
         d.mass          = 1.2f; d.enginePower   = 6.5f;
-        d.contactDamage = 0f;
         d.bodyWidth     = 40;   d.bodyHeight    = 22;   d.sizeOrder = 7;
         d.hitboxWidth   = 32;   d.hitboxHeight  = 18;
         d.bodyColor     = new Color(0.60f, 0.85f, 0.25f);
@@ -421,7 +442,6 @@ public class EnemyTypeData : ScriptableObject
         d.threatScore   = 12;
         d.maxHP         = 70f;
         d.mass          = 3f;   d.enginePower   = 5f;
-        d.contactDamage = 20f;
         d.bodyWidth     = 72;   d.bodyHeight    = 54;   d.sizeOrder = 5;
         d.bodyColor     = new Color(0.85f, 0.35f, 0.55f);
         d.barrelColor   = new Color(0.65f, 0.25f, 0.42f);
@@ -449,7 +469,6 @@ public class EnemyTypeData : ScriptableObject
         d.maxHP         = 200f;
         d.armor         = 12f;
         d.mass          = 10f;  d.enginePower   = 9f;
-        d.contactDamage = 35f;
         d.bodyWidth     = 110;  d.bodyHeight    = 72;   d.sizeOrder = 2;
         d.hitboxWidth   = 98;   d.hitboxHeight  = 64;
         d.bodyColor     = new Color(0.30f, 0.32f, 0.36f);
@@ -479,7 +498,6 @@ public class EnemyTypeData : ScriptableObject
         d.threatScore   = 12;
         d.maxHP         = 35f;
         d.mass          = 2f;   d.enginePower   = 5f;
-        d.contactDamage = 0f;
         d.bodyWidth     = 65;   d.bodyHeight    = 45;   d.sizeOrder = 6;
         d.bodyColor     = new Color(0.85f, 0.45f, 0.05f);
         d.barrelColor   = new Color(0.70f, 0.35f, 0.05f);

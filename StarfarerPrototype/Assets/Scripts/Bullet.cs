@@ -35,9 +35,9 @@ public class Bullet : MonoBehaviour
     {
         if (DamageUtil.TryDamage(other, damage, weaponType))
         {
-            bool    lethal        = other.GetComponent<HealthBar>()?.currentHealth <= 0f;
-            Vector2 surfaceNormal = ((Vector2)transform.position - (Vector2)other.transform.position).normalized;
-            HitEffect.SpawnSparks(transform.position, transform.up, surfaceNormal, lethal: lethal);
+            bool lethal = other.GetComponent<HealthBar>()?.currentHealth <= 0f;
+            HitEffect.SpawnImpact(transform.position, transform.up, other.transform.position,
+                                  DamageUtil.SurfaceOf(other), damage, lethal);
             Destroy(gameObject);
         }
     }

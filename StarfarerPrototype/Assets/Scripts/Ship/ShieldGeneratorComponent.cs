@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -7,9 +8,27 @@ using UnityEngine;
 ///   — Gecikme olmadan sürekli şarj olur.
 ///   — Tamamen boşaldığında currentShield = -10; +10'a ulaşınca genişleme animasyonu
 ///     oynar ve bittikten sonra kalkan aktif olur.
-///   — Generator SATILDIĞINDA veya yok edildiğinde mevcut kalkan HP'si
-///     s_orphanShield'e kopyalanır; kalkan bu değerle hasar emmeye devam eder.
-///   — Yeni generator kurulunca orphan HP varsa oradan başlar, yoksa maxShield'den.
+///   — SON generator satıldığında veya yok edildiğinde mevcut kalkan HP'si
+///     s_orphanShield'e taşınır; yansıtılmış kabuk bu değerle hasar emmeye
+///     devam eder. Yeni generator kurulunca oradan başlar.
+///
+/// YETİM HAVUZUN DEĞİŞMEZ KURALI: yalnızca HİÇ generator yokken var olabilir.
+/// Bu kural çiğnendiğinde ortaya çıkan hata büyüktü ve üç ayrı belirti veriyordu:
+///
+///   1. HUD kalkan barı hiç azalmıyor (upgrade ekranı ise azaldığını gösteriyor).
+///      GetTotalShield() yetim havuzu canlı generator'ın üstüne EKLİYOR, oran
+///      1'i aşıp kırpılıyordu. Oysa AbsorbDamageAll önce generator'ı boşaltıyor,
+///      yetim havuza hiç dokunmuyordu.
+///   2. Kalkan bittikten, çöküş animasyonu oynadıktan SONRA bar azalmaya
+///      başlıyor. Çünkü asıl kalkan biteli çoktan olmuş; barın gösterdiği
+///      gizli yetim havuz ancak o noktadan sonra tüketilmeye başlıyor.
+///   3. İkinci bir çöküş animasyonu. Yetim havuz da bitince AbsorbDamageAll
+///      kendi çöküşünü oynatıyor.
+///
+/// İki kaynak vardı: (a) statik alan sahne yeniden yüklendiğinde (ölüm →
+/// restart) SIFIRLANMIYORDU, yani yeni oyun önceki oyunun kalkanıyla
+/// başlıyordu; (b) iki kalkan jeneratöründen biri yok edilince, diğeri
+/// hayattayken yetim havuz açılıyordu.
 /// </summary>
 public class ShieldGeneratorComponent : ShipComponentBase
 {
@@ -27,6 +46,29 @@ public class ShieldGeneratorComponent : ShipComponentBase
     // ── Orphan state: generator yokken kalan kalkan HP'si ─────────────────────
     static float s_orphanShield    = 0f;
     static float s_orphanMaxShield = 0f; // display için son bilinen max
+
+    /// <summary>
+    /// Sahnedeki canlı jeneratörler. Yetim havuzun değişmez kuralını (yalnız
+    /// generator yokken var olur) uygulayabilmek için gerekiyor: OnDestroy
+    /// sırasında FindObjectsByType, ölmekte olan nesneyi sayıp saymayacağı
+    /// belirsiz olduğu için güvenilmez.
+    /// </summary>
+    static readonly List<ShieldGeneratorComponent> s_active = new();
+
+    static bool HasGenerator => s_active.Count > 0;
+
+    /// <summary>
+    /// Statik durumu sıfırlar. Sahne yeniden yüklendiğinde (ölüm → restart)
+    /// static alanlar HAYATTA KALIR — bu çağrı olmadan yeni oyun, önceki oyunun
+    /// kalkan artığıyla başlıyor ve HUD barı ilk andan itibaren yalan söylüyordu.
+    /// ShipLoadout.Awake çağırır.
+    /// </summary>
+    public static void ResetStatics()
+    {
+        s_active.Clear();
+        s_orphanShield    = 0f;
+        s_orphanMaxShield = 0f;
+    }
 
     /// <summary>Kurulum sırasında çağrılır; orphan HP varsa onu tüketir ve başlangıç değeri döner.</summary>
     public static float TakeOrphanShield(float installedMax)
@@ -53,14 +95,10 @@ public class ShieldGeneratorComponent : ShipComponentBase
     // _depleted = true iken kalkan -10'dan +10'a şarj oluyor ama henüz aktif değil
     public bool IsShieldActive => !_depleted && currentShield > 0f && !_reactivating;
 
-    public bool IsShieldFull
-    {
-        get
-        {
-            float effectiveMax = maxShield * GetMultiplier("maxShield");
-            return currentShield >= effectiveMax;
-        }
-    }
+    /// <summary>Stat yükseltmeleri uygulanmış kalkan tavanı — tek doğru kaynak.</summary>
+    public float EffectiveMaxShield => maxShield * GetMultiplier("maxShield");
+
+    public bool IsShieldFull => currentShield >= EffectiveMaxShield;
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
@@ -71,14 +109,30 @@ public class ShieldGeneratorComponent : ShipComponentBase
         // currentShield ShipLoadout.InstallComponent tarafından Awake'den SONRA set edilir
     }
 
+    protected override void OnEnable()
+    {
+        base.OnEnable();
+        if (!s_active.Contains(this)) s_active.Add(this);
+    }
+
+    protected override void OnDisable()
+    {
+        base.OnDisable();
+        s_active.Remove(this);
+    }
+
     void OnDestroy()
     {
-        // Kalkan HP'sini orphan state'e kaydet — generator yokken de koruma sürsün
-        if (currentShield > 0f)
-        {
-            s_orphanShield    = Mathf.Max(s_orphanShield, currentShield); // en yüksek aktif değeri sakla
-            s_orphanMaxShield = maxShield;
-        }
+        s_active.Remove(this);   // OnDisable zaten çıkarmış olmalı; güvence
+
+        // Başka generator hayattaysa yetim havuz AÇILMAZ. Açılsaydı canlı
+        // jeneratörün üstüne binen ikinci, gizli bir havuz oluşurdu: bar
+        // toplamı gösterir, hasar ise yalnızca jeneratörden düşerdi.
+        if (HasGenerator) return;
+        if (currentShield <= 0f) return;
+
+        s_orphanShield    = currentShield;
+        s_orphanMaxShield = EffectiveMaxShield;
     }
 
     void Update()
@@ -91,7 +145,7 @@ public class ShieldGeneratorComponent : ShipComponentBase
         float energyMulti   = BoostController.Mode == BoostMode.Shield ? 5f : 1f;
 
         float effectiveRate = rechargeRate * rechargeMulti * GetMultiplier("rechargeRate");
-        float effectiveMax  = maxShield    * GetMultiplier("maxShield");
+        float effectiveMax  = EffectiveMaxShield;
 
         if (EnergyBus.Instance != null &&
             EnergyBus.Instance.RequestEnergy(rechargeEnergyCost * energyMulti * Time.deltaTime))
@@ -155,48 +209,60 @@ public class ShieldGeneratorComponent : ShipComponentBase
     /// <summary>Hasar emebilir aktif kalkan var mı? (generator veya orphan)</summary>
     public static bool AnyShieldActive()
     {
-        if (s_orphanShield > 0f) return true;
-        foreach (var sg in FindObjectsByType<ShieldGeneratorComponent>(FindObjectsSortMode.None))
-            if (sg.IsShieldActive) return true;
+        if (!HasGenerator) return s_orphanShield > 0f;
+        foreach (var sg in s_active)
+            if (sg != null && sg.IsShieldActive) return true;
         return false;
     }
 
-    /// <summary>Toplam aktif kalkan HP'si (orphan dahil, negatif değerler hariç).</summary>
+    /// <summary>
+    /// Toplam aktif kalkan HP'si. Yetim havuz yalnızca generator YOKKEN sayılır —
+    /// ikisini toplamak, hasarın yalnızca birinden düştüğü gizli bir havuz
+    /// yaratıyordu ve bar donuyordu.
+    /// </summary>
     public static float GetTotalShield()
     {
-        float total = s_orphanShield;
-        foreach (var sg in FindObjectsByType<ShieldGeneratorComponent>(FindObjectsSortMode.None))
-            total += Mathf.Max(0f, sg.currentShield);
+        if (!HasGenerator) return Mathf.Max(0f, s_orphanShield);
+
+        float total = 0f;
+        foreach (var sg in s_active)
+            if (sg != null) total += Mathf.Max(0f, sg.currentShield);
         return total;
     }
 
-    /// <summary>Toplam max kalkan — generator yoksa orphan max kullanılır.</summary>
+    /// <summary>
+    /// Toplam max kalkan — generator yoksa orphan max kullanılır.
+    ///
+    /// Stat çarpanı BURADA da uygulanmak zorundadır. Uygulanmadığı sürece gemi
+    /// üstündeki kalkan barı yalan söylüyordu: currentShield çarpanlı tavana
+    /// (ör. 152) kadar doluyor, bar ise onu çarpansız tabana (50) bölüp oranı
+    /// 1'e kırpıyordu. Sonuç: "Max Kalkan" yükseltmesi almış bir oyuncuda bar,
+    /// kalkan TABANIN altına düşene kadar tam görünüyor — düşman ateş ediyor
+    /// ama kalkan hiç azalmıyormuş gibi. Kalkan aslında hasarı emiyordu.
+    /// </summary>
     public static float GetTotalMaxShield()
     {
-        var gens = FindObjectsByType<ShieldGeneratorComponent>(FindObjectsSortMode.None);
-        if (gens.Length > 0)
-        {
-            float total = 0f;
-            foreach (var sg in gens) total += sg.maxShield;
-            return total;
-        }
-        return s_orphanMaxShield; // generator yokken son bilinen max
+        if (!HasGenerator) return s_orphanMaxShield; // generator yokken son bilinen max
+
+        float total = 0f;
+        foreach (var sg in s_active)
+            if (sg != null) total += sg.EffectiveMaxShield;
+        return total;
     }
 
     /// <summary>Gelen hasarı tüm kalkan kaynaklarına (aktif generatorlar + orphan) dağıtır.</summary>
     public static float AbsorbDamageAll(float incomingDamage)
     {
-        var generators = FindObjectsByType<ShieldGeneratorComponent>(FindObjectsSortMode.None);
         float remaining = incomingDamage;
 
-        foreach (var sg in generators)
+        foreach (var sg in s_active)
         {
             if (remaining <= 0f) break;
-            remaining = sg.AbsorbDamage(remaining);
+            if (sg != null) remaining = sg.AbsorbDamage(remaining);
         }
 
-        // Generator yoksa veya yetersizse orphan kalkanı kullan
-        if (remaining > 0f && s_orphanShield > 0f)
+        // Yetim kabuk yalnızca hiç generator yokken devrededir (bkz. sınıf notu).
+        if (remaining > 0f && !HasGenerator && s_orphanShield > 0f)
         {
             if (s_orphanShield >= remaining)
             {

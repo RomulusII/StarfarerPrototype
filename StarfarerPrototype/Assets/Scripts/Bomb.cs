@@ -65,12 +65,31 @@ public class Bomb : MonoBehaviour, ITurretTarget
     {
         if (other.CompareTag("Player"))
         {
-            other.GetComponent<PlayerShip>()?.TakeDamage(damage);
+            var ship = other.GetComponent<PlayerShip>();
+            if (ship == null) return;
+
+            // Bombanın kendi kalkan küresi dalı yok — kalkanın içinden geçip
+            // gövdede patlar, ama hasarı yine kalkandan geçer (TakeDamage).
+            // Efekt de bunu izlemeli: kalkan ayaktaysa kalkan patlaması.
+            bool onShield = ShieldGeneratorComponent.AnyShieldActive();
+            if (onShield)
+                ShieldEffect.Spawn(transform.position, ship.transform.position);
+
+            ship.TakeDamage(damage);
+            HitEffect.SpawnImpact(transform.position, _dir, ship.transform.position,
+                                  onShield ? ImpactSurface.Shield : ImpactSurface.Hull,
+                                  damage);
             Destroy(gameObject);
             return;
         }
 
         var collector = other.GetComponent<CollectorShip>();
-        if (collector != null) { collector.TakeDamage(damage); Destroy(gameObject); }
+        if (collector != null)
+        {
+            collector.TakeDamage(damage);
+            HitEffect.SpawnImpact(transform.position, _dir, other.transform.position,
+                                  ImpactSurface.Hull, damage);
+            Destroy(gameObject);
+        }
     }
 }

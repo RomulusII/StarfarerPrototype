@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
@@ -14,7 +13,9 @@ public class UpgradeUI : MonoBehaviour
     private Canvas      _canvas;
     private ShipLoadout _loadout;
 
-    int WeaponSlot => _loadout?.GetSlotsByType(ComponentType.Weapon).DefaultIfEmpty(-1).First() ?? -1;
+    // Türetmek yerine sabitten okunur. Türetilmiş hâli kayıttan devam edildiğinde
+    // -1 dönüyordu (bkz. ShipLoadout.WeaponSlotIndex).
+    const int WeaponSlot = ShipLoadout.WeaponSlotIndex;
 
     // Paneller
     private GameObject _generalPanel;
@@ -32,7 +33,7 @@ public class UpgradeUI : MonoBehaviour
     // SlotInfo sol sütun — kurulu bileşen temel bilgisi
     private Text _leftNameText;
     private Text _leftTypeText;
-    private Text _leftTierText;
+    private Text _leftEnergyText;   // eski tier satırı — artık enerji yükü
     private Text _leftCostText;
     private Text _leftUpgradeCostText;
 
@@ -42,7 +43,7 @@ public class UpgradeUI : MonoBehaviour
     // HoverDetail — opsiyon detayı (bileşen hover veya stat açıklaması)
     private Text _rightNameText;
     private Text _rightTypeText;
-    private Text _rightTierText;
+    private Text _rightEnergyText;  // eski tier satırı — artık enerji yükü
     private Text _rightCostText;
     private Text _optionDescText;
 
@@ -121,12 +122,15 @@ public class UpgradeUI : MonoBehaviour
         {
             _selectedStatKey  = null;
             _selectedStatSlot = -1;
-            ClearBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText);
+            ClearBox(_rightNameText, _rightTypeText, _rightEnergyText, _rightCostText);
             if (_optionDescText != null) _optionDescText.text = "";
         }
         _currentSlotIndex = slotIndex;
 
-        bool empty = _loadout == null || _loadout.IsSlotEmpty(slotIndex);
+        // Ana silah slotu asla boş sayılmaz: silah bir ShipComponentBase değil,
+        // ayrı bir listede yaşıyor. IsSlotEmpty ona "boş" diyebilir.
+        bool empty = slotIndex != WeaponSlot &&
+                     (_loadout == null || _loadout.IsSlotEmpty(slotIndex));
         ComponentDefinition installed = empty ? null : _loadout.GetSlotDef(slotIndex);
 
         if (slotIndex == WeaponSlot)
@@ -135,7 +139,7 @@ public class UpgradeUI : MonoBehaviour
             _popupTitle.text = activeDef != null
                 ? $"Slot {WeaponSlot} — {activeDef.componentName}"
                 : $"Slot {WeaponSlot} — Ana Silah";
-            FillBox(_leftNameText, _leftTypeText, _leftTierText, _leftCostText,
+            FillBox(_leftNameText, _leftTypeText, _leftEnergyText, _leftCostText,
                     activeDef ?? installed);
         }
         else
@@ -144,9 +148,9 @@ public class UpgradeUI : MonoBehaviour
                 ? $"Slot {slotIndex} — Boş"
                 : $"Slot {slotIndex} — {installed.componentName}";
             if (installed != null)
-                FillBox(_leftNameText, _leftTypeText, _leftTierText, _leftCostText, installed);
+                FillBox(_leftNameText, _leftTypeText, _leftEnergyText, _leftCostText, installed);
             else
-                ClearBox(_leftNameText, _leftTypeText, _leftTierText, _leftCostText);
+                ClearBox(_leftNameText, _leftTypeText, _leftEnergyText, _leftCostText);
         }
 
         foreach (Transform child in _popupContent.transform)
@@ -171,7 +175,7 @@ public class UpgradeUI : MonoBehaviour
     {
         if (def == null) return;
         if (_optionDescText != null) _optionDescText.text = "";
-        FillBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText, def);
+        FillBox(_rightNameText, _rightTypeText, _rightEnergyText, _rightCostText, def);
 
         bool canAfford = ResourceInventory.Instance != null &&
                          ResourceInventory.Instance.Get(def.costResource) >= def.cost;
@@ -185,7 +189,7 @@ public class UpgradeUI : MonoBehaviour
     public void HideDetail()
     {
         if (!string.IsNullOrEmpty(_selectedStatKey)) return;
-        ClearBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText);
+        ClearBox(_rightNameText, _rightTypeText, _rightEnergyText, _rightCostText);
         if (_optionDescText != null) _optionDescText.text = "";
     }
 
@@ -208,7 +212,7 @@ public class UpgradeUI : MonoBehaviour
     {
         _selectedStatKey  = null;
         _selectedStatSlot = -1;
-        ClearBox(_rightNameText, _rightTypeText, _rightTierText, _rightCostText);
+        ClearBox(_rightNameText, _rightTypeText, _rightEnergyText, _rightCostText);
         if (_optionDescText != null) _optionDescText.text = "";
         UpdateSlotInfoStats();
         UpdateCostDisplay(_currentSlotIndex);
@@ -218,7 +222,7 @@ public class UpgradeUI : MonoBehaviour
     {
         _rightNameText.text = "";
         _rightTypeText.text = "";
-        _rightTierText.text = "";
+        _rightEnergyText.text = "";
         _rightCostText.text = "";
         if (_optionDescText != null)
             _optionDescText.text = GetStatDescription(statKey);
@@ -304,39 +308,10 @@ public class UpgradeUI : MonoBehaviour
 
         var installed = _loadout?.GetSlotComponent(slotIndex);
 
-        MakeTextLabel(_popupContent.transform, $"Tier {def.tier}", 15, TextAnchor.MiddleLeft);
-
         var btnRow = CreateRow(_popupContent.transform);
 
-        if (def.upgradeTo != null)
-        {
-            bool canAfford = ResourceInventory.Instance != null &&
-                             ResourceInventory.Instance.Get(def.upgradeTo.costResource) >=
-                             (def.upgradeTo.cost - def.sellValue);
-
-            // Üst tier daha çok enerji yer; kaynak yetse bile jeneratör yetmeyebilir
-            int   statLv   = installed != null ? installed.HighestStatLevel : 0;
-            float oldDraw  = installed != null ? installed.energyConsumption : 0f;
-            float newDraw  = def.upgradeTo.baseEnergyCost *
-                             BalanceConfig.Instance.EnergyMultiplier(statLv);
-            float eShort   = ShipLoadout.EnergyShortfall(newDraw - oldDraw);
-            bool  hasEnergy = eShort <= 0f;
-
-            var upgradeBtn = AddButton(btnRow.transform, "Upgrade", () => UpgradeAndRefresh(slotIndex), 100f);
-            if (!canAfford || !hasEnergy)
-            {
-                upgradeBtn.interactable = false;
-                upgradeBtn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
-            }
-
-            if (!hasEnergy)
-            {
-                var warn = MakeTextLabel(_popupContent.transform,
-                    $"⚡ Tier yükseltmesi {newDraw - oldDraw:0.#} enerji daha ister — " +
-                    $"{eShort:0.#} eksik.", 18, TextAnchor.MiddleLeft);
-                warn.color = new Color(1f, 0.60f, 0.2f, 1f);
-            }
-        }
+        // Tier zinciri kaldırıldı — "Upgrade" butonu yok. Bir komponenti
+        // güçlendirmenin tek yolu stat seviyeleridir.
 
         // Satışta ne geri döneceği görünür olmalı: stat yatırımı da iadeye dahil
         int refund = ShipLoadout.SellRefund(def, installed);
@@ -366,25 +341,13 @@ public class UpgradeUI : MonoBehaviour
             var degradeRow = CreateRow(_popupContent.transform);
             var capturedSlot = slotIndex;
             var capturedDef  = def;
-            var btn = AddButton(degradeRow.transform,
+            AddButton(degradeRow.transform,
                 $"← Temel Tip (+{refund})",
                 () =>
                 {
-                    var baseDef = GetSpecDef(capturedDef, TurretSpecType.None);
-                    // None spec = base def itself
-                    var bd = ScriptableObject.CreateInstance<ComponentDefinition>();
-                    bd.componentName        = TurretSpecHelper.GetBaseTypeName(capturedDef.turretBaseType);
-                    bd.componentType        = ComponentType.Turret;
-                    bd.costResource         = capturedDef.costResource;
-                    bd.cost                 = capturedDef.cost;
-                    bd.sellValue            = capturedDef.sellValue;
-                    bd.turretBaseType       = capturedDef.turretBaseType;
-                    bd.turretSpecType       = TurretSpecType.None;
-                    bd.turretFireRate       = capturedDef.turretFireRate;
-                    bd.turretDamage         = capturedDef.turretDamage;
-                    bd.turretBulletSpeed    = capturedDef.turretBulletSpeed;
-                    bd.turretBulletLifeTime = capturedDef.turretBulletLifeTime;
-                    bd.turretEnergyPerShot  = capturedDef.turretEnergyPerShot;
+                    // Uzmanlaşmasız hâl katalogda zaten var; burada elle yeniden
+                    // kurulması gerekmiyor (kurulsaydı ikinci bir tanım kaynağı olurdu).
+                    var bd = ComponentCatalog.TurretBaseOf(capturedDef.turretBaseType);
                     if (_loadout.SpecializeTurret(capturedSlot, TurretSpecType.None, bd))
                         OnSlotClicked(capturedSlot);
                 }, 160f);
@@ -437,7 +400,7 @@ public class UpgradeUI : MonoBehaviour
         {
             int curLevel = comp != null && comp.StatLevels.TryGetValue(key, out var lvl) ? lvl : 0;
             bool maxed   = curLevel >= ShipComponentBase.MaxStatLevel;
-            int cost     = maxed ? 0 : StatUpgradeCost(def, curLevel);
+            int cost     = maxed ? 0 : StatUpgradeCost(def, curLevel, key);
             bool canAfford = !maxed && ResourceInventory.Instance != null &&
                              ResourceInventory.Instance.Get(def.costResource) >= cost;
 
@@ -526,11 +489,11 @@ public class UpgradeUI : MonoBehaviour
             MakeTextLabel(_popupContent.transform, typeLabel, 22, TextAnchor.MiddleLeft);
 
             var capturedType = type;
-            foreach (var (key, statLabel) in new[] { ("damage", "Hasar"), ("fireRate", "Ateş Hızı") })
+            foreach (var (key, statLabel) in WeaponStatsFor(type))
             {
                 int curLevel = _loadout.GetWeaponStatLevel(type, key);
                 bool maxed   = curLevel >= ShipComponentBase.MaxStatLevel;
-                int cost     = maxed ? 0 : StatUpgradeCost(curDef, curLevel);
+                int cost     = maxed ? 0 : StatUpgradeCost(curDef, curLevel, key);
                 bool canAfford = !maxed && ResourceInventory.Instance != null &&
                                  ResourceInventory.Instance.Get(curDef.costResource) >= cost;
 
@@ -599,7 +562,7 @@ public class UpgradeUI : MonoBehaviour
         {
             int curLevel = hangar.StatLevels.TryGetValue(key, out var lvl) ? lvl : 0;
             bool maxed   = curLevel >= ShipComponentBase.MaxStatLevel;
-            int cost     = maxed ? 0 : StatUpgradeCost(def, curLevel);
+            int cost     = maxed ? 0 : StatUpgradeCost(def, curLevel, key);
             bool canAfford = !maxed && ResourceInventory.Instance != null &&
                              ResourceInventory.Instance.Get(def.costResource) >= cost;
 
@@ -648,7 +611,7 @@ public class UpgradeUI : MonoBehaviour
     {
         int level  = hangar.GetStatLevel(key);
         bool maxed = level >= ShipComponentBase.MaxStatLevel;
-        int cost   = maxed ? 0 : StatUpgradeCost(def, level);
+        int cost   = maxed ? 0 : StatUpgradeCost(def, level, key);
         bool canAfford = !maxed && ResourceInventory.Instance != null &&
                          ResourceInventory.Instance.Get(def.costResource) >= cost;
 
@@ -693,24 +656,24 @@ public class UpgradeUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Stat fiyatı zincirin SON tier'ına sabitlenmiştir (statCostBase), o anki
-    /// tier'a değil. Eskiden def.cost kullanılıyordu ve "Mk1'deyken statları
-    /// maxla, sonra tier atla" 4× ucuza geliyordu — oyunu optimal oynamak
-    /// tier'ları geciktirmek demekti.
+    /// Stat fiyatı komponentin statCostBase'inden ve STATIN KENDİ çarpanından
+    /// gelir. Anahtarın geçilmesi şart: zırh gibi ayrıcalıklı izler aynı
+    /// komponentin diğer statlarıyla aynı fiyata satılmamalı.
     /// </summary>
-    static int StatUpgradeCost(ComponentDefinition def, int currentLevel)
+    static int StatUpgradeCost(ComponentDefinition def, int currentLevel, string key = null)
     {
         int baseCost = def.statCostBase > 0 ? def.statCostBase : def.cost;
-        return BalanceConfig.Instance.StatUpgradeCost(baseCost, currentLevel);
+        return BalanceConfig.Instance.StatUpgradeCost(baseCost, currentLevel, key);
     }
 
     static (string key, string label)[] GetStatsForType(ComponentType type)
     {
         switch (type)
         {
-            case ComponentType.Generator:  return new[] { ("production", "Üretim") };
+            case ComponentType.Generator:  return new[] { (GeneratorComponent.ProductionKey, "Üretim"), (GeneratorComponent.CapacitorKey, "Kapasitör") };
             case ComponentType.Shield:     return new[] { ("rechargeRate", "Şarj Hızı"), ("maxShield", "Max Kalkan") };
-            case ComponentType.RepairUnit: return new[] { ("repairRate", "Tamir Hızı"), ("energyEfficiency", "Enerji Verimi") };
+            case ComponentType.RepairUnit: return new[] { ("repairRate", "Tamir Hızı"), ("energyEfficiency", "Enerji Verimi"), (RepairUnitComponent.ArmorKey, "Zırh") };
+            case ComponentType.Storage:    return new[] { (StorageComponent.CapacityKey, "Kapasite") };
             case ComponentType.Turret:     return new[] { ("damage", "Hasar"), ("fireRate", "Ateş Hızı") };
             default:                       return null;
         }
@@ -738,6 +701,19 @@ public class UpgradeUI : MonoBehaviour
         OnSlotClicked(WeaponSlot);
     }
 
+    /// <summary>
+    /// Bu silah tipinde satın alınmaya DEĞER statlar.
+    ///
+    /// Lazer sürekli ışındır: WeaponController.UpdateLaser fireRate'i hiç okumaz,
+    /// sol tık basılı olduğu sürece yanar. "Ateş Hızı" satırı yine de listeleniyor
+    /// ve satın alınabiliyordu — oyuncu hiçbir şey yapmayan bir yükseltmeye ödeme
+    /// yapıyordu. Artık listelenmiyor.
+    /// </summary>
+    static (string key, string label)[] WeaponStatsFor(WeaponType type)
+        => type == WeaponType.Laser
+            ? new[] { ("damage", "Hasar") }
+            : new[] { ("damage", "Hasar"), ("fireRate", "Ateş Hızı") };
+
     void BuildWeaponSwitchRows()
     {
         MakeTextLabel(_popupContent.transform, "ANA SİLAH", 24, TextAnchor.MiddleLeft);
@@ -757,12 +733,12 @@ public class UpgradeUI : MonoBehaviour
 
             var row = CreateRow(_popupContent.transform);
 
-            ComponentDefinition curDef  = unlocked ? _loadout.GetWeaponDef(type) : ShipLoadout.GetWeaponChainStart(type);
-            string tierStr = unlocked ? $" Mk{curDef?.tier ?? 1}" : " —";
+            ComponentDefinition curDef = unlocked ? _loadout.GetWeaponDef(type)
+                                                  : ShipLoadout.GetWeaponBase(type);
             var nameGo = new GameObject("WeaponLabel", typeof(RectTransform));
             nameGo.transform.SetParent(row.transform, false);
             var nameTxt = nameGo.AddComponent<Text>();
-            nameTxt.text      = label + tierStr;
+            nameTxt.text      = label;
             nameTxt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             nameTxt.fontSize  = 28;
             nameTxt.color     = unlocked ? Color.white : new Color(0.5f, 0.5f, 0.5f, 1f);
@@ -773,7 +749,7 @@ public class UpgradeUI : MonoBehaviour
 
             if (!unlocked)
             {
-                ComponentDefinition unlockDef = ShipLoadout.GetWeaponChainStart(type);
+                ComponentDefinition unlockDef = ShipLoadout.GetWeaponBase(type);
                 bool canAfford = ResourceInventory.Instance != null && unlockDef != null &&
                                  ResourceInventory.Instance.Get(unlockDef.costResource) >= unlockDef.cost;
                 string costLabel = unlockDef != null ? $"Satın Al\n{unlockDef.cost}" : "Satın Al";
@@ -786,23 +762,11 @@ public class UpgradeUI : MonoBehaviour
             }
             else
             {
+                // Tier yok: bir silah tipi satın alındıktan sonra yalnızca stat
+                // seviyeleriyle güçlenir. Buradaki tek karar hangisini kuşandığın.
                 var selBtn = AddButton(row.transform, "Seç", () => SwitchWeaponAndRefresh(capturedType), 60f);
                 if (isActive)
                     selBtn.GetComponent<Image>().color = new Color(0.10f, 0.55f, 0.20f, 1f);
-
-                if (curDef?.upgradeTo != null)
-                {
-                    int diff = curDef.upgradeTo.cost - curDef.sellValue;
-                    bool canAfford = ResourceInventory.Instance != null &&
-                                     ResourceInventory.Instance.Get(curDef.upgradeTo.costResource) >= diff;
-                    string upLabel = $"↑Mk{curDef.upgradeTo.tier}\n{diff}";
-                    var upBtn = AddButton(row.transform, upLabel, () => UpgradeWeaponTypeAndRefresh(capturedType), 70f);
-                    if (!canAfford)
-                    {
-                        upBtn.interactable = false;
-                        upBtn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
-                    }
-                }
             }
         }
     }
@@ -818,20 +782,6 @@ public class UpgradeUI : MonoBehaviour
     {
         _loadout?.SwitchWeapon(type);
         OnSlotClicked(WeaponSlot);
-    }
-
-    void UpgradeWeaponTypeAndRefresh(WeaponType type)
-    {
-        if (_loadout == null) return;
-        if (_loadout.UpgradeWeaponType(type))
-            OnSlotClicked(WeaponSlot);
-    }
-
-    void UpgradeAndRefresh(int slotIndex)
-    {
-        if (_loadout == null) return;
-        if (_loadout.UpgradeComponent(slotIndex))
-            OnSlotClicked(slotIndex);
     }
 
     void SellAndRefresh(int slotIndex)
@@ -884,7 +834,7 @@ public class UpgradeUI : MonoBehaviour
         if (comp != null)
             foreach (var kvp in comp.StatLevels)
                 for (int i = 0; i < kvp.Value; i++)
-                    total += StatUpgradeCost(def, i);
+                    total += StatUpgradeCost(def, i, kvp.Key);
 
         string resLabel = ResourceLabel(def.costResource);
         _leftCostText.text  = $"{total} {resLabel}";
@@ -897,7 +847,7 @@ public class UpgradeUI : MonoBehaviour
             int curLevel = comp != null && comp.StatLevels.TryGetValue(_selectedStatKey, out var lvl) ? lvl : 0;
             if (curLevel < ShipComponentBase.MaxStatLevel)
             {
-                int upgCost    = StatUpgradeCost(def, curLevel);
+                int upgCost    = StatUpgradeCost(def, curLevel, _selectedStatKey);
                 bool canAfford = ResourceInventory.Instance != null &&
                                  ResourceInventory.Instance.Get(def.costResource) >= upgCost;
                 _leftUpgradeCostText.text  = $"(+{upgCost} {resLabel})";
@@ -917,23 +867,13 @@ public class UpgradeUI : MonoBehaviour
         var curDef = _loadout.GetWeaponDef(type);
         if (curDef == null) return;
 
-        // Zincir boyunca harcanan miktar (Mk1→current)
-        int total = 0;
-        var it  = ShipLoadout.GetWeaponChainStart(type);
-        ComponentDefinition prev = null;
-        while (it != null)
-        {
-            total += prev == null ? it.cost : Mathf.Max(0, it.cost - prev.sellValue);
-            if (it == curDef) break;
-            prev = it;
-            it   = it.upgradeTo;
-        }
-        // Stat upgrade maliyetleri
-        foreach (var key in new[] { "damage", "fireRate" })
+        // Silahın kendi fiyatı + stat upgrade maliyetleri
+        int total = curDef.cost;
+        foreach (var (key, _) in WeaponStatsFor(type))
         {
             int level = _loadout.GetWeaponStatLevel(type, key);
             for (int i = 0; i < level; i++)
-                total += StatUpgradeCost(curDef, i);
+                total += StatUpgradeCost(curDef, i, key);
         }
 
         string resLabel = ResourceLabel(curDef.costResource);
@@ -946,7 +886,7 @@ public class UpgradeUI : MonoBehaviour
             int curLevel = _loadout.GetWeaponStatLevel(type, _selectedStatKey);
             if (curLevel < ShipComponentBase.MaxStatLevel)
             {
-                int upgCost    = StatUpgradeCost(curDef, curLevel);
+                int upgCost    = StatUpgradeCost(curDef, curLevel, _selectedStatKey);
                 bool canAfford = ResourceInventory.Instance != null &&
                                  ResourceInventory.Instance.Get(curDef.costResource) >= upgCost;
                 _leftUpgradeCostText.text  = $"(+{upgCost} {resLabel})";
@@ -1012,14 +952,26 @@ public class UpgradeUI : MonoBehaviour
                 float eng  = ru.energyPerRepair / ru.GetMultiplier("energyEfficiency");
                 sb.AppendLine(DeltaLine("Tamir/sn",  rate, "repairRate",       false));
                 sb.AppendLine(DeltaLine("Enerji/sn", eng,  "energyEfficiency", true));
+
+                var ship = _loadout != null ? _loadout.GetComponent<PlayerShip>() : null;
+                if (ship != null)
+                {
+                    sb.AppendLine(DeltaLine("Zırh (+HP)", ru.HullBonus(ship.baseMaxHullHP),
+                                            RepairUnitComponent.ArmorKey, false));
+                    sb.AppendLine($"Gemi HP: {ship.currentHullHP:0}/{ship.maxHullHP:0}");
+                }
                 break;
             }
             case ComponentType.Generator:
             {
                 var gen = comp as GeneratorComponent;
                 if (gen == null) break;
-                float prod = gen.productionAmount * gen.GetMultiplier("production");
-                sb.AppendLine(DeltaLine("Üretim/sn", prod, "production", false));
+                float prod = gen.productionAmount * gen.GetMultiplier(GeneratorComponent.ProductionKey);
+                sb.AppendLine(DeltaLine("Üretim/sn", prod, GeneratorComponent.ProductionKey, false));
+                sb.AppendLine(DeltaLine("Tampon +", gen.CapacitorBonus,
+                                        GeneratorComponent.CapacitorKey, false));
+                if (EnergyBus.Instance != null)
+                    sb.AppendLine($"Max enerji: {EnergyBus.Instance.maxEnergy:0}");
                 break;
             }
             case ComponentType.Shield:
@@ -1036,8 +988,10 @@ public class UpgradeUI : MonoBehaviour
             {
                 var st = comp as StorageComponent;
                 if (st == null) break;
-                sb.AppendLine($"Metal kapasitesi: +{st.metalCapacity:0}");
-                sb.AppendLine($"Kristal kapasitesi: +{st.crystalCapacity:0}");
+                sb.AppendLine(DeltaLine("Metal kap.",   st.EffMetalCapacity,
+                                        StorageComponent.CapacityKey, false));
+                sb.AppendLine(DeltaLine("Kristal kap.", st.EffCrystalCapacity,
+                                        StorageComponent.CapacityKey, false));
                 break;
             }
             case ComponentType.Hangar:
@@ -1119,12 +1073,29 @@ public class UpgradeUI : MonoBehaviour
                 return $"Ateş hızını artırır.\n{up}\n\n" +
                        "Zırha karşı hasar kadar iyi değildir — daha çok atış, " +
                        "her biri zırhtan aynı cezayı yer." + nrg;
+            case "armor":
+                return $"Ana geminin maksimum gövde HP'sini artırır.\n{up}\n\n" +
+                       "Kalkanın arkasındaki son katman: kalkanı delen her şey " +
+                       "(komponent mermileri, kalkan çökünce gelen her atış) buradan " +
+                       "yer. Bu izi taşıyan her onarım birimi bonusunu EKLER, çarpmaz." +
+                       "\n\nDiğer izlerden pahalıdır — doğrudan hayatta kalma satın alır." + nrg;
+            case "capacity":
+                return $"Deponun kaynak kapasitesini artırır.\n{up}\n\n" +
+                       "Geç seviyelerde tek bir yükseltme binlerce kaynak tutar; " +
+                       "tavan yetmezse o parayı biriktirmek mümkün değildir." + nrg;
             case "repairRate":       return $"Saniyede tamir edilen HP miktarını artırır.\n{up}{nrg}";
             case "energyEfficiency": return $"Tamir için harcanan enerji miktarını azaltır.\n{down}";
             case "production":
                 return $"Saniyede üretilen enerji miktarını artırır.\n{up}\n\n" +
                        "Diğer tüm yükseltmelerin kapısıdır: üretim yetmezse " +
                        "hiçbir komponent seviye alamaz.";
+            case "capacitor":
+                return $"Enerji tamponunu (max enerji) büyütür.\n{up}\n\n" +
+                       "Üretim AKIŞI, kapasitör STOKU belirler. Turretlerin aynı " +
+                       "anda ateşlemesi, plazma şarjı ve kalkan boost'u anlık " +
+                       "olarak üretimin çok üstünde enerji ister — tampon boşsa " +
+                       "o atışlar hiç yapılamaz.\n\nÜretimi yükseltmek bunu da " +
+                       "çözer ama çok daha pahalıya; tampon ucuz ve dar bir cevaptır." + nrg;
             case "rechargeRate":     return $"Kalkan şarj hızını artırır.\n{up}{nrg}";
             case "maxShield":        return $"Maksimum kalkan kapasitesini artırır.\n{up}{nrg}";
             case "productionSpeed":  return $"Toplayıcı/savaşçı üretim hızını artırır.\n{up}{nrg}";
@@ -1267,8 +1238,8 @@ public class UpgradeUI : MonoBehaviour
         _leftNameText = MakeLabel(leftCol.transform, "", 36, FontStyle.Bold);
         _leftTypeText = MakeLabel(leftCol.transform, "", 26, FontStyle.Normal);
         _leftTypeText.color = new Color(0.3f, 0.75f, 0.9f, 1f);
-        _leftTierText = MakeLabel(leftCol.transform, "", 24, FontStyle.Normal);
-        _leftTierText.color = new Color(1f, 0.85f, 0.2f, 1f);
+        _leftEnergyText = MakeLabel(leftCol.transform, "", 24, FontStyle.Normal);
+        _leftEnergyText.color = new Color(1f, 0.85f, 0.2f, 1f);
         _leftCostText = MakeLabel(leftCol.transform, "", 22, FontStyle.Normal);
         _leftCostText.color = new Color(0.3f, 0.9f, 0.45f, 1f);
         _leftUpgradeCostText = MakeLabel(leftCol.transform, "", 22, FontStyle.Normal);
@@ -1326,8 +1297,8 @@ public class UpgradeUI : MonoBehaviour
         _rightNameText = MakeLabel(_hoverDetailPanel.transform, "", 36, FontStyle.Bold);
         _rightTypeText = MakeLabel(_hoverDetailPanel.transform, "", 26, FontStyle.Normal);
         _rightTypeText.color = new Color(0.3f, 0.75f, 0.9f, 1f);
-        _rightTierText = MakeLabel(_hoverDetailPanel.transform, "", 24, FontStyle.Normal);
-        _rightTierText.color = new Color(1f, 0.85f, 0.2f, 1f);
+        _rightEnergyText = MakeLabel(_hoverDetailPanel.transform, "", 24, FontStyle.Normal);
+        _rightEnergyText.color = new Color(1f, 0.85f, 0.2f, 1f);
         _rightCostText = MakeLabel(_hoverDetailPanel.transform, "", 24, FontStyle.Normal);
         _rightCostText.color = new Color(0.3f, 0.9f, 0.45f, 1f);
 
@@ -1395,12 +1366,17 @@ public class UpgradeUI : MonoBehaviour
     // Detail Helpers
     // =========================================================================
 
+    /// <summary>
+    /// Tier satırı kaldırıldı; yeri boş bırakılmak yerine ENERJİ yüküne verildi.
+    /// Enerji her yükseltme kararının gerçek kapısı — kaynak kadar sık bakılan
+    /// sayı o, tier ise artık yok.
+    /// </summary>
     static void FillBox(Text n, Text ty, Text ti, Text c, ComponentDefinition def)
     {
         if (def == null) return;
         n.text  = def.componentName;
         ty.text = TypeLabel(def.componentType);
-        ti.text = $"Tier {def.tier}";
+        ti.text = def.baseEnergyCost > 0f ? $"⚡ {def.baseEnergyCost:0.#}/s (Sv0)" : "";
         // Maliyet UpdateCostDisplay() tarafından ayrıca set edilir
         if (c != null) c.text = "";
     }

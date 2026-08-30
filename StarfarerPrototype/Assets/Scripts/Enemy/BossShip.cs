@@ -309,6 +309,14 @@ public class BossShip : MonoBehaviour, ITurretTarget
 
     // ── ITurretTarget ─────────────────────────────────────────────────────────
 
+    // ── Teşhis / HUD erişimi ──────────────────────────────────────────────────
+
+    public BossShipData Data          => data;
+    public float        CurrentHP     => _hullHP;
+    public float        MaxHP         => _maxHullHP;
+    public float        CurrentShield => _shieldHP;
+    public float        MaxShield     => _maxShieldHP;
+
     public Transform TargetTransform => transform;
     public Vector2   TargetVelocity  => _movement != null ? _movement.Velocity : Vector2.zero;
     public bool      IsValidTarget   => this != null && !_dead && isActiveAndEnabled;
@@ -463,12 +471,6 @@ public class BossShip : MonoBehaviour, ITurretTarget
                 Random.insideUnitCircle.normalized * Random.Range(0.3f, 0.9f),
                 total / pieces, ResourceType.EnergyCrystal);
         }
-    }
-
-    void OnTriggerEnter2D(Collider2D other)
-    {
-        if (data.contactDamage <= 0f) return;
-        other.GetComponent<PlayerShip>()?.TakeDamage(data.contactDamage);
     }
 
     // ── Görsel yardımcılar ────────────────────────────────────────────────────

@@ -57,6 +57,7 @@ public class GameManager : MonoBehaviour
         BuildUpgradeUI();
         BuildBoostHUD();
         BuildSpeedHUD();
+        BuildEnemyInfoHUD();
 
         // Oyun açılış menüsünden başlar; seçim yapılana kadar bölüm sistemi
         // kurulmaz, dolayısıyla arkada düşman spawn olmaz.
@@ -241,6 +242,12 @@ public class GameManager : MonoBehaviour
     {
         var go = new GameObject("BoostHUD");
         go.AddComponent<BoostHUD>();
+    }
+
+    void BuildEnemyInfoHUD()
+    {
+        var go = new GameObject("EnemyInfoHUD");
+        go.AddComponent<EnemyInfoHUD>();
     }
 
     void BuildGameOverUI()

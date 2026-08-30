@@ -32,7 +32,13 @@ public abstract class ShipComponentBase : MonoBehaviour
     // ── Stat upgrade sistemi ──────────────────────────────────────────────────
 
     public readonly Dictionary<string, int> StatLevels = new();
-    public const int MaxStatLevel = 8;
+
+    /// <summary>
+    /// Stat tavanı. Tier zincirleri kaldırılınca 8'den 10'a çıkarıldı — tier'ların
+    /// taşıdığı güç stat eğrisine devredildi. Tavanı 10 tutmak, komponent
+    /// tavanlarını eski Mk3 + Sv8 seviyesinin yakınında bırakır.
+    /// </summary>
+    public const int MaxStatLevel = 10;
 
     /// <summary>
     /// Seviye başına güç çarpanı. Sabit 1.5 idi; BalanceConfig'e taşındı çünkü
@@ -71,7 +77,7 @@ public abstract class ShipComponentBase : MonoBehaviour
 
     public virtual void OnStatUpgraded(string key) { }
 
-    /// <summary>Tüm stat izlerini olduğu gibi kopyalar (tier upgrade'de korunur).</summary>
+    /// <summary>Tüm stat izlerini olduğu gibi kopyalar.</summary>
     public void CopyStatLevelsFrom(ShipComponentBase other)
     {
         if (other == null) return;

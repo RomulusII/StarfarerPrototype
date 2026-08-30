@@ -32,15 +32,19 @@ Incremental Space Shooter with Base Management. Referans: FTL, Into the Breach r
 - **Point defence:** Otomatik kısa menzilli sistemler, küçük hızlı hedeflere karşı
 
 ### Gemi Upgrade Slotları
-Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 5), Otomatik Turretler, İkincil Silahlar (point defence dahil)
+Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 1), Otomatik Turretler, İkincil Silahlar (point defence dahil)
 
-### Ana Silah (Slot 5) — Tasarım Kararları
-- Oyun başında **Lazer Mk1** ücretsiz kurulu gelir
-- Her silah tipi (**Lazer / Kinetik / Plazma**) bağımsız Mk1→Mk2→Mk3 zincirine sahip
-- Tüm tipler aynı anda farklı tier'larda olabilir; switch butonu ile aktif tip seçilir
+### Ana Silah (Slot 1) — Tasarım Kararları
+- Oyun başında **Raylı Top** ücretsiz kurulu gelir (bedava geldiği için kasten en zayıf taban: 10 hasar / 1.0 sn)
+- Üç tip: **Raylı Top** (12 metal) · **Lazer** (35 kristal) · **Plazma** (38 metal)
+- **Tier yoktur.** Tip satın alınır, sonra yalnızca stat seviyeleriyle güçlenir.
+  Tipler birbirinin üstü değil, birbirinden FARKLI: sürekli ışın / atışlı / şarjlı
+- Stat seviyeleri silah tipine bağlıdır ve kalıcıdır — tip değiştirip geri dönmek yatırımı silmez
+- **Lazerde "Ateş Hızı" statı yoktur.** `WeaponController.UpdateLaser` fireRate'i hiç
+  okumaz; satır listeleniyordu ve satın alınabiliyordu, yani oyuncu hiçbir şey
+  yapmayan bir yükseltmeye ödeme yapıyordu
 - Yeni tip satın alınınca `_unlockedWeapons` dict'e eklenir — normal slot mekanizması bypass edilir
-- Upgrade UI'da slot 5 seçilince her tip için ayrı satır: kilitliyse **Satın Al**, açıksa **Seç** + **Upgrade** butonu
-- Upgrade, aktif olmayan tipler için de yapılabilir (bağımsız zincir)
+- Upgrade UI'da slot 1 seçilince her tip için ayrı satır: kilitliyse **Satın Al**, açıksa **Seç**
 
 ### Boost Sistemi — Tasarım Kararları
 - İki boost modu var: **Kalkan Boost** ve **Silah Boost** — birbirini iptal eder, toggle çalışır
@@ -83,6 +87,119 @@ Jammer `EnergyBus.JamFactor` üzerinden üretimi kısar; Phantom faz sırasında
 `IsValidTarget = false` döner (turretler boşa mermi harcamasın); Splitter
 `EnemySpawner.Spawn` ile iki parça üretir; Regenerator aurası 0.25 sn'de bir tarar.
 
+### Savaş Uçaklarına Karşı Tutum — Tasarım Kararları
+
+İki AYRI soru, iki ayrı cevap. Eskiden ikisi de örtük olarak "evet"ti: her düşman
+en yakın tehdide (ana gemi VEYA savaşçı) kilitlenip peşine düşüyordu. Bir avuç
+savaşçı bir Kaleci'yi sahnenin dışına kadar çekebiliyordu — düşman kavis üstüne
+kavis çiziyor, ana gemi hiç ateş almıyordu.
+
+| Soru | Kural | Nerede |
+|---|---|---|
+| **Kovalar mı?** (hareket hedefi) | `mass ≤ 2.5` **ve** `agility ≥ 1.0` | `EnemyTypeData.PursuesFighters` |
+| **Ateş eder mi?** (ateş hedefi) | silah Kinetik veya Lazer | `EnemyTypeData.CanEngageFighters` |
+
+Ağır top (Cannon) yavaş ve iri bir mermi atar: savaşçıyı ıskalar ve o atış ana
+gemiye gitmemiş olur. Bomba ve komponent burst'ü zaten ana gemiye özgü
+silahlardır. Hantal bir lazer gemisi ise dibindeki avcıyı görmezden gelmemeli —
+ama peşinden de gitmemeli.
+
+`EnemyBot` bu yüzden iki ayrı hedef tutar: `_brain`'in hareket hedefi ve
+`_fireTarget`. Namlu ateş hedefine döner. Ateş hedefi taraması 0.25 sn'de bir
+yapılır (en hızlı ateş eden tip 1.4 sn'de bir atıyor, yani hiçbir atışı geciktirmez).
+
+| Tip | Kovalar | Ateş eder | Neden |
+|---|---|---|---|
+| Swarm, Interceptor | ✓ | ✓ | küçük, kıvrak, kinetik |
+| Phantom | ✓ | ✓ | hafif, lazer |
+| Shield, Jammer, Regenerator | — | ✓ | ağır ama lazerli |
+| Splitter | — | ✓ | ağır, kinetik |
+| Armored, Artillery, Juggernaut | — | — | ağır top: hem yakalayamaz hem ıskalar |
+| Bomber, Leech, BombRunner | — | — | zaten komponent/bomba hedefliyor |
+
+### Çarpışma Hasarı — Kaldırıldı
+
+**Düşman gemileri ana gemiye çarptığında hasar VERMEZ; üstünden geçerler.**
+
+Bu bir eksiklik değil, karar. Ana gemi sabit ve kaçamıyor — temas hasarı,
+oyuncunun hiçbir kararının engelleyemeyeceği bir sızıntı olurdu. Tehdit menzilli
+silahlardan gelir; onlara karşı kalkan, turret, Point Defence ve savaşçılar
+gerçek bir cevap üretir.
+
+Mekanizma yazılmıştı ama hiçbir zaman devrede olmamıştı:
+- `EnemyBot.OnTriggerEnter2D` boştu, `_contactDamage` atanıp hiç okunmuyordu.
+- `BossShip` kod yolu vardı ama `BossShipData.contactDamage` **hiçbir boss
+  factory'sinde set edilmiyordu** — yani her boss için ilk satırda `return`.
+
+13 düşman tipinde ve boss verisinde `contactDamage` alanı taşınıyor, ölçekleme
+onu çarpıyor ve düşman bilgi kutusu gösteriyordu; hiçbiri bir şey yapmıyordu.
+Alan tamamen kaldırıldı — yalan söyleyen veri, olmayan veriden kötüdür.
+
+**Asteroitler istisna ve kasten öyle:** onlar VURULABİLİR. Çarpmaları
+engellenebilir bir olay olduğu için hasar vermeleri oyuncuya bir karar sunar —
+"şunu vurayım mı yoksa düşmana mı odaklanayım". Temas hasarı orada duruyor
+(`Asteroid.HitShip`).
+
+### Işınlar ve Zırh — Tasarım Kararları
+
+Zırh eşiği **atış başına** işler. Işınların atışı yoktur; hasarı her KAREDE
+uyguluyorlardı ve bu iki ayrı hataya yol açıyordu:
+
+1. **Kare hızı hasarı değiştiriyordu.** 46 DPS'lik bir ışın 60 fps'te kare
+   başına 0.77 hasar veriyor; zırhı 6 olan hedefte bu %10'a kırpılıyor ve
+   ışın gücünün %90'ını kaybediyordu. 120 fps'te oyuncu **yarı hasar** veriyordu.
+2. **Zırh, ışını orantısız eziyordu.** Lv25'te zırh 2.2; ana lazerin etkin
+   hasarı 46 → **4.6 DPS**'e düşüyordu. Lazer turreti 1.87 → **0.20 DPS**.
+
+Çözüm: ışın hasarı biriktirilir ve sabit aralıklarla **tek bir atış olarak**
+uygulanır. Atışın süresi ışının türünden gelir:
+
+| Işın | Atış = | Atış başına |
+|---|---|---|
+| Ana lazer (sürekli) | 0.25 sn | 11.5 hasar |
+| Lazer turreti (patlama) | yanmanın TAMAMI (0.5 sn) | 13 hasar |
+| Düşman lazeri (patlama) | yanmanın tamamı (1.5 sn) | tipine göre |
+| Plazma ışını | 0.2 sn | dps × 0.2 |
+
+Patlama modunda yanmanın tamamı tek atıştır çünkü tetiğe bir kez basılmıştır;
+bölünseydi zırh aynı yanmadan üç kez pay alırdı. Turret lazeri böylece 13
+hasarlık tek vuruş yapar — kinetik turretin 12 hasarlık mermisiyle aynı ligde.
+
+Ölçülen sonuç (stat yükseltmesi olmadan, ham DPS'e karşı):
+
+| | Lv1 | Lv25 | Lv50 |
+|---|---|---|---|
+| Ana lazer, eski | 45.2 | 4.6 | 4.6 |
+| Ana lazer, yeni | 45.9 | 37.3 | 19.6 |
+| Lazer turreti, eski | 1.87 | 0.20 | 0.20 |
+| Lazer turreti, yeni | 4.33 | 3.61 | 2.13 |
+| *(kıyas)* kinetik turret | 5.99 | — | 2.70 |
+
+Geç levellerde ışının hâlâ zırha kaybetmesi **kasıtlıdır** — tablo yükseltmesiz
+silahı gösteriyor. Hasar statı yükseldikçe atış başına hasar da büyür ve zırhın
+sabit ısırığı oransal olarak küçülür; Sv10 ana lazerde atış başına 107 hasar,
+zırh 20'ye karşı %81'i geçer.
+
+### Lazer Turreti — Hızlı Hedef Tercihi
+
+Işın anlıktır, ıskalamaz. Mermili turretler hızlı ve kaçamak hedefleri sık sık
+ıskalar ama puanlama formülünde isabet oranı yoktu — sonuç, lazer turretinin
+mermili turretlerin zaten rahat vurduğu yavaş ve iri hedeflere kilitlenmesiydi.
+
+`TurretTargeting.Select` artık açık bir `speedBias` alıyor; lazer uzmanlaşması
+**1.5** geçer, diğerleri 0. Hedefin puanı hızıyla birlikte en fazla 2.5 katına
+çıkar (doyma noktası 4 birim/sn — Avcı ~5, Swarm ~3).
+
+Mermili turretlere ceza YAZILMADI: iki taraflı bir model tüm dengeyi kaydırırdı,
+oysa çözülmek istenen tek şey ışının rolünü bulmasıydı. Enerji turretinin
+uzmanlaşmamış hâli de `WeaponType.Laser` hasarı verir ama MERMİ atar — ona hız
+tercihi tanınmadı.
+
+Lazer turretinin hasarı da 12 → **26** çıkarıldı (efektif 2.0 → 4.33 DPS).
+Eski değerin gerekçesi "ışın hiç ıskalamaz, çarpanı 3.0" idi; o çarpan hiçbir
+zaman ölçülmemişti ve mermili turretler de çoğu hedefi vuruyor. Isınma
+1.35 kabul edildi. Ana lazer 40 → 46.
+
 ### Zırh Eşiği — Tasarım Kararları
 
 ```
@@ -117,47 +234,104 @@ adı, statı ve maliyet kaynağı vardı.
 **Katman ayrımı:** `ComponentCatalog` ne var → `ShipLoadout` ne kurulu → `UpgradeUI`
 nasıl gösteriliyor.
 
-**Tek kalkan tipi.** Başlangıçta kurulu gelen kalkan mağazadakinin ta kendisidir (Mk1);
-ayrı bir "başlangıç sürümü" yoktur. İkinci bir kalkan almak yine Mk1 almaktır.
-Enerji sistemi olduğu için kristalle alınır.
+**Tek kalkan tipi.** Başlangıçta kurulu gelen kalkan mağazadakinin ta kendisidir;
+ayrı bir "başlangıç sürümü" yoktur. Enerji sistemi olduğu için kristalle alınır.
 
 **Bedava başlangıç komponentleri normal `sellValue` taşır** — oyuncu bedava geleni
 satıp yerine başka bir şey kurabilsin diye bilinçli. Stratejik esneklik.
 
-| Zincir | Kaynak | Mk1 | Mk2 | Mk3 |
-|---|---|---|---|---|
-| Kalkan Jeneratörü | Kristal | 25 → 50 kalkan, 0.8 şarj | 45 → 100, 1.8 | 70 → 170, 3.0 |
-| Enerji Jeneratörü | Metal | 35 → 10 üretim | 65 → 18 | 110 → 28 |
-| Onarım Birimi | Metal | 30 → 2.0 tamir | 55 → 4.0 | 90 → 7.0 |
-| Depo | Metal | 40 → +250 metal / +50 kristal | 80 → +600/+120 | 150 → +1200/+250 |
+**Tier zinciri yok, her komponentin tek sürümü var.** Değerler eski zincirin ORTA
+halkasından (Mk2) alındı; tier'ların taşıdığı güç stat eğrisine devredildi.
 
-Onarım Mk1 kasten yavaş (eskiden 8.0'dı) — ilk seviyede tamir savaşın gidişatını
-belirlememeli.
+| Komponent | Kaynak | Fiyat | Sv0 | Sv10 (×9.31) | Statlar |
+|---|---|---|---|---|---|
+| Kalkan Jeneratörü | Kristal | 45 | 100 kalkan, 1.8 şarj | 931, 16.8 | Max Kalkan · Şarj Hızı |
+| Enerji Jeneratörü | Metal | 65 | 18 üretim | 168 | Üretim · **Kapasitör** |
+| Onarım Birimi | Metal | 55 | 4.0 tamir | 37 | Tamir Hızı · Enerji Verimi · **Zırh** |
+| Depo | Metal | 110 | +900 metal / +350 kristal | +8.381 / +3.259 | Kapasite |
+| Hangar | Metal | 20 | 1 toplayıcı, 0 savaşçı | — | 7 iz (bkz. HangarComponent) |
+| Raylı / Enerji Turret | Metal | 22 | DPS 6 | DPS 56 | Hasar · Ateş Hızı |
+| Füze Turret | Metal | 28 | DPS 6 | DPS 56 | Hasar · Ateş Hızı |
+
+Eski tavanla karşılaştırma (Mk3 × 1.25⁸ = ×5.96 → Mk2 × 1.25¹⁰ = ×9.31):
+kalkan 1013 → 931, jeneratör 167 → 168, onarım 41.7 → 37.3. Tavan neredeyse
+yerinde kaldı; kaybolan şey tier basamakları oldu.
+
+**Depo kapasitesi zincirin ÜSTÜNDEN alındı**, ortasından değil: tavan en pahalı
+yükseltmeyi tutabilmek ZORUNDA. Sv10 kalkan yükseltmesi 6.164 kristal tutuyor;
+200 tabanlı bir depo maxlansa bile 1.912 tutardı, yani sistem kilitlenirdi —
+para birikir ama tavana çarpıp yanardı. 350 tabanla maxlanmış tek depo 3.259,
+iki depo 6.568 tutar. Depo statı ayrıca kasten ucuzdur: altyapıdır, güç değil.
 
 **Depo komponenti.** Kaynak tavanı artık sabit değil: `ResourceInventory` taban
 kapasiteyi (150 metal / 50 kristal) kurulu depoların toplamıyla topluyor. Yıkılan
 veya deaktif olan depo kapasite vermez — hasar almak biriktirdiğin kaynağı da yakar.
 
-Kapasite kilidi bilinçli: kalkan Mk1→Mk2 (35 kristal) taban tavanla yapılabilir,
-Mk2→Mk3 (52 kristal) için önce depo kurmak gerekir.
+Kapasite kilidi bilinçli ve artık ilerlemenin ana kapılarından biri: ilk birkaç
+stat seviyesi taban tavanla (150 metal / 50 kristal) alınabilir, sonrası için
+önce depo kurmak, sonra deponun kapasitesini yükseltmek gerekir.
+
+**Kapasitör — jeneratörün ikinci izi.** `EnergyBus`ın tamponunu (max enerji)
+büyütür. Üretim AKIŞI, kapasitör STOKU belirler ve ikisi farklı sorunları çözer:
+turretlerin aynı anda ateşlemesi, plazma şarjı ve kalkan boost'u anlık olarak
+üretimin çok üstünde enerji ister — tampon boşsa o atışlar hiç yapılamaz.
+Üretimi yükseltmek bunu da çözer ama çok daha pahalıya; tampon ucuz ve dar bir
+cevaptır. Taban 25, toplamsal: Sv5 +51, Sv10 +208 (taban tampon 50).
+
+**Zırh — onarım biriminin üçüncü izi.** Ana geminin `maxHullHP`'sini yükseltir.
+Onarım birimine bağlanması tematik değil yapısal: gövde bakımı zaten o modülün
+işi ve zırh aynı slotta tamir hızıyla rekabet ediyor — "daha çok HP" ile "HP'yi
+daha hızlı geri kazan" arasında gerçek bir seçim doğuyor. Bonuslar **toplanır**,
+çarpılmaz (`base × (1.25^sv − 1)` her birim için ayrı ayrı): çarpılsaydı ikinci
+onarım birimi birincinin katı kadar değer üretir ve tek doğru oyun "hepsini
+onarım birimiyle doldur" olurdu. Maliyet çarpanı **×3** — doğrudan hayatta kalma
+satın alan bir iz, diğerleriyle aynı tabandan başlamamalı.
 
 ### Yükseltme Sistemi — Tasarım Kararları
 
-**Yapı korundu, sayılar ayarlandı.** Bir oturumda tier zincirleri kaldırılıp
-komponent başına tek stat eksenine geçildi; sistem dengelenmişti ama upgrade
-ekranı ~22 yükseltme kararından 9 tane tek-butonluk "Yükselt"e inmişti. Geri
-alındı: **derinlik dengeye tercih edildi.** Sonra ölçüldü ve o refactor'ın
-gereksiz olduğu görüldü — bir sabit yeterliymiş.
+**TEK EKSEN: stat seviyeleri (0–10).** Tier zincirleri kaldırıldı.
 
-**İki eksen:** tier zinciri (Mk1→Mk3, mağazadan) + komponent başına stat
-seviyeleri (8 seviye). Sayıların sahibi `BalanceConfig`.
+Neden: iki eksen aynı şeyi — güç — iki farklı fiyat eğrisiyle satıyordu ve
+"önce hangisini alayım" sorusunun her zaman tek bir doğru cevabı vardı (tier
+ucuzdu, stat pahalı). Karar gibi görünen ama karar olmayan bir seçim. Daha
+önce bir kez kaldırılıp geri alınmıştı; o seferki gerekçe "upgrade ekranı 9
+tane tek-butonluk Yükselt'e indi" idi. Bu sefer derinlik başka yerden geldi:
+tavan 8'den **10**'a çıktı, onarıma **Zırh**, depoya **Kapasite** izi eklendi.
+Silah tipleri ve turret uzmanlaşmaları zaten duruyor — onlar güç değil
+KARAKTER seçtiriyor, yani tier değiller.
+
+Sayıların sahibi `BalanceConfig`.
 
 | Ayar | Değer | Not |
 |---|---|---|
-| `statStep` | **1.25** | seviye başına güç; eskiden 1.5 idi |
-| `statCostGrowth` | 2.5 | seviye başına maliyet |
+| `MaxStatLevel` | **10** | eskiden 8; tier'ların gücü buraya devredildi |
+| `statStep` | 1.25 | seviye başına güç (sabit) |
+| `statCostGrowth` | **1.65** | seviye başına maliyet; eskiden 2.5 |
+| `armorStatCostFactor` | 3.0 | zırh izinin maliyet çarpanı |
 | `sellRefundRatio` | 0.40 | kurulum + stat harcamasının iadesi |
 | `energyGrowth` | 1.30 | seviye başına enerji tüketimi |
+
+**Neden 2.5 değil 1.65:** 10 seviye ile 2.5 tutulamazdı. Taban 60'la Sv10 tek
+başına **230.000** kaynak eder; kampanyanın TOPLAM geliri ise ~45.700. Son
+seviyeler var ama alınamaz olurdu — tavanı yükseltmenin bütün anlamı kaçardı.
+Fayda seviye başına sabit ×1.25, maliyet ×1.65 olduğu için maliyet faydadan
+hâlâ çok daha hızlı büyür; istenen buydu.
+
+| İz | Taban | Sv1 | Sv5 | Sv10 | Sonuna kadar toplam |
+|---|---|---|---|---|---|
+| Turret hasar/ateş | 33 | 33 | 245 | 2.991 | 7.543 |
+| Silah hasar (raylı) | 45 | 45 | 334 | 4.079 | 10.285 |
+| Kalkan (kristal) | 68 | 68 | 504 | **6.164** | 15.542 |
+| Jeneratör üretim | 98 | 98 | 726 | 8.883 | 22.400 |
+| Onarım → **Zırh** (×3) | 83 | 249 | 1.846 | 22.571 | 56.915 |
+
+Referans: Lv100'de bir levelin geliri ~2.070. Yani son stat seviyesi geç bir
+levelin 1.5–3 katı gelir eder; zırhın sonu kasten ulaşılamaz bir anıt.
+Odaklanmış bir build kampanya boyunca 2–4 izi sonuna kadar götürebilir.
+
+**Kristal en dar kaynak.** Kalkan izi tek kristal harcayan komponent ve Sv10'u
+6.164 tutuyor; kristal geliri ise yalnızca kalkanlı düşmanlardan ve %12'lik
+asteroit şansından geliyor. Ölçülecek ilk şey bu.
 
 **Neden 1.5 değil 1.25:** turret ve ana silahta hasar **ve** ateş hızı ikisi de
 DPS'e çarpımsal giriyor. 1.5 ile Lv5/Lv6 demek `1.5^11 = 86×` demekti; ölçülen
@@ -174,19 +348,15 @@ değerler değil, **eğrinin şekli** güvenilirdir.
 
 **Düzeltilen üç hata:**
 
-- **Stat seviyeleri tier upgrade'de siliniyordu.** `UpgradeComponent` komponenti
-  yok edip yenisini kuruyor, `StatLevels` sıfırlanıyordu — oyuncu binlerce
-  kaynak harcadığı yatırımı Mk2'ye geçerken sessizce kaybediyordu. Artık taşınır.
-- **Mk1'de ucuz stat basma istismarı.** Stat fiyatı o anki tier'ın fiyatından
-  hesaplanıyordu; Mk1'de statları maxlayıp sonra tier atlamak 4× ucuza geliyordu,
-  yani optimal oyun tier'ları geciktirmekti. Fiyat artık zincirin SON tier'ına
-  sabitlenmiştir (`ComponentDefinition.statCostBase`).
-- **UI `Lv x/5` diyordu ama tavan 8'di.** Etiket `MaxStatLevel`'den okunuyor.
+Tier'lar kalkınca iki eski hata da konusuz kaldı: stat seviyelerinin tier
+yükseltmesinde silinmesi ve "Mk1'de statları maxla, sonra tier atla" istismarı.
+`ComponentDefinition.statCostBase` duruyor ama artık zincirin son halkasına
+değil, komponentin kendi fiyatına (×1.5) dayanıyor.
 
-**Satış iadesi stat harcamasını da kapsar.** Eskiden yalnızca tier'ın
-`sellValue`'su dönüyordu: Mk3 kalkana binlerce kristal stat basıp satan oyuncu
-28 kristal alıyordu. Artık `(kurulum + stat harcaması) × 0.40`. Sat butonu
-tutarı gösterir.
+**Satış iadesi stat harcamasını da kapsar.** Eskiden yalnızca `sellValue`
+dönüyordu: kalkana binlerce kristal stat basıp satan oyuncu 18 kristal alıyordu.
+Artık `(kurulum + stat harcaması) × 0.40`, ve stat başına maliyet çarpanı
+(zırhın ×3'ü) iadeye de yansır. Sat butonu tutarı gösterir.
 
 ### Enerji Bütçesi — Tasarım Kararları
 
@@ -205,14 +375,15 @@ bedavadır, en yüksek izi zorlamak enerji ister.
 
 | Aşama | Üretim | Tüketim | Net |
 |---|---|---|---|
-| Başlangıç (Jen Mk1 + Kalkan + Hangar) | 10.0 | 3.5 | +6.5 |
-| +1 turret | 10.0 | 4.5 | +5.5 |
-| Erken orta (Jen Mk2, 3 turret, onarım) | 18.0 | 17.7 | **+0.3** |
-| Geç (Jen Mk3 + üretim Sv6, hepsi Mk3 Sv6) | 106.8 | 68.5 | +38.3 |
+| Başlangıç (Jeneratör + Kalkan + Hangar) | 18.0 | 5.0 | +13.0 |
+| Sv10 jeneratör | 168 | — | — |
+| Sv10 kalkan | — | 48.3 | — |
+| Sv10 turret | — | 13.8 | — |
 
-Erken ortada gerçekten sıkar — jeneratöre yatırım yapmak zorunludur ve o yatırım
-silahtan çıkar. Geç oyunda gevşer; sıkmaya devam etmesi isteniyorsa ayar noktası
-`energyGrowth`. **Test edilecek.**
+Tavanda bir maxlanmış jeneratör kabaca **bir kalkan + iki turret** besler.
+Tier'lar kalktıktan sonra bu tablo yeniden ölçülmedi — başlangıç eskisinden
+rahat (Mk1 yerine Mk2 değerleriyle başlanıyor), tavan ise neredeyse aynı yerde.
+**Test edilecek.**
 
 **Enerji yetersizliği kaynak yetersizliğinden AYRI gösterilir** — ikisi aynı gri
 butonla anlatılsaydı oyuncu jeneratörü suçlamayı akıl edemezdi. Yükseltme satırı
@@ -232,8 +403,11 @@ edilemez.
 - **PlayerPrefs + JsonUtility, tek slot.** Prototip için yeterli; "kayıt slotu
   seçme" akışı oynanışa bir şey katmıyor.
 - **Komponent tanımları runtime'da üretildiği için referansları kaydedilemez.**
-  Tip + tier + (turret ise) uzmanlaşma yazılır, `ComponentCatalog.Resolve` ile
-  geri bulunur.
+  Tip + (turret ise) uzmanlaşma + (silah ise) silah tipi yazılır,
+  `ComponentCatalog.Resolve` ile geri bulunur.
+- **Kayıt formatı v2.** Tier'lar kaldırılınca v1 kayıtları geçersiz oldu ve
+  PlayerPrefs anahtarı da değişti (`starfarer.save.v2`) — göç etmeye çalışmak
+  "Mk3 kalkanım Mk1 oldu" gibi sessiz kayıplar üretirdi.
 - **Kaynaklar slotlar kurulduktan SONRA yazılır** — tavan depo komponentlerine
   bağlı; önce yazılsaydı taban tavana kırpılırdı.
 - **Level seçimi ulaşılmış en yüksek levelle sınırlı** ve bölüm başlarına atlar
@@ -261,6 +435,13 @@ toplar → hangara döner → `ResourceInventory`'ye boşaltır.
   yanıp söner.
 - Toplayıcı, topladığı enkaz sola kayarken onunla birlikte sürüklenir; enkaz
   menzil dışına çıkarsa bırakır — yoksa toplayıcı sahneden dışarı çekilirdi.
+
+**Savaşçılar asteroitleri de vurur.** Hedef seçimi `ITurretTarget` üzerinden
+yapılır ve iki tarama SIRALIDIR: önce menzildeki düşmanlar, hiç yoksa
+asteroitler. Sıralı olması bilinçli — yanı başındaki bir kaya, uzaktaki bir
+düşmandan yakın olsa bile savaşçıyı dövüşten çekmemeli. Asteroit ateş etmez ama
+sürüklenip ana gemiye çarpar, üstelik parçalanınca kaynak bırakır; boş gezen bir
+savaşçının onu görmezden gelmesi için sebep yok.
 
 **Toplayıcı kuralları:**
 - Tip ayrımı yapmaz, ne bulursa toplar. Kargo tip başına ayrı sayılır (`_cargo[]`),
@@ -701,7 +882,9 @@ bırakıldı.
 | EnergyBus.cs | Enerji dağıtım sistemi — üretim/tüketim muhasebesi, Jammer kısar (JamFactor) |
 | ResourceInventory.cs | Ham madde + kristal envanteri |
 | UpgradeUI.cs | Tab ile açılan upgrade ekranı, 4 panel layout |
-| SlotVisual.cs | World-space slot göstergesi, tıklama ile UpgradeUI tetiklenir |
+| SlotVisual.cs | World-space slot göstergesi — dolu slotta halka, boş slotta daire |
+| EnemyInfoHUD.cs | Fare düşman üstündeyken sol üstte açılan bilgi kutusu |
+| HitEffect.cs | Çarpma kıvılcımlarının tek giriş noktası (`SpawnImpact`) + DeathEffect |
 | SkinLibrary.cs | TÜM görsel üretiminin tek giriş noktası — skin varsa sprite, yoksa prosedürel dikdörtgen |
 | SkinSet.cs | Skin'lerin tek sahibi (SO; Resources/SkinSet.asset). Ana aç/kapa anahtarı burada |
 | SkinId.cs | Skin anahtarları. Düşman/boss anahtarları tip adından türer |
@@ -921,6 +1104,147 @@ aksi halde ikonların altında kaybolurlar.
 
 ---
 
+## Kalkan Yetim Havuzu — Düzeltilen Hata
+
+Kalkan jeneratörü satıldığında/yok edildiğinde yansıtılmış kabuk hasar emmeye
+devam etsin diye statik bir "yetim havuz" (`s_orphanShield`) vardı. Havuzun
+değişmez kuralı olmalıydı — **yalnızca hiç jeneratör yokken var olabilir** —
+ama bu kural hiçbir yerde uygulanmıyordu. Üç belirti aynı kökten çıkıyordu:
+
+1. **HUD kalkan barı hiç azalmıyor**, upgrade ekranı ise azaldığını gösteriyor.
+   `GetTotalShield()` yetim havuzu canlı jeneratörün üstüne EKLİYOR, oran 1'i
+   aşıp kırpılıyordu. Oysa `AbsorbDamageAll` önce jeneratörü boşaltıyor,
+   havuza hiç dokunmuyordu.
+2. **Kalkan bitip çöküş animasyonu oynadıktan SONRA bar azalmaya başlıyor.**
+   Asıl kalkan çoktan bitmiş; barın gösterdiği gizli havuz ancak o noktadan
+   sonra tüketilmeye başlıyordu.
+3. **İkinci bir çöküş animasyonu.** Yetim havuz da bitince `AbsorbDamageAll`
+   kendi çöküşünü oynatıyordu.
+
+İki kaynağı vardı:
+- **Statik alan sahne yeniden yüklendiğinde sıfırlanmıyordu.** Ölüm → restart
+  sonrası yeni oyun, önceki oyunun kalkan artığıyla başlıyordu; bar ilk andan
+  itibaren yalan söylüyordu.
+- **İki jeneratörden biri yok edilince**, diğeri hayattayken havuz açılıyordu
+  (Normal/Hard'da komponentler yok edilebiliyor).
+
+Düzeltme: jeneratörler statik bir listede kayıtlı tutuluyor
+(`OnEnable`/`OnDisable`); yetim havuz yalnızca **son** jeneratör ölürken
+açılıyor ve `AnyShieldActive` / `GetTotalShield` / `GetTotalMaxShield` /
+`AbsorbDamageAll` jeneratör varken havuzu hiç saymıyor. `ResetStatics()`
+`ShipLoadout.Awake` ve `ClearAllSlots` tarafından çağrılıyor.
+
+## Çarpma Efektleri — Tasarım Kararları
+
+**Tek giriş noktası: `HitEffect.SpawnImpact`.** Oyundaki her çarpışma oradan
+geçer — ana silah, turret, savaşçı mermisi, düşman ve boss mermisi, komponent
+mermisi, bomba, asteroit çarpması, boss sürtmesi.
+
+Eskiden yalnızca oyuncunun ana kinetik silahı kıvılcım çıkarıyordu. Turret
+mermisi, düşman mermisinin kalkana çarpması, bomba ve asteroit çarpması sessizce
+hasar veriyordu; oyuncu vurulduğunu ancak barın kısalmasından anlıyordu — yani
+en çok geri bildirim gereken an, oyuncunun HASAR ALDIĞI an, en sessiz andı.
+
+**Patlamanın boyutu HASARDAN türer.** Ayrı bir "büyüklük" parametresi olsaydı
+her çağrı noktası kendi tahminini yazardı ve efekt hasarla ilgisini kaybederdi.
+
+    kıvılcım sayısı = clamp(3 + hasar × 0.3, 3, 16)
+    boyut çarpanı   = clamp(0.85 + hasar × 0.012, 0.85, 1.7)
+
+10 hasar = 6 kıvılcım, yani ana silahın bugünkü görüntüsü birebir korunur;
+3 hasarlı Swarm mermisi ile 60 hasarlı roket kendiliğinden farklı görünür.
+
+**Renk ÇARPILANI anlatır, çarpanı değil** (`ImpactSurface`). Oyuncunun bir
+bakışta okuması gereken şey "neye isabet etti" — kendi mermisinin ne olduğunu
+zaten biliyor. Asteroit kalkana çarparsa mavi, gövdeye çarparsa taş rengi kıvılcım.
+
+| Yüzey | Renk | Nerede |
+|---|---|---|
+| `Hull` | sıcak sarı | metal gövde, savaşçı, toplayıcı, düşman |
+| `Shield` | camgöbeği | kalkan kabuğu (hilal efektine ek olarak) |
+| `Rock` | tozlu kahve | asteroit |
+| `Component` | mor | gemi komponenti (komponent mermileri kalkanı bypass eder) |
+
+Collider'dan yüzeye çeviren `DamageUtil.SurfaceOf`, hedef tespitiyle aynı
+dosyada durur: ikisi de "bu collider ne" sorusunun parçası ve ayrı yerlerde
+yaşasalardı biri diğerinden sapardı.
+
+**Kalkan iki katmanlı geri bildirim verir:** `ShieldEffect` hilali (merminin
+açısında, kalkan yüzeyinde) + kıvılcım patlaması. Normal doğrudan kürenin
+normali olduğu için kıvılcım kabuktan sekiyormuş gibi çıkar.
+
+**Işınlar sayaçla kısılır.** Lazer ve plazma her kare hasar uygular; kıvılcımı
+da her kare çıkarmak tek bir atış için saniyede yüzlerce parçacık demek olurdu.
+İkisi de `SpawnLaserSparks`'ı ~0.05 sn aralıkla çağırır.
+
+**Parçacık sprite'ı paylaşılır.** Eskiden her kıvılcım için ayrı bir
+`Sprite.Create` çağrılıyordu — tek çarpışma 6 tane demekti. Artık her mermi
+tipi kıvılcım çıkardığına göre yoğun bir dalgada yüzlerce ayrı Sprite nesnesi
+doğardı. Renk `SpriteRenderer`'dan geldiği için paylaşım güvenli
+(`SkinLibrary`'deki dikdörtgen önbelleğiyle aynı gerekçe).
+
+## Ana Silah Slotu — Düzeltilen Hata
+
+Slot 1'in "ana silah slotu" olduğu ÜÇ ayrı yerde ayrı ayrı ilan ediliyordu:
+`PlayerShip` (`i == 1`), `ShipLoadout.Start` (`slotIndex: 1`) ve `UpgradeUI`
+— sonuncusu bunu `_slotsByType[Weapon]` listesinden TÜRETİYORDU.
+
+Kayıttan devam edildiğinde o liste boş kalıyordu: `SaveSystem.Apply` önce
+`ClearAllSlots()` çağırıyor, sonra slotları geri kuruyor — ama silahlar slot
+olarak kaydedilmiyor (ayrı listede tutuluyorlar). Sonuç: `WeaponSlot = -1`,
+slot 1 **"Boş"** görünüyor, ana silah paneli hiç açılmıyor ve o slota kalkan
+veya turret kurulabiliyordu.
+
+Artık tek gerçek var: `ShipLoadout.WeaponSlotIndex`. Üçü de oradan okuyor,
+`FinishRestore` slot kaydını geri yazıyor ve `InstallComponent` o slota
+silah dışında bir şey kabul etmiyor.
+
+**Slot tıklama alanı da küçültüldü** (yarıçap 0.3 → 0.2). Çizilen halkanın
+yarıçapı 0.2; slot 1 ile slot 4 arası tam 0.6 birim olduğu için 0.3'lük
+daireler kenar kenara değiyor ve aradaki piksellerde hangisinin tıklandığı
+sıralamaya kalıyordu. Gördüğün şey tıkladığın şey olmalı.
+
+## Slot Göstergesi — Tasarım Kararları
+
+Upgrade ekranı açıkken her slotun üstünde bir işaret çizilir (`SlotVisual`,
+sortingOrder 5). Kurulu komponent kendi sprite'ını **zaten aynı noktada**
+çiziyor (`ShipComponentBase.SpawnVisual`, sortingOrder −5).
+
+Eskiden slot göstergesi dolu bir daireydi ve dolu slotlarda opak yeşile
+boyanıyordu: komponent ikonu tamamen kayboluyor, on slot da birbirinin aynı
+yeşil düğmeye dönüyordu. Şeffaflığı artırmak yarım çözümdü — ikon soluk kalıyordu.
+
+Artık iki farklı şekil kullanılıyor:
+
+| Slot | Şekil | Renk |
+|---|---|---|
+| Boş | dolu daire | beyaz, α 0.28 |
+| Dolu | **halka** (ortası tamamen şeffaf) | yeşil, α 0.55 |
+| Ana silah | halka | sarı, α 0.60 |
+
+Halkanın ortası boş olduğu için altındaki komponent sprite'ı hiçbir şey
+kaybetmeden görünür; halka da tıklanabilirliği ve durumu anlatmaya devam eder.
+İki sprite paylaşılır, slot başına doku ayrılmaz.
+
+## Düşman Bilgi Kutusu — Tasarım Kararları
+
+Fare bir düşmanın üstündeyken sol üstte (kaynak şeridinin altında) açılır.
+
+Neden var: düşman tipleri davranışla ayrışıyor (zırh, direnç, faz, aura,
+karıştırma) ama oyuncu ekranda yalnızca bir siluet ve iki bar görüyordu.
+"Bu neden ölmüyor" sorusunun cevabı — zırh mı, direnç mi, aura mı — hiçbir
+yerde yazmıyordu.
+
+Gösterilenler: ad, rol, tehdit puanı · **HP** ve **KALKAN** barları (sayısal
+değerleriyle) · **ZIRH** barı · silah tipi/hasar/ateş hızı · menzil ve çarpma
+hasarı · hareket deseni · gövde ve kalkan dirençleri · savaşçılara karşı tutumu ·
+özel yetenekler (karıştırma, faz, aura, bölünme) ve "ŞU AN VURULAMAZ" uyarısı.
+
+**Enerji barı yok** çünkü düşmanların enerji havuzu yok — o üçüncü satırın
+yerini zırh aldı; bu levelde vurmayı belirleyen sayı odur. Değerler ölçeklenmiş
+runtime kopyasından okunur, yani asset'teki taban değil bu levelde gerçekten
+geçerli olan sayı görünür. Boss ve hardpoint'leri de kutu açar.
+
 ## HealthBar Sistemi
 - SpriteRenderer tabanlı, Canvas kullanılmaz
 - **Kalkan barı:** Mavi, maxShield > 0 ise her zaman görünür
@@ -943,7 +1267,7 @@ aksi halde ikonların altında kaybolurlar.
 - [x] Temel silah, mermi, düşman, spawner, GameManager
 - [x] [Kur] / [Sat] / [Upgrade] butonları — kaynak yetersizse inaktif, maliyet kırmızı
 - [x] ResourceInventory HUD — ham madde + kristal GeneralPanel'de
-- [x] Silah tipleri — Kinetic/Laser/Plasma, her biri bağımsız Mk1→Mk2→Mk3 zinciri
+- [x] Silah tipleri — Kinetic/Laser/Plasma, her biri bağımsız stat izlerine sahip
 - [x] Ana silah switch mekanizması — per-tip Satın Al / Seç / Upgrade, bağımsız upgrade
 - [x] Boost sistemi — Kalkan/Silah boost toggle, BoostHUD, çarpan efektleri
 - [x] Düşman çeşitleri — Swarm/Armored/Shield/Bomber, ateş sistemi, Bomber komponent hedefleme
@@ -959,7 +1283,7 @@ aksi halde ikonların altında kaybolurlar.
 - [x] Kadraj (oran tabanlı) + savaşçılara dogfight sınırı
 - [x] Komponent kataloğu birleştirildi — ComponentCatalog tek sahip, tek kalkan tipi
 - [x] Depo komponenti — kaynak tavanı kurulu depolardan türetiliyor
-- [x] Onarım birimi yavaşlatıldı — Mk1 8.0 → 2.0
+- [x] Onarım birimi yavaşlatıldı — taban 8.0 → 4.0
 - [x] Deterministik kaçamak manevra — iki harmonikli desen + imza kaçışı
 - [x] Spawn mimarisi ayrıştırıldı — tek inşa yolu, AsteroidSpawner, serbest test modu
 - [x] Açılış menüsü — kampanya / serbest mod / zorluk seçimi
@@ -970,7 +1294,7 @@ aksi halde ikonların altında kaybolurlar.
 
 - [x] Otomatik turretler — Gatling/Plazma/Lazer/Roket/Point Defence, slot pozisyonuna kurulur
 - [x] Toplayıcı gemiler + kaynak toplama sistemi — Debris → CollectorShip → ResourceInventory
-- [x] Stat upgrade sistemi — komponent başına çoklu stat, `1.5^seviye`, 8 seviye
+- [x] Stat upgrade sistemi — komponent başına çoklu stat, `1.25^seviye`, 10 seviye
 - [x] Bölüm sistemi — 100 level / 10 bölüm / 10 boss, wave'ler bütçeden üretilir
 - [x] Boss taşıyıcı gemi — 10 boss, `BossShipData.CreateForChapter` formülünden türer
 - [x] Gelir eğrisi — `BalanceConfig`, asteroit farm kaçağı kapandı
@@ -983,6 +1307,23 @@ aksi halde ikonların altında kaybolurlar.
 - [x] Satış iadesi stat harcamasını kapsıyor
 - [x] **Level seçimi** — başlangıç menüsünde, ulaşılmış en yüksek levele kadar
 - [x] **Kayıt/yükleme** — SaveSystem, level sınırlarında kaydeder
+- [x] **Tier zincirleri kaldırıldı** — tek eksen: stat seviyeleri 0–10,
+      `statCostGrowth` 2.5 → 1.65, kayıt v2
+- [x] **Zırh statı** — onarım biriminin üçüncü izi, ana geminin max HP'sini yükseltir
+- [x] **Depo kapasite statı** — kaynak tavanı artık geç seviyeleri tutabiliyor
+- [x] **Düşman bilgi kutusu** — fare düşman üstündeyken sol üstte açılır
+- [x] **Slot göstergesi** — dolu slotlar halka çiziyor, komponent ikonu görünür kalıyor
+- [x] **Savaşçılar asteroitleri de hedefler**
+- [x] **Ağır düşmanlar savaşçı kovalamıyor** — hareket hedefi / ateş hedefi ayrıldı
+- [x] **Çarpma efektleri birleştirildi** — `HitEffect.SpawnImpact` tek giriş noktası;
+      düşman mermisi, bomba, asteroit ve kalkan çarpmaları da kıvılcım çıkarıyor
+- [x] **Çarpışma hasarı kaldırıldı** — hiçbir zaman devrede değildi; `contactDamage`
+      alanı düşman ve boss verisinden tamamen silindi
+- [x] **Ana silah slotu düzeltildi** — kayıttan devam edince slot 1 "boş" görünüyordu
+- [x] **Kalkan yetim havuzu düzeltildi** — bar donması, geç azalma, çift çöküş animasyonu
+- [x] **Kapasitör izi** — jeneratörün ikinci statı, enerji tamponunu büyütür
+- [x] **Işın hasarı kare hızından bağımsızlaştı** — zırh artık atış başına bir kez ısırıyor
+- [x] **Lazer turreti hızlı hedefleri tercih ediyor** ve hasarı 12 → 26
 - [ ] **Denge testleri** — aşağıdaki listeye bak; sayıların hiçbiri oyunda denenmedi
 - [ ] Point defence turretleri — küçük/hızlı hedeflere odaklı otomatik turret
 - [ ] Mobil UI
@@ -1043,6 +1384,13 @@ Sıra kararlaştırıldı: **hitbox ayrımı → denge testleri → skin'ler.**
   - **Yükseltme dengesi.** `statStep = 1.25` ile üstünlük düz kalıyor (4.5 → 4.3)
     ama bu simülasyon; gerçekte oyuncu daha odaklı oynar ve üstünlük artar.
     Hangi bölümde oyun kolaylaşıyor?
+  - **Tier'sız eğri.** Hiçbiri oynanmadı. Bakılacaklar: (a) kristal en dar
+    kaynak — kalkan Sv10 6.164 kristal tutuyor, kristal geliri yetiyor mu?
+    (b) başlangıç eskisinden rahat (Mk1 yerine Mk2 değerleri) — ilk bölümler
+    fazla kolay mı? (c) `statCostGrowth = 1.65` son seviyeleri gerçekten
+    ulaşılabilir mi bırakıyor? (d) zırh izi ×3 çarpanla doğru fiyatta mı?
+  - **Depo baskısı.** Kapasite artık zorunlu bir yatırım. Bu "ilginç bir karar"
+    mı yoksa "her seferinde alınması gereken vergi" mi?
   - **Enerji baskısı.** Erken ortada jeneratöre yatırım zorunluluğu doğru mu
     hissettiriyor, yoksa "hiçbir şey yükseltemiyorum" duvarı mı?
   - **Kayıt akışı.** Ölünce son tamamlanan levele dönmek doğru ceza mı?
@@ -1100,6 +1448,10 @@ Sıra kararlaştırıldı: **hitbox ayrımı → denge testleri → skin'ler.**
 ## Bekleyen Tasarım Kararları
 
 - [ ] Fighter tipi düşman — Bomber'dan nasıl ayrışır? (tasarım netleşmedi)
+- [ ] Savaşçı kovalama eşikleri (`mass ≤ 2.5`, `agility ≥ 1.0`) veriden değil
+      koddan geliyor. Tip başına elle ayar gerekirse `EnemyTypeData`'ya açık
+      bir alan eklenmeli — şimdilik türetilmiş olması 12 tipin hepsinde doğru
+      sonucu veriyor.
 - [ ] Area-effect bombalar — büyük düşman gemilerinden, komponentlere hasar verir mi?
 - [ ] Komponent HP göstergesi — oyuncuya nasıl gösterilecek? (UI tasarımı yok)
 - [ ] Bölüm 9 İkiz Dreadnought: iki boss aynı anda spawn oluyor ama ikisi de aynı

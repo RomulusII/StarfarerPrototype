@@ -2,7 +2,12 @@ using UnityEngine;
 
 /// <summary>
 /// Kaynak deposu. Kurulduğu sürece envanterin tavanını yükseltir.
-/// Upgrade'ler "daha kompakt depolama" — aynı slotta çok daha fazla kapasite.
+/// "Kapasite" statı daha kompakt depolamadır — aynı slotta çok daha fazla yer.
+///
+/// Bu stat opsiyonel değil, ZORUNLU bir eksendir: geç seviyelerde tek bir stat
+/// yükseltmesi binlerce kaynak tutuyor ve taban tavan (150 metal / 50 kristal)
+/// o parayı tutamaz. Tier zincirleri kaldırılınca kapasitenin tek büyüme yolu
+/// bu oldu.
 ///
 /// Yok edilirse (veya Easy modda deaktive olursa) kapasite düşer; envanterdeki
 /// fazlalık yeni tavana kırpılır, yani hasar almak biriktirdiğin kaynağı da yakar.
@@ -11,6 +16,12 @@ public class StorageComponent : ShipComponentBase
 {
     public float metalCapacity   = 250f;
     public float crystalCapacity =  50f;
+
+    /// <summary>Stat anahtarı — UpgradeUI ve kayıt aynı adı kullanır.</summary>
+    public const string CapacityKey = "capacity";
+
+    public float EffMetalCapacity   => metalCapacity   * GetMultiplier(CapacityKey);
+    public float EffCrystalCapacity => crystalCapacity * GetMultiplier(CapacityKey);
 
     // Kapasite toplamı sık okunuyor (her kaynak eklemede + HUD'da her kare).
     // FindObjectsByType'ı her seferinde çalıştırmamak için kısa ömürlü önbellek.
@@ -38,6 +49,13 @@ public class StorageComponent : ShipComponentBase
     /// <summary>Önbelleği düşürür — kurulum, satış ve yıkımda çağrılır.</summary>
     public static void Invalidate() => _cacheTime = -1f;
 
+    /// <summary>Kapasite yükseltmesi önbelleği geçersiz kılar — aksi halde yeni
+    /// tavan çeyrek saniye boyunca görünmez ve oyuncu "işe yaramadı" sanır.</summary>
+    public override void OnStatUpgraded(string key)
+    {
+        if (key == CapacityKey) Invalidate();
+    }
+
     public static float TotalMetalCapacity   { get { Refresh(); return _cachedMetal; } }
     public static float TotalCrystalCapacity { get { Refresh(); return _cachedCrystal; } }
 
@@ -51,8 +69,8 @@ public class StorageComponent : ShipComponentBase
         foreach (var s in FindObjectsByType<StorageComponent>(FindObjectsSortMode.None))
         {
             if (!s.IsOperational) continue;   // yıkık/deaktif depo kapasite vermez
-            _cachedMetal   += s.metalCapacity;
-            _cachedCrystal += s.crystalCapacity;
+            _cachedMetal   += s.EffMetalCapacity;
+            _cachedCrystal += s.EffCrystalCapacity;
         }
 
         _cacheTime = Time.unscaledTime;

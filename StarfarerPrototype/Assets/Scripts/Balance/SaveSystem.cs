@@ -10,14 +10,18 @@ using UnityEngine;
 /// Tek slot vardır; "kayıt slotu seçme" akışı oynanışa bir şey katmıyor.
 ///
 /// Komponent tanımları runtime'da üretildiği için referansları kaydedilemez;
-/// tip + tier + (turret ise) uzmanlaşma yazılır ve
+/// tip + (turret ise) uzmanlaşma + (silah ise) silah tipi yazılır ve
 /// <see cref="ComponentCatalog.Resolve"/> ile geri bulunur.
+///
+/// v2: tier zincirleri kaldırıldı. v1 kayıtları GEÇERSİZDİR ve sessizce yok
+/// sayılır — yarısı artık var olmayan bir tier'a işaret ediyordu, göç etmeye
+/// çalışmak "Mk3 kalkanım Mk1 oldu" gibi sessiz kayıplar üretirdi.
 /// </summary>
 public static class SaveSystem
 {
-    const string Key            = "starfarer.save.v1";
+    const string Key            = "starfarer.save.v2";
     const string MaxLevelKey    = "starfarer.maxLevel";
-    const int    CurrentVersion = 1;
+    const int    CurrentVersion = 2;
 
     // ── Serileştirilen yapı ───────────────────────────────────────────────────
 
@@ -26,7 +30,6 @@ public static class SaveSystem
     {
         public int    slot;
         public int    componentType;
-        public int    tier;
         public int    turretBase;
         public int    turretSpec;
         public int    weaponType;
@@ -38,7 +41,6 @@ public static class SaveSystem
     public class WeaponSave
     {
         public int weaponType;
-        public int tier;
         public int damageLevel;
         public int fireRateLevel;
     }
@@ -131,7 +133,6 @@ public static class SaveSystem
             {
                 slot          = slot,
                 componentType = (int)def.componentType,
-                tier          = def.tier,
                 turretBase    = (int)def.turretBaseType,
                 turretSpec    = (int)def.turretSpecType,
                 weaponType    = (int)def.weaponType,
@@ -146,7 +147,6 @@ public static class SaveSystem
             d.weapons.Add(new WeaponSave
             {
                 weaponType    = (int)wt,
-                tier          = loadout.GetWeaponTier(wt),
                 damageLevel   = loadout.GetWeaponStatLevel(wt, "damage"),
                 fireRateLevel = loadout.GetWeaponStatLevel(wt, "fireRate"),
             });
@@ -194,7 +194,7 @@ public static class SaveSystem
         foreach (var s in d.slots)
         {
             var def = ComponentCatalog.Resolve(
-                (ComponentType)s.componentType, s.tier,
+                (ComponentType)s.componentType,
                 (TurretBaseType)s.turretBase, (TurretSpecType)s.turretSpec,
                 (WeaponType)s.weaponType);
             if (def == null) continue;
@@ -203,7 +203,7 @@ public static class SaveSystem
         }
 
         foreach (var w in d.weapons)
-            loadout.RestoreWeapon((WeaponType)w.weaponType, w.tier, w.damageLevel, w.fireRateLevel);
+            loadout.RestoreWeapon((WeaponType)w.weaponType, w.damageLevel, w.fireRateLevel);
 
         loadout.FinishRestore((WeaponType)d.activeWeapon);
 

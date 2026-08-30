@@ -64,7 +64,6 @@ public class BossShipData : ScriptableObject
     public float maxHP       = 800f;
     public float mass        = 20f;
     public float enginePower = 8f;
-    public float contactDamage = 0f;
 
     [Tooltip("Atış başına sabit hasar düşürür. Geç bölüm boss'larının düşük " +
              "seviye silahları elemesini sağlayan mekanizma — bir bölüm boss'u " +

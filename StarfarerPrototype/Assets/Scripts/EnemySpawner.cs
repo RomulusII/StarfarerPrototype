@@ -104,7 +104,6 @@ public class EnemySpawner : MonoBehaviour
         d.maxHP         = src.maxHP         * s.hp;
         d.maxShield     = src.maxShield     * s.hp;
         d.fireDamage    = src.fireDamage    * s.damage;
-        d.contactDamage = src.contactDamage * s.damage;
         d.evasionAngle  = src.evasionAngle  * s.evasion;
         d.escapeAngle   = src.escapeAngle   * s.evasion;
         d.armor         = src.armor         + s.armor;

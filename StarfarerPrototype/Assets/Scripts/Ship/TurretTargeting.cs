@@ -19,6 +19,17 @@ using UnityEngine;
 /// Böylece "en yakın", "en çok zarar vereceğim" ve "en çabuk öldüreceğim" tek bir
 /// orana iner; ayrı ayrı ağırlıklandırmaya gerek kalmaz.
 ///
+/// HIZ TERCİHİ (yalnızca ışın turretleri):
+///   Işın anlıktır — ıskalamaz. Mermili turretler ise hızlı, kaçamak bir hedefi
+///   sık sık ıskalar; puanlama bunu göremiyordu çünkü formülde isabet oranı yok.
+///   Sonuç: lazer turreti, mermili turretlerin zaten rahatça vurduğu yavaş ve
+///   iri hedeflere kilitleniyor, asıl işe yarayacağı Avcı/Swarm gibi hedefleri
+///   onlara bırakıyordu.
+///
+///   Açık bir <c>speedBias</c> ile lazer, hızlı hedeflerin puanını yükseltir.
+///   Mermili turretlere ceza YAZILMADI: iki taraflı bir model tüm dengeyi
+///   kaydırırdı, oysa çözülmek istenen tek şey ışının rolünü bulması.
+///
 /// KİLİTLENME:
 ///   - Hedef her karede değil, ReevaluateInterval'de bir yeniden değerlendirilir.
 ///   - Kilitli hedef geçerli ve menzildeyken kilit korunur.
@@ -38,16 +49,24 @@ public static class TurretTargeting
     const float UrgencyRange = 7f;
     const float UrgencyBoost = 2.5f;   // temas mesafesinde tehdit bu katsayıyla çarpılır
 
+    /// <summary>Hız tercihinin doyduğu hedef hızı (birim/sn). Avcı ~5, Swarm ~3.</summary>
+    const float FastTargetSpeed = 4f;
+
     const float MinCost = 0.05f;       // sıfıra bölmeyi engeller
 
     /// <summary>
     /// Menzildeki hedefler arasından en yüksek puanlıyı döndürür.
     /// current verilirse kilit histerezisi uygulanır.
     /// </summary>
+    /// <param name="speedBias">
+    /// 0 = hız önemsiz (mermili turretler). Işın turretleri pozitif geçer:
+    /// hızlı hedefin puanı en fazla (1 + speedBias) katına çıkar.
+    /// </param>
     public static ITurretTarget Select(
         Vector3 turretPos, Vector3 shipPos,
         float range, float dps, float bulletSpeed, WeaponType weaponType,
-        bool pointDefenceOnly, ITurretTarget current, float shotDamage = 0f)
+        bool pointDefenceOnly, ITurretTarget current, float shotDamage = 0f,
+        float speedBias = 0f)
     {
         ITurretTarget best      = null;
         float         bestScore = 0f;
@@ -62,7 +81,7 @@ public static class TurretTargeting
             float dist = Vector2.Distance(turretPos, t.TargetTransform.position);
             if (dist > range) continue;
 
-            float score = Score(t, dist, shipPos, dps, bulletSpeed, weaponType, shotDamage);
+            float score = Score(t, dist, shipPos, dps, bulletSpeed, weaponType, shotDamage, speedBias);
 
             if (ReferenceEquals(t, current))
             {
@@ -83,7 +102,7 @@ public static class TurretTargeting
     /// <summary>Tek bir hedefin puanı — formül sınıf dokümanında açıklanmıştır.</summary>
     public static float Score(ITurretTarget t, float dist, Vector3 shipPos,
                               float dps, float bulletSpeed, WeaponType weaponType,
-                              float shotDamage = 0f)
+                              float shotDamage = 0f, float speedBias = 0f)
     {
         float rawToKill = t.RawDamageToKill(weaponType);
         if (rawToKill <= 0f) return 0f;
@@ -103,7 +122,18 @@ public static class TurretTargeting
         float urgency    = 1f + (UrgencyBoost - 1f)
                          * (1f - Mathf.Clamp01(distToShip / UrgencyRange));
 
-        return t.ThreatValue * urgency / cost;
+        return t.ThreatValue * urgency * SpeedPreference(t, speedBias) / cost;
+    }
+
+    /// <summary>
+    /// Işın turretinin hızlı hedefe verdiği ek değer (1 .. 1+speedBias).
+    /// speedBias 0 iken hesap tamamen devre dışıdır.
+    /// </summary>
+    static float SpeedPreference(ITurretTarget t, float speedBias)
+    {
+        if (speedBias <= 0f) return 1f;
+        float speed = t.TargetVelocity.magnitude;
+        return 1f + speedBias * Mathf.Clamp01(speed / FastTargetSpeed);
     }
 
     /// <summary>

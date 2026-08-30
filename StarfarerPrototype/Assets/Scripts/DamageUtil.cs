@@ -7,6 +7,18 @@ using UnityEngine;
 public static class DamageUtil
 {
     /// <summary>
+    /// Bu collider hangi yüzey? Kıvılcım rengi buradan gelir.
+    /// Hedef tespitiyle aynı dosyada durur: iki soru da "bu collider ne"
+    /// sorusunun parçası ve ayrı yerlerde yaşasalardı biri diğerinden sapardı.
+    /// </summary>
+    public static ImpactSurface SurfaceOf(Collider2D other)
+    {
+        if (other == null) return ImpactSurface.Hull;
+        return other.GetComponent<Asteroid>() != null ? ImpactSurface.Rock
+                                                      : ImpactSurface.Hull;
+    }
+
+    /// <summary>
     /// Çarpışılan collider'a hasar uygular.
     /// Sıra: BossHardpoint → BossShip gövdesi → EnemyBot → Asteroid
     /// Hasar uygulandıysa true döner.
