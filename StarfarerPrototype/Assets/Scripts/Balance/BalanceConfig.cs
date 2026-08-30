@@ -132,6 +132,15 @@ public class BalanceConfig : ScriptableObject
              "atışı tamamen yer.")]
     public float armorMinDamageRatio = 0.10f;
 
+    [Tooltip("Zırhın SÜREKLİ kaynakları (ışınlar) saniyede kaç kez ısırdığı.\n\n" +
+             "Işının atışı yoktur; zırh eşiğinin ona uygulanabilmesi için bir " +
+             "referans sıklık gerekir. Bu sayı tamamen bir DENGE kolu, fiziksel " +
+             "bir gerçek değil: yüksek değer ışını zırha karşı zayıflatır.\n\n" +
+             "2 seçildi çünkü lazer turretinin 0.5 sn'lik yanmasını tam bir " +
+             "'atış' sayar. O ayarla turret kinetik turretle aynı ligde kalıyor " +
+             "(Lv50 zırhında 2.13'e karşı 2.70 DPS).")]
+    public float beamArmorBitesPerSecond = 2f;
+
     // ── Singleton ─────────────────────────────────────────────────────────────
 
     static BalanceConfig _instance;
@@ -187,5 +196,32 @@ public class BalanceConfig : ScriptableObject
     {
         if (armor <= 0f) return damage;
         return Mathf.Max(damage - armor, damage * armorMinDamageRatio);
+    }
+
+    /// <summary>
+    /// SÜREKLİ kaynaklar (ışınlar) için zırhın etkisi — 0..1 arası bir ORAN.
+    ///
+    /// Zırh eşiği atış BAŞINA sabit bir miktar düşürür; ışının atışı yoktur.
+    /// Işını "saniyede bir atış yapan silah" saymak tek tutarlı çözüm:
+    ///
+    ///     efektif_dps = max(dps − zırh, dps × armorMinDamageRatio)
+    ///
+    /// Kritik nokta: sonuç bir ORANDIR ve hasarın hangi SIKLIKTA uygulandığından
+    /// bağımsızdır. Böylece ışın her karede minik hasar verebilir — oyuncu hedefin
+    /// barının akıcı düştüğünü görür — ama zırh yine de saniyede bir kez ısırır.
+    ///
+    /// Bunun olmadığı hâlde iki kötü seçenekten birini seçmek zorundaydık:
+    /// ya hasarı sık uygula (zırh 60 kez ısırır, ışın gücünün %90'ını kaybeder,
+    /// üstelik sonuç kare hızına bağlanır) ya da seyrek uygula (zırh doğru
+    /// ısırır ama hedef 0.5 saniye hiç hasar almamış gibi durur).
+    /// </summary>
+    public float BeamArmorEfficiency(float dps, float armor)
+    {
+        if (armor <= 0f || dps <= 0.001f) return 1f;
+
+        // Işını "saniyede N atış yapan silah" say: her atış dps/N taşır, zırh
+        // her birinden armor kadar keser. Saniyeye indirgenince N × armor olur.
+        float bite = armor * Mathf.Max(0.1f, beamArmorBitesPerSecond);
+        return Mathf.Max(dps - bite, dps * armorMinDamageRatio) / dps;
     }
 }

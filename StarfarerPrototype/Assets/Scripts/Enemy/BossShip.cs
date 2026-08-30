@@ -352,12 +352,15 @@ public class BossShip : MonoBehaviour, ITurretTarget
         return false;
     }
 
-    public void TakeDamage(float amount, WeaponType wt = WeaponType.Kinetic)
+    public void TakeDamage(float amount, WeaponType wt = WeaponType.Kinetic,
+                           bool armorPreApplied = false)
     {
         if (_dead) return;
 
-        // Zırh eşiği atış başına, kalkandan önce uygulanır
-        amount = BalanceConfig.Instance.ApplyArmor(amount, ArmorValue);
+        // Zırh eşiği atış başına, kalkandan önce uygulanır. Işınlar zırhı
+        // kendileri ORAN olarak uygulamıştır (BeamArmorEfficiency), tekrar kesilmez.
+        if (!armorPreApplied)
+            amount = BalanceConfig.Instance.ApplyArmor(amount, ArmorValue);
 
         bool shieldGenAlive = false;
         foreach (var hp in _hardpoints)

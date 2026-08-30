@@ -196,29 +196,42 @@ uyguluyorlardı ve bu iki ayrı hataya yol açıyordu:
 2. **Zırh, ışını orantısız eziyordu.** Lv25'te zırh 2.2; ana lazerin etkin
    hasarı 46 → **4.6 DPS**'e düşüyordu. Lazer turreti 1.87 → **0.20 DPS**.
 
-Çözüm: ışın hasarı biriktirilir ve sabit aralıklarla **tek bir atış olarak**
-uygulanır. Atışın süresi ışının türünden gelir:
+**Çözüm: hasarın SIKLIĞI ile zırhın ISIRIĞI birbirinden ayrıldı.**
 
-| Işın | Atış = | Atış başına |
-|---|---|---|
-| Ana lazer (sürekli) | 0.25 sn | 11.5 hasar |
-| Lazer turreti (patlama) | yanmanın TAMAMI (0.5 sn) | 13 hasar |
-| Düşman lazeri (patlama) | yanmanın tamamı (1.5 sn) | tipine göre |
-| Plazma ışını | 0.2 sn | dps × 0.2 |
+İlk denemede hasar biriktirilip seyrek aralıklarla tek atış olarak
+uygulanıyordu. Zırh doğru ısırıyordu ama yeni bir sorun doğdu: hedef yarım
+saniye boyunca hiç hasar almamış gibi duruyor, sonra barı bir anda düşüyordu —
+ışının vurduğu GÖRÜNMÜYORDU. İki kötü seçenek arasında sıkışmıştık.
 
-Patlama modunda yanmanın tamamı tek atıştır çünkü tetiğe bir kez basılmıştır;
-bölünseydi zırh aynı yanmadan üç kez pay alırdı. Turret lazeri böylece 13
-hasarlık tek vuruş yapar — kinetik turretin 12 hasarlık mermisiyle aynı ligde.
+Doğru çözüm, zırhı bir miktar değil bir ORAN olarak hesaplamaktır
+(`BalanceConfig.BeamArmorEfficiency`):
+
+    efektif_dps = max(dps − N × zırh, dps × 0.10)
+    oran        = efektif_dps / dps
+
+`N` = `beamArmorBitesPerSecond` (2): zırhın ışını saniyede kaç kez ısırdığı.
+**Bu sayı fiziksel bir gerçek değil, açık bir denge koludur** — ışının atışı
+yoktur, eşiği uygulayabilmek için bir referans sıklık gerekir. 2 seçildi çünkü
+lazer turretinin 0.5 sn'lik yanmasını tam bir "atış" sayar.
+
+Sonuç bir oran olduğu için hasarın uygulanma sıklığından BAĞIMSIZDIR. Bu yüzden
+ışınlar artık **her karede** minik hasar verir: oyuncu barın akıcı düştüğünü
+görür, zırh yine de doğru miktarda ısırır ve sonuç kare hızından etkilenmez.
+Hedefe zırhın uygulandığı bildirilir (`armorPreApplied`), ikinci kez kesilmez.
 
 Ölçülen sonuç (stat yükseltmesi olmadan, ham DPS'e karşı):
 
-| | Lv1 | Lv25 | Lv50 |
-|---|---|---|---|
-| Ana lazer, eski | 45.2 | 4.6 | 4.6 |
-| Ana lazer, yeni | 45.9 | 37.3 | 19.6 |
-| Lazer turreti, eski | 1.87 | 0.20 | 0.20 |
-| Lazer turreti, yeni | 4.33 | 3.61 | 2.13 |
-| *(kıyas)* kinetik turret | 5.99 | — | 2.70 |
+| | Lv1 | Lv25 | Lv50 | Lv75 |
+|---|---|---|---|---|
+| Ana lazer, ESKİ (kare başına) | 45.2 | 4.6 | 4.6 | 4.6 |
+| Ana lazer, şimdi | 46.0 | 41.6 | 32.8 | 20.8 |
+| Lazer turreti, ESKİ | 1.87 | 0.20 | 0.20 | 0.20 |
+| Lazer turreti, şimdi | 4.33 | 3.61 | 2.13 | 0.43 |
+| *(kıyas)* kinetik turret | 5.99 | — | 2.70 | — |
+
+Lazer turreti kinetik turretle aynı ligde; geç levellerde zırha kaybetmesi
+kasıtlıdır (tablo yükseltmesiz silahı gösterir — hasar statı yükseldikçe ham
+dps büyür ve zırhın sabit ısırığı oransal olarak küçülür).
 
 Geç levellerde ışının hâlâ zırha kaybetmesi **kasıtlıdır** — tablo yükseltmesiz
 silahı gösteriyor. Hasar statı yükseldikçe atış başına hasar da büyür ve zırhın

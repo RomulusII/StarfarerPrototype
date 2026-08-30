@@ -882,7 +882,12 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 
     // ── Hasar alma ────────────────────────────────────────────────────────────
 
-    public void TakeDamage(float amount, WeaponType weaponType = WeaponType.Kinetic)
+    /// <param name="armorPreApplied">
+    /// Işınlar true geçer: zırhı kendileri ORAN olarak uygulamıştır
+    /// (bkz. BalanceConfig.BeamArmorEfficiency).
+    /// </param>
+    public void TakeDamage(float amount, WeaponType weaponType = WeaponType.Kinetic,
+                           bool armorPreApplied = false)
     {
         if (_healthBar == null) return;
         if (IsPhased) return;   // Hayalet: faz sırasında hiçbir şey geçmez
@@ -890,7 +895,9 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         // Zırh EŞİĞİ dirençlerden ÖNCE, atış başına uygulanır. Sıra önemlidir:
         // zırh ham atışı budar, dirençler kalanı ölçekler. Ters sırada olsaydı
         // dirençli düşmanlara karşı zırh iki kez cezalandırırdı.
-        float shot = BalanceConfig.Instance.ApplyArmor(amount, EffectiveArmor);
+        float shot = armorPreApplied
+            ? amount
+            : BalanceConfig.Instance.ApplyArmor(amount, EffectiveArmor);
 
         // YÖNLÜ kalkan burada devreye GİRMEZ: bu çağrı gövde collider'ından
         // geliyor, yani mermi yayı ıskalamış demektir. Kalkanı kenarından
@@ -906,12 +913,15 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     /// Yay kalkanına isabet — yalnızca <see cref="BarrierShield"/> çağırır.
     /// Kalkanı aşan fazlalık gövdeye geçer.
     /// </summary>
-    public void TakeShieldDamage(float amount, WeaponType weaponType)
+    public void TakeShieldDamage(float amount, WeaponType weaponType,
+                                 bool armorPreApplied = false)
     {
         if (_healthBar == null) return;
         if (IsPhased) return;
 
-        float shot = BalanceConfig.Instance.ApplyArmor(amount, EffectiveArmor);
+        float shot = armorPreApplied
+            ? amount
+            : BalanceConfig.Instance.ApplyArmor(amount, EffectiveArmor);
         ApplyHullDamage(ApplyShieldLayer(shot, weaponType));
     }
 

@@ -42,13 +42,8 @@ public class PlasmaBeam : MonoBehaviour
     float       _sparkTimer;
     const float SparkInterval = 0.05f;
 
-    /// <summary>
-    /// Hasar tiki — LaserBeam.DamageTick ile aynı gerekçe: zırh eşiği atış
-    /// başına işlediği için kare başına hasar uygulamak plazmanın gücünü
-    /// kare hızına bağlıyor ve zırha karşı yok ediyordu.
-    /// </summary>
-    const float DamageTick = 0.2f;
-    float       _damageTimer;
+    // Hasar HER KAREDE uygulanır; zırh LaserBeam ile aynı modelle, ORAN olarak
+    // hesaplanır (BalanceConfig.BeamArmorEfficiency). Bkz. LaserBeam.ApplyDamage.
 
     static readonly Color PlasmaSparkColor = new Color(0.55f, 1f, 0.4f);
 
@@ -141,12 +136,7 @@ public class PlasmaBeam : MonoBehaviour
         // ── Alan hasarı (Fading'de de kuyruk geçerken hasar verebilir) ────────
         if (totalEnergy <= 0f) return;
 
-        _sparkTimer  -= Time.deltaTime;
-        _damageTimer += Time.deltaTime;
-        if (_damageTimer < DamageTick) return;
-
-        float tickSeconds = _damageTimer;
-        _damageTimer = 0f;
+        _sparkTimer -= Time.deltaTime;
 
         _hitSet.Clear();
         int count = Physics2D.OverlapBox(
@@ -169,10 +159,17 @@ public class PlasmaBeam : MonoBehaviour
             int id = col.gameObject.GetInstanceID();
             if (!_hitSet.Add(id)) continue;
 
-            float tickDmg = Mathf.Min(dps * tickSeconds, totalEnergy);
+            float tickDmg = Mathf.Min(dps * Time.deltaTime, totalEnergy);
             if (tickDmg <= 0f) break;
 
-            DamageUtil.TryDamage(col, tickDmg, weaponType);
+            // Zırh oran olarak: enerji bütçesinden düşen HAM hasardır, hedefe
+            // varan ise zırhla ölçeklenmiş olanı. Işın zırhlı hedefte daha çabuk
+            // tükenir — kalkan gibi delinmesi gereken bir engel olarak durur.
+            float efficiency = BalanceConfig.Instance.BeamArmorEfficiency(
+                dps, DamageUtil.ArmorOf(col));
+
+            DamageUtil.TryDamage(col, tickDmg * efficiency, weaponType,
+                                 armorPreApplied: true);
             totalEnergy -= tickDmg;
 
             if (_sparkTimer <= 0f)
@@ -186,8 +183,8 @@ public class PlasmaBeam : MonoBehaviour
             }
         }
 
-        // Sayaç döngüden SONRA sıfırlanır: aynı karede birden fazla hedefi
-        // yakan bir bolt hepsinde kıvılcım çıkarsın, yalnızca ilkinde değil.
+        // Kıvılcım sayacı döngüden SONRA sıfırlanır: aynı karede birden fazla
+        // hedefi yakan bir bolt hepsinde kıvılcım çıkarsın, yalnızca ilkinde değil.
         if (_sparkTimer <= 0f) _sparkTimer = SparkInterval;
     }
 }

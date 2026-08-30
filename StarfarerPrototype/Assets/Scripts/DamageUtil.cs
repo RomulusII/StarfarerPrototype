@@ -19,19 +19,42 @@ public static class DamageUtil
                                                       : ImpactSurface.Hull;
     }
 
+    /// <summary>Hedefin zırhı. Zırh kavramı olmayan hedeflerde 0.</summary>
+    public static float ArmorOf(Collider2D other)
+    {
+        if (other == null) return 0f;
+
+        var barrier = other.GetComponent<BarrierShield>();
+        if (barrier != null && barrier.owner != null) return barrier.owner.ArmorValue;
+
+        var enemy = other.GetComponent<EnemyBot>();
+        if (enemy != null) return enemy.ArmorValue;
+
+        var boss = other.GetComponent<BossShip>();
+        if (boss != null) return boss.ArmorValue;
+
+        return 0f;   // hardpoint ve asteroit zırhsız
+    }
+
     /// <summary>
     /// Çarpışılan collider'a hasar uygular.
-    /// Sıra: BossHardpoint → BossShip gövdesi → EnemyBot → Asteroid
+    /// Sıra: BarrierShield → BossHardpoint → BossShip gövdesi → EnemyBot → Asteroid
     /// Hasar uygulandıysa true döner.
     /// </summary>
-    public static bool TryDamage(Collider2D other, float damage, WeaponType weaponType)
+    /// <param name="armorPreApplied">
+    /// Işınlar için true. Zırh eşiği atış başına işler; sürekli bir kaynak onu
+    /// kendisi ORAN olarak hesaplar (BalanceConfig.BeamArmorEfficiency) ve
+    /// hedefin bir kez daha kesmesini istemez.
+    /// </param>
+    public static bool TryDamage(Collider2D other, float damage, WeaponType weaponType,
+                                 bool armorPreApplied = false)
     {
         // Yay kalkanı — gövdenin ÖNÜNDE ayrı bir collider. Önden gelen mermi
         // buraya çarpar; yandan gelen onu ıskalayıp aşağıdaki gövde dalına düşer.
         var barrier = other.GetComponent<BarrierShield>();
         if (barrier != null && barrier.owner != null)
         {
-            barrier.owner.TakeShieldDamage(damage, weaponType);
+            barrier.owner.TakeShieldDamage(damage, weaponType, armorPreApplied);
             return true;
         }
 
@@ -47,7 +70,7 @@ public static class DamageUtil
         var boss = other.GetComponent<BossShip>();
         if (boss != null)
         {
-            boss.TakeDamage(damage, weaponType);
+            boss.TakeDamage(damage, weaponType, armorPreApplied);
             return true;
         }
 
@@ -55,7 +78,7 @@ public static class DamageUtil
         var enemy = other.GetComponent<EnemyBot>();
         if (enemy != null)
         {
-            enemy.TakeDamage(damage, weaponType);
+            enemy.TakeDamage(damage, weaponType, armorPreApplied);
             return true;
         }
 

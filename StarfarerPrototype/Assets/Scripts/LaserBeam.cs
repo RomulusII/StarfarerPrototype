@@ -26,33 +26,6 @@ public class LaserBeam : MonoBehaviour
     public bool       continuous      = false; // true → süre sınırı yok, dışarıdan kapatılır
     public bool       hitsPlayer      = false; // true → düşman lazeri, player'a hasar verir
 
-    /// <summary>
-    /// Sürekli ışının hasar uygulama aralığı (saniye) — yani ışının "atışı".
-    ///
-    /// Zırh eşiği atış başına sabit hasar düşürür (bkz. BalanceConfig.ApplyArmor).
-    /// Hasar her KAREDE uygulandığında tek seferlik miktar dps/60 oluyordu:
-    /// 46 DPS'lik bir ışın için 0.77 hasar, zırhı 6 olan bir hedefte %10'a
-    /// kırpılıyordu — ışın gücünün %90'ını zırha kaptırıyordu. Daha kötüsü sonuç
-    /// KARE HIZINA bağlıydı: 120 fps'te oyuncu yarı hasar veriyordu.
-    ///
-    /// 0.25 sn'lik tik ışını "saniyede 4 atış yapan bir silah" yapar; atış
-    /// başına ~11 hasar, yani kinetik bir mermiyle aynı mertebede.
-    /// </summary>
-    const float ContinuousTick = 0.25f;
-
-    /// <summary>
-    /// Bu ışın için bir "atış" ne kadar sürer?
-    ///
-    /// Patlama modunda (turret lazeri, düşman lazeri) yanmanın TAMAMI tek bir
-    /// atıştır — tetiğe bir kez basılmıştır. Turret lazeri böylece 0.5 sn'lik
-    /// yanmasını 13 hasarlık tek vuruş olarak indirir; kinetik turretin 12
-    /// hasarlık mermisiyle aynı ligde ve zırha karşı aynı muameleyi görür.
-    /// Bölünseydi zırh aynı yanmadan üç kez pay alırdı.
-    /// </summary>
-    float TickInterval => continuous ? ContinuousTick : Mathf.Max(burnDuration, 0.05f);
-
-    float        _tickTimer;
-    float        _pendingDamage;
     float        _remaining;
     Collider2D   _target;
     PlayerShip   _targetPlayer;
@@ -81,7 +54,7 @@ public class LaserBeam : MonoBehaviour
         if (!continuous)
         {
             _remaining -= Time.deltaTime;
-            if (_remaining <= 0f) { Flush(); Destroy(gameObject); return; }
+            if (_remaining <= 0f) { Destroy(gameObject); return; }
         }
 
         // Enerji tüketimi (0 ise EnergyBus'a dokunmaz)
@@ -89,7 +62,6 @@ public class LaserBeam : MonoBehaviour
         {
             if (!EnergyBus.Instance.RequestEnergy(energyPerSecond * Time.deltaTime))
             {
-                Flush();
                 Destroy(gameObject);
                 return;
             }
@@ -103,7 +75,7 @@ public class LaserBeam : MonoBehaviour
 
         UpdateRaycast();
         UpdateVisual();
-        AccumulateDamage(damage * dmgMulti * Time.deltaTime);
+        ApplyDamage(damage * dmgMulti, Time.deltaTime);
         UpdateSparks();
     }
 
@@ -165,42 +137,40 @@ public class LaserBeam : MonoBehaviour
     }
 
     /// <summary>
-    /// Hasarı biriktirir ve DamageTick aralıklarında topluca uygular.
-    /// Işın bir şeye değmiyorsa birikim de durur — beklerken şarj olup ilk
-    /// temasta boşalan bir "hasar deposu" olmamalı.
+    /// Hasarı HER KAREDE uygular — oyuncu hedefin barının akıcı düştüğünü görür.
+    ///
+    /// Bunu yapabilmemizin sebebi zırhın burada ORAN olarak hesaplanması:
+    /// <see cref="BalanceConfig.BeamArmorEfficiency"/> ışını "saniyede bir atış"
+    /// sayıp 0..1 arası bir katsayı döner, hedefe de zırhın uygulandığı
+    /// bildirilir. Böylece hasarın sıklığı ile zırhın ısırığı BİRBİRİNDEN
+    /// BAĞIMSIZ olur.
+    ///
+    /// Eskiden ikisi bağlıydı ve iki kötü seçenek vardı: sık uygula (zırh 60 kez
+    /// ısırır, ışın gücünün %90'ını kaybeder, üstelik hasar kare hızına bağlanır)
+    /// ya da seyrek uygula (zırh doğru ısırır ama hedef yarım saniye hiç hasar
+    /// almamış gibi durur — ışının vurduğu görünmez).
     /// </summary>
-    void AccumulateDamage(float amount)
+    void ApplyDamage(float dps, float dt)
     {
-        bool hitting = hitsPlayer
-            ? (_targetPlayer != null || _targetFighter != null || _targetCollector != null)
-            : (_target != null);
-
-        if (!hitting) { _pendingDamage = 0f; _tickTimer = 0f; return; }
-
-        _pendingDamage += amount;
-        _tickTimer     += Time.deltaTime;
-        if (_tickTimer < TickInterval) return;
-
-        _tickTimer = 0f;
-        Flush();
-    }
-
-    void Flush()
-    {
-        if (_pendingDamage <= 0f) return;
-        float amount   = _pendingDamage;
-        _pendingDamage = 0f;
+        if (dps <= 0f || dt <= 0f) return;
 
         if (hitsPlayer)
         {
+            // Oyuncu tarafında zırh eşiği yok; kalkan zaten havuz olarak emiyor
+            float amount = dps * dt;
             _targetPlayer?.TakeDamage(amount);
             _targetFighter?.TakeDamage(amount);
             _targetCollector?.TakeDamage(amount);
+            return;
         }
-        else if (_target != null)
-        {
-            DamageUtil.TryDamage(_target, amount, weaponType);
-        }
+
+        if (_target == null) return;
+
+        float efficiency = BalanceConfig.Instance.BeamArmorEfficiency(
+            dps, DamageUtil.ArmorOf(_target));
+
+        DamageUtil.TryDamage(_target, dps * efficiency * dt, weaponType,
+                             armorPreApplied: true);
     }
 
     // ── Görsel ────────────────────────────────────────────────────────────────
@@ -259,6 +229,4 @@ public class LaserBeam : MonoBehaviour
             Destroy(_line.material);
     }
 
-    /// <summary>WeaponController ışını dışarıdan kapatırken artığı işletir.</summary>
-    void OnDisable() => Flush();
 }
