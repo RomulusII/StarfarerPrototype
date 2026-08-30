@@ -1396,7 +1396,9 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         if (_barrier != null) { _barrier.Flash(worldHitPos); return; }
         if (_shieldVisual == null) return;
 
-        ShieldEffect.Spawn(worldHitPos, transform.position,
-                           _shieldRadius, BarrierShield.ArcColor);
+        // Küre kalkanın bandı (BubbleSprite: InR = 0.55×R) parlamanın
+        // varsayılan 0.60'ına zaten yakın; ayrıca oran vermeye gerek yok.
+        ShieldEffect.Spawn(worldHitPos, transform.position, _shieldRadius,
+                           BarrierShield.FlashColor, 55f, 0.60f, transform);
     }
 }

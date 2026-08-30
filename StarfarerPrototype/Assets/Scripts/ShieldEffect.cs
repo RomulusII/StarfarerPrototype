@@ -19,8 +19,8 @@ public class ShieldEffect : MonoBehaviour
     float          _timer;
     const float    FadeDuration = 0.5f;
 
-    // Yay genişliğine göre önbellek: oyuncunun geniş hilali ile siper gemisinin
-    // dar hilali aynı dokuyu paylaşamaz.
+    // Yay genişliği + bant kalınlığına göre önbellek: oyuncunun geniş/kalın
+    // hilali ile siper gemisinin dar/ince hilali aynı dokuyu paylaşamaz.
     static readonly System.Collections.Generic.Dictionary<int, Sprite> _cache = new();
 
     // ── Spawn ─────────────────────────────────────────────────────────────────
@@ -36,12 +36,27 @@ public class ShieldEffect : MonoBehaviour
     /// Hilalin yarı genişliği. YAY kalkanlarda dar tutulmalıdır: geniş bir hilal
     /// yayın ucundan taşar ve kalkan olmayan boşlukta parlar.
     /// </param>
+    /// <param name="innerRatio">
+    /// Hilalin İÇ kenarı — yarıçapın oranı olarak. Parlamanın radyal kalınlığı
+    /// kalkanın kendi kalınlığına oturmalıdır: 0.60 ile bir yay kalkanda parlama
+    /// yayın iki katı kalınlığında oluyor ve yüzeyin İÇİNE, kalkanla gemi
+    /// arasındaki boşluğa taşıyordu. Efekt "yanlış yerde" görünmesinin sebebi
+    /// buydu — konumu doğru, bandı fazla kalındı.
+    /// </param>
+    /// <param name="parent">
+    /// Verilirse efekt bu transform'un altında doğar ve gemiyle birlikte hareket
+    /// eder. Ana geminin kalkanı sabit olduğu için gerekmiyordu; hareket eden bir
+    /// düşman kalkanında parlama yerinde kalıp geride kalıyordu.
+    /// </param>
     public static void Spawn(Vector2 hitPos, Vector2 center,
                              float radius = ShieldRadius,
                              Color? color = null,
-                             float halfAngleDeg = 55f)
+                             float halfAngleDeg = 55f,
+                             float innerRatio = 0.60f,
+                             Transform parent = null)
     {
         var go = new GameObject("ShieldHit");
+        if (parent != null) go.transform.SetParent(parent, false);
         go.transform.position = center;
 
         // Çarpma yönüne döndür — hilal dışa baksın
@@ -50,7 +65,7 @@ public class ShieldEffect : MonoBehaviour
         go.transform.localScale = Vector3.one * radius;
 
         var sr          = go.AddComponent<SpriteRenderer>();
-        sr.sprite       = GetSprite(halfAngleDeg);
+        sr.sprite       = GetSprite(halfAngleDeg, innerRatio);
         sr.sortingOrder = 12;
         sr.color        = color ?? new Color(0.45f, 0.88f, 1f, 1f); // oyuncu: açık mavi
 
@@ -74,14 +89,14 @@ public class ShieldEffect : MonoBehaviour
 
     // ── Sprite üretimi ────────────────────────────────────────────────────────
 
-    static Sprite GetSprite(float halfDeg)
+    static Sprite GetSprite(float halfDeg, float innerRatio)
     {
-        int key = Mathf.RoundToInt(halfDeg);
+        int key = Mathf.RoundToInt(halfDeg) * 1000 + Mathf.RoundToInt(innerRatio * 100f);
         if (_cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
         const int   Sz    = 256;
         const float OutR  = 118f;          // piksel — PPU olarak da kullanılır → dış kenar = 1 birim
-        const float InR   = OutR * 0.60f;  // iç kenar, buradan içe doğru transparan
+        float       InR   = OutR * Mathf.Clamp(innerRatio, 0.05f, 0.98f);
         float       Half  = Mathf.Max(5f, halfDeg);
         const float Cx    = Sz * 0.5f;
 

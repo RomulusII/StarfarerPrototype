@@ -32,10 +32,25 @@ public class BarrierShield : MonoBehaviour
     /// ayrılsın. Yarı saydam: arkasındaki gemi ve mermiler görünmeli, kalkan
     /// bir duvar değil bir yüzey olarak okunmalı.
     /// </summary>
-    public static readonly Color ArcColor = new Color(1f, 0.62f, 0.28f, 0.42f);
+    public static readonly Color ArcColor = new Color(1f, 0.62f, 0.28f, 0.16f);
+
+    /// <summary>
+    /// Çarpma parlaması kalkanın kendisinden belirgin olmalı — yoksa isabet
+    /// hiç okunmaz. Kalkan belli belirsiz dururken parlama onu bir an için
+    /// görünür kılar.
+    /// </summary>
+    public static readonly Color FlashColor = new Color(1f, 0.72f, 0.40f, 0.55f);
 
     /// <summary>Çarpma hilalinin yarı genişliği (derece).</summary>
     const float FlashHalfAngle = 20f;
+
+    /// <summary>
+    /// Parlamanın iç kenarı — yayın kendi iç kenarıyla AYNI oran (bkz. ArcSprite:
+    /// OutR 122, MaxThick 26 → 0.787). Varsayılan 0.60 ile parlama yayın iki
+    /// katı kalınlığında oluyor ve yüzeyin içine, kalkanla gemi arasındaki
+    /// boşluğa taşıyordu.
+    /// </summary>
+    const float FlashInnerRatio = 0.78f;
 
     /// <param name="radius">Yayın dış yarıçapı (dünya birimi).</param>
     /// <param name="arcDegrees">Yayın toplam açısı.</param>
@@ -95,7 +110,7 @@ public class BarrierShield : MonoBehaviour
         _sr.enabled = up;
         // Zayıflayan kalkan solar — oyuncu ne zaman kırılacağını görebilmeli
         _sr.color = new Color(ArcColor.r, ArcColor.g, ArcColor.b,
-                              Mathf.Lerp(0.12f, ArcColor.a, ratio));
+                              Mathf.Lerp(0.04f, ArcColor.a, ratio));
     }
 
     /// <summary>
@@ -117,7 +132,11 @@ public class BarrierShield : MonoBehaviour
         float rad    = (facing + offset) * Mathf.Deg2Rad;
 
         Vector2 onArc = center + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * _radius;
-        ShieldEffect.Spawn(onArc, center, _radius, ArcColor, FlashHalfAngle);
+
+        // Ebeveyn olarak GEMİ verilir, kalkanın kendisi değil: BarrierShield'in
+        // ölçeği zaten yarıçap kadar, altına eklenen efekt bir kez daha ölçeklenirdi.
+        ShieldEffect.Spawn(onArc, center, _radius, FlashColor, FlashHalfAngle,
+                           FlashInnerRatio, owner != null ? owner.transform : null);
     }
 
     // ── Prosedürel yay ────────────────────────────────────────────────────────

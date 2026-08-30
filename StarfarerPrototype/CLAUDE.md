@@ -216,9 +216,24 @@ kendi işi (`ShipComponentBase` halkasıyla aynı desen: skin varsa o, yoksa
 (`ShieldEffect`). `ShieldEffect.Spawn` artık yarıçap, renk ve yay genişliği
 alıyor; hilal dokusu genişliğe göre önbelleklenir.
 
-Yay kalkanda hilal **yayın sınırları içine kırpılır**: dar tutulur (20°) ve
-çarpma açısı `±(yarıAçı − 20°)` aralığına sıkıştırılır. Kırpılmasaydı yayın
-ucuna yakın bir isabet, kalkanın olmadığı boşlukta parlardı.
+Yay kalkanda hilal iki yönden de kalkanın sınırlarına oturtulur:
+
+- **Açısal:** dar tutulur (20°) ve çarpma açısı  aralığına
+  sıkıştırılır. Yoksa yayın ucuna yakın bir isabet, kalkanın olmadığı boşlukta parlar.
+- **Radyal:** parlamanın iç kenarı yayın iç kenarıyla aynı orandadır (0.78).
+  Varsayılan 0.60 ile parlama yayın **1.9 katı** kalınlığında oluyor ve yüzeyin
+  İÇİNE, kalkanla gemi arasındaki boşluğa taşıyordu — efektin "yanlış yerde"
+  görünmesinin sebebi buydu: konumu doğruydu, bandı fazla kalındı.
+
+Efekt düşman kalkanlarında **gemiye bağlanır** (ebeveyn olarak gemi verilir,
+kalkanın kendisi değil — onun ölçeği zaten yarıçap kadar). Ana geminin kalkanı
+sabit olduğu için gerekmiyordu; hareket eden bir düşmanda parlama yerinde kalıp
+geride kalıyordu.
+
+**Kalkan belli belirsizdir, parlama belirgin.** Yay alfası 0.16'ya indi (sprite
+gradyanıyla birlikte 0.04–0.16), boşalmış hâli 0.04. Parlama ise 0.55 tepe
+alfayla yarım saniyede söner: kalkan neredeyse görünmezken isabet onu bir an
+için ortaya çıkarır.
 
 Çarpma noktası yalnızca merminin kendisinde biliniyor. `TryDamage`'a bir
 parametre daha eklemek yerine, zaten o konumu elinde tutan çağıran taraf
