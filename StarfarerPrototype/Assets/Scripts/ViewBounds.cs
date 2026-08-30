@@ -74,6 +74,33 @@ public static class ViewBounds
         }
     }
 
+    /// <summary>
+    /// Ana silahın ulaşabilmesi GEREKEN mesafe: ana gemiden görünür alanın en
+    /// uzak köşesine, üstüne bir pay.
+    ///
+    /// Mermi ömrü/menzili sabit sayılarla yazılmıştı (kinetik 3 sn × 6 hız =
+    /// 18 birim, lazer 22 birim) ve ikisi de kadrajdan bağımsızdı. Zoom-out ile
+    /// görünür alan x ekseninde +32'ye açılınca mermiler ekranın ORTASINDA
+    /// yok oluyordu — oyuncu nişan alıp ateş ediyor, mermi hedefe varmadan
+    /// buharlaşıyordu.
+    /// </summary>
+    public static float MaxShotRange
+    {
+        get
+        {
+            var r    = Visible;
+            var ship = Object.FindFirstObjectByType<PlayerShip>();
+            Vector2 s = ship != null ? (Vector2)ship.transform.position : new Vector2(0f, -2f);
+
+            float far = Mathf.Max(
+                Mathf.Max((new Vector2(r.xMin, r.yMin) - s).magnitude,
+                          (new Vector2(r.xMax, r.yMin) - s).magnitude),
+                Mathf.Max((new Vector2(r.xMin, r.yMax) - s).magnitude,
+                          (new Vector2(r.xMax, r.yMax) - s).magnitude));
+            return far + SpawnMargin;
+        }
+    }
+
     // ── Hesap ─────────────────────────────────────────────────────────────────
 
     static void Refresh()

@@ -837,7 +837,7 @@ Slot'a kurulunca otomatik ateş açar, oyuncu müdahalesi gerekmez. Enerji tüke
 | **Plazma** | Düşük (20f) | Orta | Düşük | Yüksek | 4s | — |
 | **Lazer** | Orta (5f) | Orta | Yüksek | Yüksek | 4s | — |
 | **Roket** | Çok düşük (30f+) | Yüksek | Orta | Düşük | 10s | Güdümlü, hedefi izler |
-| **Point Defence** | Hızlı (1f) | Düşük | Orta | Orta | 0.8s | Gelen roketleri + Bomber/Fighter/Drone hedefler, kısa menzil |
+| **Point Defence** | Hızlı (1f) | Düşük | Orta | Orta | 0.8s | Bombaları ve kalkana sızmış küçük gemileri düşürür, kısa menzil |
 
 **Hedefleme — puanlama formülü** (`TurretTargeting`):
 
@@ -876,6 +876,21 @@ dokunmak gerekmez — arayüzü uygulamak yeterlidir.
 
 Point Defence yalnızca `IsPointDefencePriority` olan hedefleri alır: bombalar,
 yakın saldırgan gemiler (Approach / BombRun / AttackRun) ve küçük asteroit parçaları.
+
+**Mermi düşürme — bugünkü durum.** PD'nin vurabildiği tek MERMİ bombadır; o da
+tek vurulabilir mermi tipi olduğu için (HP 1, `ITurretTarget` uygular,
+`TurretBullet` ayrıca kontrol eder). Diğerleri vurulamaz:
+
+| Ne | Vurulabilir mi | Neden |
+|---|---|---|
+| Bomba (BombRunner) | evet | `ITurretTarget` + HP 1 |
+| Düşman mermisi (`EnemyBullet`) | hayır | HP yok, hedef arayüzü yok |
+| Düşman roketi | — | `EnemyWeaponKind.Rocket` tanımlı ama hiçbir kod yolu üretmiyor |
+| Oyuncunun güdümlü roketi | (evet) | HP 3 taşıyor ama düşman tarafında onu vuran hiçbir şey yok |
+
+Yani "füze savar" rolü yazılı ama ortada füze yok: `Rocket` silah tipi ölü bir
+enum değeri, oyuncunun roketinin HP'si de uyuyan bir yetenek. PD şu an yalnızca
+bombaya ve kalkana sızan küçük gemilere karşı çalışıyor.
 
 ### Açılış Menüsü — Tasarım Kararları
 
@@ -1117,6 +1132,26 @@ bırakıldı.
 | HitboxOverlay.cs | Teşhis aracı — collider sınırlarını sprite üstüne çizer |
 
 ---
+
+## Ana Silah Menzili — Tasarım Kararı
+
+Menzil **kadrajdan türer**, sabit sayıdan değil (`ViewBounds.MaxShotRange`):
+ana gemiden görünür alanın en uzak köşesine olan mesafe + pay = **36 birim**.
+
+Eskiden iki ayrı sabit vardı ve ikisi de kameradan habersizdi — kinetik mermi
+3 saniye yaşıyordu (× 6 hız = **18 birim**), lazer ışını **22 birim** menzilliydi.
+Zoom-out ile görünür alan x ekseninde +32'ye açılınca mermiler ekranın
+ORTASINDA buharlaşıyordu: oyuncu nişan alıp ateş ediyor, mermi hedefe hiç
+varmıyordu.
+
+| | eski | yeni |
+|---|---|---|
+| Kinetik | 18 birim (3 sn ömür) | 36 birim (5.9 sn ömür) |
+| Lazer | 22 birim | 36 birim |
+| Plazma | 60 birim | değişmedi — zaten yeterliydi |
+
+Turret menzilleri BİLEREK dokunulmadı: onlar `bulletLifeTime × bulletSpeed`
+ile tanımlı birer DENGE değeri, kadraj sınırı değil.
 
 ## Kamera Sistemi
 

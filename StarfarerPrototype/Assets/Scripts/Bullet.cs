@@ -23,7 +23,10 @@ public class Bullet : MonoBehaviour
 
     void Start()
     {
-        Destroy(gameObject, 3f);
+        // Ömür MENZİLDEN türer, sabit değil. 3 saniye + 6 hız = 18 birimlik bir
+        // menzil demekti; kadraj ise zoom-out'ta 32 birime açılıyor, yani mermi
+        // ekranın ortasında buharlaşıyordu.
+        Destroy(gameObject, ViewBounds.MaxShotRange / Mathf.Max(speed, 0.01f));
     }
 
     void Update()

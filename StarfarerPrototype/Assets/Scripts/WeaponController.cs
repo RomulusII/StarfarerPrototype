@@ -95,7 +95,8 @@ public class WeaponController : MonoBehaviour
             beam.weaponType      = WeaponType.Laser;
             beam.continuous      = true;
             beam.energyPerSecond = energyCostPerShot * energyMulti;
-            beam.maxRange        = 22f;
+            // Sabit 22 birim kadrajın yarısına bile ulaşmıyordu (bkz. ViewBounds)
+            beam.maxRange        = ViewBounds.MaxShotRange;
             beam.Init();
             _activeLaserBeam = beam;
         }
