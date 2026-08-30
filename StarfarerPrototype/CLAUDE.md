@@ -248,7 +248,7 @@ halkasından (Mk2) alındı; tier'ların taşıdığı güç stat eğrisine devr
 | Kalkan Jeneratörü | Kristal | 45 | 100 kalkan, 1.8 şarj | 931, 16.8 | Max Kalkan · Şarj Hızı |
 | Enerji Jeneratörü | Metal | 65 | 18 üretim | 168 | Üretim · **Kapasitör** |
 | Onarım Birimi | Metal | 55 | 4.0 tamir | 37 | Tamir Hızı · Enerji Verimi · **Zırh** |
-| Depo | Metal | 110 | +900 metal / +350 kristal | +8.381 / +3.259 | Kapasite |
+| Depo | Metal | **50** | +900 metal / +350 kristal | +8.381 / +3.259 | Kapasite |
 | Hangar | Metal | 20 | 1 toplayıcı, 0 savaşçı | — | 7 iz (bkz. HangarComponent) |
 | Raylı / Enerji Turret | Metal | 22 | DPS 6 | DPS 56 | Hasar · Ateş Hızı |
 | Füze Turret | Metal | 28 | DPS 6 | DPS 56 | Hasar · Ateş Hızı |
@@ -261,14 +261,18 @@ yerinde kaldı; kaybolan şey tier basamakları oldu.
 yükseltmeyi tutabilmek ZORUNDA. Sv10 kalkan yükseltmesi 6.164 kristal tutuyor;
 200 tabanlı bir depo maxlansa bile 1.912 tutardı, yani sistem kilitlenirdi —
 para birikir ama tavana çarpıp yanardı. 350 tabanla maxlanmış tek depo 3.259,
-iki depo 6.568 tutar. Depo statı ayrıca kasten ucuzdur: altyapıdır, güç değil.
+iki depo 6.568 tutar.
+
+Depo hem FİYAT hem stat olarak kasten ucuzdur (50 metal): bir güç yükseltmesi
+değil, başka yükseltmelerin ön koşuludur. Pahalı olsaydı oyuncu, ilerlemesini
+açan şeyi satın alabilmek için ilerlemesi gereken bir kısır döngüye girerdi.
 
 **Depo komponenti.** Kaynak tavanı artık sabit değil: `ResourceInventory` taban
-kapasiteyi (150 metal / 50 kristal) kurulu depoların toplamıyla topluyor. Yıkılan
+kapasiteyi (150 metal / 100 kristal) kurulu depoların toplamıyla topluyor. Yıkılan
 veya deaktif olan depo kapasite vermez — hasar almak biriktirdiğin kaynağı da yakar.
 
 Kapasite kilidi bilinçli ve artık ilerlemenin ana kapılarından biri: ilk birkaç
-stat seviyesi taban tavanla (150 metal / 50 kristal) alınabilir, sonrası için
+stat seviyesi taban tavanla (150 metal / 100 kristal) alınabilir, sonrası için
 önce depo kurmak, sonra deponun kapasitesini yükseltmek gerekir.
 
 **Kapasitör — jeneratörün ikinci izi.** `EnergyBus`ın tamponunu (max enerji)
@@ -456,6 +460,11 @@ savaşçının onu görmezden gelmesi için sebep yok.
   parça başına %12 olasılıkla düştüğü için neredeyse hep tek başına kalıyor
   ve tam birime hiç ulaşamıyordu: oyuncu asteroitlerden hiç kristal alamıyordu.
   `ResourceInventory.Add` de artık `float` alır.
+
+**Geminin kendi kristal ambarı 50 → 100.** Kristal metalden çok daha yavaş
+akıyor: yalnızca kalkanlı düşmanlardan ve asteroitlerin %12'sinden geliyor.
+50'lik tavanla oyuncu ilk kalkan yükseltmesini biriktiremeden tavana çarpıp
+kaynağı yakıyordu — yani depo kurulana kadar kristal TOPLAMANIN anlamı yoktu.
 
 **Kristal kaynakları:**
 

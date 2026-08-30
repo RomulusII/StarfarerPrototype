@@ -129,8 +129,12 @@ public static class ComponentCatalog
     // ── Depo ──────────────────────────────────────────────────────────────────
     // Kaynak tavanını yükseltir. "Kapasite" statı ZORUNLU bir eksendir: geç
     // seviyelerde tek bir stat yükseltmesi binlerce kaynak tutuyor ve taban
-    // tavan (150 metal / 50 kristal) o parayı tutamaz. Tier'lar kalkınca
+    // tavan (150 metal / 100 kristal) o parayı tutamaz. Tier'lar kalkınca
     // kapasite ilerlemesinin tek yolu bu stat oldu.
+    //
+    // Fiyat kasten DÜŞÜK (50 metal): depo bir güç yükseltmesi değil, başka
+    // yükseltmelerin ön koşulu. Pahalı olsaydı oyuncu ilerlemesini açan şeyi
+    // satın alabilmek için ilerlemesi gereken bir kısır döngüye girerdi.
     //
     // Taban kapasiteler zincirin ORTA halkasından DEĞİL, üstünden alındı:
     // tavan en pahalı yükseltmeyi tutabilmek ZORUNDA. Sv10 kalkan yükseltmesi
@@ -149,7 +153,7 @@ public static class ComponentCatalog
         {
             if (_storage != null) return _storage;
             _storage = New("Depo", ComponentType.Storage,
-                           ResourceType.RawMaterial, cost: 110, sell: 44);
+                           ResourceType.RawMaterial, cost: 50, sell: 20);
             _storage.storageMetal   = 900f;
             _storage.storageCrystal = 350f;
             _storage.baseEnergyCost = 0.8f;

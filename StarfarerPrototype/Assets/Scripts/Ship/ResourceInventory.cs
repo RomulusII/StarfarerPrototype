@@ -13,7 +13,13 @@ public class ResourceInventory : MonoBehaviour
 
     [Header("Taban Kapasite (depo komponentleri bunun üstüne ekler)")]
     public float baseMetalCapacity   = 150f;
-    public float baseCrystalCapacity =  50f;
+
+    [Tooltip("Kristal, metalden çok daha yavaş akar: yalnızca kalkanlı " +
+             "düşmanlardan ve asteroitlerin %12'sinden geliyor. 50 tavanla " +
+             "oyuncu daha ilk kalkan yükseltmesini biriktiremeden tavana " +
+             "çarpıp kaynağı yakıyordu — depo kurulana kadar kristal " +
+             "toplamanın anlamı yoktu.")]
+    public float baseCrystalCapacity = 100f;
     public float maxEnergyScrap      = 200f;
 
     /// <summary>Taban kapasite + kurulu depoların toplamı.</summary>
