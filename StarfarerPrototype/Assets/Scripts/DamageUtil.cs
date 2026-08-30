@@ -14,6 +14,7 @@ public static class DamageUtil
     public static ImpactSurface SurfaceOf(Collider2D other)
     {
         if (other == null) return ImpactSurface.Hull;
+        if (other.GetComponent<BarrierShield>() != null) return ImpactSurface.Shield;
         return other.GetComponent<Asteroid>() != null ? ImpactSurface.Rock
                                                       : ImpactSurface.Hull;
     }
@@ -25,6 +26,15 @@ public static class DamageUtil
     /// </summary>
     public static bool TryDamage(Collider2D other, float damage, WeaponType weaponType)
     {
+        // Yay kalkanı — gövdenin ÖNÜNDE ayrı bir collider. Önden gelen mermi
+        // buraya çarpar; yandan gelen onu ıskalayıp aşağıdaki gövde dalına düşer.
+        var barrier = other.GetComponent<BarrierShield>();
+        if (barrier != null && barrier.owner != null)
+        {
+            barrier.owner.TakeShieldDamage(damage, weaponType);
+            return true;
+        }
+
         // Boss hardpoint (collider doğrudan hardpoint GO'sunda)
         var hardpoint = other.GetComponent<BossHardpoint>();
         if (hardpoint != null && hardpoint.IsAlive)

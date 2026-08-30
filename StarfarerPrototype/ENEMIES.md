@@ -4,6 +4,33 @@ Mevcut isimler placeholder. İsimler ve hikaye uyumu için tartışma notları e
 
 ---
 
+### Barrier (Bariyer)
+**Kod adı:** `Barrier` · **Rol:** Bariyer · **Tehdit puanı:** 8
+
+| Stat | Değer |
+|------|-------|
+| HP | 40 |
+| Kalkan | 150 (şarj 20/s, 2.5 sn gecikme) |
+| Kalkan şekli | Önde 120° YAY, yarıçap 1.25 |
+| Kütle | 4 · Güç: 6 |
+| Silah | — (silahsız) |
+| Boyut | 46×62 px |
+| Enkaz | Ham madde + 15 kristal (kalkan × 0.1) |
+
+**Hareket:** Screen — ana geminin 5.5 birim önüne park eder, burnu oyuncuda
+bekler. Kalkanı bitince retro itkiyle geri çekilir (burun oyuncuda kalır),
+kalkan %90'a dolunca farklı bir yükseklikten geri gelir.
+
+**Yönlü kalkan:** yalnızca öndeki yaydan giren mermiyi emer. Yandan/arkadan
+gelen mermi gövdeye ulaşır ve kalkanı hiç görmez.
+
+**Direnç (kalkan):** Kinetik ×1.5 · Lazer ×0.25
+
+**Ne zorlar:** Ateş hattı. Del, kenarından dolan ya da kalkanı boşalana kadar
+bekle — üçü de gerçek bir karar.
+
+---
+
 ## Uzak Saldırganlar
 Gemiye yaklaşır, periyodik ateş eder. Mermileri kalkandan hasar verir.
 

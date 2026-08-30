@@ -24,12 +24,22 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     ShipBrain    _brain;
 
     // Kalkan
-    float      _shieldHP;
-    float      _maxShieldHP;
-    GameObject _shieldVisual;
-    float      _shieldRechargeTimer;
-    const float ShieldRechargeDelay = 4f;
-    const float ShieldRechargeRate  = 5f;
+    float         _shieldHP;
+    float         _maxShieldHP;
+    GameObject    _shieldVisual;   // küresel kalkan kabuğu
+    BarrierShield _barrier;        // yönlü yay kalkanı (Bariyer tipi)
+    float         _shieldRechargeTimer;
+
+    // Siper (Screen) durum makinesi
+    enum ScreenPhase { Advancing, Holding, Retreating }
+    ScreenPhase _screenPhase;
+    float       _screenHoldY;
+
+    /// <summary>Kaçtıktan sonra geri dönmek için gereken kalkan oranı.</summary>
+    const float ScreenReturnRatio = 0.9f;
+
+    /// <summary>Kaçarken bu mesafeye ulaşınca durup şarj bekler.</summary>
+    const float ScreenRetreatDistance = 13f;
 
     // Ateş etme
     float _fireTimer;
@@ -177,7 +187,12 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     void InitShield()
     {
         _shieldHP = _maxShieldHP = data.maxShield;
-        BuildShieldVisual(data.bodyWidth + 20, data.bodyHeight + 15);
+
+        if (data.HasDirectionalShield)
+            _barrier = BarrierShield.Attach(this, data.shieldArcRadius, data.shieldArcDegrees);
+        else
+            BuildShieldVisual(data.bodyWidth + 20, data.bodyHeight + 15);
+
         if (_healthBar != null)
         {
             _healthBar.maxShield     = _maxShieldHP;
@@ -212,6 +227,12 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
                 break;
 
             case EnemyMovementKind.Stationary:
+                break;
+
+            case EnemyMovementKind.Screen:
+                // ShipBrain KURULMAZ: siper gemisinin taktiği yörünge/dalış
+                // değil, tek bir noktayı tutmaktır. _initialFacing 180'de kalır,
+                // yani burun (ve yay kalkanı) daha doğduğu an oyuncuya dönüktür.
                 break;
 
             case EnemyMovementKind.BombRun:
@@ -286,6 +307,12 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         if (data.movementKind == EnemyMovementKind.AttackRun)
         {
             UpdateAttackRun();
+            return;
+        }
+
+        if (data.movementKind == EnemyMovementKind.Screen)
+        {
+            UpdateScreen();
             return;
         }
 
@@ -572,6 +599,74 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
             Destroy(gameObject);
     }
 
+    /// <summary>
+    /// Siper manevrası: ana geminin önüne geç, dur, bekle. Kalkan bitince kaç,
+    /// dolunca geri gel.
+    ///
+    /// Burun DAİMA oyuncuya dönüktür — yay kalkanı geminin +X yönünde durduğu
+    /// için burnun yönü kalkanın yönüdür. Kaçarken bile burun geride kalır ve
+    /// gemi retro itkiyle uzaklaşır: sırtını dönseydi kalkan işe yaramaz olur ve
+    /// kaçış bir ölüm cezasına dönerdi.
+    ///
+    /// Bu tip HİÇ ateş etmez; tehdidi tamamen oyuncunun ateş hattını kapatmasıdır.
+    /// </summary>
+    void UpdateScreen()
+    {
+        Vector2 self    = transform.position;
+        Vector2 shipPos = _playerShip != null ? (Vector2)_playerShip.transform.position : Vector2.zero;
+        Vector2 toShip  = shipPos - self;
+
+        UpdateShieldRecharge();
+
+        bool depleted  = _maxShieldHP > 0f && _shieldHP <= 0f;
+        bool recovered = _maxShieldHP > 0f && _shieldHP >= _maxShieldHP * ScreenReturnRatio;
+
+        switch (_screenPhase)
+        {
+            case ScreenPhase.Advancing:
+            {
+                // Ana geminin önünde (sağında) bir tutuş noktası
+                Vector2 hold = shipPos + new Vector2(data.engageRange, _screenHoldY);
+                _movement.MoveToward(hold);
+                if (_movement.IsNear(hold, 0.7f)) _screenPhase = ScreenPhase.Holding;
+                if (depleted) BeginScreenRetreat();
+                break;
+            }
+
+            case ScreenPhase.Holding:
+            {
+                // Burnu oyuncuya çevir ve dur — kalkan hattı sabit kalsın
+                _movement.FaceAndBrake(toShip);
+                if (depleted) BeginScreenRetreat();
+                break;
+            }
+
+            case ScreenPhase.Retreating:
+            {
+                // Yeterince uzaklaştıysa dur ve şarj ol; yoksa uzaklaşmaya devam.
+                // Burun oyuncuda kaldığı için bu bir GERİ ÇEKİLME, kaçış değil.
+                if (toShip.magnitude < ScreenRetreatDistance)
+                    _movement.Reverse(toShip);
+                else
+                    _movement.FaceAndBrake(toShip);
+
+                if (recovered) _screenPhase = ScreenPhase.Advancing;
+                break;
+            }
+        }
+
+        if (Vector2.Distance(transform.position, Vector2.zero) > ViewBounds.DespawnRadius)
+            Destroy(gameObject);
+    }
+
+    void BeginScreenRetreat()
+    {
+        _screenPhase = ScreenPhase.Retreating;
+        // Geri döndüğünde farklı bir yükseklikte siper alsın — hep aynı noktaya
+        // dönmek oyuncuya bedava bir nişan hattı verirdi
+        _screenHoldY = Random.Range(-2.5f, 2.5f);
+    }
+
     void DropBomb()
     {
         var go = new GameObject("Bomb");
@@ -797,9 +892,32 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         // dirençli düşmanlara karşı zırh iki kez cezalandırırdı.
         float shot = BalanceConfig.Instance.ApplyArmor(amount, EffectiveArmor);
 
-        float hull = data.maxShield > 0f && _shieldHP > 0f
+        // YÖNLÜ kalkan burada devreye GİRMEZ: bu çağrı gövde collider'ından
+        // geliyor, yani mermi yayı ıskalamış demektir. Kalkanı kenarından
+        // dolanmanın ödülü tam da budur.
+        float hull = data.maxShield > 0f && _shieldHP > 0f && !data.HasDirectionalShield
             ? ApplyShieldLayer(shot, weaponType)
             : ApplyResistances(shot, weaponType, data.hullResistances);
+
+        ApplyHullDamage(hull);
+    }
+
+    /// <summary>
+    /// Yay kalkanına isabet — yalnızca <see cref="BarrierShield"/> çağırır.
+    /// Kalkanı aşan fazlalık gövdeye geçer.
+    /// </summary>
+    public void TakeShieldDamage(float amount, WeaponType weaponType)
+    {
+        if (_healthBar == null) return;
+        if (IsPhased) return;
+
+        float shot = BalanceConfig.Instance.ApplyArmor(amount, EffectiveArmor);
+        ApplyHullDamage(ApplyShieldLayer(shot, weaponType));
+    }
+
+    void ApplyHullDamage(float hull)
+    {
+        if (hull <= 0f) return;
 
         _healthBar.TakeDamage(hull);
         if (_healthBar.currentHealth <= 0f)
@@ -940,7 +1058,7 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
                 ? data.shieldResistances
                 : DefaultShieldResistances);
 
-        _shieldRechargeTimer = ShieldRechargeDelay;
+        _shieldRechargeTimer = data.shieldRechargeDelay;
 
         if (_shieldHP >= effective)
         {
@@ -974,11 +1092,11 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 
     void UpdateShieldRecharge()
     {
-        if (_shieldHP >= _maxShieldHP) return;
+        if (_maxShieldHP <= 0f || _shieldHP >= _maxShieldHP) return;
         _shieldRechargeTimer -= Time.deltaTime;
         if (_shieldRechargeTimer > 0f) return;
 
-        _shieldHP = Mathf.Min(_shieldHP + ShieldRechargeRate * Time.deltaTime, _maxShieldHP);
+        _shieldHP = Mathf.Min(_shieldHP + data.shieldRechargeRate * Time.deltaTime, _maxShieldHP);
         SyncShieldBar();
         RefreshShieldVisual();
     }
@@ -1088,11 +1206,15 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 
     void RefreshShieldVisual()
     {
+        float ratio = _maxShieldHP > 0f ? Mathf.Clamp01(_shieldHP / _maxShieldHP) : 0f;
+
+        if (_barrier != null) { _barrier.Refresh(ratio); return; }
+
         if (_shieldVisual == null) return;
         if (_shieldHP <= 0f) { _shieldVisual.SetActive(false); return; }
         _shieldVisual.SetActive(true);
         var sr = _shieldVisual.GetComponent<SpriteRenderer>();
         if (sr != null)
-            sr.color = new Color(0.3f, 0.75f, 1f, (_shieldHP / _maxShieldHP) * 0.55f);
+            sr.color = new Color(0.3f, 0.75f, 1f, ratio * 0.55f);
     }
 }

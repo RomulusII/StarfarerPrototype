@@ -119,6 +119,7 @@ public class EnemySpawner : MonoBehaviour
             EnemyTypeData.CreateSwarm(),
             EnemyTypeData.CreateArmored(),
             EnemyTypeData.CreateShield(),
+            EnemyTypeData.CreateBarrier(),
             EnemyTypeData.CreateBomber(),
             EnemyTypeData.CreateBombRunner(),
             EnemyTypeData.CreateInterceptor(),
@@ -131,8 +132,8 @@ public class EnemySpawner : MonoBehaviour
         };
         _defaultWeights = new[]
         {
-            0.30f, 0.13f, 0.10f, 0.05f, 0.05f,
-            0.09f, 0.07f, 0.06f, 0.05f, 0.05f, 0.03f, 0.02f,
+            0.28f, 0.12f, 0.09f, 0.07f, 0.05f, 0.05f,
+            0.08f, 0.06f, 0.05f, 0.05f, 0.05f, 0.03f, 0.02f,
         };
     }
 

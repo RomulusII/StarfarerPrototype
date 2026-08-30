@@ -150,9 +150,10 @@ public class LaserBeam : MonoBehaviour
             }
             else
             {
-                if (c.GetComponent<EnemyBot>()      != null ||
-                    c.GetComponent<BossHardpoint>() != null ||
-                    c.GetComponent<BossShip>()      != null)
+                if (c.GetComponent<EnemyBot>()       != null ||
+                    c.GetComponent<BarrierShield>()  != null ||
+                    c.GetComponent<BossHardpoint>()  != null ||
+                    c.GetComponent<BossShip>()       != null)
                 {
                     _target    = c;
                     _endPoint  = hit.point;

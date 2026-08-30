@@ -160,7 +160,8 @@ public class PlasmaBeam : MonoBehaviour
         {
             var col = _buffer[i];
 
-            bool isEnemy = col.GetComponent<EnemyBot>()      != null
+            bool isEnemy = col.GetComponent<EnemyBot>()       != null
+                        || col.GetComponent<BarrierShield>()  != null
                         || col.GetComponent<BossHardpoint>()  != null
                         || col.GetComponent<BossShip>()       != null;
             if (!isEnemy) continue;

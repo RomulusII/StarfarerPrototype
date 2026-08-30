@@ -82,10 +82,55 @@ Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 1), Otomatik Turretler, İki
 | **Leech** (Sülük) | 8 | Komponentlere yapışır | Point Defence talebi |
 | **Splitter** (Bölünen) | 12 | Ölünce ikiye ayrılır (%50 HP) | Alan hasarı talebi |
 | **Juggernaut** (Kaleci) | 20 | Zırh +12, çok yavaş, 200 HP | Zırh eşiğinin doruk testi |
+| **Barrier** (Bariyer) | 8 | Silahsız; önünde YÖNLÜ yay kalkanı, ana geminin önüne park eder | Ateş hattı — del, dolan ya da bekle |
 
 Jammer `EnergyBus.JamFactor` üzerinden üretimi kısar; Phantom faz sırasında
 `IsValidTarget = false` döner (turretler boşa mermi harcamasın); Splitter
 `EnemySpawner.Spawn` ile iki parça üretir; Regenerator aurası 0.25 sn'de bir tarar.
+
+### Bariyer ve Yönlü Kalkan — Tasarım Kararları
+
+Silahsız bir gemi. Hiç hasar vermez; tehdidi TAMAMEN dolaylıdır — ana geminin
+önüne park edip **oyuncunun ateş hattını kapatır** ve arkasındaki filoya siper olur.
+
+**Kalkan küresel değil, geminin önünde 120°'lik bir YAY.** Bu fark oyunun içine
+ekstra bir parametreyle değil, GEOMETRİYLE girer: kalkan ayrı bir collider'dır
+(`BarrierShield`, dilim şeklinde `PolygonCollider2D`). Önden gelen mermi ona
+çarpar; yandan veya arkadan gelen onu ıskalayıp gövde collider'ına ulaşır ve
+kalkanı hiç görmez. "Kenarından dolanmak" bir kural değil, sahnedeki şeklin
+doğal sonucudur.
+
+Collider ince bir şerit değil DİLİM: hızlı mermi ince şeridi bir karede atlayıp
+içeri girebilir; dilim sektörün tamamını kapladığı için tünelleme olmaz.
+
+Oyuncunun üç cevabı var, üçü de gerçek bir karar:
+
+| Cevap | Bedeli |
+|---|---|
+| Kalkanı del | Kinetik ×1.5, lazer ×0.25 — silah seçimi belirleyici |
+| Yayın kenarından dolan | Ana gemi sabit; nişan açısı sınırlı |
+| Yok say, arkasındakileri vur | Mermilerin yayda erir |
+
+**Kalkanı boşalınca kaçar, dolunca geri gelir.** Bu bir PENCERE açar: gövdesi
+kasten kırılgandır (40 HP), yani pencereyi görüp kullanmak öğrenilebilir bir
+beceridir. Kalkan güçlü (150) ve hızlı şarj olur (20/s, 2.5 sn gecikme) ki
+pencere kapansın ve mekanik yaşasın — bir kez kırıp unutulacak bir engel olmasın.
+
+Geri çekilirken **burun oyuncuda kalır** (`Reverse`, retro itki). Sırtını
+dönseydi kalkan işe yaramaz hâle gelir ve geri çekilme bir ölüm cezasına
+dönerdi. Geri geldiğinde farklı bir yükseklikte siper alır — hep aynı noktaya
+dönmek oyuncuya bedava bir nişan hattı verirdi.
+
+`EnemyMovementKind.Screen` üç durumlu: **Advancing → Holding → Retreating**.
+`ShipBrain` kurulmaz; siperin taktiği yörünge ya da dalış değil, tek bir noktayı
+tutmaktır.
+
+`FormationTemplate.CreateShieldWall()` bariyeri formasyonun EN ÖNÜNE koyar —
+arkasındakilere siper olmazsa hiçbir şey ifade etmez.
+
+**Kalkan şarjı artık veriden gelir** (`shieldRechargeRate` / `shieldRechargeDelay`).
+Eskiden `EnemyBot` içinde sabitti (5/s, 4 sn), yani her kalkanlı tip aynı hızda
+şarj oluyordu.
 
 ### Savaş Uçaklarına Karşı Tutum — Tasarım Kararları
 
@@ -920,6 +965,9 @@ bırakıldı.
 | WeaponMount.cs | Mouse'a dönen silah noktası |
 | WeaponController.cs | Kinetic/Laser/Plasma ateş mantığı, Boost çarpanları |
 | Bullet.cs | Oyuncu mermisi — hareket, trigger collision, 3sn sonra yok |
+| BarrierShield.cs | Yönlü yay kalkanı — ayrı collider, önden gelen mermiyi emer |
+| FormationGroup.cs | Bir dalganın birlikte uçan gemi grubu — çapa + yuvalar |
+| ViewBounds.cs | Kameranın en geniş kadrajı; doğum ve silinme sınırları buradan türer |
 | EnemyBot.cs | Data-driven düşman — hareket, ateş, direnç, zırh eşiği, faz/bölünme/onarım aurası |
 | Asteroid.cs | Parçalanabilir asteroit — Large→Medium→Small, çarpma hasarı, enkaz bırakır |
 | Debris.cs | Enkaz — sürüklenip durur, tipe göre renk, ömür sonunda solup yanıp söner |

@@ -50,6 +50,7 @@ public class ChapterData : ScriptableObject
         var swarm       = EnemyTypeData.CreateSwarm();
         var armored     = EnemyTypeData.CreateArmored();
         var shield      = EnemyTypeData.CreateShield();
+        var barrier     = EnemyTypeData.CreateBarrier();
         var bomber      = EnemyTypeData.CreateBomber();
         var bombRunner  = EnemyTypeData.CreateBombRunner();
         var interceptor = EnemyTypeData.CreateInterceptor();
@@ -78,26 +79,26 @@ public class ChapterData : ScriptableObject
             Make(3, "Sektör 3: Kalkan Duvarı",
                 "Enerji kalkanıyla donatılmış yeni bir varyant. Lazer kalkanda eriyor.",
                 introduced: shield,
-                pool: new[] { swarm, armored, shield },
+                pool: new[] { swarm, armored, shield, barrier },
                 asteroids: 3),
 
             Make(4, "Sektör 4: Bomba Yağmuru",
                 "Yakın mesafe bombardımanı. Komponentleriniz doğrudan hedef alınıyor — " +
                 "Point Defence artık lüks değil.",
                 introduced: bomber,
-                pool: new[] { swarm, armored, shield, bomber, bombRunner },
+                pool: new[] { swarm, armored, shield, barrier, bomber, bombRunner },
                 asteroids: 3),
 
             Make(5, "Sektör 5: Avcı Sürüsü",
                 "Küçük, hızlı, kaçamak. Turretleriniz nişan alamıyor.",
                 introduced: interceptor,
-                pool: new[] { swarm, armored, shield, bomber, interceptor },
+                pool: new[] { swarm, armored, shield, barrier, bomber, interceptor },
                 asteroids: 3),
 
             Make(6, "Sektör 6: Uzun Menzil",
                 "Menzil dışından dövülüyoruz. Beklemek ölüm, ilerlemek şart.",
                 introduced: artillery,
-                pool: new[] { swarm, armored, shield, interceptor, artillery },
+                pool: new[] { swarm, armored, shield, barrier, interceptor, artillery },
                 asteroids: 4),
 
             Make(7, "Sektör 7: Karartma",
@@ -109,7 +110,7 @@ public class ChapterData : ScriptableObject
             Make(8, "Sektör 8: Onarım Kovanı",
                 "Vurduğunuz her şey geri geliyor. Yetersiz hasar, hiç hasar demek.",
                 introduced: regenerator,
-                pool: new[] { swarm, armored, shield, interceptor, jammer, regenerator, leech },
+                pool: new[] { swarm, armored, shield, barrier, interceptor, jammer, regenerator, leech },
                 asteroids: 4),
 
             Make(9, "Sektör 9: Bölünen Sürü",
@@ -121,7 +122,7 @@ public class ChapterData : ScriptableObject
             Make(10, "Sektör 10: Kovan Zihni",
                 "Sinyalin kaynağı. Bütün bu tasarımlar tek bir yerden çıkıyordu.",
                 introduced: juggernaut,
-                pool: new[] { armored, shield, interceptor, artillery, jammer,
+                pool: new[] { armored, shield, barrier, interceptor, artillery, jammer,
                               phantom, regenerator, splitter, juggernaut },
                 asteroids: 4),
         };

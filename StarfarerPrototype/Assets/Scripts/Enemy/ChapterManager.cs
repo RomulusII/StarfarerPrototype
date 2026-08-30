@@ -63,6 +63,7 @@ public class ChapterManager : MonoBehaviour
             FormationTemplate.CreateColumn(),
             FormationTemplate.CreateBroadFront(),
             FormationTemplate.CreateEscort(),
+            FormationTemplate.CreateShieldWall(),
             FormationTemplate.CreateScattered(),
         };
 

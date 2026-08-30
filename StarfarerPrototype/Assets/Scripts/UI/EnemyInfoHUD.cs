@@ -200,6 +200,12 @@ public class EnemyInfoHUD : MonoBehaviour
                                    : "Savaşçıları tamamen yok sayar");
         sb.AppendLine(vsFighters);
 
+        if (d.HasDirectionalShield)
+            sb.AppendLine($"⚠ YÖNLÜ kalkan: yalnızca öndeki {d.shieldArcDegrees:0}° yayı korur — " +
+                          "kenarından dolan");
+        if (d.maxShield > 0f)
+            sb.AppendLine($"Kalkan şarjı: {d.shieldRechargeRate:0.#}/s ({d.shieldRechargeDelay:0.#}s gecikme)");
+
         if (d.energyDrain   > 0f) sb.AppendLine($"⚠ Enerji karıştırıcı: üretimi %{d.energyDrain * 100f:0} kısar ({d.energyDrainRange:0.#} menzil)");
         if (d.phaseInterval > 0f) sb.AppendLine($"⚠ Faz: {d.phaseInterval:0.#}s'de bir {d.phaseDuration:0.#}s vurulamaz");
         if (d.repairAura    > 0f) sb.AppendLine($"⚠ Onarım aurası: {d.repairAura:0.#} HP/s ({d.repairAuraRange:0.#} menzil)");

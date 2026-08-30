@@ -26,6 +26,7 @@ public static class SkinId
     public const string EnemyBullet         = "enemy.bullet.hull";
     public const string EnemyBulletComponent= "enemy.bullet.component";
     public const string EnemyBarrel         = "enemy.barrel";
+    public const string EnemyBarrierArc     = "enemy.barrier.arc";
     public const string Bomb                = "enemy.bomb";
     public const string BossBody            = "boss.body";
     public const string BossHardpoint       = "boss.hardpoint";

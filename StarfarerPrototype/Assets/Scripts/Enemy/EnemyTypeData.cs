@@ -136,6 +136,25 @@ public class EnemyTypeData : ScriptableObject
     [Header("Kalkan Dirençleri (maxShield > 0 ise geçerli)")]
     public DamageModifier[] shieldResistances;
 
+    [Header("Kalkan Davranışı")]
+    [Tooltip("Kalkanın şarj hızı (HP/sn).")]
+    public float shieldRechargeRate = 5f;
+
+    [Tooltip("Son hasardan sonra şarjın başlaması için beklenen süre (sn).")]
+    public float shieldRechargeDelay = 4f;
+
+    [Tooltip("0 = KÜRESEL kalkan (her yönden emer, gövdeyle aynı collider). " +
+             ">0 = geminin ÖNÜNDE bu açıda bir YAY: yalnızca yaydan giren mermi " +
+             "emilir, yandan/arkadan gelen doğrudan gövdeye ulaşır. Yönlü kalkan " +
+             "oyuncuya 'ya del ya kenarından dolan' seçimi verir.")]
+    public float shieldArcDegrees = 0f;
+
+    [Tooltip("Yayın dış yarıçapı (dünya birimi). shieldArcDegrees > 0 ise geçerli.")]
+    public float shieldArcRadius = 1.1f;
+
+    /// <summary>Kalkan yönlü mü? Gövdeye isabet eden mermi kalkanı ATLAR.</summary>
+    public bool HasDirectionalShield => shieldArcDegrees > 0f && maxShield > 0f;
+
     // ── Özel davranışlar ──────────────────────────────────────────────────────
     // Her biri oyuncunun bir sistemine baskı yapar; süs değildir.
 
@@ -429,6 +448,56 @@ public class EnemyTypeData : ScriptableObject
         d.escapeAngle   = 45f;
         d.weaponKind    = EnemyWeaponKind.ComponentBurst;
         d.fireDamage    = 3f;   d.fireRate      = 1.4f; d.bulletSpeed = 2.5f;
+        return d;
+    }
+
+    /// <summary>
+    /// Bariyer — silahsız, yalnızca yön duyarlı bir yay kalkanı taşır.
+    ///
+    /// Ana geminin önüne park eder ve arkasındaki filoya siper olur. Hiç hasar
+    /// vermez; tehdidi TAMAMEN dolaylıdır — oyuncunun ateş hattını kapatır.
+    /// Oyuncunun üç cevabı var ve üçü de gerçek bir karar:
+    ///   1. Kalkanı del (kinetik ×1.5, lazer ×0.25 — silah seçimi belirleyici)
+    ///   2. Yayın kenarından dolan: gövdesi savunmasız, HP'si düşük
+    ///   3. Yok say ve arkasındakileri vur — ama mermilerin yayda erir
+    ///
+    /// Kalkanı boşalınca kaçar, dolunca geri gelir: oyuncuya bir PENCERE açar.
+    /// O pencereyi görmek ve kullanmak öğrenilebilir bir beceridir.
+    /// </summary>
+    public static EnemyTypeData CreateBarrier()
+    {
+        var d = CreateInstance<EnemyTypeData>();
+        d.name          = "Barrier";
+        d.displayName   = "Bariyer";
+        d.role          = EnemyRole.Barrier;
+        d.threatScore   = 8;
+        // Gövde kasten kırılgan: yayın kenarından dolanmak gerçekten ödüllendirmeli
+        d.maxHP         = 40f;
+        d.maxShield     = 150f;
+        d.mass          = 4f;   d.enginePower   = 6f;
+        d.bodyWidth     = 46;   d.bodyHeight    = 62;   d.sizeOrder = 4;
+        d.hitboxWidth   = 40;   d.hitboxHeight  = 54;
+        d.bodyColor     = new Color(0.40f, 0.62f, 0.78f);
+        d.barrelColor   = new Color(0.30f, 0.48f, 0.62f);
+        d.movementKind  = EnemyMovementKind.Screen;
+        // engageRange = ana geminin önünde duracağı mesafe
+        d.engageRange   = 5.5f; d.fireRange     = 0f;
+        d.agility       = 0.7f; d.grip          = 0.8f;
+        d.evasionAngle  = 5f;   d.evasionPeriod = 3f;
+        d.escapeAngle   = 35f;
+        d.weaponKind    = EnemyWeaponKind.None;
+        d.fireDamage    = 0f;   d.fireRate      = 0f;   d.bulletSpeed = 0f;
+        // Kalkan güçlü VE hızlı şarj olur — geri gelmesi kısa sürsün ki
+        // "pencere" mekaniği yaşasın, oyuncu bir kez kırıp unutmasın.
+        d.shieldRechargeRate  = 20f;
+        d.shieldRechargeDelay = 2.5f;
+        d.shieldArcDegrees    = 120f;
+        d.shieldArcRadius     = 1.25f;
+        d.shieldResistances = new[]
+        {
+            new DamageModifier { weaponType = WeaponType.Kinetic, multiplier = 1.5f  },
+            new DamageModifier { weaponType = WeaponType.Laser,   multiplier = 0.25f },
+        };
         return d;
     }
 
