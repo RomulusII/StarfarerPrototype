@@ -45,6 +45,16 @@ MonoBehaviour:
       width: 221
       height: 146
     hitboxScale: 1
+  - id: enemy.barrier
+    sprite: {fileID: 21300000, guid: dc965ad6c5f38a8267d28a467d311803, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 33
+      y: 72
+      width: 134
+      height: 104
+    hitboxScale: 0.9
   - id: enemy.bomber
     sprite: {fileID: 21300000, guid: 875f0aaeb2e8ee94a9a63e29190c064d, type: 3}
     colliderMode: 1

@@ -27,6 +27,7 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     float         _shieldHP;
     float         _maxShieldHP;
     GameObject    _shieldVisual;   // küresel kalkan kabuğu
+    float         _shieldRadius;   // kabuğun dünya yarıçapı — çarpma parlaması buna oturur
     BarrierShield _barrier;        // yönlü yay kalkanı (Bariyer tipi)
     float         _shieldRechargeTimer;
 
@@ -1300,16 +1301,68 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         _reloadFillSR.color        = ReloadColor(0f);
     }
 
+    /// <summary>
+    /// Küresel kalkan kabuğu. Yarıçapı gövdeden türer ve DAİREDİR.
+    ///
+    /// Eskiden SkinLibrary.Get(...) çağrılıyordu; "fx.shield" hiçbir SkinSet'te
+    /// olmadığı için prosedürel yedeğe düşüyordu — ve o yedek bir DİKDÖRTGEN.
+    /// Yani oyundaki her kalkanlı düşman, kalkanını kare bir levha olarak
+    /// taşıyordu. Yuvarlak yedek burada üretilir (ShipComponentBase halkasıyla
+    /// aynı desen: skin varsa o, yoksa çağıranın kendi şekli).
+    /// </summary>
     void BuildShieldVisual(int w, int h)
     {
+        _shieldRadius = Mathf.Max(w, h) / 100f * 0.62f;
+
         _shieldVisual = new GameObject("ShieldVisual");
         _shieldVisual.transform.SetParent(transform, false);
-        var sr = _shieldVisual.AddComponent<SpriteRenderer>();
-        sr.sprite       = SkinLibrary.Get(SkinId.ShieldBubble, w, h, Color.white);
-        sr.sortingOrder = data.sizeOrder + 1;
-        sr.color        = new Color(0.3f, 0.75f, 1f, 0.55f);
 
-        SkinLibrary.FitToSize(_shieldVisual.transform, sr.sprite, w, h);
+        var sr = _shieldVisual.AddComponent<SpriteRenderer>();
+        sr.sprite       = SkinLibrary.GetOrNull(SkinId.ShieldBubble) ?? BubbleSprite();
+        sr.sortingOrder = data.sizeOrder + 1;
+        sr.color        = BarrierShield.ArcColor;
+
+        // Sprite dış kenarı 1 birim (ppu = yarıçap) → ölçek doğrudan yarıçap
+        _shieldVisual.transform.localScale = Vector3.one * _shieldRadius;
+    }
+
+    /// <summary>
+    /// Yumuşak kenarlı kalkan kabuğu: merkeze doğru şeffaf, kenarda parlak.
+    /// Arkasındaki gemi görünmeli — kalkan bir duvar değil bir yüzey.
+    /// </summary>
+    static Sprite _bubbleSprite;
+
+    static Sprite BubbleSprite()
+    {
+        if (_bubbleSprite != null) return _bubbleSprite;
+
+        const int   Sz   = 128;
+        const float OutR = 62f;              // ppu olarak da kullanılır → 1 birim
+        const float InR  = OutR * 0.55f;
+        const float C    = Sz * 0.5f;
+
+        var tex = new Texture2D(Sz, Sz, TextureFormat.RGBA32, false)
+                  { filterMode = FilterMode.Bilinear };
+        var px = new Color[Sz * Sz];
+
+        for (int i = 0; i < px.Length; i++)
+        {
+            float dx = (i % Sz) + 0.5f - C;
+            float dy = (i / Sz) + 0.5f - C;
+            float r  = Mathf.Sqrt(dx * dx + dy * dy);
+
+            if (r > OutR) { px[i] = Color.clear; continue; }
+
+            // İçeride soluk bir dolgu, kenara doğru güçlenen bir halka
+            float rim  = Mathf.Clamp01((r - InR) / (OutR - InR));
+            float edge = Mathf.Clamp01((OutR - r) / 2.5f);   // dış kenar yumuşatma
+            px[i] = new Color(1f, 1f, 1f, (0.18f + 0.82f * rim * rim) * edge);
+        }
+
+        tex.SetPixels(px);
+        tex.Apply();
+        _bubbleSprite = Sprite.Create(tex, new Rect(0, 0, Sz, Sz), Vector2.one * 0.5f, OutR);
+        return _bubbleSprite;
     }
 
     void RefreshShieldVisual()
@@ -1323,6 +1376,27 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         _shieldVisual.SetActive(true);
         var sr = _shieldVisual.GetComponent<SpriteRenderer>();
         if (sr != null)
-            sr.color = new Color(0.3f, 0.75f, 1f, ratio * 0.55f);
+        {
+            var c = BarrierShield.ArcColor;
+            sr.color = new Color(c.r, c.g, c.b, Mathf.Lerp(0.12f, c.a, ratio));
+        }
+    }
+
+    /// <summary>Kalkan ayakta mı? Çarpma efektinin rengini/parlamasını belirler.</summary>
+    public bool HasActiveShield => _maxShieldHP > 0f && _shieldHP > 0f;
+
+    /// <summary>
+    /// Kalkana isabet parlaması — ana geminin kalkanındaki hilalin aynısı.
+    /// Yay kalkanında kırpma BarrierShield'in işi; küre kalkanda kırpma gerekmez.
+    /// </summary>
+    public void ShieldFlash(Vector2 worldHitPos)
+    {
+        if (!HasActiveShield) return;
+
+        if (_barrier != null) { _barrier.Flash(worldHitPos); return; }
+        if (_shieldVisual == null) return;
+
+        ShieldEffect.Spawn(worldHitPos, transform.position,
+                           _shieldRadius, BarrierShield.ArcColor);
     }
 }

@@ -27,7 +27,15 @@ public class BarrierShield : MonoBehaviour
     SpriteRenderer    _sr;
     PolygonCollider2D _col;
 
-    static readonly Color ArcColor = new Color(0.35f, 0.8f, 1f, 0.75f);
+    /// <summary>
+    /// Düşman kalkanları soluk turuncu — oyuncunun mavi kalkanından bir bakışta
+    /// ayrılsın. Yarı saydam: arkasındaki gemi ve mermiler görünmeli, kalkan
+    /// bir duvar değil bir yüzey olarak okunmalı.
+    /// </summary>
+    public static readonly Color ArcColor = new Color(1f, 0.62f, 0.28f, 0.42f);
+
+    /// <summary>Çarpma hilalinin yarı genişliği (derece).</summary>
+    const float FlashHalfAngle = 20f;
 
     /// <param name="radius">Yayın dış yarıçapı (dünya birimi).</param>
     /// <param name="arcDegrees">Yayın toplam açısı.</param>
@@ -87,7 +95,29 @@ public class BarrierShield : MonoBehaviour
         _sr.enabled = up;
         // Zayıflayan kalkan solar — oyuncu ne zaman kırılacağını görebilmeli
         _sr.color = new Color(ArcColor.r, ArcColor.g, ArcColor.b,
-                              Mathf.Lerp(0.18f, ArcColor.a, ratio));
+                              Mathf.Lerp(0.12f, ArcColor.a, ratio));
+    }
+
+    /// <summary>
+    /// Çarpma parlaması. Ana geminin kalkanındaki hilalin aynısı, iki farkla:
+    /// dar (20°) ve YAYIN SINIRLARI İÇİNE KIRPILIR. Kırpılmasaydı yayın ucuna
+    /// yakın bir isabet, kalkan olmayan boşlukta parlardı.
+    /// </summary>
+    public void Flash(Vector2 worldHitPos)
+    {
+        if (_sr == null || !_sr.enabled) return;
+
+        Vector2 center  = transform.position;
+        float   facing  = transform.eulerAngles.z;
+        float   hitDeg  = Mathf.Atan2(worldHitPos.y - center.y, worldHitPos.x - center.x) * Mathf.Rad2Deg;
+
+        // Yayın içinde kalacak şekilde kırp
+        float limit  = Mathf.Max(0f, _halfAngle - FlashHalfAngle);
+        float offset = Mathf.Clamp(Mathf.DeltaAngle(facing, hitDeg), -limit, limit);
+        float rad    = (facing + offset) * Mathf.Deg2Rad;
+
+        Vector2 onArc = center + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * _radius;
+        ShieldEffect.Spawn(onArc, center, _radius, ArcColor, FlashHalfAngle);
     }
 
     // ── Prosedürel yay ────────────────────────────────────────────────────────
@@ -95,19 +125,23 @@ public class BarrierShield : MonoBehaviour
     static readonly Dictionary<int, Sprite> _cache = new();
 
     /// <summary>
-    /// İçi boş yay: dış kenar opak, içe doğru sönümlenir; uçlara doğru da solar.
-    /// ShieldEffect'in çarpma hilaliyle aynı fikir, farklı ölçüde — o anlık bir
-    /// parlama, bu duran bir yapı.
+    /// HİLAL — yeni ay. Dış kenar sabit yarıçapta (kalkan yüzeyi), iç kenar
+    /// ortada içeri girip UÇLARDA dış kenarla BİRLEŞİR. Böylece yay ortada
+    /// kalın, uçlarda sivridir.
+    ///
+    /// Eskiden sabit kalınlıkta bir şeritti: her iki ucu da küt bitiyor ve
+    /// kalkandan çok bir boru parçası gibi duruyordu. Kalınlığın kosinüsle
+    /// sönmesi, şekli tek bir satırla gerçek bir hilale çevirir.
     /// </summary>
     static Sprite ArcSprite(float halfAngle)
     {
         int key = Mathf.RoundToInt(halfAngle);
         if (_cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
-        const int   Sz   = 256;
-        const float OutR = 120f;           // piksel; ppu olarak da kullanılır
-        const float InR  = OutR * 0.78f;   // yayın kalınlığı
-        const float C    = Sz * 0.5f;
+        const int   Sz        = 256;
+        const float OutR      = 122f;       // piksel; ppu olarak da kullanılır
+        const float MaxThick  = 26f;        // ortadaki en kalın yer (piksel)
+        const float C         = Sz * 0.5f;
 
         var tex = new Texture2D(Sz, Sz, TextureFormat.RGBA32, false)
                   { filterMode = FilterMode.Bilinear };
@@ -118,15 +152,19 @@ public class BarrierShield : MonoBehaviour
         {
             float dx = x - C, dy = y - C;
             float r  = Mathf.Sqrt(dx * dx + dy * dy);
-            if (r < InR || r > OutR) { px[y * Sz + x] = Color.clear; continue; }
+            if (r > OutR) { px[y * Sz + x] = Color.clear; continue; }
 
             float deg = Mathf.Abs(Mathf.Atan2(dy, dx) * Mathf.Rad2Deg); // 0 = +X
             if (deg > halfAngle) { px[y * Sz + x] = Color.clear; continue; }
 
-            float radial = (r - InR) / (OutR - InR);          // içte 0, dışta 1
-            float ang    = 1f - deg / halfAngle;              // ortada 1, uçta 0
-            px[y * Sz + x] = new Color(1f, 1f, 1f,
-                Mathf.Max(radial * 0.55f + 0.45f, 0f) * Mathf.Sqrt(ang));
+            // Kalınlık ortada MaxThick, uçlarda 0 — hilalin sivri uçları
+            float taper = Mathf.Cos(deg / halfAngle * Mathf.PI * 0.5f);
+            float thick = MaxThick * taper;
+            if (thick < 0.5f || r < OutR - thick) { px[y * Sz + x] = Color.clear; continue; }
+
+            // Dış kenar parlak, iç kenara doğru sönümlenir
+            float t = (r - (OutR - thick)) / thick;   // içte 0, dışta 1
+            px[y * Sz + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(0.25f + 0.75f * t));
         }
 
         tex.SetPixels(px);

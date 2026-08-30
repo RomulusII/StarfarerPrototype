@@ -326,7 +326,53 @@ const juggernaut = () => {
   };
 };
 
+// Barrier - silahsiz siper gemisi. Onde iki buyuk emitor kolu: yay kalkani
+// tam o iki kolun arasina yansitilir, yani gemi ne yaptigini siluetiyle soyler.
+// Govde kasten kucuk ve arkada; kutlenin cogu kollarda.
+const barrier = () => {
+  const p  = pal(u(0.40, 0.62, 0.78), u(0.30, 0.48, 0.62));
+  const CY = 124;
+
+  // Emitor kolu: govdeden one ve yukari suzulur, ucunda parlak emitor
+  // Uclar fazla acilirsa iki kolun arasindaki bosluk hitbox'i sisirir; acikligi
+  // kalkanin yayina birakip kollari biraz iceri aliyoruz.
+  const prong = [120,146, 140,166, 160,188, 174,183, 168,161, 148,141, 128,132];
+  const tip   = [160,188, 174,183, 171,169, 157,173];
+
+  return {
+    name: "Barrier", w: 184, h: 248, ppu: 400,
+    shapes: [
+      { pts: prong,             color: p.wing },
+      { pts: mirrorY(prong, CY), color: p.wing },
+      { pts: tip,               color: p.light },
+      { pts: mirrorY(tip, CY),  color: p.light },
+
+      // Govde: sekizgen blok
+      { pts: [124,102, 116,86, 66,78, 34,94, 26,124,
+              34,154, 66,170, 116,162, 124,146], color: p.hull },
+
+      // Motor blogu — govdenin icinde
+      { pts: [26,124, 34,154, 52,150, 52,98, 34,94], color: p.dark },
+
+      // Ust kenar aydinlatmasi
+      { pts: [116,162, 66,170, 34,154, 34,148, 66,164, 116,156], color: p.light },
+
+      // Panel dikisi
+      { pts: [52,120, 108,120, 114,124, 108,128, 52,128], color: p.dark },
+
+      // Merkez emitor mili — iki kolun arasini baglar, alan buradan yansitilir
+      { pts: [120,115, 156,119, 164,124, 156,129, 120,133], color: p.wing },
+      { pts: [156,119, 164,124, 156,129], color: p.light },
+
+      // Sensor lensi
+      { pts: [122,124, 108,111, 92,114, 92,134, 108,137], color: p.eye },
+      { pts: [116,124, 106,115, 96,117, 96,131, 106,133], color: p.eyeIn },
+    ],
+    skin: { id: "enemy.barrier", colliderMode: "Box", hitboxScale: 0.9 },
+  };
+};
+
 module.exports = {
-  armored, shield, bomber, bombRunner, interceptor, artillery,
+  armored, shield, barrier, bomber, bombRunner, interceptor, artillery,
   jammer, phantom, regenerator, leech, splitter, juggernaut,
 };

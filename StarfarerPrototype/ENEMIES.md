@@ -5,17 +5,17 @@ Mevcut isimler placeholder. İsimler ve hikaye uyumu için tartışma notları e
 ---
 
 ### Barrier (Bariyer)
-**Kod adı:** `Barrier` · **Rol:** Bariyer · **Tehdit puanı:** 8
+**Kod adı:** `Barrier` · **Rol:** Bariyer · **Tehdit puanı:** 3 · **İlk çıkış:** level 12
 
 | Stat | Değer |
 |------|-------|
 | HP | 40 |
-| Kalkan | 150 (şarj 20/s, 2.5 sn gecikme) |
-| Kalkan şekli | Önde 120° YAY, yarıçap 1.25 |
+| Kalkan | 170 (şarj 24/s, 2.5 sn gecikme) — ikisi de levelle ölçeklenir |
+| Kalkan şekli | Önde 100° HİLAL, yarıçap 2.0 (kiriş 3.06 birim) |
 | Kütle | 4 · Güç: 6 |
 | Silah | — (silahsız) |
 | Boyut | 46×62 px |
-| Enkaz | Ham madde + 15 kristal (kalkan × 0.1) |
+| Enkaz | Ham madde + 17 kristal (kalkan × 0.1) |
 
 **Hareket:** Screen — ana gemi ile korunan filonun ARASINA, gemiden 5.5 birim
 uzağa yerleşir; filo hareket ettikçe koruma ekseni döner ve siper onunla kayar.

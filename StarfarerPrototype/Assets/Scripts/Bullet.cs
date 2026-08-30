@@ -33,11 +33,17 @@ public class Bullet : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D other)
     {
+        // Yüzey hasardan ÖNCE okunur: bu vuruş kalkanı düşürecekse bile
+        // çarpmanın kendisi kalkana olmuştur.
+        var surface = DamageUtil.SurfaceOf(other);
+
         if (DamageUtil.TryDamage(other, damage, weaponType))
         {
             bool lethal = other.GetComponent<HealthBar>()?.currentHealth <= 0f;
             HitEffect.SpawnImpact(transform.position, transform.up, other.transform.position,
-                                  DamageUtil.SurfaceOf(other), damage, lethal);
+                                  surface, damage, lethal);
+            if (surface == ImpactSurface.Shield)
+                DamageUtil.ShieldFlash(other, transform.position);
             Destroy(gameObject);
         }
     }

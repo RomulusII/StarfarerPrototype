@@ -67,7 +67,7 @@ const K = require("./components");
 module.exports = {
   ships: [
     swarm(),
-    E.armored(), E.shield(), E.bomber(), E.bombRunner(),
+    E.armored(), E.shield(), E.barrier(), E.bomber(), E.bombRunner(),
     E.interceptor(), E.artillery(), E.jammer(), E.phantom(),
     E.regenerator(), E.leech(), E.splitter(), E.juggernaut(),
 

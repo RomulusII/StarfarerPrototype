@@ -19,7 +19,9 @@ public class ShieldEffect : MonoBehaviour
     float          _timer;
     const float    FadeDuration = 0.5f;
 
-    static Sprite _sprite;
+    // Yay genişliğine göre önbellek: oyuncunun geniş hilali ile siper gemisinin
+    // dar hilali aynı dokuyu paylaşamaz.
+    static readonly System.Collections.Generic.Dictionary<int, Sprite> _cache = new();
 
     // ── Spawn ─────────────────────────────────────────────────────────────────
 
@@ -28,7 +30,16 @@ public class ShieldEffect : MonoBehaviour
     /// hitPos: merminin konumu (kalkan yüzeyinde).
     /// center: kalkan küresinin merkezi (genellikle PlayerShip.transform.position).
     /// </summary>
-    public static void Spawn(Vector2 hitPos, Vector2 center)
+    /// <param name="radius">Kalkan yüzeyinin yarıçapı. Hilalin dış kenarı buraya oturur.</param>
+    /// <param name="color">Kalkan rengi. Düşman kalkanları soluk turuncu, oyuncunun mavi.</param>
+    /// <param name="halfAngleDeg">
+    /// Hilalin yarı genişliği. YAY kalkanlarda dar tutulmalıdır: geniş bir hilal
+    /// yayın ucundan taşar ve kalkan olmayan boşlukta parlar.
+    /// </param>
+    public static void Spawn(Vector2 hitPos, Vector2 center,
+                             float radius = ShieldRadius,
+                             Color? color = null,
+                             float halfAngleDeg = 55f)
     {
         var go = new GameObject("ShieldHit");
         go.transform.position = center;
@@ -36,12 +47,12 @@ public class ShieldEffect : MonoBehaviour
         // Çarpma yönüne döndür — hilal dışa baksın
         float angle           = Mathf.Atan2(hitPos.y - center.y, hitPos.x - center.x) * Mathf.Rad2Deg;
         go.transform.rotation   = Quaternion.Euler(0f, 0f, angle);
-        go.transform.localScale = Vector3.one * ShieldRadius;
+        go.transform.localScale = Vector3.one * radius;
 
         var sr          = go.AddComponent<SpriteRenderer>();
-        sr.sprite       = GetSprite();
+        sr.sprite       = GetSprite(halfAngleDeg);
         sr.sortingOrder = 12;
-        sr.color        = new Color(0.45f, 0.88f, 1f, 1f); // açık mavi
+        sr.color        = color ?? new Color(0.45f, 0.88f, 1f, 1f); // oyuncu: açık mavi
 
         var fx    = go.AddComponent<ShieldEffect>();
         fx._sr    = sr;
@@ -63,14 +74,15 @@ public class ShieldEffect : MonoBehaviour
 
     // ── Sprite üretimi ────────────────────────────────────────────────────────
 
-    static Sprite GetSprite()
+    static Sprite GetSprite(float halfDeg)
     {
-        if (_sprite != null) return _sprite;
+        int key = Mathf.RoundToInt(halfDeg);
+        if (_cache.TryGetValue(key, out var cached) && cached != null) return cached;
 
         const int   Sz    = 256;
         const float OutR  = 118f;          // piksel — PPU olarak da kullanılır → dış kenar = 1 birim
         const float InR   = OutR * 0.60f;  // iç kenar, buradan içe doğru transparan
-        const float Half  = 55f;           // yarı yay genişliği (derece) — toplam 110°
+        float       Half  = Mathf.Max(5f, halfDeg);
         const float Cx    = Sz * 0.5f;
 
         var tex = new Texture2D(Sz, Sz, TextureFormat.RGBA32, false);
@@ -99,7 +111,8 @@ public class ShieldEffect : MonoBehaviour
         tex.Apply();
 
         // PPU = OutR → dış kenar tam 1 birim @ scale 1
-        _sprite = Sprite.Create(tex, new Rect(0, 0, Sz, Sz), new Vector2(0.5f, 0.5f), OutR);
-        return _sprite;
+        var sprite = Sprite.Create(tex, new Rect(0, 0, Sz, Sz), new Vector2(0.5f, 0.5f), OutR);
+        _cache[key] = sprite;
+        return sprite;
     }
 }

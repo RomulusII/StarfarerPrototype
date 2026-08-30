@@ -15,8 +15,27 @@ public static class DamageUtil
     {
         if (other == null) return ImpactSurface.Hull;
         if (other.GetComponent<BarrierShield>() != null) return ImpactSurface.Shield;
+
+        var bot = other.GetComponent<EnemyBot>();
+        if (bot != null && bot.HasActiveShield) return ImpactSurface.Shield;
+
         return other.GetComponent<Asteroid>() != null ? ImpactSurface.Rock
                                                       : ImpactSurface.Hull;
+    }
+
+    /// <summary>
+    /// Kalkana isabet hilalini tetikler. Çarpma NOKTASI yalnızca merminin
+    /// kendisinde biliniyor; TryDamage'a bir parametre daha eklemek yerine
+    /// çağıran taraf zaten elindeki konumu buraya veriyor.
+    /// </summary>
+    public static void ShieldFlash(Collider2D other, Vector2 hitPos)
+    {
+        if (other == null) return;
+
+        var barrier = other.GetComponent<BarrierShield>();
+        if (barrier != null && barrier.owner != null) { barrier.owner.ShieldFlash(hitPos); return; }
+
+        other.GetComponent<EnemyBot>()?.ShieldFlash(hitPos);
     }
 
     /// <summary>Hedefin zırhı. Zırh kavramı olmayan hedeflerde 0.</summary>

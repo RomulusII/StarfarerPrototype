@@ -93,7 +93,7 @@ Jammer `EnergyBus.JamFactor` üzerinden üretimi kısar; Phantom faz sırasında
 Silahsız bir gemi. Hiç hasar vermez; tehdidi TAMAMEN dolaylıdır — ana geminin
 önüne park edip **oyuncunun ateş hattını kapatır** ve arkasındaki filoya siper olur.
 
-**Kalkan küresel değil, geminin önünde 120°'lik bir YAY.** Bu fark oyunun içine
+**Kalkan küresel değil, geminin önünde 100°'lik bir HİLAL.** Bu fark oyunun içine
 ekstra bir parametreyle değil, GEOMETRİYLE girer: kalkan ayrı bir collider'dır
 (`BarrierShield`, dilim şeklinde `PolygonCollider2D`). Önden gelen mermi ona
 çarpar; yandan veya arkadan gelen onu ıskalayıp gövde collider'ına ulaşır ve
@@ -102,6 +102,21 @@ doğal sonucudur.
 
 Collider ince bir şerit değil DİLİM: hızlı mermi ince şeridi bir karede atlayıp
 içeri girebilir; dilim sektörün tamamını kapladığı için tünelleme olmaz.
+
+**Şekil gerçek bir hilaldir** (yeni ay): dış kenar sabit yarıçapta — kalkan
+yüzeyi — iç kenar ortada içeri girip UÇLARDA dış kenarla birleşir. Kalınlık
+kosinüsle söner. Eskiden sabit kalınlıkta bir şeritti ve iki ucu da küt bitiyor,
+kalkandan çok bir boru parçası gibi duruyordu.
+
+Yay ayrıca **daha geniş yarıçaplı bir dairenin parçası** oldu — yani daha yatık:
+
+| | yarıçap | açı | kiriş | sehim | yatıklık |
+|---|---|---|---|---|---|
+| eski | 1.25 | 120° | 2.17 | 0.62 | 0.289 |
+| yeni | **2.0** | **100°** | **3.06** | 0.71 | **0.233** |
+
+Kiriş %42 büyüdü. Açının daralması bir çelişki değil: "daha açık yay" ile
+"daha geniş dairenin parçası" aynı şeyi ister — kıvrımın azalmasını.
 
 Oyuncunun üç cevabı var, üçü de gerçek bir karar:
 
@@ -166,6 +181,49 @@ arkasındakilere siper olmazsa hiçbir şey ifade etmez.
 **Kalkan şarjı artık veriden gelir** (`shieldRechargeRate` / `shieldRechargeDelay`).
 Eskiden `EnemyBot` içinde sabitti (5/s, 4 sn), yani her kalkanlı tip aynı hızda
 şarj oluyordu.
+
+**Kalkan VE şarj hızı levelle birlikte ölçeklenir**, ikisi de aynı çarpanla
+(`EnemySpawner.ApplyScaling`). Aynı çarpan olması şart: yalnızca kalkan
+büyüseydi geç levellerde doldurma süresi de 10 katına çıkar ve "boşalt, pencereyi
+kullan" mekaniği tek seferlik bir olaya dönerdi. Şimdi pencerenin UZUNLUĞU
+kampanya boyunca sabit (7.1 sn), yalnızca kırmak zorlaşıyor.
+
+| Level | Kalkan | Şarj/sn | Dolma |
+|---|---|---|---|
+| 12 | 219 | 31 | 7.1 sn |
+| 50 | 526 | 74 | 7.1 sn |
+| 100 | 1662 | 235 | 7.1 sn |
+
+**Tehdit puanı 8 → 3.** 8'de bir DALGANIN bütçesi 8'e ulaşana kadar hiç
+seçilemiyordu; gerçek ilk çıkışı ~level 40'tı. Refakat kuralı yüzünden etkin
+eşik `en ucuz gemi (1) + tehdit` olduğundan 4'e inmek yetmezdi — 3 ile eşik 4
+oluyor ve bunu bölüm 2'nin son dalgaları karşılıyor. İlk çıkışı artık
+**level 12** (level 11 bölümün tanıtım leveli, yalnız Armored gelir).
+
+### Düşman Kalkanlarının Görünümü — Tasarım Kararları
+
+**Düşman kalkanları soluk turuncu, oyuncununki mavi.** Bir bakışta ayrılmalı;
+oyuncu ekranda beliren mavi bir hilalin kendi kalkanı olduğunu düşünmeli.
+
+**Küresel kalkan artık DAİRE.** `BuildShieldVisual` `SkinLibrary.Get(...)`
+çağırıyordu; "fx.shield" hiçbir SkinSet'te olmadığı için prosedürel yedeğe
+düşüyordu — ve o yedek bir DİKDÖRTGEN. Yani oyundaki her kalkanlı düşman,
+kalkanını **kare bir levha** olarak taşıyordu. Yuvarlak yedek artık çağıranın
+kendi işi (`ShipComponentBase` halkasıyla aynı desen: skin varsa o, yoksa
+çağıranın kendi şekli).
+
+**Her iki kalkan da çarpma hilali gösterir** — ana gemidekinin aynısı
+(`ShieldEffect`). `ShieldEffect.Spawn` artık yarıçap, renk ve yay genişliği
+alıyor; hilal dokusu genişliğe göre önbelleklenir.
+
+Yay kalkanda hilal **yayın sınırları içine kırpılır**: dar tutulur (20°) ve
+çarpma açısı `±(yarıAçı − 20°)` aralığına sıkıştırılır. Kırpılmasaydı yayın
+ucuna yakın bir isabet, kalkanın olmadığı boşlukta parlardı.
+
+Çarpma noktası yalnızca merminin kendisinde biliniyor. `TryDamage`'a bir
+parametre daha eklemek yerine, zaten o konumu elinde tutan çağıran taraf
+`DamageUtil.ShieldFlash(collider, hitPos)` çağırıyor. Yüzey tipi hasardan ÖNCE
+okunuyor — bu vuruş kalkanı düşürecek olsa bile çarpmanın kendisi kalkana olmuştur.
 
 ### Savaş Uçaklarına Karşı Tutum — Tasarım Kararları
 

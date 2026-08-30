@@ -103,6 +103,10 @@ public class EnemySpawner : MonoBehaviour
 
         d.maxHP         = src.maxHP         * s.hp;
         d.maxShield     = src.maxShield     * s.hp;
+        // Şarj hızı kalkanla AYNI çarpanı alır: yoksa geç levellerde kalkan
+        // 10 katına çıkarken doldurma süresi de 10 katına çıkar ve "boşalt,
+        // pencereyi kullan" mekaniği tek seferlik bir olaya dönerdi.
+        d.shieldRechargeRate = src.shieldRechargeRate * s.hp;
         d.fireDamage    = src.fireDamage    * s.damage;
         d.evasionAngle  = src.evasionAngle  * s.evasion;
         d.escapeAngle   = src.escapeAngle   * s.evasion;

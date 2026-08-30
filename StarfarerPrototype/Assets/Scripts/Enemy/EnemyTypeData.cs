@@ -489,10 +489,14 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Barrier";
         d.displayName   = "Bariyer";
         d.role          = EnemyRole.Barrier;
-        d.threatScore   = 8;
+        // Tehdit 8'di ve bir DALGANIN bütçesi 8'e ulaşana kadar hiç seçilemiyordu:
+        // gerçek ilk çıkışı ~level 40'tı. 3'e indi — refakat kuralı yüzünden
+        // dalgada önce başka bir gemi seçilmesi gerektiği için etkin eşik 1+3=4,
+        // bunu bölüm 2'nin son dalgaları (level 12+) karşılıyor.
+        d.threatScore   = 3;
         // Gövde kasten kırılgan: yayın kenarından dolanmak gerçekten ödüllendirmeli
         d.maxHP         = 40f;
-        d.maxShield     = 150f;
+        d.maxShield     = 170f;
         d.mass          = 4f;   d.enginePower   = 6f;
         d.bodyWidth     = 46;   d.bodyHeight    = 62;   d.sizeOrder = 4;
         d.hitboxWidth   = 40;   d.hitboxHeight  = 54;
@@ -508,10 +512,15 @@ public class EnemyTypeData : ScriptableObject
         d.fireDamage    = 0f;   d.fireRate      = 0f;   d.bulletSpeed = 0f;
         // Kalkan güçlü VE hızlı şarj olur — geri gelmesi kısa sürsün ki
         // "pencere" mekaniği yaşasın, oyuncu bir kez kırıp unutmasın.
-        d.shieldRechargeRate  = 20f;
+        // İkisi de levelle ÖLÇEKLENİR (EnemySpawner.ApplyScaling): kalkan ve şarj
+        // aynı çarpanı aldığı için dolma süresi kampanya boyunca sabit kalır,
+        // yani pencerenin uzunluğu değişmez, yalnızca kırmak zorlaşır.
+        d.shieldRechargeRate  = 24f;
         d.shieldRechargeDelay = 2.5f;
-        d.shieldArcDegrees    = 120f;
-        d.shieldArcRadius     = 1.25f;
+        // Yay: daha geniş yarıçaplı bir dairenin parçası (daha yatık) ve
+        // toplam açıklığı biraz dar. Kiriş 2.17 -> 3.06 birim, yani %41 büyük.
+        d.shieldArcDegrees    = 100f;
+        d.shieldArcRadius     = 2.0f;
         d.shieldResistances = new[]
         {
             new DamageModifier { weaponType = WeaponType.Kinetic, multiplier = 1.5f  },

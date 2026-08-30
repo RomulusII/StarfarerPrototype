@@ -73,7 +73,7 @@ public class ChapterData : ScriptableObject
             Make(2, "Sektör 2: Devriye Hattı",
                 "Zırhlı birimler tespit edildi. Raylı toplar bu gövdeleri delmiyor.",
                 introduced: armored,
-                pool: new[] { swarm, armored },
+                pool: new[] { swarm, armored, barrier },
                 asteroids: 2),
 
             Make(3, "Sektör 3: Kalkan Duvarı",
