@@ -218,8 +218,9 @@ alıyor; hilal dokusu genişliğe göre önbelleklenir.
 
 Yay kalkanda hilal iki yönden de kalkanın sınırlarına oturtulur:
 
-- **Açısal:** dar tutulur (20°) ve çarpma açısı  aralığına
-  sıkıştırılır. Yoksa yayın ucuna yakın bir isabet, kalkanın olmadığı boşlukta parlar.
+- **Açısal:** dar tutulur (20°) ve çarpma açısı `±(yarıAçı − 20°)` aralığına
+  sıkıştırılır. Yoksa yayın ucuna yakın bir isabet, kalkanın olmadığı boşlukta
+  parlar.
 - **Radyal:** parlamanın iç kenarı yayın iç kenarıyla aynı orandadır (0.78).
   Varsayılan 0.60 ile parlama yayın **1.9 katı** kalınlığında oluyor ve yüzeyin
   İÇİNE, kalkanla gemi arasındaki boşluğa taşıyordu — efektin "yanlış yerde"
