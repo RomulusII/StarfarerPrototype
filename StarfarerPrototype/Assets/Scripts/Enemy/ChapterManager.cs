@@ -370,7 +370,31 @@ public class ChapterManager : MonoBehaviour
                 affordable.Add(t);
             }
 
-            if (affordable.Count == 0) break;
+            if (affordable.Count == 0)
+            {
+                // Hiçbir tip bütçeye sığmıyor. Dalga BOŞ kalmamalı: bölümün
+                // tanıtım levelinde havuz tek tipe indiriliyor ve o tip
+                // bütçeden pahalıysa level hiç düşman üretmiyordu.
+                //
+                // Bölüm 4 ("Bomba Yağmuru", level 31) tam olarak böyleydi:
+                // tanıtılan tip Bomber (tehdit 10), level 31'in en büyük
+                // dalgası 6 — üç dalga da boş geçiyor, oyuncu boş bir sahnede
+                // bekliyordu ve level kendiliğinden bitiyordu.
+                //
+                // Bütçeyi bir tip kadar aşmak, boş dalgadan iyidir. Yalnızca
+                // dalga HÂLÂ boşken yapılır; içi dolu bir dalgaya taşma eklemek
+                // bütçe kavramını anlamsızlaştırırdı.
+                if (list.Count == 0)
+                {
+                    EnemyTypeData cheapest = null;
+                    foreach (var t in pool)
+                        if (t != null && !t.RequiresEscort &&
+                            (cheapest == null || t.threatScore < cheapest.threatScore))
+                            cheapest = t;
+                    if (cheapest != null) list.Add(cheapest);
+                }
+                break;
+            }
 
             var chosen = affordable[Random.Range(0, affordable.Count)];
             list.Add(chosen);
