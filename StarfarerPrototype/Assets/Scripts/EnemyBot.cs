@@ -41,6 +41,10 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     SpriteRenderer _reloadFillSR;
     bool           _fireFlash;
 
+    // Formasyon — dalga hâlinde gelirken grup yuvasını tutar, çapa oyuncuya
+    // yaklaşınca grup dağılır ve gemi kendi taktik AI'sına döner.
+    FormationGroup _formation;
+
     // Hedef tarama
     float _targetScanTimer;
 
@@ -241,6 +245,16 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 
     // ── Update ────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Formasyon grubuna katılır. Grup dağılana kadar HAREKET grubun; tipe özgü
+    /// davranış (yörünge, dalış, bomba koşusu) ancak dağılınca devreye girer.
+    /// </summary>
+    public void AssignFormation(FormationGroup group) => _formation = group;
+
+    /// <summary>Grup hızını belirlemek için: bu geminin seyir hızı.</summary>
+    public float CruiseSpeed => _movement != null ? _movement.MaxSpeed
+                              : (data != null ? data.enginePower / Mathf.Max(data.mass, 0.01f) : 1f);
+
     void Update()
     {
         if (UpgradeUI.IsPaused) return;
@@ -250,6 +264,12 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         _prevPos = transform.position;
 
         UpdateSpecialBehaviours();
+
+        if (_formation != null)
+        {
+            if (_formation.Active) { UpdateFormationFlight(); return; }
+            _formation = null;   // grup dağıldı, kendi AI'na dön
+        }
 
         if (data.movementKind == EnemyMovementKind.Approach)
         {
@@ -299,7 +319,7 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         if (data.maxShield > 0f)
             UpdateShieldRecharge();
 
-        if (Vector2.Distance(transform.position, Vector2.zero) > 30f)
+        if (Vector2.Distance(transform.position, Vector2.zero) > ViewBounds.DespawnRadius)
             Destroy(gameObject);
     }
 
@@ -312,6 +332,41 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     /// düşman gemisi kavis üstüne kavis çizip ana gemiden uzaklaşıyor, oyuncu
     /// hiç baskı hissetmiyordu.
     /// </summary>
+    /// <summary>
+    /// Grup yuvasını tut. Salınım KAPALI: kaçamak manevra formasyonu bozar ve
+    /// düzenli gelen bir filo, dağınık gelen bir sürüden çok daha tehditkâr
+    /// görünür. Silahı uygun olan menzile giren hedefe ateş etmeye devam eder.
+    /// </summary>
+    void UpdateFormationFlight()
+    {
+        _movement.MoveToward(_formation.SlotOf(this));
+
+        // Bomba ve komponent burst'ü yaklaşma sırasında anlamsız — onlar
+        // tipin kendi davranışına ait, formasyon dağılınca başlar.
+        bool canFire = data.weaponKind != EnemyWeaponKind.None
+                    && data.weaponKind != EnemyWeaponKind.ComponentBurst;
+
+        if (canFire)
+        {
+            _fireScanTimer -= Time.deltaTime;
+            if (_fireScanTimer <= 0f)
+            {
+                _fireScanTimer = FireScanInterval;
+                _fireTarget    = SelectFireTarget();
+            }
+
+            _fireTimer -= Time.deltaTime;
+            if (_fireTarget != null && _fireTimer <= 0f)
+            {
+                _fireTimer = _fireRateBase;
+                FireAtTarget();
+            }
+        }
+
+        UpdateBarrel();
+        if (data.maxShield > 0f) UpdateShieldRecharge();
+    }
+
     Transform FindClosestThreat()
     {
         Transform ship = _playerShip != null ? _playerShip.transform : null;
@@ -405,8 +460,11 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
                 break;
         }
 
+        // Sabit 20 sınırı, ViewBounds.SpawnX'in (~35) çok altındaydı: Approach
+        // tipi düşman doğduğu KARE yok oluyordu.
         float x = transform.position.x;
-        if (x < -15f || x > 20f) Destroy(gameObject);
+        if (x < ViewBounds.DespawnX || x > ViewBounds.SpawnX + ViewBounds.SpawnMargin)
+            Destroy(gameObject);
     }
 
     void UpdateBombRun()
@@ -420,7 +478,7 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
             DropBomb();
         }
 
-        if (transform.position.x < -15f) Destroy(gameObject);
+        if (transform.position.x < ViewBounds.DespawnX) Destroy(gameObject);
     }
 
     /// <summary>
@@ -510,7 +568,7 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
             }
         }
 
-        if (Vector2.Distance(transform.position, Vector2.zero) > 30f)
+        if (Vector2.Distance(transform.position, Vector2.zero) > ViewBounds.DespawnRadius)
             Destroy(gameObject);
     }
 

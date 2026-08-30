@@ -28,6 +28,15 @@ public class CameraController : MonoBehaviour
     [Tooltip("Mouse ile yatay kaydırma menzili (birim), kadraj tabanının etrafında.")]
     public float panRange = 8f;
 
+    [Header("Zoom")]
+    [Tooltip("Dinlenme hâlindeki ortographic size.")]
+    public float minZoomSize = 5f;
+
+    [Tooltip("Tam zoom-out'taki ortographic size. ViewBounds bunu okuyup dünyanın " +
+             "ne kadar geniş olması gerektiğini hesaplar — doğum noktaları ve toz " +
+             "alanı buradan türer, o yüzden sabit değil ALAN olmalı.")]
+    public float maxZoomSize = 7f;
+
     PlayerShip _ship;
 
     private Camera _cam;
@@ -75,7 +84,7 @@ public class CameraController : MonoBehaviour
         transform.position = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * 3f);
 
         float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
-        float targetSize = Mathf.Lerp(5f, 7f, zoomT);
+        float targetSize = Mathf.Lerp(minZoomSize, maxZoomSize, zoomT);
         _cam.orthographicSize = Mathf.Lerp(_cam.orthographicSize, targetSize, Time.deltaTime * 3f);
     }
 

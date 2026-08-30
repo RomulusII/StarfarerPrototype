@@ -83,7 +83,9 @@ public class Asteroid : MonoBehaviour, ITurretTarget
     const float KineticMultiplier = 2.0f;
     const float LaserMultiplier   = 0.25f;
 
-    const float DespawnX = -17f;
+    // Sabit -17 idi; kadrajın sol kenarı zoom-out'ta -18'e kadar açılıyor,
+    // yani asteroit ekranın İÇİNDE yok oluyordu.
+    static float DespawnX => ViewBounds.DespawnX;
 
     static readonly Color RockColor = new Color(0.45f, 0.40f, 0.34f);
 

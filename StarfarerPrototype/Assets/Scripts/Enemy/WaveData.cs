@@ -2,6 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// Bir dalga tanımı: bütçe aralığı, izin verilen düşman tipleri ve giriş yönü.
+/// Dalganın TÜM gemileri aynı anda doğar; "spawn aralığı" diye bir şey yoktur.
 /// FormationTemplate atanmazsa ChapterManager içerik rollerine göre otomatik seçer.
 /// </summary>
 [System.Serializable]
@@ -19,9 +20,6 @@ public class WaveData
 
     [Tooltip("Right dışında bir yön zorlamak için. Random = ağırlıklı seçim.")]
     public SpawnSide spawnSide = SpawnSide.Right;
-
-    [Tooltip("Wave içindeki spawn aralığı (saniye). 0 = chapter varsayılanı kullanılır.")]
-    public float spawnInterval = 0f;
 
     [Tooltip("Set edilirse bu boss gemi bu wave'de spawn edilir. allowedTypes ile birlikte kullanılabilir (escort).")]
     public BossShipData bossType;

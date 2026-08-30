@@ -504,12 +504,35 @@ ve gelir yalnızca wave bütçesiyle büyüyordu; 100. levelde gereken kaynağı
 
 | Bileşen | Formül | Lv1 → Lv100 |
 |---|---|---|
-| Wave tehdit bütçesi | `7 × 1.018^(n−1)` | 7 → 41 (5.8× daha çok düşman) |
-| Tehdit başına drop | `2.1 × 1.031^(n−1)` | 2.1 → 43 (21× daha değerli düşman) |
+| Level tehdit bütçesi | `7 × 1.027^(n−1)` | 7 → 98 (14× daha çok düşman) |
+| Tehdit başına drop | `2.1 × 1.022^(n−1)` | 2.1 → 18 |
 | Asteroit bütçesi | `10 × 1.035^(n−1)` | 10 → 301 |
 | Boss primi | `25 × drop × 3` | bölüm kapanışı |
 
-Kalabalık yavaş, birim değeri hızlı büyür. Kampanya toplam geliri **≈45.700**.
+Kalabalık ve birim değeri farklı hızlarda büyür. Kampanya toplam geliri
+**≈45.800** — eğriler değişti ama toplam korundu (aşağıya bak).
+
+**Bütçe büyümesi oyuncu gücünden TÜRER.** Oyuncu kampanya boyunca ~13.8 kat
+güçleniyor (`LevelCurve`); bütçe de aynı oranda büyürse level SÜRESİ sabit
+kalır ve büyümenin tamamı dalga BOYUTUNA gider. `13.8^(1/99) = 1.0267`.
+
+**Neden level başına %10-15 değil:** 100 level bileşik faizdir.
+
+| oran / level | Lv10 | Lv50 | Lv100 |
+|---|---|---|---|
+| %10 | 17 | 750 | **87.700** |
+| %15 | 25 | 6.600 | **7.100.000** |
+| %2.7 | 9 | 26 | 98 |
+
+%10 ile 100. levelin bütçesi 87.700 tehdit puanı, yani tek levelde 87.700
+Swarm eder. Level başına anlamlı olan oran ~%2.7; **hissedilen birim BÖLÜMDÜR**
+ve orada artış ×1.31 olur. Bölüm 1 → bölüm 10 arası ×11.
+
+**Gelir sabit tutuldu.** `budgetGrowth` 1.018 → 1.027 çıkarken `dropGrowth`
+1.031 → 1.022'ye indirildi; kampanya geliri = Σ(bütçe × drop) olduğu için
+çarpımları sabit kalmalıydı (1.018×1.031 ≈ 1.027×1.022). Yoksa toplam gelir iki
+katına çıkar ve az önce ayarlanan yükseltme fiyatlarının tamamı geçersizleşirdi.
+Artık düşman daha çok ama tanesi daha ucuz.
 
 **Asteroit geliri artık süre bazlı bir kaçak değil.** `Asteroid.SmallResourceAmount`
 sabit 5 iken asteroit geliri düşman gelirinin **3 katıydı** ve bölümü uzatarak
@@ -776,6 +799,38 @@ otomatik kapatılır. Aynı `Spawn()` metodunu çağırdığı için gerçek oyu
 bir düşman üretmesi mümkün değildir — eskiden ayrı bir kod yolu olduğu için
 çarpansız düşman üretiyor ve testi yanıltıyordu.
 
+### Formasyon Sistemi — Düzeltilen Hata
+
+Formasyon şablonları (`FormationTemplate`) yazılmıştı ama **hiç çalışmıyordu**;
+üç ayrı sebepten, üçü aynı anda:
+
+1. **Dalganın gemileri `spawnInterval` (3 sn) arayla TEK TEK doğuyordu.**
+   Altı gemilik bir dalga 18 saniyeye yayılıyor, ilk gelen ölmeden sonuncusu
+   doğmuyordu — formasyonun var olduğu bir an hiç oluşmuyordu.
+2. **`RoleSlot.offset.x` hiç okunmuyordu**, yalnızca `.y`. Ok formasyonunun
+   tamamı x ekseninde tanımlıdır (0.6 / 0.2 / 0 / −0.4), dolayısıyla hangi
+   şablon seçilirse seçilsin düzen aynı dikey çizgiye çöküyordu.
+3. **Doğan gemi anında kendi `ShipBrain`'ini çalıştırıyor ve RASTGELE bir
+   yaklaşma açısı seçiyordu** (`_approachAngle = Random.Range(0, 360)`).
+   Formasyon yalnızca bir doğum ofsetiydi; uçuş sırasında korunmuyordu.
+
+Ayrıca gemi sayısı yuva sayısını aşınca indeks mod alınıyor, fazla gemiler
+öndekilerin tam üstüne doğuyordu.
+
+**Artık grup gerçek** (`FormationGroup`): tek bir *çapa* noktası hedefe doğru
+ilerler, gemiler o çapaya göre kendi yuvalarını tutar.
+
+| Karar | Gerekçe |
+|---|---|
+| Çapa **en yavaş üyenin** hızıyla gider (×0.85) | Yoksa hızlılar öne fırlar ve formasyon ilk saniyede dağılır |
+| Formasyonda **salınım kapalı** | Kaçamak manevra düzeni bozar; düzenli gelen bir filo dağınık bir sürüden daha tehditkâr görünür |
+| Çapa hedefe 9 birim kalınca **dağılır** | Formasyon bir YAKLAŞMA düzenidir, dövüş düzeni değil. Yakın dövüşte tipe özgü davranış (yörünge, dalış, bomba koşusu) çok daha ilginç |
+| 30 sn emniyet süresi | Hedefe varamayan bir çapa yüzünden dalga sonsuza dek formasyonda kalırsa level de ilerlemez |
+| Bomba / komponent burst'ü formasyonda ateşlenmez | Onlar tipin kendi davranışına ait, yaklaşma sırasında anlamsız |
+
+`WaveData.spawnInterval` ve `ChapterData.defaultSpawnInterval` silindi —
+dalga tek bir olay olduğuna göre "dalga içi aralık" diye bir şey yok.
+
 ### Bölüm Yapısı — 100 Level, 10 Bölüm, 10 Boss
 
 **Bölüm = 10 level. Her bölümün 10. leveli boss levelidir.** Tek gerçek sayı
@@ -788,14 +843,22 @@ Eskiden her bölümde elle yazılmış `enemyHpMultiplier` ve wave dizileri vard
 
 | Formül | Değer | Lv100 |
 |---|---|---|
+| Bütçe `ThreatBudget(n)` | `7 × 1.027^(n−1)` | 98 (14×) |
 | `HpMultiplier(n)` | `1.0233^(n−1)` | 9.8× |
 | `DamageMultiplier(n)` | `1.0141^(n−1)` | 4.0× (eskiden sabit 1.0 idi) |
 | `Armor(n)` | `20 × (n/100)^1.6` | 20 |
 | `EvasionMultiplier(n)` | `n = 1..25 arası doğrusal` | 1.0 |
 
-**Wave'ler elle yazılmaz.** `ChapterManager` levelin tehdit bütçesini 2–4 dalgaya
-böler; geç leveller daha çok dalga görür (tek seferde 40 tehdit puanı boca etmek
-yığılma yaratır). Son dalga %25 daha ağırdır — level kendi zirvesiyle bitsin.
+**Wave'ler elle yazılmaz.** `ChapterManager` levelin tehdit bütçesini dalgalara
+böler (level < 50 → 3 dalga, sonrası 4).
+
+**Dalga bütçesi GEOMETRİK bölünür:** her dalga bir öncekinden %25 daha ağırdır
+(`BalanceConfig.waveBudgetGrowth`). Eskiden eşit bölüşüm + son dalgaya sabit bir
+zam vardı; level düz gidip sonunda tek sıçrama yapıyordu. Artık baştan sona
+tırmanıyor: Lv75'te dalgalar 9 / 11 / 14 / 17.
+
+**BİR DALGANIN TÜM GEMİLERİ AYNI ANDA DOĞAR VE FORMASYONLA GELİR.**
+Ayrıntı: "Formasyon Sistemi" bölümü.
 
 **İki özel level tipi:**
 - **Bölümün 1. leveli** yalnızca o bölümün yeni tipini getirir. Oyuncu bir tipin

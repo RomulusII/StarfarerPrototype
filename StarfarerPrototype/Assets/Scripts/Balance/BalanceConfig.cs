@@ -27,17 +27,29 @@ public class BalanceConfig : ScriptableObject
     [Tooltip("Level 1'in tehdit puanı bütçesi.")]
     public float baseThreatBudget = 7f;
 
-    [Tooltip("Level başına bütçe büyümesi. Lv100'de 5.8× daha çok düşman — " +
-             "sahneye sığacak kadar.")]
-    public float budgetGrowth = 1.018f;
+    [Tooltip("Level başına bütçe büyümesi.\n\n" +
+             "OYUNCU GÜCÜNDEN TÜRER: oyuncu kampanya boyunca ~13.8 kat güçleniyor " +
+             "(LevelCurve). Bütçe de aynı oranda büyürse level SÜRESİ sabit kalır " +
+             "ve büyüme tamamen dalga BOYUTUNA gider — istenen buydu. " +
+             "13.8^(1/99) = 1.0267.\n\n" +
+             "Neden %10-15 değil: 100 level bileşik faizdir. %10 ile Lv100 bütçesi " +
+             "87.700 tehdit puanı eder, yani tek levelde 87.700 Swarm. Level " +
+             "başına anlamlı olan oran %2.7; hissedilen birim BÖLÜMDÜR ve orada " +
+             "artış ×1.31 olur.")]
+    public float budgetGrowth = 1.027f;
 
     [Header("Düşman Değeri")]
     [Tooltip("Tehdit puanı başına düşen kaynak (level 1). Eskiden sabit 4'tü.")]
     public float baseDropPerThreat = 2.1f;
 
-    [Tooltip("Level başına drop büyümesi. Lv100'de 21× daha değerli düşman. " +
-             "Bütçeden AYRI tutulur: kalabalık yavaş, değer hızlı büyür.")]
-    public float dropGrowth = 1.031f;
+    [Tooltip("Level başına drop büyümesi. Bütçeden AYRI tutulur: kalabalık ve " +
+             "birim değeri farklı hızlarda büyür.\n\n" +
+             "budgetGrowth 1.018 -> 1.027 çıkarken bu 1.031 -> 1.022'ye indirildi. " +
+             "Kampanya geliri = Σ(bütçe × drop) olduğu için çarpımları sabit " +
+             "tutulmalıydı (1.018×1.031 ≈ 1.027×1.022); yoksa toplam gelir iki " +
+             "katına çıkar ve yükseltme fiyatlarının tamamı geçersizleşirdi. " +
+             "Artık düşman daha çok ama tanesi daha ucuz.")]
+    public float dropGrowth = 1.022f;
 
     [Header("Asteroit")]
     [Tooltip("Level başına asteroit kaynak bütçesi. Asteroit geliri eskiden süre " +
@@ -45,6 +57,11 @@ public class BalanceConfig : ScriptableObject
              "sınırsız farm edilebiliyordu. Artık levelle birlikte büyür.")]
     public float asteroidBase   = 10f;
     public float asteroidGrowth = 1.035f;
+
+    [Tooltip("Bir level içinde her dalganın bir öncekine göre büyüme oranı. " +
+             "Level kendi zirvesiyle bitsin diye: ilk dalga ısınma, son dalga " +
+             "levelin en ağır anı.")]
+    public float waveBudgetGrowth = 1.25f;
 
     [Header("Boss")]
     [Tooltip("Bölümü kapatan boss'un tehdit değeri ve kapanış primi çarpanı.")]
@@ -140,6 +157,30 @@ public class BalanceConfig : ScriptableObject
 
     public float AsteroidYieldPerLevel(int gameLevel)
         => asteroidBase * Mathf.Pow(asteroidGrowth, Mathf.Max(0, gameLevel - 1));
+
+    /// <summary>
+    /// Levelin bütçesini dalgalara böler. Her dalga bir öncekinden
+    /// <see cref="waveBudgetGrowth"/> kadar büyüktür; toplam levelin bütçesine
+    /// eşittir. Eşit bölüşüm + son dalgaya sabit bir zam yerine geometrik
+    /// bölüşüm: level baştan sona TIRMANIR, sonunda tek bir sıçrama yapmaz.
+    /// </summary>
+    public int[] SplitWaveBudget(float levelBudget, int waveCount)
+    {
+        waveCount = Mathf.Max(1, waveCount);
+
+        var weights = new float[waveCount];
+        float sum = 0f;
+        for (int i = 0; i < waveCount; i++)
+        {
+            weights[i] = Mathf.Pow(waveBudgetGrowth, i);
+            sum += weights[i];
+        }
+
+        var result = new int[waveCount];
+        for (int i = 0; i < waveCount; i++)
+            result[i] = Mathf.Max(1, Mathf.RoundToInt(levelBudget * weights[i] / sum));
+        return result;
+    }
 
     /// <summary>Zırh eşiği — atış başına hasarı ödüllendiren tek formül.</summary>
     public float ApplyArmor(float damage, float armor)

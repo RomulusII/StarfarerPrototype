@@ -9,6 +9,11 @@ using UnityEngine;
 ///   BeginLevel → wave döngüsü (SpawnWave → WaitWaveClear) → level biter
 ///   → aynı bölümdeyse kısa nefes, bölüm bittiyse geçiş ekranı
 ///
+/// BİR DALGANIN TÜM GEMİLERİ AYNI ANDA doğar ve formasyon hâlinde gelir.
+/// Eskiden spawnInterval (3 sn) arayla teker teker doğuyorlardı: altı gemilik
+/// bir dalga 18 saniyeye yayılıyor, ilk gelen ölmeden sonuncusu doğmuyor ve
+/// formasyonun var olduğu bir an hiç oluşmuyordu. Dalga artık tek bir olaydır.
+///
 /// NE spawn edileceğine bu sınıf karar verir. NASIL kurulacağını bilmez —
 /// düşmanı EnemySpawner.Spawn(), asteroit alanını AsteroidSpawner kurar.
 ///
@@ -33,20 +38,13 @@ public class ChapterManager : MonoBehaviour
 
     // ── Durum ─────────────────────────────────────────────────────────────────
 
-    enum Phase { Spawning, WaitClear, Transition, Done }
-    Phase _phase = Phase.Spawning;
+    enum Phase { WaitClear, Transition, Done }
+    Phase _phase = Phase.WaitClear;
 
     List<WaveData> _levelWaves = new();
     int            _waveIndex;
 
-    List<EnemyTypeData> _pendingSpawns = new();
-    float               _spawnTimer;
-    float               _currentSpawnInterval;
-    bool                _allSpawned;
-
-    FormationTemplate _currentFormation;
-    Vector3           _baseSpawnPos;
-    int               _spawnSlotIndex;
+    readonly List<EnemyTypeData> _pendingSpawns = new();
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
@@ -79,11 +77,7 @@ public class ChapterManager : MonoBehaviour
     {
         if (UpgradeUI.IsPaused) return;
 
-        switch (_phase)
-        {
-            case Phase.Spawning:  UpdateSpawning();  break;
-            case Phase.WaitClear: UpdateWaitClear(); break;
-        }
+        if (_phase == Phase.WaitClear) UpdateWaitClear();
     }
 
     // ── Level kurulumu ────────────────────────────────────────────────────────
@@ -134,38 +128,39 @@ public class ChapterManager : MonoBehaviour
         {
             // Escort dalgası, sonra boss + küçük refakat
             int escort = Mathf.RoundToInt(budget * 0.6f);
-            waves.Add(Wave(escort, pool, chapter.defaultSpawnInterval));
+            waves.Add(Wave(escort, pool));
 
-            var bossWave = Wave(Mathf.RoundToInt(budget * 0.3f), pool,
-                                chapter.defaultSpawnInterval);
+            var bossWave = Wave(Mathf.RoundToInt(budget * 0.3f), pool);
             bossWave.bossType = chapter.boss;
             waves.Add(bossWave);
             return waves;
         }
 
-        // Normal level: bütçe 2–4 dalgaya bölünür. Geç leveller daha çok dalga
-        // görür — tek seferde 40 tehdit puanı boca etmek yığılma yaratır.
-        int waveCount = Mathf.Clamp(2 + level / 34, 2, 4);
-        for (int i = 0; i < waveCount; i++)
-        {
-            // Son dalga biraz daha ağır: level kendi zirvesiyle bitsin
-            float share = (i == waveCount - 1) ? 1.25f : 1f;
-            int   share_ = Mathf.Max(1, Mathf.RoundToInt(budget / waveCount * share));
-            waves.Add(Wave(share_, pool, chapter.defaultSpawnInterval));
-        }
+        // Bütçe dalgalara GEOMETRİK bölünür: her dalga bir öncekinden %25 daha
+        // ağır. Eskiden eşit bölüşüm + son dalgaya sabit bir zam vardı, yani
+        // level düz gidip sonunda tek bir sıçrama yapıyordu; şimdi baştan sona
+        // tırmanıyor.
+        foreach (int waveBudget in cfg.SplitWaveBudget(budget, WaveCountFor(level)))
+            waves.Add(Wave(waveBudget, pool));
+
         return waves;
     }
 
-    static WaveData Wave(int budget, EnemyTypeData[] pool, float interval)
+    /// <summary>
+    /// Bir levelde kaç dalga var. Bütçe büyüdükçe dalga sayısı da bir artar;
+    /// yoksa geç levellerde tek dalga 30+ tehdit puanı taşır ve sahneye sığmaz.
+    /// </summary>
+    static int WaveCountFor(int level) => level < 50 ? 3 : 4;
+
+    static WaveData Wave(int budget, EnemyTypeData[] pool)
     {
         budget = Mathf.Max(1, budget);
         return new WaveData
         {
-            budgetMin     = budget,
-            budgetMax     = budget,
-            allowedTypes  = pool,
-            spawnSide     = SpawnSide.Right,
-            spawnInterval = interval,
+            budgetMin    = budget,
+            budgetMax    = budget,
+            allowedTypes = pool,
+            spawnSide    = SpawnSide.Right,
         };
     }
 
@@ -195,25 +190,64 @@ public class ChapterManager : MonoBehaviour
             FillByBudget(_pendingSpawns, pool,
                 Random.Range(wave.budgetMin, wave.budgetMax + 1));
 
-            _currentFormation = wave.formation ?? PickFormation(_pendingSpawns, _formations);
-            SortByFormation(_pendingSpawns, _currentFormation);
-        }
-        else
-        {
-            _currentFormation = null;
+            var formation = wave.formation ?? PickFormation(_pendingSpawns, _formations);
+            SortByFormation(_pendingSpawns, formation);
+            SpawnFormation(_pendingSpawns, formation, wave.spawnSide);
         }
 
-        _baseSpawnPos   = SpawnPosition(wave.spawnSide);
-        _spawnSlotIndex = 0;
-
-        _currentSpawnInterval = wave.spawnInterval > 0f
-            ? wave.spawnInterval
-            : chapter.defaultSpawnInterval;
-
-        _spawnTimer = 0f;
-        _allSpawned = _pendingSpawns.Count == 0;
-        _phase      = Phase.Spawning;
+        _phase = Phase.WaitClear;
     }
+
+    /// <summary>
+    /// Dalganın TÜM gemilerini aynı anda, formasyon düzeninde doğurur ve tek bir
+    /// <see cref="FormationGroup"/>'a bağlar.
+    ///
+    /// Ofsetin İKİ ekseni de kullanılır. Eskiden yalnızca y okunuyordu; ok
+    /// formasyonunun tamamı x ekseninde tanımlı olduğu için (0.6 / 0.2 / 0 /
+    /// -0.4) düzen dikey bir çizgiye çöküyor ve hangi şablon seçilirse seçilsin
+    /// aynı görünüyordu.
+    ///
+    /// Gemi sayısı yuva sayısını aşarsa formasyon ARKAYA doğru sıralar hâlinde
+    /// uzatılır. Eskiden indeks yuva sayısına göre mod alınıyordu, yani fazla
+    /// gemiler öndekilerin tam üstüne doğuyordu.
+    /// </summary>
+    void SpawnFormation(List<EnemyTypeData> types, FormationTemplate formation, SpawnSide side)
+    {
+        Vector3 basePos = SpawnPosition(side);
+        var     group   = FormationGroup.Create(basePos, FormationTarget());
+
+        int slotCount = formation != null && formation.slots != null && formation.slots.Length > 0
+            ? formation.slots.Length : 1;
+
+        for (int i = 0; i < types.Count; i++)
+        {
+            Vector2 offset = Vector2.zero;
+            if (formation != null && slotCount > 1)
+            {
+                offset = formation.slots[i % slotCount].offset;
+                // Taşan her sıra formasyonun bir boy gerisine düşer
+                offset.x -= (i / slotCount) * RankSpacing;
+            }
+
+            Vector3 pos = basePos + new Vector3(offset.x * FormationGroup.SpreadX,
+                                                offset.y * FormationGroup.SpreadY, 0f);
+
+            var bot = EnemySpawner.Spawn(types[i], pos);
+            if (bot != null) group.Add(bot, offset);
+        }
+
+        group.Seal();
+    }
+
+    /// <summary>Formasyonun ilerlediği nokta — ana gemi.</summary>
+    static Vector2 FormationTarget()
+    {
+        var ship = FindFirstObjectByType<PlayerShip>();
+        return ship != null ? (Vector2)ship.transform.position : Vector2.zero;
+    }
+
+    /// <summary>Taşan sıralar arası mesafe (normalize ofset biriminde).</summary>
+    const float RankSpacing = 0.55f;
 
     /// <summary>
     /// Boss'u sahneye koyar. 9. bölümde İKİ tane gelir — tek hedefe kilitlenen
@@ -225,56 +259,11 @@ public class ChapterManager : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             var go = new GameObject($"Boss_{bossData.displayName}");
-            go.transform.position = new Vector3(14f + i * 2f, count == 1 ? 0f : (i == 0 ? 2f : -2f), 0f);
+            go.transform.position = new Vector3(ViewBounds.SpawnX + i * 2f,
+                                                count == 1 ? 0f : (i == 0 ? 2f : -2f), 0f);
             var boss = go.AddComponent<BossShip>();
             boss.data = bossData;
         }
-    }
-
-    // ── Spawning güncellemesi ─────────────────────────────────────────────────
-
-    void UpdateSpawning()
-    {
-        if (_allSpawned)
-        {
-            _phase = Phase.WaitClear;
-            return;
-        }
-
-        _spawnTimer -= Time.deltaTime;
-        if (_spawnTimer > 0f) return;
-
-        _spawnTimer = _currentSpawnInterval;
-
-        if (_pendingSpawns.Count == 0)
-        {
-            _allSpawned = true;
-            return;
-        }
-
-        var data = _pendingSpawns[0];
-        _pendingSpawns.RemoveAt(0);
-
-        SpawnEnemy(data, _levelWaves[_waveIndex]);
-        _spawnSlotIndex++;
-    }
-
-    void SpawnEnemy(EnemyTypeData data, WaveData wave)
-    {
-        Vector3 pos;
-        if (_currentFormation != null && _currentFormation.slots.Length > 0)
-        {
-            int   si   = _spawnSlotIndex % _currentFormation.slots.Length;
-            float yOff = _currentFormation.slots[si].offset.y * 2.5f; // -1..1 → ±2.5 birim
-            pos = new Vector3(_baseSpawnPos.x, Mathf.Clamp(_baseSpawnPos.y + yOff, -4f, 4f), 0f);
-        }
-        else
-        {
-            pos = SpawnPosition(wave.spawnSide);
-        }
-
-        // Ölçekleme dahil kurulum EnemySpawner'ın işi — tek inşa yolu orası
-        EnemySpawner.Spawn(data, pos);
     }
 
     // ── Dalga temizlenme bekleme ──────────────────────────────────────────────
@@ -401,10 +390,13 @@ public class ChapterManager : MonoBehaviour
     {
         switch (side)
         {
-            case SpawnSide.Top:    return new Vector3(Random.Range(-8f,  8f),  6f, 0f);
-            case SpawnSide.Bottom: return new Vector3(Random.Range(-8f,  8f), -6f, 0f);
-            case SpawnSide.Left:   return new Vector3(-14f, Random.Range(-3f, 3f), 0f);
-            default:               return new Vector3( 12f, Random.Range(-3f, 3f), 0f);
+            // Sabit sayılar kadrajla ilgisizdi: zoom-out + pan ile görünür alan
+            // x ekseninde +32'ye kadar açılıyor, yani 12'de doğan düşman ekranın
+            // ORTASINDA yoktan var oluyordu. Kenarlar artık ViewBounds'tan gelir.
+            case SpawnSide.Top:    return new Vector3(Random.Range(-8f, 8f), ViewBounds.SpawnYTop,    0f);
+            case SpawnSide.Bottom: return new Vector3(Random.Range(-8f, 8f), ViewBounds.SpawnYBottom, 0f);
+            case SpawnSide.Left:   return new Vector3(ViewBounds.SpawnXLeft, Random.Range(-3f, 3f),   0f);
+            default:               return new Vector3(ViewBounds.SpawnX,     Random.Range(-3f, 3f),   0f);
         }
     }
 }

@@ -164,7 +164,7 @@ public class EnemySpawner : MonoBehaviour
             ? EnemyScaling.ForLevel(debugLevel)
             : CurrentRamp(level);
 
-        Spawn(type, new Vector3(15f, Random.Range(-4.5f, 4.5f), 0f), scaling);
+        Spawn(type, new Vector3(ViewBounds.SpawnX, Random.Range(-4.5f, 4.5f), 0f), scaling);
     }
 
     /// <summary>Serbest mod açıldığında sayaçları sıfırlar, asteroit alanını kurar.</summary>

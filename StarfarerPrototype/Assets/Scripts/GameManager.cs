@@ -22,6 +22,10 @@ public class GameManager : MonoBehaviour
 
     void Awake()
     {
+        // Kadraj önbelleği statiktir; sahne yeniden yüklenince (ölüm → restart)
+        // hayatta kalır ve eski en-boy oranıyla hesaplanmış kalırdı.
+        ViewBounds.Invalidate();
+
         if (FindFirstObjectByType<EnergyBar>() == null)
         {
             var go = new GameObject("EnergyBarHUD");
