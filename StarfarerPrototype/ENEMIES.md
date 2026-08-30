@@ -17,9 +17,16 @@ Mevcut isimler placeholder. İsimler ve hikaye uyumu için tartışma notları e
 | Boyut | 46×62 px |
 | Enkaz | Ham madde + 15 kristal (kalkan × 0.1) |
 
-**Hareket:** Screen — ana geminin 5.5 birim önüne park eder, burnu oyuncuda
-bekler. Kalkanı bitince retro itkiyle geri çekilir (burun oyuncuda kalır),
-kalkan %90'a dolunca farklı bir yükseklikten geri gelir.
+**Hareket:** Screen — ana gemi ile korunan filonun ARASINA, gemiden 5.5 birim
+uzağa yerleşir; filo hareket ettikçe koruma ekseni döner ve siper onunla kayar.
+Üstüne 1.6 birimlik, 10 saniyelik yavaş bir yanal salınım (strafe) biner.
+Manevra iticilidir: burnu (ve yay kalkanı) hep oyuncuda kalırken yana süzülür.
+Kalkanı bitince retro itkiyle geri çekilir, %90'a dolunca yeni bir yanal paydan
+geri gelir.
+
+**Dalga ilerlemesini engellemez** ve dalgada tehdit üreten kimse kalmayınca
+sahneden çekilir. Tek başına bir dalga oluşturamaz — refakat ettiği bir filo
+olmadan seçilmez.
 
 **Yönlü kalkan:** yalnızca öndeki yaydan giren mermiyi emer. Yandan/arkadan
 gelen mermi gövdeye ulaşır ve kalkanı hiç görmez.

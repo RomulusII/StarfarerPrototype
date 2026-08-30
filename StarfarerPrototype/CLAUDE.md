@@ -121,9 +121,44 @@ dönseydi kalkan işe yaramaz hâle gelir ve geri çekilme bir ölüm cezasına
 dönerdi. Geri geldiğinde farklı bir yükseklikte siper alır — hep aynı noktaya
 dönmek oyuncuya bedava bir nişan hattı verirdi.
 
-`EnemyMovementKind.Screen` üç durumlu: **Advancing → Holding → Retreating**.
-`ShipBrain` kurulmaz; siperin taktiği yörünge ya da dalış değil, tek bir noktayı
-tutmaktır.
+**Yuvası korunan filoya göre hesaplanır**, sabit bir "geminin sağı" değil:
+siperin işi kendini korumak değil ARKASINDAKİLERİ korumak. Yuva, ana gemi ile
+korunan filonun ağırlık merkezi arasındaki eksende, gemiden `engageRange`
+kadar uzaktadır. Filo yukarıdan geliyorsa siper de yukarı kayar; sabit dursaydı
+oyuncunun ateş hattı zaten açık kalır ve gemi hiçbir işe yaramazdı. Diğer
+siperler bu hesaba katılmaz — siper sipere siper olmaz.
+
+Üstüne yavaş bir yanal salınım biner (strafe). Salınım **deterministiktir**
+(sinüs), oyunun geri kalanındaki kaçamak manevralarla aynı gerekçe: oyuncu
+deseni öğrenip önünü kesebilmeli. Genlik 1.6 birim, periyot **10 sn** — ve bu
+periyot geminin HIZ BÜTÇESİNDEN türer: 7 sn tepe noktada 1.44 birim/sn ister,
+siperin max hızı 1.5, yani salınımı kovalarken koruma eksenini takip edecek
+gücü kalmaz ve strafe "yavaş" değil sendeleyerek görünürdü.
+
+**Siper gemisi manevra iticilidir** (`ShipMovement.omniThrust`). Roket
+modelinde gemi yalnızca burnu doğrultusunda itebilir, yani yana kaymak için
+burnunu çevirmesi gerekir — ve o an yay kalkanı oyuncudan kayardı. Yönlü kalkanı
+olan bir gemi için yan süzülme bir süs değil, işleyişinin ön koşulu. Bunun için
+`ShipMovement`e `AimAt()` eklendi: omni gemilerde burnu hareketten BAĞIMSIZ
+çevirir. Boss'un davranışı korunur — çağırmayan gemide burun sabit kalır.
+
+`EnemyMovementKind.Screen` üç durumlu: **Guarding → Retreating → (Leaving)**.
+`ShipBrain` kurulmaz; siperin taktiği yörünge ya da dalış değil, bir yuvayı
+tutmaktır. Ayrı bir "yaklaşma" durumu yoktu: manevra iticileriyle yaklaşma ile
+tutma aynı hareket, `MoveToward` varınca zaten frenliyor.
+
+**Dalga ilerlemesini ENGELLEMEZ** (`EnemyTypeData.BlocksWaveClear`). Bariyer
+hiç hasar vermez; ölmesini beklemek leveli hiçbir şeyin olmadığı bir bekleyişte
+kilitler, üstelik kalkanı boşalınca çekilip şarj olduğu için oyuncu onu köşeye
+sıkıştıramaz bile. Dalga temizliği TEHDİT üretenlere bakar.
+
+Geriye yalnızca siperler kalınca onlara **çekilme emri** verilir (`Withdraw` →
+`Leaving`): koruyacak filo yoksa sahnede durmalarının anlamı yok ve dalga dalga
+birikip oyuncunun ateş hattını kalıcı olarak kapatırlardı.
+
+**Tek başına bir dalga oluşturamaz** (`RequiresEscort`). `FillByBudget` siperi
+ancak dalgada koruyacak biri VARSA seçer; yalnız gelen bir bariyer bir olay
+değil, yalnızca bir gecikmedir.
 
 `FormationTemplate.CreateShieldWall()` bariyeri formasyonun EN ÖNÜNE koyar —
 arkasındakilere siper olmazsa hiçbir şey ifade etmez.

@@ -31,15 +31,36 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     float         _shieldRechargeTimer;
 
     // Siper (Screen) durum makinesi
-    enum ScreenPhase { Advancing, Holding, Retreating }
+    // Manevra iticileri sayesinde "yaklaşma" ile "tutma" arasında bir fark
+    // kalmadı: gemi her iki durumda da yuvasına doğru süzülüyor ve varınca
+    // MoveToward zaten frenliyor. Ayrı bir Holding durumu hiçbir şey yapmıyordu.
+    enum ScreenPhase { Guarding, Retreating, Leaving }
     ScreenPhase _screenPhase;
-    float       _screenHoldY;
 
-    /// <summary>Kaçtıktan sonra geri dönmek için gereken kalkan oranı.</summary>
+    // Korunacak yön: ana gemiden korunan filonun ağırlık merkezine. Sahne
+    // taraması pahalı olduğu için aralıklarla tazelenir.
+    Vector2 _guardDir = Vector2.right;
+    float   _guardScanTimer;
+
+    // Yuvanın koruma eksenine DİK kayması — sabit pay + yavaş salınım
+    float _screenLateral;
+    float _screenSwayPhase;
+
+    /// <summary>Çekildikten sonra geri dönmek için gereken kalkan oranı.</summary>
     const float ScreenReturnRatio = 0.9f;
 
-    /// <summary>Kaçarken bu mesafeye ulaşınca durup şarj bekler.</summary>
+    /// <summary>Çekilirken bu mesafeye ulaşınca durup şarj bekler.</summary>
     const float ScreenRetreatDistance = 13f;
+
+    const float GuardScanInterval   = 0.5f;
+    const float ScreenSwayAmplitude = 1.6f;
+
+    // Periyot geminin HIZ BÜTÇESİNDEN türer. 1.6 birimlik genlikte 7 sn'lik bir
+    // periyot tepe noktada 1.44 birim/sn ister; siperin max hızı 1.5, yani gemi
+    // salınımı kovalarken koruma eksenini takip edecek gücü kalmazdı ve strafe
+    // 'yavaş' değil sendeleyerek görünürdü. 10 sn'de tepe hız 1.01, bütçenin
+    // üçte ikisi.
+    const float ScreenSwayPeriod    = 10f;
 
     // Ateş etme
     float _fireTimer;
@@ -233,6 +254,18 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
                 // ShipBrain KURULMAZ: siper gemisinin taktiği yörünge/dalış
                 // değil, tek bir noktayı tutmaktır. _initialFacing 180'de kalır,
                 // yani burun (ve yay kalkanı) daha doğduğu an oyuncuya dönüktür.
+                //
+                // MANEVRA İTİCİLERİ: roket modelinde gemi yalnızca burnu
+                // doğrultusunda itebilir, yani yana kaymak için burnunu çevirmesi
+                // gerekir — ve o an yay kalkanı oyuncudan kayardı. Siper gemisi
+                // burnunu hedefte tutup yana süzülebilmeli; kalkanı yönlü olan
+                // bir gemi için bu bir süs değil, işleyişinin ön koşulu.
+                _movement.omniThrust = true;
+                //
+                // Faz ve yanal pay gemi başına ayrılır: aynı dalgada iki siper
+                // varsa aynı noktayı paylaşmasınlar ve senkron salınmasınlar.
+                _screenSwayPhase = Random.Range(0f, Mathf.PI * 2f);
+                _screenLateral   = Random.Range(-1.5f, 1.5f);
                 break;
 
             case EnemyMovementKind.BombRun:
@@ -600,13 +633,13 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     }
 
     /// <summary>
-    /// Siper manevrası: ana geminin önüne geç, dur, bekle. Kalkan bitince kaç,
-    /// dolunca geri gel.
+    /// Siper manevrası: ana gemi ile KORUNAN FİLO arasına geç, dur, bekle.
+    /// Kalkan bitince çekil, dolunca geri gel.
     ///
     /// Burun DAİMA oyuncuya dönüktür — yay kalkanı geminin +X yönünde durduğu
-    /// için burnun yönü kalkanın yönüdür. Kaçarken bile burun geride kalır ve
+    /// için burnun yönü kalkanın yönüdür. Çekilirken bile burun geride kalır ve
     /// gemi retro itkiyle uzaklaşır: sırtını dönseydi kalkan işe yaramaz olur ve
-    /// kaçış bir ölüm cezasına dönerdi.
+    /// çekilme bir ölüm cezasına dönerdi.
     ///
     /// Bu tip HİÇ ateş etmez; tehdidi tamamen oyuncunun ateş hattını kapatmasıdır.
     /// </summary>
@@ -618,26 +651,22 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 
         UpdateShieldRecharge();
 
+        // Burun (ve yay kalkanı) HER DURUMDA oyuncuda; çekilirken de.
+        _movement.AimAt(toShip);
+
         bool depleted  = _maxShieldHP > 0f && _shieldHP <= 0f;
         bool recovered = _maxShieldHP > 0f && _shieldHP >= _maxShieldHP * ScreenReturnRatio;
 
         switch (_screenPhase)
         {
-            case ScreenPhase.Advancing:
+            case ScreenPhase.Guarding:
             {
-                // Ana geminin önünde (sağında) bir tutuş noktası
-                Vector2 hold = shipPos + new Vector2(data.engageRange, _screenHoldY);
-                _movement.MoveToward(hold);
-                if (_movement.IsNear(hold, 0.7f)) _screenPhase = ScreenPhase.Holding;
-                if (depleted) BeginScreenRetreat();
-                break;
-            }
+                // Yuva yavaşça kayar (strafe) ve korunan filo hareket ettikçe
+                // koruma ekseni döner; gemi yana süzülerek yuvasını takip eder.
+                // Burun AimAt ile hep oyuncuda — kalkan hattı hiç açılmaz.
+                _movement.MoveToward(ScreenHoldPosition(shipPos));
 
-            case ScreenPhase.Holding:
-            {
-                // Burnu oyuncuya çevir ve dur — kalkan hattı sabit kalsın
-                _movement.FaceAndBrake(toShip);
-                if (depleted) BeginScreenRetreat();
+                if (depleted) _screenPhase = ScreenPhase.Retreating;
                 break;
             }
 
@@ -646,11 +675,24 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
                 // Yeterince uzaklaştıysa dur ve şarj ol; yoksa uzaklaşmaya devam.
                 // Burun oyuncuda kaldığı için bu bir GERİ ÇEKİLME, kaçış değil.
                 if (toShip.magnitude < ScreenRetreatDistance)
-                    _movement.Reverse(toShip);
+                    _movement.MoveInDirection(-toShip);   // burun oyuncuda, itki geriye
                 else
-                    _movement.FaceAndBrake(toShip);
+                    _movement.Brake();
 
-                if (recovered) _screenPhase = ScreenPhase.Advancing;
+                if (recovered)
+                {
+                    // Dönerken yeni bir yanal pay: hep aynı noktaya dönmek
+                    // oyuncuya bedava bir nişan hattı verirdi
+                    _screenLateral = Random.Range(-1.5f, 1.5f);
+                    _screenPhase   = ScreenPhase.Guarding;
+                }
+                break;
+            }
+
+            case ScreenPhase.Leaving:
+            {
+                // Koruyacak filo kalmadı — sahneden çekil (bkz. Withdraw)
+                _movement.MoveInDirection(Vector2.right);
                 break;
             }
         }
@@ -659,12 +701,68 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
             Destroy(gameObject);
     }
 
-    void BeginScreenRetreat()
+    /// <summary>
+    /// Siperin tutmaya çalıştığı nokta: ana gemi ile korunan filonun arasında,
+    /// gemiden <c>engageRange</c> kadar uzakta.
+    ///
+    /// Sabit "geminin sağı" değil: siperin işi kendini korumak değil,
+    /// ARKASINDAKİLERİ korumak. Filo yukarıdan geliyorsa siper de yukarı
+    /// kayar, yoksa oyuncunun ateş hattı zaten açık kalır ve gemi bir işe
+    /// yaramaz.
+    ///
+    /// Üstüne yavaş bir yanal salınım biner. Salınım DETERMİNİSTİKTİR (sinüs) —
+    /// oyunun geri kalanındaki kaçamak manevralarla aynı gerekçe: oyuncu deseni
+    /// öğrenip önünü kesebilmeli.
+    /// </summary>
+    Vector2 ScreenHoldPosition(Vector2 shipPos)
     {
-        _screenPhase = ScreenPhase.Retreating;
-        // Geri döndüğünde farklı bir yükseklikte siper alsın — hep aynı noktaya
-        // dönmek oyuncuya bedava bir nişan hattı verirdi
-        _screenHoldY = Random.Range(-2.5f, 2.5f);
+        _guardScanTimer -= Time.deltaTime;
+        if (_guardScanTimer <= 0f)
+        {
+            _guardScanTimer = GuardScanInterval;
+            _guardDir       = GuardDirection(shipPos);
+        }
+
+        Vector2 lateral = new Vector2(-_guardDir.y, _guardDir.x);
+        float   sway    = Mathf.Sin(Time.time * (Mathf.PI * 2f / ScreenSwayPeriod) + _screenSwayPhase);
+
+        return shipPos + _guardDir * data.engageRange
+                       + lateral  * (_screenLateral + sway * ScreenSwayAmplitude);
+    }
+
+    /// <summary>
+    /// Ana gemiden korunan filonun ağırlık merkezine bakan birim vektör.
+    /// Diğer siperler sayılmaz — siper sipere siper olmaz.
+    /// Korunacak kimse yoksa geminin tam önü.
+    /// </summary>
+    Vector2 GuardDirection(Vector2 shipPos)
+    {
+        Vector2 sum = Vector2.zero;
+        int     n   = 0;
+
+        foreach (var e in FindObjectsByType<EnemyBot>(FindObjectsSortMode.None))
+        {
+            if (e == this || e.data == null) continue;
+            if (e.data.role == EnemyRole.Barrier) continue;
+            sum += (Vector2)e.transform.position;
+            n++;
+        }
+
+        if (n == 0) return Vector2.right;
+
+        Vector2 dir = (sum / n) - shipPos;
+        return dir.sqrMagnitude > 0.01f ? dir.normalized : Vector2.right;
+    }
+
+    /// <summary>
+    /// Sahneden çekil. ChapterManager, dalgada tehdit üreten kimse kalmayınca
+    /// çağırır: koruyacak filo yoksa siperin sahnede durmasının anlamı yok ve
+    /// dalga dalga birikip oyuncunun ateş hattını kalıcı olarak kapatırlardı.
+    /// </summary>
+    public void Withdraw()
+    {
+        if (data == null || data.movementKind != EnemyMovementKind.Screen) return;
+        _screenPhase = ScreenPhase.Leaving;
     }
 
     void DropBomb()

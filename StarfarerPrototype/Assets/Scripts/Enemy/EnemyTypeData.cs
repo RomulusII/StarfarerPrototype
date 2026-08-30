@@ -155,6 +155,25 @@ public class EnemyTypeData : ScriptableObject
     /// <summary>Kalkan yönlü mü? Gövdeye isabet eden mermi kalkanı ATLAR.</summary>
     public bool HasDirectionalShield => shieldArcDegrees > 0f && maxShield > 0f;
 
+    /// <summary>
+    /// Bu tip hayattayken dalga "temizlendi" sayılabilir mi?
+    ///
+    /// Bariyer hiç hasar vermez; onun ölmesini beklemek leveli hiçbir şeyin
+    /// olmadığı bir bekleyişte kilitler. Üstelik kalkanı boşalınca çekilip şarj
+    /// oluyor, yani oyuncu onu köşeye sıkıştıramıyor bile. Dalga ilerlemesi
+    /// TEHDİT üretenlere bakar.
+    /// </summary>
+    public bool BlocksWaveClear => role != EnemyRole.Barrier;
+
+    /// <summary>
+    /// Tek başına bir dalga oluşturabilir mi?
+    ///
+    /// Hayır: siper gemisinin bütün anlamı ARKASINDAKİLERE siper olmasıdır.
+    /// Yalnız gelen bir bariyer, oyuncunun ateş hattını kapatan ama hiçbir
+    /// baskı üretmeyen bir engelden ibaret kalır — bir olay değil, bir gecikme.
+    /// </summary>
+    public bool RequiresEscort => role == EnemyRole.Barrier;
+
     // ── Özel davranışlar ──────────────────────────────────────────────────────
     // Her biri oyuncunun bir sistemine baskı yapar; süs değildir.
 

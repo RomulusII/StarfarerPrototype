@@ -269,10 +269,25 @@ public class ChapterManager : MonoBehaviour
 
     // ── Dalga temizlenme bekleme ──────────────────────────────────────────────
 
+    /// <summary>
+    /// Dalga temizlendi mi? Yalnızca TEHDİT üreten düşmanlara bakılır
+    /// (bkz. EnemyTypeData.BlocksWaveClear): silahsız bir siper gemisinin
+    /// ölmesini beklemek, leveli hiçbir şeyin olmadığı bir bekleyişte kilitler.
+    ///
+    /// Geriye yalnızca siperler kaldığında onlara ÇEKİLME emri verilir: koruyacak
+    /// bir filo kalmamışsa sahnede durmalarının bir anlamı yok, üstelik dalga
+    /// dalga birikip oyuncunun ateş hattını kalıcı olarak kapatırlardı.
+    /// </summary>
     void UpdateWaitClear()
     {
-        if (FindFirstObjectByType<EnemyBot>() != null) return;
         if (FindFirstObjectByType<BossShip>() != null) return;
+
+        var enemies = FindObjectsByType<EnemyBot>(FindObjectsSortMode.None);
+        foreach (var e in enemies)
+            if (e != null && e.data != null && e.data.BlocksWaveClear) return;
+
+        foreach (var e in enemies)
+            if (e != null) e.Withdraw();
 
         _waveIndex++;
         _phase = Phase.Transition;   // geçici duraksatma
@@ -339,10 +354,21 @@ public class ChapterManager : MonoBehaviour
         int safety = 200;
         while (budget > 0 && safety-- > 0)
         {
+            // Refakat gerektiren tipler (siper gemileri) ancak dalgada koruyacak
+            // biri VARSA seçilebilir — yalnız gelen bir bariyer bir olay değil,
+            // yalnızca bir gecikmedir.
+            bool hasEscorted = false;
+            foreach (var t in list)
+                if (t != null && !t.RequiresEscort) { hasEscorted = true; break; }
+
             // Bütçeye sığan tipleri filtrele
             var affordable = new List<EnemyTypeData>();
             foreach (var t in pool)
-                if (t != null && t.threatScore <= budget) affordable.Add(t);
+            {
+                if (t == null || t.threatScore > budget) continue;
+                if (t.RequiresEscort && !hasEscorted) continue;
+                affordable.Add(t);
+            }
 
             if (affordable.Count == 0) break;
 
