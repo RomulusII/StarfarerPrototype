@@ -41,7 +41,7 @@ public class Bomb : MonoBehaviour, ITurretTarget
     public Vector2   TargetVelocity         => Velocity;
     public bool      IsValidTarget          => this != null && isActiveAndEnabled;
     public float     ThreatValue            => Mathf.Max(1f, damage / 2f);
-    public bool      IsPointDefencePriority => true;
+    public PointDefenceClass PdClass => PointDefenceClass.Munition;
 
     public float RawDamageToKill(WeaponType weaponType) => 1f;
 

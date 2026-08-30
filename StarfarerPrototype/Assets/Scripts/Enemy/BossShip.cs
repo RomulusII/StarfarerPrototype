@@ -325,7 +325,7 @@ public class BossShip : MonoBehaviour, ITurretTarget
     public float ThreatValue => BossThreatValue;
 
     /// <summary>Boss devasa ve yavaş — PD'nin işi değil.</summary>
-    public bool IsPointDefencePriority => false;
+    public PointDefenceClass PdClass => PointDefenceClass.None;
 
     /// <summary>
     /// Boss zırhı. Geç bölüm boss'ları düşük seviye silahları eler: zırh her

@@ -938,11 +938,21 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 
     public float ArmorValue => EffectiveArmor;
 
-    /// <summary>Kalkanın içine girmiş küçük/yakın saldırganlar PD'nin işi.</summary>
-    public bool IsPointDefencePriority =>
-        data != null && (data.movementKind == EnemyMovementKind.Approach
-                      || data.movementKind == EnemyMovementKind.BombRun
-                      || data.movementKind == EnemyMovementKind.AttackRun);
+    /// <summary>
+    /// PD bu gemiyi vurur mu? Ölçü GÖVDE KÜTLESİ — hareket tipi değil.
+    ///
+    /// Eskiden filtre "movementKind ∈ {Approach, BombRun, AttackRun}" idi.
+    /// Bölüm 1–3'ün havuzunda (Swarm=Strafe, Armored=HoverFire, Shield=Charge,
+    /// Barrier=Screen) bu üçünden HİÇBİRİ yok, yani Point Defence turreti
+    /// bölüm 4'e kadar tek bir el bile ateş etmiyordu.
+    ///
+    /// Kütle eşiği savaşçı kovalama eşiğiyle aynı (2.5) ve bu bilinçli: "hafif
+    /// gövde" oyunda tek bir kavram olmalı. Avcı ve Swarm hedeftir, Zırhlı ve
+    /// Kaleci değildir — PD'nin atış başına hasarı zırhlı gövdede zaten erir.
+    /// </summary>
+    public PointDefenceClass PdClass =>
+        data != null && data.IsLightHull ? PointDefenceClass.Small
+                                         : PointDefenceClass.None;
 
     /// <summary>
     /// Kalkan + gövdeyi bu silah tipiyle bitirmek için gereken ham hasar.

@@ -853,7 +853,7 @@ Slot'a kurulunca otomatik ateş açar, oyuncu müdahalesi gerekmez. Enerji tüke
 | **Plazma** | Düşük (20f) | Orta | Düşük | Yüksek | 4s | — |
 | **Lazer** | Orta (5f) | Orta | Yüksek | Yüksek | 4s | — |
 | **Roket** | Çok düşük (30f+) | Yüksek | Orta | Düşük | 10s | Güdümlü, hedefi izler |
-| **Point Defence** | Hızlı (1f) | Düşük | Orta | Orta | 0.8s | Bombaları ve kalkana sızmış küçük gemileri düşürür, kısa menzil |
+| **Point Defence** | Çok hızlı (0.28f) | Düşük/atış, **28.6 DPS** | **Çok yüksek (20)** | Düşük | 0.25s | Menzil 4.0 — yalnızca mühimmat ve hafif gövde |
 
 **Hedefleme — puanlama formülü** (`TurretTargeting`):
 
@@ -893,9 +893,36 @@ dokunmak gerekmez — arayüzü uygulamak yeterlidir.
 Point Defence yalnızca `IsPointDefencePriority` olan hedefleri alır: bombalar,
 yakın saldırgan gemiler (Approach / BombRun / AttackRun) ve küçük asteroit parçaları.
 
-**Mermi düşürme — bugünkü durum.** PD'nin vurabildiği tek MERMİ bombadır; o da
-tek vurulabilir mermi tipi olduğu için (HP 1, `ITurretTarget` uygular,
-`TurretBullet` ayrıca kontrol eder). Diğerleri vurulamaz:
+**PD İKİ KADEMELİ SEÇER** (`PointDefenceClass`):
+
+1. Menzilde **mühimmat** (bomba/füze) varsa YALNIZCA ona ateş eder ve kilit
+   histerezisi uygulanmaz — bomba kalkana varmadan vurulmalı, 0.35 saniyelik
+   bir gecikme bile onu kaçırmaya yeter.
+2. Mühimmat yoksa **hafif gövdeli** gemilere ve küçük asteroit parçalarına.
+3. Büyük/zırhlı gövdelere **hiç** ateş etmez.
+
+**Eskiden hiçbir şeye ateş etmiyordu.** Filtre `movementKind ∈ {Approach,
+BombRun, AttackRun}` idi; bölüm 1–3'ün havuzunda (Swarm=Strafe,
+Armored=HoverFire, Shield=Charge, Barrier=Screen) bu üçünden hiçbiri yok —
+yani PD turreti bölüm 4'e kadar tek el bile ateş etmiyordu. Ölçü artık
+GÖVDE KÜTLESİ (`EnemyTypeData.IsLightHull`, eşik 2.5) ve bu eşik savaşçı
+kovalamayla AYNI: "küçük gemi" oyunda tek bir kavram olmalı.
+
+**Dar rolün karşılığı yüksek DPS.** Menzil 5.5 → **4.0** (kalkan küresi 2.5;
+turretler gövdede ±1.3 yayılı, yani en uzak slottan bile kalkanın biraz dışına
+ulaşır). Buna karşılık 8 hasar / 0.28 sn = **28.6 ham DPS**, diğer turretlerin
+~4.8 katı. Mermi hızı 8 → **20**: bomba 2.5 hızla geliyor, eski hızda menzilin
+ucundaki bir bombaya mermi 0.5 sn'de gidiyordu ve bomba o sürede 1.25 birim
+ilerliyordu — durdurmak kıl payına kalıyordu. Şimdi uçuş 0.2 sn, bomba 0.5 birim.
+
+Avcı öldürme süresi (yükseltmesiz): Lv5 **1.0 sn**, Lv12 1.2 sn, Lv25 2.1 sn.
+Lv50'de 15.4 sn'ye çıkıyor — PD zırha en duyarlı turret, çünkü çok sayıda zayıf
+atış yapıyor ve zırh eşiği tam olarak bunu cezalandırıyor. Hasar statı Sv3 ile
+Lv50'de 2.4 sn. Yani PD geç oyunda yatırım İSTER; bu bir kusur değil, zırh
+eşiğinin PD üzerindeki doğal sonucu.
+
+**Vurulabilir mermiler.** Bomba oyundaki tek vurulabilir mermi tipi (HP 1,
+`ITurretTarget` uygular, `TurretBullet` ayrıca kontrol eder):
 
 | Ne | Vurulabilir mi | Neden |
 |---|---|---|
@@ -904,9 +931,10 @@ tek vurulabilir mermi tipi olduğu için (HP 1, `ITurretTarget` uygular,
 | Düşman roketi | — | `EnemyWeaponKind.Rocket` tanımlı ama hiçbir kod yolu üretmiyor |
 | Oyuncunun güdümlü roketi | (evet) | HP 3 taşıyor ama düşman tarafında onu vuran hiçbir şey yok |
 
-Yani "füze savar" rolü yazılı ama ortada füze yok: `Rocket` silah tipi ölü bir
-enum değeri, oyuncunun roketinin HP'si de uyuyan bir yetenek. PD şu an yalnızca
-bombaya ve kalkana sızan küçük gemilere karşı çalışıyor.
+`PointDefenceClass.Munition` füzeler için hazır duruyor ama ortada füze yok:
+`EnemyWeaponKind.Rocket` ölü bir enum değeri, oyuncunun roketinin HP'si de
+uyuyan bir yetenek. Düşman roketi eklendiğinde tek yapılacak şey ona
+`ITurretTarget` + `Munition` vermek.
 
 ### Açılış Menüsü — Tasarım Kararları
 

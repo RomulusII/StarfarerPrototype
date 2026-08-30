@@ -34,7 +34,13 @@ public class TurretController : ShipComponentBase
     ITurretTarget _lockedTarget;
     float         _retargetTimer;
 
-    const float PDRange = 5.5f;
+    /// <summary>
+    /// Point Defence menzili. Kalkan küresi 2.5 birim; turretler gövdede
+    /// ±1.3 birim yayılı duruyor, yani 4.0 birim en uzak slottan bile kalkanın
+    /// biraz dışına ulaşır. Daha fazlası PD'yi "kısa menzilli ama sert" olmaktan
+    /// çıkarır — o kısıt yüksek DPS'inin karşılığıdır.
+    /// </summary>
+    const float PDRange = 4f;
 
     /// <summary>
     /// Işın turretinin hızlı hedeflere verdiği öncelik. Işın ıskalamaz;

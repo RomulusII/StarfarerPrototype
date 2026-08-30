@@ -163,7 +163,8 @@ public class Asteroid : MonoBehaviour, ITurretTarget
     public float ThreatValue => ImpactDamageFor(size) / 20f;
 
     /// <summary>Küçük parçalar hızlı ve gemiye yakın olabilir — PD onları da alsın.</summary>
-    public bool IsPointDefencePriority => size == Size.Small;
+    public PointDefenceClass PdClass =>
+        size == Size.Small ? PointDefenceClass.Small : PointDefenceClass.None;
 
     public float ArmorValue => 0f;   // kaya zırhsız; direnç sistemi zaten var
 

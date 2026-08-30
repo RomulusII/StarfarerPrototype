@@ -30,6 +30,14 @@ using UnityEngine;
 ///   Mermili turretlere ceza YAZILMADI: iki taraflı bir model tüm dengeyi
 ///   kaydırırdı, oysa çözülmek istenen tek şey ışının rolünü bulması.
 ///
+/// POINT DEFENCE — iki kademe:
+///   1. Menzilde bomba/füze varsa YALNIZCA onlara ateş eder ve kilit
+///      histerezisi uygulanmaz: bomba kalkana varmadan vurulmalı.
+///   2. Mühimmat yoksa hafif gövdeli gemilere (bkz. EnemyTypeData.IsLightHull)
+///      ve küçük asteroit parçalarına.
+///   3. Büyük/zırhlı gövdelere HİÇ ateş etmez — atış başına hasarı orada
+///      zırh eşiğinde erir, mermi de enerji de boşa gider.
+///
 /// KİLİTLENME:
 ///   - Hedef her karede değil, ReevaluateInterval'de bir yeniden değerlendirilir.
 ///   - Kilitli hedef geçerli ve menzildeyken kilit korunur.
@@ -73,10 +81,18 @@ public static class TurretTargeting
         float         currentScore = 0f;
         bool          currentStillValid = false;
 
+        // Point Defence iki kademeli seçer: menzilde MÜHİMMAT varsa yalnızca
+        // onlara bakar, yoksa küçük gemilere. Tek geçişte ikisini de topluyoruz;
+        // ayrı bir tarama, sahneyi iki kez gezmek demek olurdu.
+        ITurretTarget bestMunition = null;
+        float         munitionScore = 0f;
+
         foreach (var t in EnumerateTargets())
         {
             if (!t.IsValidTarget) continue;
-            if (pointDefenceOnly && !t.IsPointDefencePriority) continue;
+
+            var pd = t.PdClass;
+            if (pointDefenceOnly && pd == PointDefenceClass.None) continue;
 
             float dist = Vector2.Distance(turretPos, t.TargetTransform.position);
             if (dist > range) continue;
@@ -89,8 +105,18 @@ public static class TurretTargeting
                 currentScore      = score;
             }
 
+            if (pointDefenceOnly && pd == PointDefenceClass.Munition)
+            {
+                if (score > munitionScore) { munitionScore = score; bestMunition = t; }
+                continue;
+            }
+
             if (score > bestScore) { bestScore = score; best = t; }
         }
+
+        // MÜHİMMAT KİLİDİ KIRAR. Bomba kalkana varmadan vurulmalı; histerezisin
+        // onu 0.35 saniye geciktirmesi bile bir bombayı kaçırmaya yeter.
+        if (bestMunition != null) return bestMunition;
 
         // Kilit korunuyor mu? Rakip yeterince üstün değilse mevcut hedefte kal.
         if (currentStillValid && bestScore < currentScore * SwitchAdvantage)

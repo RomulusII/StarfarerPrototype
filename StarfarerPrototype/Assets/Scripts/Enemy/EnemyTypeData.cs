@@ -118,6 +118,18 @@ public class EnemyTypeData : ScriptableObject
         mass <= FighterChaseMaxMass && agility >= FighterChaseMinAgility;
 
     /// <summary>
+    /// Hafif gövde mü? Savaşçı kovalama ve Point Defence hedeflemesi AYNI eşiği
+    /// kullanır — "küçük gemi" oyunda tek bir kavram olmalı, iki ayrı sayı
+    /// zamanla birbirinden sapardı.
+    ///
+    /// Hafif: Swarm(1), Interceptor(0.8), Leech(1.2), Phantom(1.6), Bomber(2),
+    ///        BombRunner(2)
+    /// Ağır:  Shield(3), Splitter(3), Jammer(3.5), Barrier(4), Armored(5),
+    ///        Regenerator(5), Artillery(6), Juggernaut(10)
+    /// </summary>
+    public bool IsLightHull => mass <= FighterChaseMaxMass;
+
+    /// <summary>
     /// Silahı küçük ve hızlı bir hedefe uygun mu?
     /// Ağır top (Cannon) yavaş, iri bir mermi atar — savaşçıyı ıskalar ve o
     /// atış ana gemiye gitmemiş olur. Bomba ve komponent burst'ü ise zaten
