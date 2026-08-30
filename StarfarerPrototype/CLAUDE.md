@@ -446,8 +446,33 @@ stat seviyesi taban tavanla (150 metal / 100 kristal) alınabilir, sonrası içi
 büyütür. Üretim AKIŞI, kapasitör STOKU belirler ve ikisi farklı sorunları çözer:
 turretlerin aynı anda ateşlemesi, plazma şarjı ve kalkan boost'u anlık olarak
 üretimin çok üstünde enerji ister — tampon boşsa o atışlar hiç yapılamaz.
-Üretimi yükseltmek bunu da çözer ama çok daha pahalıya; tampon ucuz ve dar bir
-cevaptır. Taban 25, toplamsal: Sv5 +51, Sv10 +208 (taban tampon 50).
+Üretimi yükseltmek bunu da çözer ama çok daha pahalıya; tampon dar bir cevaptır.
+
+**Her seviye tamponu %50 büyütür** (`capacitorStatStep = 1.5`) — oyundaki tek
+statStep istisnası ve bilinçli. Sebep: kapasitör bir AKIŞ değil STOK. Üretim
+tüketimle yarışır (statStep 1.25'e karşı energyGrowth 1.30) ve o yarış
+dengelidir; tampon o yarışa hiç girmez, yalnızca ne kadar süre burst
+yapabildiğini belirler. 1.25 ile ilk seviye 98 metala **+6 enerji** veriyordu,
+yani oyundaki en zayıf yükseltmeydi.
+
+    bonus(L) = tabanTampon × (1.5^L − 1)
+
+Taban EnergyBus'tan OKUNUR, sabit yazılmaz — "her seviye +%50" ifadesi taban
+kapasite değiştiğinde de doğru kalsın diye.
+
+| Sv | Max enerji | O seviyenin fiyatı |
+|---|---|---|
+| 0 | 50 | — |
+| 1 | 75 | 98 |
+| 5 | 380 | 726 |
+| 10 | 2.883 | 8.883 |
+
+İzi sonuna kadar götürmek 22.400 metal — kampanya gelirinin yaklaşık yarısı.
+Sv10 tamponu, Sv10 jeneratörün 17 saniyelik tam üretimini depolar.
+
+Büyüme seviye içinde çarpımsal, **jeneratörler arası toplamsaldır** (zırh iziyle
+aynı gerekçe): çarpımsal olsaydı ikinci jeneratör birincinin katı kadar tampon
+üretir ve tek doğru oyun "hepsini jeneratörle doldur" olurdu.
 
 **Zırh — onarım biriminin üçüncü izi.** Ana geminin `maxHullHP`'sini yükseltir.
 Onarım birimine bağlanması tematik değil yapısal: gövde bakımı zaten o modülün

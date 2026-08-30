@@ -24,12 +24,6 @@ public class GeneratorComponent : ShipComponentBase
     public const string ProductionKey = "production";
     public const string CapacitorKey  = "capacitor";
 
-    /// <summary>
-    /// Sv1'de eklenen tampon. EnergyBus'ın taban kapasitesi 50; ilk seviye
-    /// bunun yarısını ekler, Sv10 yaklaşık 7 katına çıkarır.
-    /// </summary>
-    public const float CapacitorBase = 25f;
-
     float _effectiveProduction;
     float _appliedCapacity;
 
@@ -61,8 +55,27 @@ public class GeneratorComponent : ShipComponentBase
     }
 
     /// <summary>Bu jeneratörün eklediği tampon kapasitesi.</summary>
-    public float CapacitorBonus
-        => CapacitorBase * (BalanceConfig.Instance.StatMultiplier(GetStatLevel(CapacitorKey)) - 1f);
+    public float CapacitorBonus => CapacitorBonusAt(GetStatLevel(CapacitorKey));
+
+    /// <summary>
+    /// Verilen seviyedeki tampon bonusu. Her seviye tamponu %50 büyütür:
+    ///
+    ///     bonus(L) = tabanTampon × (1.5^L − 1)
+    ///
+    /// Taban EnergyBus'tan OKUNUR, sabit yazılmaz — böylece "her seviye +%50"
+    /// ifadesi taban kapasite değiştiğinde de doğru kalır.
+    ///
+    /// Bonus jeneratörler arasında TOPLAMSALDIR (zırh iziyle aynı gerekçe):
+    /// çarpımsal olsaydı ikinci jeneratör birincinin katı kadar tampon üretir
+    /// ve tek doğru oyun "hepsini jeneratörle doldur" olurdu. Seviye içindeki
+    /// büyüme çarpımsal, jeneratörler arası toplamsal.
+    /// </summary>
+    public static float CapacitorBonusAt(int level)
+    {
+        float baseEnergy = EnergyBus.Instance != null ? EnergyBus.Instance.baseMaxEnergy : 50f;
+        float step       = BalanceConfig.Instance.capacitorStatStep;
+        return baseEnergy * (Mathf.Pow(step, Mathf.Max(0, level)) - 1f);
+    }
 
     /// <summary>
     /// EnergyBus kaydını tazeler. Eklenen miktar alanda tutulur ve yalnızca

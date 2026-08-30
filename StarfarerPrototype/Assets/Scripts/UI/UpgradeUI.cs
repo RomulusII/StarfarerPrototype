@@ -969,7 +969,9 @@ public class UpgradeUI : MonoBehaviour
                 float prod = gen.productionAmount * gen.GetMultiplier(GeneratorComponent.ProductionKey);
                 sb.AppendLine(DeltaLine("Üretim/sn", prod, GeneratorComponent.ProductionKey, false));
                 sb.AppendLine(DeltaLine("Tampon +", gen.CapacitorBonus,
-                                        GeneratorComponent.CapacitorKey, false));
+                                        GeneratorComponent.CapacitorKey, false,
+                                        GeneratorComponent.CapacitorBonusAt(
+                                            gen.GetStatLevel(GeneratorComponent.CapacitorKey) + 1)));
                 if (EnergyBus.Instance != null)
                     sb.AppendLine($"Max enerji: {EnergyBus.Instance.maxEnergy:0}");
                 break;
@@ -1036,11 +1038,19 @@ public class UpgradeUI : MonoBehaviour
     /// Seçili stat bu satırla eşleşiyorsa delta değeri ekler.
     /// isDecreasing=true → upgrade azaltıcı (enerji verimi gibi).
     /// </summary>
-    string DeltaLine(string label, float current, string statKey, bool isDecreasing)
+    /// <param name="explicitNext">
+    /// Bir sonraki seviyedeki DEĞER. Adımı statStep'ten farklı olan izler
+    /// (kapasitör) bunu verir; verilmezse delta genel adımdan hesaplanır.
+    /// </param>
+    string DeltaLine(string label, float current, string statKey, bool isDecreasing,
+                     float? explicitNext = null)
     {
         string valStr = $"{current:0.##}";
         if (_selectedStatKey != statKey || _selectedStatSlot != _currentSlotIndex)
             return $"{label}: {valStr}";
+
+        if (explicitNext.HasValue)
+            return $"{label}: {valStr}  (+{explicitNext.Value - current:0.##})";
 
         float step = BalanceConfig.Instance.statStep;
         float delta;
@@ -1090,7 +1100,9 @@ public class UpgradeUI : MonoBehaviour
                        "Diğer tüm yükseltmelerin kapısıdır: üretim yetmezse " +
                        "hiçbir komponent seviye alamaz.";
             case "capacitor":
-                return $"Enerji tamponunu (max enerji) büyütür.\n{up}\n\n" +
+                return $"Enerji tamponunu (max enerji) büyütür.\n" +
+                       $"Her seviye tamponu %{(cfg.capacitorStatStep - 1f) * 100f:0} büyütür " +
+                       "— diğer statlardan farklı, çünkü tampon bir AKIŞ değil STOK.\n\n" +
                        "Üretim AKIŞI, kapasitör STOKU belirler. Turretlerin aynı " +
                        "anda ateşlemesi, plazma şarjı ve kalkan boost'u anlık " +
                        "olarak üretimin çok üstünde enerji ister — tampon boşsa " +

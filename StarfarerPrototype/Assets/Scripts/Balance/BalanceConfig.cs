@@ -87,6 +87,16 @@ public class BalanceConfig : ScriptableObject
              "hızlı büyür — istenen buydu.")]
     public float statCostGrowth = 1.65f;
 
+    [Tooltip("Kapasitör izinin seviye başına büyümesi. Diğer statlar statStep " +
+             "(1.25) kullanır; kapasitör bilerek AYRIKTIR.\n\n" +
+             "Sebep: kapasitör bir AKIŞ değil STOK. Üretim, tüketimle yarışır " +
+             "(statStep 1.25'e karşı energyGrowth 1.30) ve o yarış dengelidir. " +
+             "Tampon o yarışa hiç girmez — yalnızca ne kadar süre burst " +
+             "yapabildiğini belirler. 1.25 ile ilk seviye 98 metala +12 enerji " +
+             "veriyordu, yani oyundaki en zayıf yükseltme oluyordu. 1.5'te her " +
+             "seviye tamponu tam yarı yarıya büyütür.")]
+    public float capacitorStatStep = 1.5f;
+
     [Tooltip("Zırh (gövde HP) statının maliyet çarpanı. Onarım biriminin diğer " +
              "izleriyle aynı tabandan başlasaydı, doğrudan hayatta kalma satın " +
              "alan bir iz olarak açık ara en verimli yükseltme olurdu.")]
