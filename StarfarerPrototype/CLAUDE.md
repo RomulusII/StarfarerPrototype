@@ -212,6 +212,43 @@ kalkanını **kare bir levha** olarak taşıyordu. Yuvarlak yedek artık çağı
 kendi işi (`ShipComponentBase` halkasıyla aynı desen: skin varsa o, yoksa
 çağıranın kendi şekli).
 
+**Küresel kalkan ARTIK VURULABİLİR** (`BubbleShield`). Uzun süre yalnızca bir
+sprite'tı: hasar gemi gövde collider'ından geçiyordu, dolayısıyla kabuğu kesip
+gövdeyi ıskalayan mermi hiçbir şeye çarpmadan öbür taraftan çıkıyordu. Oyuncunun
+GÖRDÜĞÜ ile oyunun BİLDİĞİ farklıydı — ekranda bir kabuk var ama mermiler içinden
+geçiyor. Artık bariyerdeki desenin aynısı: gövdeden ayrı bir collider, sahibi
+`owner`. Yarıçap sprite'ın kendisinden ÖLÇÜLÜR, ayrı bir sayı olarak yazılmaz —
+bağımsız iki değer zamanla sapar ve tam bu hata geri gelirdi.
+
+Kalkan boşalınca görsel nesne komple kapanır, dolayısıyla collider da kapanır ve
+mermiler gövdeye ulaşır. Ayrı bir "collider'ı kapat" yolu YOK: tek anahtar.
+
+`DamageUtil` iki kalkan tipini tek yerden çözer (`ShieldOwnerOf`). Dört ayrı
+yerde "önce yayı sor, sonra küreyi sor" yazmak, üçüncü bir kalkan şekli
+eklendiğinde üç yerin güncellenip birinin unutulması demekti.
+
+**Kabuk bir DİSK değil bir YÜZEY.** İç dolgu 0.18 ve halka rim² ile yayvandı;
+sonuç arkasındaki gemiyi ve yıldızları boyayan dolu bir daireydi. Şimdi iç dolgu
+0.05, halka rim⁴ ile dar (`InR` 0.55 → 0.70) ve tepe alfa 0.13. Kural yine aynı:
+kalkan belli belirsiz, parlama belirgin — kabuğun nerede olduğunu isabet anında
+`ShieldEffect` hilali (0.55) söyler. Alfa `BarrierShield.ArcColor`dan AYRI
+tutulur: dar bir hilalde doğru olan sayı, geminin birkaç katı alan kaplayan bir
+dairede o bölgeyi boyuyor.
+
+**Boss kalkanı ELİPS.** Aynı dikdörtgen hatası orada da vardı ve daha uzun
+sürdü: boss gövdesi geniş olduğu için levha kocamandı. Boss'ta daire de doğru
+şekil değil — gövdenin en-boy oranı her bölümde tam 2:1, daire ya burnu ve kıçı
+açıkta bırakır ya da gövdenin kat kat üstüne taşar. Kabuk sprite'ı bu yüzden bir
+**aspect** parametresi alıyor (`BubbleShield.Shell`) ve elipsi KENDİ İÇİNDE
+çiziyor; transform uniform kalır (bkz. Kod Kuralları) ve halka yamulmaz.
+
+Sprite üreteci artık tek yerde (`BubbleShield.Shell`), `EnemyBot` ve `BossShip`
+onu paylaşıyor — iki kopya zamanla birbirinden sapardı ve bu hata tam olarak
+öyle hayatta kalmıştı.
+
+**Boss kalkanı hâlâ yalnızca görsel** — vurulabilir değil; `BubbleShield.owner`
+`EnemyBot` tipinde olduğu için collider'ı da ortak hâle getirmek ayrı bir iş.
+
 **Her iki kalkan da çarpma hilali gösterir** — ana gemidekinin aynısı
 (`ShieldEffect`). `ShieldEffect.Spawn` artık yarıçap, renk ve yay genişliği
 alıyor; hilal dokusu genişliğe göre önbelleklenir.
@@ -624,7 +661,22 @@ toplar → hangara döner → `ResourceInventory`'ye boşaltır.
   kayma** (0.3 birim/sn, kalıcı). Enkaz asla durmaz; vaktinde toplanmazsa soldan
   çıkıp kaybolur. Tamamen dursaydı ekranın sağında kalan enkaz toplayıcının
   menzili (hangardan 12 birim) dışında sonsuza dek asılı kalırdı.
-- Tipe göre renklenir: ham madde kahverengi, kristal **mavimsi gri**.
+- **Şekil KÖKENDEN, renk KAYNAK TİPİNDEN gelir** — iki ayrı eksen
+  (`DebrisOrigin` / `ResourceType`). Bir gemi hem metal hem kristal enkaz
+  bırakabilir ve ikisi de gemi parçasına benzemelidir; tek eksene bağlansaydı
+  "kristal enkaz" ile "kaya enkazı" aynı şey olurdu.
+  - **Ship** — gemi parçasına benzeyen çizgiler, plakalar, kirişler (6 varyant)
+  - **Rock** — YALNIZCA şekilsiz silik lekeler (4 varyant). Kayanın parçası
+    kayadır; düz kenar, perçin ya da simetri taşımaz.
+  - Varyant doğarken rastgele seçilir. Tek sprite ile sahnedeki onlarca enkaz
+    kopyala-yapıştır görünürdü.
+- **Boy 0.12 → 0.18 birim** (ham madde 12×10 → 18×15 piksel; kristal ×1.35).
+  0.12 ekranda ~9 piksel demekti: enkazın silueti okunmadan toplanıp gidiyordu.
+  Skin tuvali (48×40 → 72×60) ve prosedürel yedek AYNI oranda büyür — iki yol
+  aynı boyu vermek zorunda, yoksa skin aç/kapa boyut değiştirirdi.
+- Renk: ham madde kahverengi, kristal parlak camgöbeği. Sprite'lar **gri
+  tonlamalıdır** ve rengi `sr.color` çarpar — `SkinLibrary.Tint` KULLANILMAZ,
+  o skin varken beyaza düşürüp metal/kristal ayrımını silerdi.
 - İki şekilde kaybolur: soldan çıkarak (asıl yol, sahnenin genişliğine göre
   ~50–107 sn) veya 180 sn'lik ömrü dolarak (emniyet). Görsel uyarı hangisi önce
   gelecekse ona göre işler: kaybolmasına 25 sn kala solmaya başlar, 8 sn kala
@@ -957,10 +1009,41 @@ eşiğinin PD üzerindeki doğal sonucu.
 | Düşman roketi | — | `EnemyWeaponKind.Rocket` tanımlı ama hiçbir kod yolu üretmiyor |
 | Oyuncunun güdümlü roketi | (evet) | HP 3 taşıyor ama düşman tarafında onu vuran hiçbir şey yok |
 
+**Vurulabilir olan farklı GÖRÜNÜR.** Bomba ile düşman mermisi neredeyse aynı
+renkteydi (ikisi de sıcak turuncu yumru) ve oyuncu hangisinin durdurulabileceğini
+göremiyordu — PD'nin ateş etmemesini menzil hatası sanmasının bir sebebi buydu.
+Bomba artık `ShootableMarker` taşıyor: etrafında yanıp sönen köşe parantezleri.
+İşaret merminin sprite'ına GÖMÜLMEZ, ayrı bir çocuk nesnedir — yanıp sönme
+merminin kendi görselini karartmamalı ve yeni bir vurulabilir tip eklendiğinde
+tek satırla ona da takılabilmeli. Halka değil parantez: halka kalkan/aura
+okuması yaratıyor, köşe parantezi evrensel "nişan alınabilir" dili.
+
 `PointDefenceClass.Munition` füzeler için hazır duruyor ama ortada füze yok:
 `EnemyWeaponKind.Rocket` ölü bir enum değeri, oyuncunun roketinin HP'si de
 uyuyan bir yetenek. Düşman roketi eklendiğinde tek yapılacak şey ona
 `ITurretTarget` + `Munition` vermek.
+
+### Level Bandı — Tasarım Kararları
+
+Her level başında ekranın üstünde ~2.9 saniye görünen bant: level numarası,
+bölüm numarası ve sektör adı (boss levelinde ayrıca "BOSS").
+
+Neden var: **bölüm içi level geçişi tamamen sessizdi.** Oyuncu 2.5 saniye
+bekleyip yeni bir dalga görüyordu ama bir levelin bittiğini, kaçıncı levelde
+olduğunu ya da hangi sektörde savaştığını hiçbir yerden okuyamıyordu —
+100 levellik bir kampanyada yer duygusu tamamen kayboluyordu.
+
+**Bant tam ekranın yerini almaz, ARALARINI doldurur.** Bölüm geçişi (her 10
+levelde bir) mürettebat diyaloğu ve hikâye metniyle akışı durdurmayı sürdürüyor;
+level geçişi ise bir olay değil bir RİTİM — her levelde akışı durdurmak 100 kez
+tekrarlanacak bir kesinti olurdu.
+
+`ChapterManager.BeginLevel` çağırır, yani kayıttan devam etme ve bölüm geçişi
+sonrası dahil her level başlangıcı kapsanır. Bant oynanışa hiç dokunmaz:
+`GraphicRaycaster` yok, hiçbir `Graphic` raycast almaz. Süre
+`Time.unscaledDeltaTime` ile ölçülür — hız kontrolü ×2'ye alındığında bant
+yarı süre görünmemeli, süresi duvar saatidir. Canvas sortingOrder 45, yani
+bölüm geçiş ekranının (50) ALTINDA: ikisi üst üste gelirse anlatım kazanır.
 
 ### Açılış Menüsü — Tasarım Kararları
 
@@ -1157,11 +1240,14 @@ bırakıldı.
 | WeaponController.cs | Kinetic/Laser/Plasma ateş mantığı, Boost çarpanları |
 | Bullet.cs | Oyuncu mermisi — hareket, trigger collision, 3sn sonra yok |
 | BarrierShield.cs | Yönlü yay kalkanı — ayrı collider, önden gelen mermiyi emer |
+| BubbleShield.cs | Küresel kalkanın çarpışma yüzeyi — kabuk artık vurulabilir |
 | FormationGroup.cs | Bir dalganın birlikte uçan gemi grubu — çapa + yuvalar |
 | ViewBounds.cs | Kameranın en geniş kadrajı; doğum ve silinme sınırları buradan türer |
 | EnemyBot.cs | Data-driven düşman — hareket, ateş, direnç, zırh eşiği, faz/bölünme/onarım aurası |
 | Asteroid.cs | Parçalanabilir asteroit — Large→Medium→Small, çarpma hasarı, enkaz bırakır |
-| Debris.cs | Enkaz — sürüklenip durur, tipe göre renk, ömür sonunda solup yanıp söner |
+| Debris.cs | Enkaz — sürüklenip durur, kökene göre şekil + tipe göre renk, ömür sonunda solup yanıp söner |
+| ShootableMarker.cs | Vurulabilir mühimmatın etrafında yanıp sönen köşe parantezleri |
+| LevelBannerUI.cs | Her level başında üstte 2–3 sn görünen level / bölüm bandı |
 | ComponentCatalog.cs | Tüm komponent tanımlarının tek sahibi — ne var, kaça, hangi zincirle |
 | BalanceConfig.cs | Gelir ve zırh eğrilerinin tek sahibi (SO; asset yoksa varsayılan) |
 | LevelCurve.cs | Düşman ölçeklemesi: HP, hasar, zırh, kaçamak — levelden türer |
@@ -1311,6 +1397,11 @@ mevcut denge sayıları aynen korunur. Skin ile hitbox **birlikte** açılıp ka
    Dünya boyutu birebir aynı kalır, piksel yoğunluğu 4× olur (zoom ve mobil için)
 6. Import'ta **Mesh Type = Full Rect**. Tight, saydam kenarları kırpar ve
    `sprite.bounds` küçülür — hitbox ofset hesabı kayar
+7. **Rengi koddan gelen sprite GRİ TONLAMALI çizilir**, kod `sr.color` ile
+   çarpar. Turret tabanı/namlusu/mermisi (6 uzmanlaşma) ve enkaz (2 kaynak
+   tipi) böyledir: alternatif aynı şeklin 18 ve 20 renkli kopyasını çizmekti.
+   Bu sprite'lara `SkinLibrary.Get` yedek rengi olarak **beyaz** verilir —
+   yedeğe renk gömülseydi skinli yolda renk iki kez çarpılır ve nesne kararırdı.
 
 ### Doluluk: hangi sayıya bakılır
 
@@ -1339,6 +1430,8 @@ node Tools/SkinGen/gen.js
 | `enemies.js` | 12 düşman tipi |
 | `player.js` | Ana gemi gövdesi + namlu |
 | `components.js` | Komponent slot ikonları |
+| `props.js` | Gemi olmayan her şey: mermiler, bomba, füze, enkaz, turret parçaları |
+| `boss.js` | Paylaşılan boss gövdesi + 5 hardpoint tipi |
 | `ships.js` | Swarm + hepsini toplayan liste |
 | `gen.js` | PNG'leri yazar, `hitboxRect` ölçer, doluluk basar |
 | `install.js` | `.meta` ve `SkinSet.asset`'i yazar |
@@ -1683,8 +1776,14 @@ geçerli olan sayı görünür. Boss ve hardpoint'leri de kutu açar.
 - [ ] Ses efektleri
 - [x] **Skin altyapısı** — SkinLibrary/SkinSet/SkinId, 53 çağrı tek imzada toplandı,
       hitbox sprite siluetinden türer, tek bool ile aç/kapa
-- [~] Gerçek sprite'lar — 13 düşman + ana gemi + namlu + 5 komponent ikonu çizildi.
-      Kalan: boss + hardpoint, asteroit, enkaz, mermiler, savaşçı, toplayıcı, turret
+- [~] Gerçek sprite'lar — 13 düşman + ana gemi + namlu + 5 komponent ikonu +
+      23 prop (mermiler, bomba, füze, 10 enkaz varyantı, turret taban/namlu,
+      savaşçı, toplayıcı, hangar gövdesi, vurulabilir çerçevesi).
+      + boss gövdesi (10 boss paylaşır) + 5 hardpoint tipi.
+      Asteroit ve kalkan kabuğu bilinçli olarak prosedürel kalıyor
+      (bkz. Skin Sistemi).
+- [x] **Vurulabilir mermi işareti** — bomba yanıp sönen köşe parantezleri taşıyor
+- [x] **Level bandı** — her level başında üstte 2–3 sn level / bölüm / sektör
 
 ### Yeniden ele alınabilecekler
 
@@ -1770,8 +1869,47 @@ Sıra kararlaştırıldı: **hitbox ayrımı → denge testleri → skin'ler.**
   **Bilerek skin verilmeyenler:** Hangar ve Turret halkaları. İkisinin de kendi
   gövde görseli var; halkaya da ikon konsaydı üst üste binerdi.
 
-  **Hâlâ prosedürel dikdörtgen:** boss + hardpoint, asteroit, enkaz, tüm
-  mermiler, savaşçı, toplayıcı, hangar gövdesi, turret taban/namlu, kalkan kabuğu.
+  **Gemi olmayan 23 sprite eklendi** (`props.js`): bomba, düşman mermisi (gövde
+  ve komponent), ana silah mermisi, turret mermisi, avcı mermisi, füze, turret
+  taban + namlu, savaşçı, toplayıcı, hangar gövdesi, vurulabilir çerçevesi ve
+  10 enkaz varyantı. **Hiçbiri oyunda görülmedi** — bakılacaklar: pivotu özel
+  olanların hizası (turret namlusu/mermisi, füze, avcı mermisi mount noktasından
+  +X uzanmalı), gri tonlamalı turret parçalarının uzmanlaşma renginde okunurluğu.
+
+  **Hâlâ prosedürel — ve bilinçli olarak öyle:**
+  - **Asteroit.** `Asteroid.BuildVisual` her asteroide özgü rastgele bir kaya
+    üretiyor ve bunu ÖNBELLEĞE ALMIYOR; çeşitlilik kasıtlı. Tek bir skin,
+    sahnedeki bütün kayaları aynı yapardı.
+  - **Kalkan kabuğu** (`fx.shield`). Yarıçap, yay açısı ve renk runtime'da
+    değişiyor (ana gemi küresi, düşman küresi, bariyer hilali); sabit bir
+    sprite bunların hiçbirini karşılayamaz.
+
+  **Jammer yeniden çizildi.** Sprite'ı vardı ama SİLUETİ dikdörtgen okuyordu:
+  sekizgen bir blok, üst ve alt kenarı uzunluğunun çoğunda düz ve yatay, çanağı
+  gövdeye yapışık ince bir yay. "Sprite var" ile "sprite işini yapıyor" aynı şey
+  değil — ölçüt dosyanın varlığı değil, oyun ölçeğinde ne okunduğu.
+
+  Yeni siluet: baştan sona eğimli (kuyrukta 120px, burunda 56px) gövde, önünde
+  ayrı duran ve öne açılan kalın bir çanak, iki kalın süpürülmüş anten. Çanak
+  gemi görevinin (yayın) tek göstergesi ve oyundaki başka hiçbir gemide yok.
+  Hitbox içi doluluk %63.7. Denenip bırakılanlar üreteç dosyasında yazılı.
+
+  **Boss gövdesi ve 5 hardpoint tipi çizildi** (`boss.js`). 10 boss TEK gövde
+  sprite'ını (`boss.body`) paylaşır ve rengini koddan alır — `BossShip` zaten iki
+  kademeli anahtar kullanıyordu (`boss.<ad>` → `boss.body`), yani mimari bunu
+  bekliyordu. Bir bölümün boss'u gerçekten farklı görünmeliyse `boss.<ad>`
+  eklemek onu bu yoldan çıkarır.
+
+  Paylaşım mümkün çünkü **en-boy oranı her bölümde tam 2:1** (`bodyWidth =
+  200 + bölüm×6`, `bodyHeight = 100 + bölüm×3`), yani tek tuval bütün bosslara
+  UNIFORM ölçekle oturuyor (`FitToSize`).
+
+  **Hitbox değişmedi:** `BossShip` collider'ı `boss.<ad>` anahtarıyla arıyor, o
+  kayıtlı değil — veri kaynaklı kutu yerinde kaldı. Hardpoint tuvalleri ise
+  verideki ölçünün TAM 4 katı, çünkü `FitToSize` orada collider'ı da taşıyan
+  transform'u ölçekliyor; oran tutmasaydı görsel düzelirken hitbox kayardı.
+
+  **Hâlâ eksik:** yok.
 
 ---
 

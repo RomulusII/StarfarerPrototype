@@ -95,6 +95,14 @@ public class ChapterManager : MonoBehaviour
         var chapter = ChapterFor(GameProgress.CurrentChapter);
         CurrentChapter = chapter;
 
+        // Nerede olduğunu söyle. Bölüm geçişi (her 10 levelde bir) tam ekran
+        // anlatımını sürdürüyor; bant onun ARALARINI dolduruyor — bölüm içi
+        // level geçişi tamamen sessizdi ve 100 levellik kampanyada oyuncu
+        // kaçıncı levelde olduğunu hiçbir yerden okuyamıyordu.
+        LevelBannerUI.Show(level, GameProgress.CurrentChapter,
+                           chapter != null ? chapter.chapterTitle : null,
+                           GameProgress.IsBossLevel);
+
         _asteroids?.Configure(chapter.asteroidCount, chapter.asteroidInterval);
 
         _levelWaves = BuildWaves(level, chapter);

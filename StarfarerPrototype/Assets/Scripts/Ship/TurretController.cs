@@ -336,6 +336,17 @@ public class TurretController : ShipComponentBase
     // Görseller
     // -------------------------------------------------------------------------
 
+    /// <summary>
+    /// Taban, namlu ve mermi sprite'ları GRİ TONLAMALIDIR; uzmanlaşma rengini
+    /// SpriteRenderer.color çarpar. Alternatif her uzmanlaşma için ayrı bir
+    /// görsel çizmekti — altı uzmanlaşma × (taban + namlu + mermi) = 18 sprite,
+    /// hepsi aynı şeklin farklı renklisi.
+    ///
+    /// Bu yüzden SkinLibrary'ye yedek renk olarak BEYAZ verilir: prosedürel
+    /// dikdörtgen de beyaz doğar ve rengi yine sr.color'dan alır. İki yol da
+    /// aynı sonucu verir — yedeğe rengi gömseydik skinli yolda renk iki kez
+    /// çarpılır ve turretler kararırdı.
+    /// </summary>
     void BuildVisual()
     {
         Color baseColor = TurretColor();
@@ -344,7 +355,8 @@ public class TurretController : ShipComponentBase
         baseGo.transform.SetParent(transform, false);
         var baseSR = baseGo.AddComponent<SpriteRenderer>();
         baseSR.sprite       = SkinLibrary.Get(SkinId.TurretBase + "." + specType.ToString().ToLowerInvariant(), SkinId.TurretBase,
-                                  30, 30, baseColor * 0.7f);
+                                  30, 30, Color.white);
+        baseSR.color        = baseColor * 0.7f;
         baseSR.sortingOrder = 3;
 
         _barrel = new GameObject("Barrel").transform;
@@ -352,7 +364,8 @@ public class TurretController : ShipComponentBase
         _barrel.localPosition = new Vector3(0.10f, 0f, 0f);
         var barrelSR = _barrel.gameObject.AddComponent<SpriteRenderer>();
         barrelSR.sprite       = SkinLibrary.Get(SkinId.TurretBarrel + "." + specType.ToString().ToLowerInvariant(), SkinId.TurretBarrel,
-                                    20, 8, TurretColor(), new Vector2(0f, 0.5f));
+                                    20, 8, Color.white, new Vector2(0f, 0.5f));
+        barrelSR.color        = baseColor;
         barrelSR.sortingOrder = 4;
     }
 
@@ -375,12 +388,14 @@ public class TurretController : ShipComponentBase
             _                           => Color.white,
         };
 
+        // Füze mermiden üç kat uzun: siluetten "bu bir füze" okunmalı.
         int w = spec == TurretSpecType.HomingRocket ? 14 : 8;
         int h = spec == TurretSpecType.HomingRocket ? 6  : 4;
 
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite       = SkinLibrary.Get(SkinId.TurretBullet + "." + spec.ToString().ToLowerInvariant(), SkinId.TurretBullet,
-                              w, h, c, new Vector2(0f, 0.5f));
+                              w, h, Color.white, new Vector2(0f, 0.5f));
+        sr.color        = c;   // sprite gri tonlamalı — bkz. BuildVisual
         sr.sortingOrder = 3;
     }
 

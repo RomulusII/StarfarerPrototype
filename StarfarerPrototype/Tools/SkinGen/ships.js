@@ -63,6 +63,8 @@ const swarm = () => {
 const E = require("./enemies");
 const P = require("./player");
 const K = require("./components");
+const PR = require("./props");
+const B  = require("./boss");
 
 module.exports = {
   ships: [
@@ -75,6 +77,12 @@ module.exports = {
 
     K.generator(), K.shieldGen(), K.repair(), K.storage(),
     K.capacitor(), K.hangar(), K.turretRing(),
+
+    // Gemi olmayan her sey: mermiler, bombalar, fuzeler, enkaz, turret parcalari
+    ...PR.all(),
+
+    // Boss govdesi (10 boss icin PAYLASILAN) + 5 hardpoint tipi
+    ...B.all(),
   ],
   C,
 };

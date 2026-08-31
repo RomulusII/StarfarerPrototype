@@ -147,6 +147,13 @@ TextureImporter:
 // Pivotu ozel olan spritelar (varsayilan merkez degil)
 const PIVOTS = {
   "player.barrel": { x: 0.5, y: 0 },   // namlu mount noktasindan YUKARI uzanir
+
+  // Namludan CIKAN her sey mount noktasindan +X yonunde uzanir; pivot merkez
+  // olsaydi namlu ve mermi yarim boy geriden baslardi.
+  "turret.barrel":              { x: 0, y: 0.5 },
+  "turret.bullet":              { x: 0, y: 0.5 },
+  "turret.bullet.homingrocket": { x: 0, y: 0.5 },
+  "player.fighter.bullet":      { x: 0, y: 0.5 },
 };
 
 // SkinSet'e KAYDEDILMEYECEK spritelar: kendi govde gorseli olan komponentler.

@@ -226,9 +226,11 @@ public class Asteroid : MonoBehaviour, ITurretTarget
 
         var go = new GameObject(crystal ? "Debris_Crystal" : "Debris");
         go.transform.position = transform.position;
+        // Köken Rock: kaya enkazı yalnızca şekilsiz silik lekelerden seçilir —
+        // gemi parçasına benzeyen çizgiler ve plakalar yalnızca gemilerden kopar.
         go.AddComponent<Debris>().Init(
             Velocity * 0.4f + Random.insideUnitCircle.normalized * Random.Range(0.15f, 0.4f),
-            amount, type);
+            amount, type, DebrisOrigin.Rock);
     }
 
     // ── Gemiye çarpma ─────────────────────────────────────────────────────────

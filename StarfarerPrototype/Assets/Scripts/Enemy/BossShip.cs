@@ -104,13 +104,29 @@ public class BossShip : MonoBehaviour, ITurretTarget
         _healthBar.barWidth      = data.bodyWidth / 100f * 1.4f;
         _healthBar.barOffsetY    = data.bodyHeight / 100f * 0.9f;
 
-        // Görsel gövde
+        // Görsel gövde.
+        //
+        // 10 boss TEK gövde sprite'ını (boss.body) paylaşır ve rengini koddan
+        // alır — sprite gri tonlamalıdır. Her bölüme ayrı kapital gemi çizmek
+        // yerine tek siluet + renk; bir boss gerçekten farklı görünmeliyse
+        // "boss.<ad>" eklemek onu bu yoldan çıkarır.
+        //
+        // Yedek renk BEYAZ verilir: prosedürel dikdörtgen de beyaz doğar ve
+        // rengi yine sr.color'dan alır, yani iki yol aynı sonucu üretir.
+        // Yedeğe renk gömülseydi skinli yolda renk iki kez çarpılır, boss
+        // kararırdı.
         var body = new GameObject("Body");
         body.transform.SetParent(transform, false);
         var sr = body.AddComponent<SpriteRenderer>();
         sr.sprite       = SkinLibrary.Get(SkinId.ForBoss(data.name), SkinId.BossBody,
-                              data.bodyWidth, data.bodyHeight, data.bodyColor);
+                              data.bodyWidth, data.bodyHeight, Color.white);
+        sr.color        = data.bodyColor;
         sr.sortingOrder = 0;
+
+        // Paylaşılan sprite tek boyutta üretilir, boss gövdesi ise bölümle
+        // büyür (200 + bölüm×6). En-boy oranı her bölümde tam 2:1 olduğu için
+        // bu ölçekleme UNIFORM kalır.
+        SkinLibrary.FitToSize(body.transform, sr.sprite, data.bodyWidth, data.bodyHeight);
     }
 
     void BuildHardpoints()
@@ -478,19 +494,49 @@ public class BossShip : MonoBehaviour, ITurretTarget
 
     // ── Görsel yardımcılar ────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Kalkan kabuğu — ELİPS. Boss gövdesinin en-boy oranı her bölümde 2:1;
+    /// daire kabuk ya burnu ve kıçı açıkta bırakır ya da gövdenin kat kat
+    /// üstüne taşar. Şekil sprite'ın kendisinden gelir, transform uniform kalır.
+    ///
+    /// Eskiden <c>SkinLibrary.Get(...)</c> çağrılıyordu: "fx.shield" hiçbir
+    /// SkinSet'te olmadığı için prosedürel yedeğe düşüyordu — ve o yedek bir
+    /// DİKDÖRTGEN. Yani her boss kalkanını mavi bir LEVHA olarak taşıyordu.
+    /// Aynı hata küresel düşman kalkanında da vardı ve orada düzeltilmişti;
+    /// yuvarlak yedek çağıranın kendi işidir (SkinLibrary'nin yedeği kutudur).
+    /// </summary>
     void BuildShieldVisual()
     {
-        int sw = data.bodyWidth  + 30;
-        int sh = data.bodyHeight + 20;
+        // Yarı eksenler. 0.62 çarpanı küresel düşman kalkanıyla AYNI
+        // (EnemyBot.BuildShieldVisual): gövdeye teğet geçen bir elipsin
+        // köşeleri dışarıda kalır, kabuk gövdeyi ÇEVRELEMELİ.
+        float rx = (data.bodyWidth  + 30) / 100f * 0.62f;
+        float ry = (data.bodyHeight + 20) / 100f * 0.62f;
 
         _shieldVisual = new GameObject("ShieldVisual");
         _shieldVisual.transform.SetParent(transform, false);
+
         var sr = _shieldVisual.AddComponent<SpriteRenderer>();
-        sr.sprite       = SkinLibrary.Get(SkinId.ShieldBubble, sw, sh, Color.white);
+        sr.sprite       = SkinLibrary.GetOrNull(SkinId.ShieldBubble)
+                          ?? BubbleShield.Shell(ry / rx);
         sr.sortingOrder = 1;
-        sr.color        = new Color(0.3f, 0.75f, 1f, 0.45f);
-        SkinLibrary.FitToSize(_shieldVisual.transform, sr.sprite, sw, sh);
+        sr.color        = ShellColor(1f);
+
+        // Sprite'ın yatay dış kenarı 1 birim (ppu = yatay yarıçap); dikey
+        // eksen sprite'ın İÇİNDE ezildiği için ölçek uniform kalır.
+        _shieldVisual.transform.localScale = Vector3.one * rx;
     }
+
+    /// <summary>
+    /// Kabuğun rengi. Boss kalkanı MAVİ kalır — düşmanların solgun turuncusundan
+    /// ayrılır ve kalkan jeneratörü hardpoint'i hâlâ ayakta demektir.
+    ///
+    /// Alfa düşüktür çünkü kabuk sprite'ının kendi halkası zaten opak: kural
+    /// küresel kalkandakiyle aynı — kalkan belli belirsiz, isabet parlaması
+    /// belirgin. Eski 0.45 düz bir dikdörtgen dolgusuna aitti.
+    /// </summary>
+    static Color ShellColor(float ratio)
+        => new Color(0.3f, 0.75f, 1f, Mathf.Lerp(0.06f, 0.20f, Mathf.Clamp01(ratio)));
 
     void RefreshShieldVisual()
     {
@@ -498,6 +544,6 @@ public class BossShip : MonoBehaviour, ITurretTarget
         _shieldVisual.SetActive(_shieldHP > 0f);
         var sr = _shieldVisual.GetComponent<SpriteRenderer>();
         if (sr != null)
-            sr.color = new Color(0.3f, 0.75f, 1f, (_shieldHP / _maxShieldHP) * 0.45f);
+            sr.color = ShellColor(_maxShieldHP > 0f ? _shieldHP / _maxShieldHP : 0f);
     }
 }

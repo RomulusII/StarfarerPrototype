@@ -7,6 +7,24 @@ using UnityEngine;
 public static class DamageUtil
 {
     /// <summary>
+    /// Bu collider bir KALKAN yüzeyi mi, öyleyse sahibi kim? İki kalkan tipi
+    /// var — <see cref="BarrierShield"/> (yay) ve <see cref="BubbleShield"/>
+    /// (küre) — ve ikisi de gövdeden AYRI collider taşır. Dört ayrı yerde
+    /// "önce yayı sor, sonra küreyi sor" yazmak yerine soru burada bir kez
+    /// cevaplanır; yeni bir kalkan şekli eklendiğinde de tek yer değişir.
+    /// </summary>
+    static EnemyBot ShieldOwnerOf(Collider2D other)
+    {
+        if (other == null) return null;
+
+        var barrier = other.GetComponent<BarrierShield>();
+        if (barrier != null) return barrier.owner;
+
+        var bubble = other.GetComponent<BubbleShield>();
+        return bubble != null ? bubble.owner : null;
+    }
+
+    /// <summary>
     /// Bu collider hangi yüzey? Kıvılcım rengi buradan gelir.
     /// Hedef tespitiyle aynı dosyada durur: iki soru da "bu collider ne"
     /// sorusunun parçası ve ayrı yerlerde yaşasalardı biri diğerinden sapardı.
@@ -14,7 +32,7 @@ public static class DamageUtil
     public static ImpactSurface SurfaceOf(Collider2D other)
     {
         if (other == null) return ImpactSurface.Hull;
-        if (other.GetComponent<BarrierShield>() != null) return ImpactSurface.Shield;
+        if (ShieldOwnerOf(other) != null) return ImpactSurface.Shield;
 
         var bot = other.GetComponent<EnemyBot>();
         if (bot != null && bot.HasActiveShield) return ImpactSurface.Shield;
@@ -32,8 +50,8 @@ public static class DamageUtil
     {
         if (other == null) return;
 
-        var barrier = other.GetComponent<BarrierShield>();
-        if (barrier != null && barrier.owner != null) { barrier.owner.ShieldFlash(hitPos); return; }
+        var shieldOwner = ShieldOwnerOf(other);
+        if (shieldOwner != null) { shieldOwner.ShieldFlash(hitPos); return; }
 
         other.GetComponent<EnemyBot>()?.ShieldFlash(hitPos);
     }
@@ -43,8 +61,8 @@ public static class DamageUtil
     {
         if (other == null) return 0f;
 
-        var barrier = other.GetComponent<BarrierShield>();
-        if (barrier != null && barrier.owner != null) return barrier.owner.ArmorValue;
+        var shieldOwner = ShieldOwnerOf(other);
+        if (shieldOwner != null) return shieldOwner.ArmorValue;
 
         var enemy = other.GetComponent<EnemyBot>();
         if (enemy != null) return enemy.ArmorValue;
@@ -57,7 +75,7 @@ public static class DamageUtil
 
     /// <summary>
     /// Çarpışılan collider'a hasar uygular.
-    /// Sıra: BarrierShield → BossHardpoint → BossShip gövdesi → EnemyBot → Asteroid
+    /// Sıra: kalkan yüzeyi → BossHardpoint → BossShip gövdesi → EnemyBot → Asteroid
     /// Hasar uygulandıysa true döner.
     /// </summary>
     /// <param name="armorPreApplied">
@@ -68,12 +86,15 @@ public static class DamageUtil
     public static bool TryDamage(Collider2D other, float damage, WeaponType weaponType,
                                  bool armorPreApplied = false)
     {
-        // Yay kalkanı — gövdenin ÖNÜNDE ayrı bir collider. Önden gelen mermi
-        // buraya çarpar; yandan gelen onu ıskalayıp aşağıdaki gövde dalına düşer.
-        var barrier = other.GetComponent<BarrierShield>();
-        if (barrier != null && barrier.owner != null)
+        // Kalkan yüzeyi — gövdeden AYRI bir collider, gövdeden önce sorulur.
+        // Yay kalkanında yalnızca önden gelen mermi buraya çarpar, yandan gelen
+        // onu ıskalayıp aşağıdaki gövde dalına düşer. Küresel kalkanda ise her
+        // yönden gelen çarpar — kabuğu kesip gövdeyi ıskalayan mermi artık
+        // öbür taraftan çıkmıyor.
+        var shieldOwner = ShieldOwnerOf(other);
+        if (shieldOwner != null)
         {
-            barrier.owner.TakeShieldDamage(damage, weaponType, armorPreApplied);
+            shieldOwner.TakeShieldDamage(damage, weaponType, armorPreApplied);
             return true;
         }
 

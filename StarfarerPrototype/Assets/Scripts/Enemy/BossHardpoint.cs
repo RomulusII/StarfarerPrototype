@@ -33,11 +33,15 @@ public class BossHardpoint : MonoBehaviour
         SkinLibrary.TryApplyCollider(gameObject, SkinId.ForHardpoint(definition.type));
 
         // Görsel
+        // Sprite gri tonlamalıdır, rengi tanımdan gelir — aynı tip farklı
+        // bosslarda o boss'un paletinde çıkar. Yedek renk beyaz: bkz. BossShip.
         _sr = gameObject.AddComponent<SpriteRenderer>();
         _sr.sprite       = SkinLibrary.Get(SkinId.ForHardpoint(definition.type),
                                SkinId.BossHardpoint,
-                               definition.width, definition.height, definition.color);
+                               definition.width, definition.height, Color.white);
+        _sr.color        = definition.color;
         _sr.sortingOrder = 2;
+        SkinLibrary.FitToSize(transform, _sr.sprite, definition.width, definition.height);
 
         // HP barı
         _healthBar              = gameObject.AddComponent<HealthBar>();

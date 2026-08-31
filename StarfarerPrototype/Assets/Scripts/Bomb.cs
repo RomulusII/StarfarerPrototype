@@ -14,6 +14,10 @@ public class Bomb : MonoBehaviour, ITurretTarget
 
     static readonly Color BombColor = new Color(1f, 0.35f, 0f);
 
+    // Çerçeve bombanın kendi renginden AÇIK: bombanın üstünde okunması gerek,
+    // ona karışması değil.
+    static readonly Color MarkerColor = new Color(1f, 0.85f, 0.45f);
+
     void Awake()
     {
         var sr = gameObject.AddComponent<SpriteRenderer>();
@@ -27,6 +31,11 @@ public class Bomb : MonoBehaviour, ITurretTarget
         var rb = gameObject.AddComponent<Rigidbody2D>();
         rb.bodyType     = RigidbodyType2D.Kinematic;
         rb.gravityScale = 0f;
+
+        // Bomba oyundaki TEK vurulabilir mermi. Düşman mermisiyle neredeyse aynı
+        // renkte (ikisi de sıcak turuncu) olduğu için oyuncu hangisinin
+        // durdurulabileceğini göremiyordu; yanıp sönen çerçeve o farkı söyler.
+        ShootableMarker.Attach(transform, 0.30f, MarkerColor, sortingOrder: 2);
 
         Destroy(gameObject, 8f);
     }

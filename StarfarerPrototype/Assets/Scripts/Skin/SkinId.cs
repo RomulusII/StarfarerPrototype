@@ -33,8 +33,27 @@ public static class SkinId
 
     // Ortam
     public const string Asteroid            = "world.asteroid";
-    public const string DebrisMetal         = "world.debris.metal";
-    public const string DebrisCrystal       = "world.debris.crystal";
+
+    // Enkaz: KAYNAK TİPİ değil KÖKEN ayırır. Renk kaynak tipinden gelir
+    // (sr.color ile çarpılır), ŞEKİL ise enkazın neyden koptuğundan:
+    // gemi parçası çizgi ve plaka taşır, kaya parçası yalnızca şekilsiz leke.
+    // Her köken için birden çok varyant var, doğarken rastgele seçilir —
+    // tek sprite ile sahnedeki onlarca enkaz kopyala-yapıştır görünürdü.
+    public const string DebrisShipPrefix    = "world.debris.ship.";
+    public const string DebrisRockPrefix    = "world.debris.rock.";
+    public const int    DebrisShipVariants  = 6;
+    public const int    DebrisRockVariants  = 4;
+
+    /// <summary>Köken ve varyant indisinden enkaz anahtarı üretir.</summary>
+    public static string ForDebris(DebrisOrigin origin, int variant) =>
+        (origin == DebrisOrigin.Rock ? DebrisRockPrefix : DebrisShipPrefix) + variant;
+
+    /// <summary>Bu kökenin kaç varyantı var — çağıran taraf rastgele seçer.</summary>
+    public static int DebrisVariantCount(DebrisOrigin origin) =>
+        origin == DebrisOrigin.Rock ? DebrisRockVariants : DebrisShipVariants;
+
+    // Vurulabilir mühimmatın etrafında yanıp sönen köşe parantezleri
+    public const string ShootableFrame      = "fx.shootable";
 
     // Efektler — beyaz doku, rengi SpriteRenderer verir
     public const string ShieldBubble        = "fx.shield";

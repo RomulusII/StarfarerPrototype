@@ -1328,51 +1328,39 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         _shieldVisual.transform.SetParent(transform, false);
 
         var sr = _shieldVisual.AddComponent<SpriteRenderer>();
-        sr.sprite       = SkinLibrary.GetOrNull(SkinId.ShieldBubble) ?? BubbleSprite();
+        sr.sprite       = SkinLibrary.GetOrNull(SkinId.ShieldBubble) ?? BubbleShield.Shell();
         sr.sortingOrder = data.sizeOrder + 1;
-        sr.color        = BarrierShield.ArcColor;
+        sr.color        = BubbleColor(1f);
 
         // Sprite dış kenarı 1 birim (ppu = yarıçap) → ölçek doğrudan yarıçap
         _shieldVisual.transform.localScale = Vector3.one * _shieldRadius;
+
+        // Kabuk artık VURULABİLİR. Eskiden yalnızca bir sprite'tı: hasar gemi
+        // gövdesinden geçiyordu, dolayısıyla kabuğu kesip gövdeyi ıskalayan
+        // mermi hiçbir şeye çarpmadan öbür taraftan çıkıyordu.
+        BubbleShield.Attach(this, _shieldVisual, sr.sprite);
     }
 
     /// <summary>
-    /// Yumuşak kenarlı kalkan kabuğu: merkeze doğru şeffaf, kenarda parlak.
-    /// Arkasındaki gemi görünmeli — kalkan bir duvar değil bir yüzey.
+    /// Kabuğun rengi. Ton düşman kalkanlarının ortak solgun turuncusudur
+    /// (BarrierShield.ArcColor) ama ALFA burada ayrı tutulur: kabuk artık
+    /// mermileri durduran gerçek bir yüzey ve kaplayabileceği alan geminin
+    /// birkaç katı. Yay kalkanının alfası dar bir hilalde doğruyken aynı sayı
+    /// koca bir dairede ekranın o bölgesini boyuyordu.
+    ///
+    /// Yerine giden kural CLAUDE.md'deki ile aynı: KALKAN BELLİ BELİRSİZ,
+    /// PARLAMA BELİRGİN. İç dolgu neredeyse yok, yüzeyi yalnızca ince dış
+    /// halka anlatır; kabuğun nerede olduğunu isabet anında ShieldEffect
+    /// hilali (tepe alfa 0.55) söyler.
     /// </summary>
-    static Sprite _bubbleSprite;
+    const float BubbleAlphaFull  = 0.13f;   // kalkan doluyken dış halka
+    const float BubbleAlphaEmpty = 0.04f;   // boşalmak üzereyken
 
-    static Sprite BubbleSprite()
+    static Color BubbleColor(float ratio)
     {
-        if (_bubbleSprite != null) return _bubbleSprite;
-
-        const int   Sz   = 128;
-        const float OutR = 62f;              // ppu olarak da kullanılır → 1 birim
-        const float InR  = OutR * 0.55f;
-        const float C    = Sz * 0.5f;
-
-        var tex = new Texture2D(Sz, Sz, TextureFormat.RGBA32, false)
-                  { filterMode = FilterMode.Bilinear };
-        var px = new Color[Sz * Sz];
-
-        for (int i = 0; i < px.Length; i++)
-        {
-            float dx = (i % Sz) + 0.5f - C;
-            float dy = (i / Sz) + 0.5f - C;
-            float r  = Mathf.Sqrt(dx * dx + dy * dy);
-
-            if (r > OutR) { px[i] = Color.clear; continue; }
-
-            // İçeride soluk bir dolgu, kenara doğru güçlenen bir halka
-            float rim  = Mathf.Clamp01((r - InR) / (OutR - InR));
-            float edge = Mathf.Clamp01((OutR - r) / 2.5f);   // dış kenar yumuşatma
-            px[i] = new Color(1f, 1f, 1f, (0.18f + 0.82f * rim * rim) * edge);
-        }
-
-        tex.SetPixels(px);
-        tex.Apply();
-        _bubbleSprite = Sprite.Create(tex, new Rect(0, 0, Sz, Sz), Vector2.one * 0.5f, OutR);
-        return _bubbleSprite;
+        var c = BarrierShield.ArcColor;
+        return new Color(c.r, c.g, c.b,
+                         Mathf.Lerp(BubbleAlphaEmpty, BubbleAlphaFull, ratio));
     }
 
     void RefreshShieldVisual()
@@ -1385,11 +1373,7 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         if (_shieldHP <= 0f) { _shieldVisual.SetActive(false); return; }
         _shieldVisual.SetActive(true);
         var sr = _shieldVisual.GetComponent<SpriteRenderer>();
-        if (sr != null)
-        {
-            var c = BarrierShield.ArcColor;
-            sr.color = new Color(c.r, c.g, c.b, Mathf.Lerp(0.12f, c.a, ratio));
-        }
+        if (sr != null) sr.color = BubbleColor(ratio);
     }
 
     /// <summary>Kalkan ayakta mı? Çarpma efektinin rengini/parlamasını belirler.</summary>
@@ -1406,7 +1390,7 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         if (_barrier != null) { _barrier.Flash(worldHitPos); return; }
         if (_shieldVisual == null) return;
 
-        // Küre kalkanın bandı (BubbleSprite: InR = 0.55×R) parlamanın
+        // Küre kalkanın bandı (BubbleShield.Shell: InR = 0.70×R) parlamanın
         // varsayılan 0.60'ına zaten yakın; ayrıca oran vermeye gerek yok.
         ShieldEffect.Spawn(worldHitPos, transform.position, _shieldRadius,
                            BarrierShield.FlashColor, 55f, 0.60f, transform);

@@ -168,31 +168,86 @@ const circle = (cx, cy, rx, ry, n = 28) => {
   return pts;
 };
 
-// Jammer - buyuk parabolik canak + anten dizisi
+// Jammer - one bakan yayin canagi tasiyan EW gemisi.
+//
+// Onceki cizim sekizgen bir bloktu: ust ve alt kenarlari uzunlugunun cogunda
+// DUZ ve YATAY gidiyordu, canak da govdeye yapisik ince bir yaydi. Oyunda
+// 66x52 birimde bakildiginda siluet "yuvarlatilmis mor dikdortgen"den baska
+// bir sey okumuyordu - sprite vardi ama isini yapmiyordu.
+//
+// Uc degisiklik silueti kurtariyor:
+//   1. Govdenin ust ve alt kenari BASTAN SONA egimli (kuyrukta 120px, burunda
+//      56px). Hicbir yerde yatay cizgi yok. Disbukey kaldigi icin Box collider
+//      hala dogru oturuyor.
+//   2. Canak govdeden AYRILDI ve one gecti: burnun onunde duran, one acilan
+//      kalin bir C. Gorevini (yayin) anlatan tek parca bu ve oyundaki baska
+//      hicbir gemide benzeri yok.
+//   3. Antenler 8px'ten 14px'e kalinlasti - eskiler ekranda tek pikselden
+//      ince kaliyor ve hic gorunmuyordu.
+//
+// Denenip birakilanlar:
+//   - Sivri kama govde (burun 30px): canakla birlikte siluet gemi degil
+//     YAY-OK okuyordu, ustelik hitbox dolulugu %56.5'e dusuyordu (kural %60).
+//   - Canagin agzini capraz gecen iki uzun besleme cubugu: yay KIRISI gibi
+//     duruyordu. Yerine eksen uzerinde tek kisa boom kondu.
+//   - Canagin govdeden ONCE cizilmesi: govde canagin parlak yansitici yuzunu
+//     tamamen ortuyordu. Canak artik EN SON cizilir, yani govdenin onundedir.
 const jammer = () => {
   const p = pal(u(0.55, 0.25, 0.75), u(0.40, 0.18, 0.60));
-  const ant  = [150, 150, 146, 196, 154, 196, 162, 152];
-  const ant2 = [110, 148, 106, 186, 114, 186, 122, 150];
+
+  // Canak: egrilik merkezi govdenin SAGINDA, yani yay one dogru acilir.
+  // Boyutu govde kuyruguyla (120px) kiyaslanabilir tutuldu - daha buyugu
+  // gemiyi canagin sapi gibi gosteriyor.
+  const DCX = 272, DCY = 104, A0 = 132 * Math.PI / 180, A1 = 228 * Math.PI / 180;
+  const band = (rOut, rIn, n = 22) => {
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const a = A0 + (A1 - A0) * i / n;
+      pts.push(DCX + Math.cos(a) * rOut, DCY + Math.sin(a) * rOut);
+    }
+    for (let i = n; i >= 0; i--) {
+      const a = A0 + (A1 - A0) * i / n;
+      pts.push(DCX + Math.cos(a) * rIn, DCY + Math.sin(a) * rIn);
+    }
+    return pts;
+  };
+
+  // Antenler: govde kenarindan geriye dogru taranmis kalin sivriler
+  const antA = [106, 64, 90, 61, 70, 190, 84, 192];
+  const antB = [58, 53, 42, 50, 26, 184, 40, 186];
+
+  const hull = [168, 76, 140, 68, 84, 54, 14, 44,
+                14, 164, 84, 154, 140, 140, 168, 132];
+  const hi   = [168, 76, 140, 68, 84, 54, 14, 44,
+                14, 53, 84, 63, 140, 77, 168, 85];
 
   return {
     name: "Jammer", w: 264, h: 208, ppu: 400,
     shapes: [
-      { pts: ant,                color: p.wing },
-      { pts: mirrorY(ant, 104),  color: p.wing },
-      { pts: ant2,               color: p.wing },
-      { pts: mirrorY(ant2, 104), color: p.wing },
-      { pts: [256, 104, 246, 50, 224, 14, 202, 24, 224, 60, 232, 104,
-              224, 148, 202, 184, 224, 194, 246, 158], color: p.trim },
-      { pts: [250, 104, 242, 62, 226, 34, 216, 38, 230, 66, 238, 104,
-              230, 142, 216, 170, 226, 174, 242, 146], color: p.light },
-      { pts: [228, 104, 216, 76, 184, 58, 96, 52, 44, 70, 22, 104,
-              44, 138, 96, 156, 184, 150, 216, 132], color: p.hull },
-      { pts: [22, 104, 44, 138, 70, 142, 70, 66, 44, 70], color: p.dark },
-      { pts: [216, 132, 184, 150, 96, 156, 44, 138, 44, 131,
-              96, 149, 184, 143], color: p.light },
-      { pts: [80, 107, 190, 107, 196, 104, 190, 101, 80, 101], color: p.dark },
-      { pts: [196, 104, 180, 92, 160, 95, 160, 113, 180, 116], color: p.eye },
-      { pts: [190, 104, 179, 96, 166, 98, 166, 110, 179, 112], color: p.eyeIn },
+      { pts: antA,               color: p.wing },
+      { pts: mirrorY(antA, 104), color: p.wing },
+      { pts: antB,               color: p.wing },
+      { pts: mirrorY(antB, 104), color: p.wing },
+
+      { pts: hull, color: p.hull },
+      { pts: [14, 58, 54, 66, 54, 142, 14, 150], color: p.dark },   // motor blogu
+      { pts: hi,               color: p.light },                    // ust kenar isigi
+      { pts: mirrorY(hi, 104), color: p.dark },                     // alt golge
+      { pts: [40, 101, 156, 101, 162, 104, 156, 107, 40, 107], color: p.dark },
+
+      // Canak pilonu - govde burnunu canagin arkasina baglar. Olmadan canak
+      // gemiden kopuk, havada duran ayri bir nesne gibi okunuyordu.
+      { pts: [162, 94, 188, 96, 188, 112, 162, 114], color: p.wing },
+
+      // Besleme boomu ve boynuz - canagin odaginda, "yayin ucu".
+      { pts: [200, 98, 240, 99, 240, 109, 200, 110], color: p.wing },
+      { pts: [252, 104, 243, 91, 230, 94, 230, 114, 243, 117], color: p.eye },
+      { pts: [247, 104, 240, 96, 234, 98, 234, 110, 240, 112], color: p.eyeIn },
+
+      // Canak EN SON: govdenin ONUNDE durur. Arka kabuk koyu, one bakan
+      // yansitici yuz parlak - ikisi birlikte bir kepce okutur.
+      { pts: band(92, 74), color: p.wing },
+      { pts: band(74, 64), color: p.light },
     ],
     skin: { id: "enemy.jammer", colliderMode: "Box", hitboxScale: 1.0 },
   };
