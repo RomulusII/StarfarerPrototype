@@ -878,7 +878,7 @@ Slot'a kurulunca otomatik ateş açar, oyuncu müdahalesi gerekmez. Enerji tüke
 | **Plazma** | Düşük (20f) | Orta | Düşük | Yüksek | 4s | — |
 | **Lazer** | Orta (5f) | Orta | Yüksek | Yüksek | 4s | — |
 | **Roket** | Çok düşük (30f+) | Yüksek | Orta | Düşük | 10s | Güdümlü, hedefi izler |
-| **Point Defence** | Çok hızlı (0.28f) | Düşük/atış, **28.6 DPS** | **Çok yüksek (20)** | Düşük | 0.25s | Menzil 4.0 — yalnızca mühimmat ve hafif gövde |
+| **Point Defence** | Çok hızlı (0.28f) | Düşük/atış, **28.6 DPS** | **Çok yüksek (20)** | Düşük | 0.32s | Menzil 5.2 — yalnızca mühimmat ve hafif gövde |
 
 **Hedefleme — puanlama formülü** (`TurretTargeting`):
 
@@ -933,9 +933,10 @@ yani PD turreti bölüm 4'e kadar tek el bile ateş etmiyordu. Ölçü artık
 GÖVDE KÜTLESİ (`EnemyTypeData.IsLightHull`, eşik 2.5) ve bu eşik savaşçı
 kovalamayla AYNI: "küçük gemi" oyunda tek bir kavram olmalı.
 
-**Dar rolün karşılığı yüksek DPS.** Menzil 5.5 → **4.0** (kalkan küresi 2.5;
-turretler gövdede ±1.3 yayılı, yani en uzak slottan bile kalkanın biraz dışına
-ulaşır). Buna karşılık 8 hasar / 0.28 sn = **28.6 ham DPS**, diğer turretlerin
+**Dar rolün karşılığı yüksek DPS.** Menzil 5.5 → 4.0 → **5.2** (kalkan küresi 2.5;
+turretler gövdede ±1.3 yayılı, yani en uzak slottan bile kabuğun 1.4 birim
+dışına ulaşır ve bombayı kalkana değmeden karşılar). Mermi ömrü menzille
+BİRLİKTE büyümeli: 0.32 sn = 6.4 birim yol, hedefleme menzilinin bir tık ötesi. Buna karşılık 8 hasar / 0.28 sn = **28.6 ham DPS**, diğer turretlerin
 ~4.8 katı. Mermi hızı 8 → **20**: bomba 2.5 hızla geliyor, eski hızda menzilin
 ucundaki bir bombaya mermi 0.5 sn'de gidiyordu ve bomba o sürede 1.25 birim
 ilerliyordu — durdurmak kıl payına kalıyordu. Şimdi uçuş 0.2 sn, bomba 0.5 birim.

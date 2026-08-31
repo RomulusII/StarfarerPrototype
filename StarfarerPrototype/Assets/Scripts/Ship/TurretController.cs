@@ -36,11 +36,13 @@ public class TurretController : ShipComponentBase
 
     /// <summary>
     /// Point Defence menzili. Kalkan küresi 2.5 birim; turretler gövdede
-    /// ±1.3 birim yayılı duruyor, yani 4.0 birim en uzak slottan bile kalkanın
-    /// biraz dışına ulaşır. Daha fazlası PD'yi "kısa menzilli ama sert" olmaktan
-    /// çıkarır — o kısıt yüksek DPS'inin karşılığıdır.
+    /// ±1.3 birim yayılı duruyor, yani en uzak slottan bile kalkanın belirgin
+    /// şekilde dışına ulaşır ve bombayı kabuğa değmeden karşılar.
+    ///
+    /// Yine de menzil PD'nin TEK kısıtıdır — yüksek DPS'inin ve dar hedef
+    /// listesinin karşılığı odur. Diğer turretlerin menzili 27–56 birim.
     /// </summary>
-    const float PDRange = 4f;
+    const float PDRange = 5.2f;
 
     /// <summary>
     /// Işın turretinin hızlı hedeflere verdiği öncelik. Işın ıskalamaz;
