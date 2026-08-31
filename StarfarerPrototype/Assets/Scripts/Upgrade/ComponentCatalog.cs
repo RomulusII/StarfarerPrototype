@@ -219,8 +219,8 @@ public static class ComponentCatalog
     ///   Lazer:   TEMEL=4.33, çarpan=1.35 → 5.8 (damage × burnDuration / fireRate = 26×0.5/3)
     ///   Gatling: sustained = 10×8/(10×1+3) = 80/13 ≈ 6.15
     ///   Roket:   TEMEL=4.0, çarpan=1.5 → 6.0  (60/15)
-    ///   PD:      TEMEL=28.6 — menzil 5.2u ve YALNIZCA küçük hedef; bu kadar dar
-    ///            bir rol yüksek ham DPS hak ediyor
+    ///   PD:      TEMEL=28.6 — YALNIZCA küçük hedef ve en kısa menzil (10.4u);
+    ///            bu kadar dar bir rol yüksek ham DPS hak ediyor
     /// </summary>
     public static ComponentDefinition TurretSpec(ComponentDefinition baseDef, TurretSpecType spec)
     {
@@ -228,7 +228,7 @@ public static class ComponentCatalog
         {
             TurretSpecType.Gatling      => Spec(baseDef, spec, specCost: 20,
                 fireRate: 1f,  damage: 8f,  speed: 9f,   life: 3f,   energy: 0.5f, mag: 10, reload: 3f),
-            // Menzil dar (5.2u) ve hedef listesi dar; karşılığı yüksek ham DPS:
+            // Menzil dar (10.4u) ve hedef listesi dar; karşılığı yüksek ham DPS:
             // 8 hasar / 0.28 sn = 28.6 DPS, diğer turretlerin ~5 katı.
             //
             // MERMİ HIZI 20: bomba 2.5 hızla geliyor ve kalkana varmadan
@@ -236,12 +236,12 @@ public static class ComponentCatalog
             // gidiyordu; bomba o sürede 1.25 birim yol alıyor, yani kalkana
             // çarpmadan durdurmak kıl payına kalıyordu. 20'de uçuş 0.2 sn.
             //
-            // Ömür 0.32 sn = 6.4 birim yol: hedefleme menzilinin (5.2) bir tık
+            // Ömür 0.6 sn = 12 birim yol: hedefleme menzilinin (10.4) bir tık
             // ötesi, ıskalayan mermi hemen buharlaşmasın. Ömür menzille BİRLİKTE
-            // büyümeli — 0.25 sn'de mermi 5 birimde ölür ve menzilin ucundaki
-            // hedefe hiç varamazdı.
+            // büyümek ZORUNDA — mermi menzilin ucuna varamazsa menzili artırmak
+            // sessizce işlevsiz kalır.
             TurretSpecType.PointDefence => Spec(baseDef, spec, specCost: 25,
-                fireRate: 0.28f, damage: 8f, speed: 20f, life: 0.32f, energy: 0.5f),
+                fireRate: 0.28f, damage: 8f, speed: 20f, life: 0.6f, energy: 0.5f),
             // Lazer 12 hasarla 2.0 EFEKTİF DPS veriyordu — diğerlerinin üçte
             // biri. Gerekçe "ışın hiç ıskalamaz, çarpanı 3.0" idi ama bu çarpan
             // hiçbir zaman ölçülmemişti; mermili turretler de çoğu hedefi

@@ -39,10 +39,11 @@ public class TurretController : ShipComponentBase
     /// ±1.3 birim yayılı duruyor, yani en uzak slottan bile kalkanın belirgin
     /// şekilde dışına ulaşır ve bombayı kabuğa değmeden karşılar.
     ///
-    /// Yine de menzil PD'nin TEK kısıtıdır — yüksek DPS'inin ve dar hedef
-    /// listesinin karşılığı odur. Diğer turretlerin menzili 27–56 birim.
+    /// Menzil yine de PD'nin TEK kısıtıdır — yüksek DPS'inin ve dar hedef
+    /// listesinin karşılığı odur. Diğer turretlerin menzili 27–56 birim, yani
+    /// 10.4'te bile PD açık ara en kısa menzilli turret.
     /// </summary>
-    const float PDRange = 5.2f;
+    const float PDRange = 10.4f;
 
     /// <summary>
     /// Işın turretinin hızlı hedeflere verdiği öncelik. Işın ıskalamaz;
