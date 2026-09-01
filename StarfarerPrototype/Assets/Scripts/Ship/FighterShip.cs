@@ -5,9 +5,14 @@ using UnityEngine;
 /// Hedef yoksa hangar etrafında devriye gezer.
 /// ShipBrain taktik hareketini, ShipMovement fiziğini yönetir.
 ///
-/// Dogfight: EnemyBot'lar da FighterShip'i tehdit olarak tarar,
-/// birbirine yörünge çizerek savaşırlar. FighterShip kıvraklığı (TurnRate)
-/// EnemyBot'ların orbit radiusunu etkiler.
+/// Dogfight: kıvrak EnemyBot'lar da FighterShip'i tehdit olarak tarar,
+/// birbirine yörünge çizerek savaşırlar (bkz. EnemyTypeData.PursuesFighters —
+/// ağır gemiler peşine düşmez).
+///
+/// Hedef seçimi ITurretTarget üzerinden yapılır: düşmanlar ÖNCELİKLİDİR, ama
+/// menzilde düşman yoksa asteroitler de vurulur. Asteroit ateş etmez fakat
+/// sürüklenip ana gemiye çarpar ve boş gezen bir savaşçının onu parçalamaması
+/// için hiçbir sebep yok — üstelik parçalanan asteroit kaynak bırakır.
 /// </summary>
 public class FighterShip : MonoBehaviour
 {
@@ -16,7 +21,7 @@ public class FighterShip : MonoBehaviour
     public float fireRate  = 2f;
     public float damage    = 8f;
 
-    EnemyBot     _currentTarget;
+    ITurretTarget _currentTarget;
     Transform    _hangar;
     ShipMovement _movement;
     ShipBrain    _brain;
@@ -80,13 +85,13 @@ public class FighterShip : MonoBehaviour
         if (_targetScanTimer <= 0f)
         {
             _targetScanTimer = 1.5f;
-            var nearest = FindClosestEnemy(AttackRange);
+            var nearest = FindTarget(AttackRange);
             if (nearest != null)
             {
                 _currentTarget = nearest;
-                _brain.SetTarget(nearest.transform);
+                _brain.SetTarget(nearest.TargetTransform);
             }
-            else if (_currentTarget == null || !_currentTarget.gameObject.activeInHierarchy)
+            else if (!IsTargetAlive(_currentTarget))
             {
                 _currentTarget = null;
                 _brain.ClearTarget();
@@ -94,7 +99,7 @@ public class FighterShip : MonoBehaviour
         }
 
         // Hedef kaybedildiyse sıfırla
-        if (_currentTarget != null && !_currentTarget.gameObject.activeInHierarchy)
+        if (!IsTargetAlive(_currentTarget))
         {
             _currentTarget = null;
             _brain.ClearTarget();
@@ -131,23 +136,41 @@ public class FighterShip : MonoBehaviour
         return anchor + new Vector3(Mathf.Cos(ang) * r, Mathf.Sin(ang) * r, 0f);
     }
 
-    EnemyBot FindClosestEnemy(float maxRange)
+    static bool IsTargetAlive(ITurretTarget t)
+        => t != null && t.IsValidTarget && t.TargetTransform != null;
+
+    /// <summary>
+    /// Menzildeki en yakın düşman; düşman yoksa en yakın asteroit.
+    /// İki taramanın SIRALI olması bilinçli: yanı başındaki bir kaya, uzaktaki
+    /// bir düşmandan daha yakın olsa bile savaşçıyı dövüşten çekmemeli.
+    /// </summary>
+    ITurretTarget FindTarget(float maxRange)
     {
-        var      all   = FindObjectsByType<EnemyBot>(FindObjectsSortMode.None);
-        EnemyBot best  = null;
-        float    bestD = maxRange;
-        foreach (var e in all)
+        ITurretTarget best  = null;
+        float         bestD = maxRange;
+
+        foreach (var e in FindObjectsByType<EnemyBot>(FindObjectsSortMode.None))
         {
+            if (!e.IsValidTarget) continue;
             float d = Vector2.Distance(transform.position, e.transform.position);
             if (d < bestD) { bestD = d; best = e; }
+        }
+        if (best != null) return best;
+
+        bestD = maxRange;
+        foreach (var a in FindObjectsByType<Asteroid>(FindObjectsSortMode.None))
+        {
+            if (!a.IsValidTarget) continue;
+            float d = Vector2.Distance(transform.position, a.transform.position);
+            if (d < bestD) { bestD = d; best = a; }
         }
         return best;
     }
 
-    void FireAt(EnemyBot target)
+    void FireAt(ITurretTarget target)
     {
-        if (target == null) return;
-        var dir = ((Vector3)target.transform.position - transform.position).normalized;
+        if (!IsTargetAlive(target)) return;
+        var dir = (target.TargetTransform.position - transform.position).normalized;
         var go  = new GameObject("FighterBullet");
         go.transform.position = transform.position;
 
@@ -158,9 +181,9 @@ public class FighterShip : MonoBehaviour
         tb.isGuided   = false;
         tb.SetDirection(dir);
 
-        var tex = MakeTex(8, 4, Color.yellow);
         var sr  = go.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 8, 4), new Vector2(0f, 0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.FighterBullet, 8, 4, Color.yellow,
+                              new Vector2(0f, 0.5f));
         sr.sortingOrder = 3;
 
         Destroy(go, 1.5f);
@@ -179,21 +202,9 @@ public class FighterShip : MonoBehaviour
 
     void BuildVisual()
     {
-        var tex = new Texture2D(22, 10);
-        var px  = new Color[22 * 10];
-        for (int i = 0; i < px.Length; i++) px[i] = new Color(0.85f, 0.75f, 0.20f);
-        tex.SetPixels(px); tex.Apply();
         var sr        = gameObject.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 22, 10), new Vector2(0.5f, 0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.Fighter, 22, 10,
+                              new Color(0.85f, 0.75f, 0.20f));
         sr.sortingOrder = 5;
-    }
-
-    static Texture2D MakeTex(int w, int h, Color c)
-    {
-        var tex = new Texture2D(w, h);
-        var px  = new Color[w * h];
-        for (int i = 0; i < px.Length; i++) px[i] = c;
-        tex.SetPixels(px); tex.Apply();
-        return tex;
     }
 }

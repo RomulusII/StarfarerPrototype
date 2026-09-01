@@ -58,9 +58,11 @@ public class ShipMovement : MonoBehaviour
              "titrek uçuş, büyük = uzun yayvan kavisler. Desen bu periyotta tekrarlar.")]
     public float wanderPeriod = 2f;
 
-    [Tooltip("Manevra iticili büyük gemiler (boss, taşıyıcı): itki her yöne " +
-             "uygulanabilir ve burun yönü hareketten bağımsızdır. Küçük gemilerde " +
-             "kapalı olmalı — kavis, grip ve kaçamak manevra kuralları atlanır.")]
+    [Tooltip("Manevra iticili gemiler (boss, taşıyıcı, siper gemisi): itki her " +
+             "yöne uygulanabilir ve burun yönü hareketten bağımsızdır. Küçük " +
+             "gemilerde kapalı olmalı — kavis, grip ve kaçamak manevra kuralları " +
+             "atlanır.\n\nBurun varsayılan olarak SABİT kalır; ayrıca çevrilmesi " +
+             "isteniyorsa her kare AimAt() çağrılır.")]
     public bool omniThrust = false;
 
     const float AccelFactor   = 2f;    // enginePower/mass birimi başına ivme
@@ -111,6 +113,11 @@ public class ShipMovement : MonoBehaviour
     /// </summary>
     public bool IsInsideTurnCircle(Vector2 target)
     {
+        // Manevra iticili gemide kavis çemberi diye bir şey yok — yana da
+        // itebiliyor. Kontrol edilseydi 4 birimlik hayalî bir çember yüzünden
+        // yakın hedefe giderken boş yere frenlerdi.
+        if (omniThrust) return false;
+
         float r = CurrentTurnRadius;
         if (r < 0.01f) return false;
 
@@ -210,6 +217,22 @@ public class ShipMovement : MonoBehaviour
     {
         float heading = dir.sqrMagnitude > 0.000001f ? DirToAngle(dir) : _facingAngle;
         Command(heading, -Mathf.Clamp01(throttle), CmdMode.Thrust);
+    }
+
+    /// <summary>
+    /// omniThrust gemilerinde burnu verilen yöne çevirir — HAREKETTEN BAĞIMSIZ.
+    /// Manevra iticili bir gemi yan giderken burnunu hedefte tutabilir; siper
+    /// gemisinin yay kalkanını oyuncuya dönük tutması buna dayanır.
+    ///
+    /// Her kare çağrılmalıdır (komutlar gibi tek karelik). Çağrılmazsa burun
+    /// olduğu yerde kalır — boss'un bugünkü davranışı böylece korunur.
+    /// omniThrust kapalıyken hiçbir etkisi yoktur; orada burnu hareket belirler.
+    /// </summary>
+    public void AimAt(Vector2 dir)
+    {
+        if (dir.sqrMagnitude < 0.000001f) return;
+        _aimHeading = DirToAngle(dir);
+        _hasAim     = true;
     }
 
     /// <summary>Sadece döner — gaz yok, mevcut hızla süzülür.</summary>
@@ -384,8 +407,15 @@ public class ShipMovement : MonoBehaviour
     /// Initialize ile verilen açıda sabit kalır. 1–5 numaralı kurallar geçerli
     /// değildir — bu gemiler kavis çizmez, mevki tutar.
     /// </summary>
+    bool  _hasAim;
+    float _aimHeading;
+
     void IntegrateOmni(float dt, float maxSpeed)
     {
+        // Burun: yalnızca AimAt çağrıldıysa döner, hareketten bağımsız
+        if (_hasAim)
+            _facingAngle = Mathf.MoveTowardsAngle(_facingAngle, _aimHeading, TurnRate * dt);
+
         switch (_mode)
         {
             case CmdMode.Thrust:
@@ -414,6 +444,7 @@ public class ShipMovement : MonoBehaviour
         transform.rotation  = Quaternion.Euler(0f, 0f, _facingAngle);
 
         _hasCommand = false;
+        _hasAim     = false;
         _mode       = CmdMode.Coast;
         _evasive    = false;
     }

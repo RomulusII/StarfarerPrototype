@@ -22,8 +22,8 @@ public class AsteroidSpawner : MonoBehaviour
 
     float _timer;
 
-    // Sahne kenarı ve sürüklenme aralığı — kadrajın sağından gelip sola süzülürler
-    const float SpawnX      = 15f;
+    // Doğum x'i kadrajdan türer (ViewBounds): sabit 15, zoom-out'ta görünür
+    // alanın içinde kalıyordu ve asteroitler ekranın ortasında beliriyordu.
     const float SpawnYRange = 4.5f;
 
     /// <summary>Bölüm başında çağrılır. targetCount 0 ise spawner boşta bekler.</summary>
@@ -44,7 +44,7 @@ public class AsteroidSpawner : MonoBehaviour
         if (FindObjectsByType<Asteroid>(FindObjectsSortMode.None).Length >= targetCount)
             return;
 
-        var pos = new Vector3(SpawnX, Random.Range(-SpawnYRange, SpawnYRange), 0f);
+        var pos = new Vector3(ViewBounds.SpawnX, Random.Range(-SpawnYRange, SpawnYRange), 0f);
         var drift = new Vector2(Random.Range(-1.3f, -0.6f), Random.Range(-0.25f, 0.25f));
         Asteroid.Spawn(pos, Asteroid.Size.Large, drift);
     }

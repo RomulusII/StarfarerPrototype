@@ -29,6 +29,8 @@ public class LaserBeam : MonoBehaviour
     float        _remaining;
     Collider2D   _target;
     PlayerShip   _targetPlayer;
+    FighterShip  _targetFighter;
+    CollectorShip _targetCollector;
     Vector3      _endPoint;
     LineRenderer _line;
     Vector2      _hitNormal;
@@ -39,8 +41,6 @@ public class LaserBeam : MonoBehaviour
     public void Init()
     {
         _remaining = burnDuration;
-        if (hitsPlayer)
-            _targetPlayer = FindFirstObjectByType<PlayerShip>();
         UpdateRaycast();
         BuildVisual();
     }
@@ -75,7 +75,7 @@ public class LaserBeam : MonoBehaviour
 
         UpdateRaycast();
         UpdateVisual();
-        ApplyDamage(damage * dmgMulti * Time.deltaTime);
+        ApplyDamage(damage * dmgMulti, Time.deltaTime);
         UpdateSparks();
     }
 
@@ -89,9 +89,15 @@ public class LaserBeam : MonoBehaviour
         var hits = Physics2D.RaycastAll(origin, direction, maxRange);
         System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
-        _target       = null;
-        _targetPlayer = hitsPlayer ? _targetPlayer : null;
-        _endPoint     = transform.position + (Vector3)(direction * maxRange);
+        // Işın her karede yeniden atılır; hedefler de her karede SIFIRLANIR.
+        // Düşman lazerinde _targetPlayer korunuyordu ve Init() zaten sahnedeki
+        // gemiyi yazıyordu: ışın nereye bakarsa baksın, hatta hiçbir şeye
+        // değmese bile, oyuncu hasar alıyordu.
+        _target          = null;
+        _targetPlayer    = null;
+        _targetFighter   = null;
+        _targetCollector = null;
+        _endPoint        = transform.position + (Vector3)(direction * maxRange);
 
         foreach (var hit in hits)
         {
@@ -99,19 +105,27 @@ public class LaserBeam : MonoBehaviour
 
             if (hitsPlayer)
             {
-                if (c.GetComponent<PlayerShip>() != null)
+                // Düşman ışını oyuncu tarafında ne bulursa onu yakar —
+                // savaşçılar ve toplayıcılar dahil.
+                var ship      = c.GetComponent<PlayerShip>();
+                var fighter   = c.GetComponent<FighterShip>();
+                var collector = c.GetComponent<CollectorShip>();
+                if (ship != null || fighter != null || collector != null)
                 {
-                    _targetPlayer = c.GetComponent<PlayerShip>();
-                    _endPoint     = hit.point;
-                    _hitNormal    = hit.normal;
+                    _targetPlayer    = ship;
+                    _targetFighter   = fighter;
+                    _targetCollector = collector;
+                    _endPoint        = hit.point;
+                    _hitNormal       = hit.normal;
                     break;
                 }
             }
             else
             {
-                if (c.GetComponent<EnemyBot>()      != null ||
-                    c.GetComponent<BossHardpoint>() != null ||
-                    c.GetComponent<BossShip>()      != null)
+                if (c.GetComponent<EnemyBot>()       != null ||
+                    c.GetComponent<BarrierShield>()  != null ||
+                    c.GetComponent<BossHardpoint>()  != null ||
+                    c.GetComponent<BossShip>()       != null)
                 {
                     _target    = c;
                     _endPoint  = hit.point;
@@ -122,12 +136,41 @@ public class LaserBeam : MonoBehaviour
         }
     }
 
-    void ApplyDamage(float amount)
+    /// <summary>
+    /// Hasarı HER KAREDE uygular — oyuncu hedefin barının akıcı düştüğünü görür.
+    ///
+    /// Bunu yapabilmemizin sebebi zırhın burada ORAN olarak hesaplanması:
+    /// <see cref="BalanceConfig.BeamArmorEfficiency"/> ışını "saniyede bir atış"
+    /// sayıp 0..1 arası bir katsayı döner, hedefe de zırhın uygulandığı
+    /// bildirilir. Böylece hasarın sıklığı ile zırhın ısırığı BİRBİRİNDEN
+    /// BAĞIMSIZ olur.
+    ///
+    /// Eskiden ikisi bağlıydı ve iki kötü seçenek vardı: sık uygula (zırh 60 kez
+    /// ısırır, ışın gücünün %90'ını kaybeder, üstelik hasar kare hızına bağlanır)
+    /// ya da seyrek uygula (zırh doğru ısırır ama hedef yarım saniye hiç hasar
+    /// almamış gibi durur — ışının vurduğu görünmez).
+    /// </summary>
+    void ApplyDamage(float dps, float dt)
     {
+        if (dps <= 0f || dt <= 0f) return;
+
         if (hitsPlayer)
+        {
+            // Oyuncu tarafında zırh eşiği yok; kalkan zaten havuz olarak emiyor
+            float amount = dps * dt;
             _targetPlayer?.TakeDamage(amount);
-        else if (_target != null)
-            DamageUtil.TryDamage(_target, amount, weaponType);
+            _targetFighter?.TakeDamage(amount);
+            _targetCollector?.TakeDamage(amount);
+            return;
+        }
+
+        if (_target == null) return;
+
+        float efficiency = BalanceConfig.Instance.BeamArmorEfficiency(
+            dps, DamageUtil.ArmorOf(_target));
+
+        DamageUtil.TryDamage(_target, dps * efficiency * dt, weaponType,
+                             armorPreApplied: true);
     }
 
     // ── Görsel ────────────────────────────────────────────────────────────────
@@ -164,7 +207,9 @@ public class LaserBeam : MonoBehaviour
 
     void UpdateSparks()
     {
-        bool hitting = hitsPlayer ? (_targetPlayer != null) : (_target != null);
+        bool hitting = hitsPlayer
+            ? (_targetPlayer != null || _targetFighter != null || _targetCollector != null)
+            : (_target != null);
         if (!hitting) return;
 
         _sparkTimer -= Time.deltaTime;
@@ -183,4 +228,5 @@ public class LaserBeam : MonoBehaviour
         if (_line != null && _line.material != null)
             Destroy(_line.material);
     }
+
 }

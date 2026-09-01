@@ -34,7 +34,22 @@ public class TurretController : ShipComponentBase
     ITurretTarget _lockedTarget;
     float         _retargetTimer;
 
-    const float PDRange = 5.5f;
+    /// <summary>
+    /// Point Defence menzili. Kalkan küresi 2.5 birim; turretler gövdede
+    /// ±1.3 birim yayılı duruyor, yani en uzak slottan bile kalkanın belirgin
+    /// şekilde dışına ulaşır ve bombayı kabuğa değmeden karşılar.
+    ///
+    /// Menzil yine de PD'nin TEK kısıtıdır — yüksek DPS'inin ve dar hedef
+    /// listesinin karşılığı odur. Diğer turretlerin menzili 27–56 birim, yani
+    /// 10.4'te bile PD açık ara en kısa menzilli turret.
+    /// </summary>
+    const float PDRange = 10.4f;
+
+    /// <summary>
+    /// Işın turretinin hızlı hedeflere verdiği öncelik. Işın ıskalamaz;
+    /// mermili turretlerin zorlandığı kaçamak hedefler onun işidir.
+    /// </summary>
+    const float LaserSpeedBias = 1.5f;
 
     /// <summary>Merminin ömrü boyunca gidebildiği mesafe — bunun ötesi vurulamaz.</summary>
     public float EffectiveRange => specType == TurretSpecType.PointDefence
@@ -45,6 +60,13 @@ public class TurretController : ShipComponentBase
     public float DamagePerSecond => specType == TurretSpecType.Laser
         ? damage
         : (fireRate > 0.001f ? damage / fireRate : damage);
+
+    /// <summary>
+    /// Stat upgrade uygulanmış ATIŞ BAŞINA hasar. Zırh eşiği atış başına işlediği
+    /// için hedefleme bunu bilmek zorundadır — DPS yetmez: aynı DPS'i tek güçlü
+    /// atışla üreten turret zırhı deler, çok sayıda zayıf atışla üreten delemez.
+    /// </summary>
+    public float EffectiveShotDamage => damage * GetMultiplier("damage");
 
     /// <summary>Mermi tipinin hasar sınıfı — hedef dirençleri buna göre işler.</summary>
     public WeaponType ProjectileWeaponType
@@ -133,7 +155,14 @@ public class TurretController : ShipComponentBase
                 transform.position, shipPos,
                 EffectiveRange, DamagePerSecond, bulletSpeed, ProjectileWeaponType,
                 specType == TurretSpecType.PointDefence,
-                _lockedTarget);
+                _lockedTarget,
+                // Zırh atış BAŞINA işler; turret kendi atış hasarını bildirmezse
+                // zırhlı hedefleri "kolay" sanıp onlara kilitlenir ve mermi harcar.
+                EffectiveShotDamage,
+                // Yalnızca LAZER uzmanlaşması anlıktır. Enerji turretinin
+                // uzmanlaşmamış hâli de WeaponType.Laser hasarı verir ama
+                // MERMİ atar — ona hız tercihi tanımak yanlış olurdu.
+                specType == TurretSpecType.Laser ? LaserSpeedBias : 0f);
         }
 
         return _lockedTarget?.TargetTransform;
@@ -236,6 +265,14 @@ public class TurretController : ShipComponentBase
 
         tb.SetDirection(transform.right);
 
+        BalanceLog.Event("shot_fired")
+                  .Str("kaynak", "turret")
+                  .Str("spec",   specType.ToString())
+                  .Str("silah",  tb.weaponType.ToString())
+                  .Num("hasar",  tb.damage)
+                  .Num("hiz",    bulletSpeed)
+                  .End();
+
         BuildBulletVisual(go, specType);
         Destroy(go, bulletLifeTime);
     }
@@ -307,6 +344,17 @@ public class TurretController : ShipComponentBase
     // Görseller
     // -------------------------------------------------------------------------
 
+    /// <summary>
+    /// Taban, namlu ve mermi sprite'ları GRİ TONLAMALIDIR; uzmanlaşma rengini
+    /// SpriteRenderer.color çarpar. Alternatif her uzmanlaşma için ayrı bir
+    /// görsel çizmekti — altı uzmanlaşma × (taban + namlu + mermi) = 18 sprite,
+    /// hepsi aynı şeklin farklı renklisi.
+    ///
+    /// Bu yüzden SkinLibrary'ye yedek renk olarak BEYAZ verilir: prosedürel
+    /// dikdörtgen de beyaz doğar ve rengi yine sr.color'dan alır. İki yol da
+    /// aynı sonucu verir — yedeğe rengi gömseydik skinli yolda renk iki kez
+    /// çarpılır ve turretler kararırdı.
+    /// </summary>
     void BuildVisual()
     {
         Color baseColor = TurretColor();
@@ -314,16 +362,18 @@ public class TurretController : ShipComponentBase
         var baseGo = new GameObject("Base");
         baseGo.transform.SetParent(transform, false);
         var baseSR = baseGo.AddComponent<SpriteRenderer>();
-        baseSR.sprite       = Sprite.Create(MakeTex(30, 30, baseColor * 0.7f),
-                                  new Rect(0,0,30,30), new Vector2(0.5f,0.5f), 100f);
+        baseSR.sprite       = SkinLibrary.Get(SkinId.TurretBase + "." + specType.ToString().ToLowerInvariant(), SkinId.TurretBase,
+                                  30, 30, Color.white);
+        baseSR.color        = baseColor * 0.7f;
         baseSR.sortingOrder = 3;
 
         _barrel = new GameObject("Barrel").transform;
         _barrel.SetParent(transform, false);
         _barrel.localPosition = new Vector3(0.10f, 0f, 0f);
         var barrelSR = _barrel.gameObject.AddComponent<SpriteRenderer>();
-        barrelSR.sprite       = Sprite.Create(MakeTex(20, 8, TurretColor()),
-                                    new Rect(0,0,20,8), new Vector2(0f,0.5f), 100f);
+        barrelSR.sprite       = SkinLibrary.Get(SkinId.TurretBarrel + "." + specType.ToString().ToLowerInvariant(), SkinId.TurretBarrel,
+                                    20, 8, Color.white, new Vector2(0f, 0.5f));
+        barrelSR.color        = baseColor;
         barrelSR.sortingOrder = 4;
     }
 
@@ -346,11 +396,14 @@ public class TurretController : ShipComponentBase
             _                           => Color.white,
         };
 
+        // Füze mermiden üç kat uzun: siluetten "bu bir füze" okunmalı.
         int w = spec == TurretSpecType.HomingRocket ? 14 : 8;
         int h = spec == TurretSpecType.HomingRocket ? 6  : 4;
 
         var sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(MakeTex(w, h, c), new Rect(0,0,w,h), new Vector2(0f,0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.TurretBullet + "." + spec.ToString().ToLowerInvariant(), SkinId.TurretBullet,
+                              w, h, Color.white, new Vector2(0f, 0.5f));
+        sr.color        = c;   // sprite gri tonlamalı — bkz. BuildVisual
         sr.sortingOrder = 3;
     }
 
@@ -385,16 +438,6 @@ public class TurretController : ShipComponentBase
         if (specType == TurretSpecType.None)
             return baseName;
         return $"{baseName} — {TurretSpecHelper.GetSpecName(specType)}";
-    }
-
-    static Texture2D MakeTex(int w, int h, Color c)
-    {
-        var tex = new Texture2D(w, h);
-        var px  = new Color[w * h];
-        for (int i = 0; i < px.Length; i++) px[i] = c;
-        tex.SetPixels(px);
-        tex.Apply();
-        return tex;
     }
 
     // -------------------------------------------------------------------------

@@ -9,17 +9,23 @@ using UnityEngine;
 /// </summary>
 public class PlayerShip : MonoBehaviour
 {
+    [Tooltip("Zırh yükseltmesi olmadan gövde HP'si. maxHullHP bundan TÜRER — " +
+             "doğrudan yazılmaz, yoksa zırh bonusu yeniden hesaplanınca silinir.")]
+    public float baseMaxHullHP = 200f;
+
     public float maxHullHP     = 200f;
     public float currentHullHP;
     public bool  IsAlive       => currentHullHP > 0f;
 
     public List<MountSlot> mountSlots { get; private set; }
 
-    Vector3  _fixedPosition;
-    HealthBar _healthBar;
+    Vector3        _fixedPosition;
+    HealthBar      _healthBar;
+    SpriteRenderer _bodyRenderer;
 
     void Awake()
     {
+        maxHullHP      = baseMaxHullHP;
         currentHullHP  = maxHullHP;
         _fixedPosition = transform.position;
 
@@ -29,27 +35,25 @@ public class PlayerShip : MonoBehaviour
             busGO.AddComponent<EnergyBus>();
         }
 
-        // 400x100 px → ppu 100 → dünya boyutu 4 x 1 birim
-        Texture2D tex    = new Texture2D(400, 100);
-        Color[]   pixels = new Color[400 * 100];
-        Color shipColor  = new Color(0.3f, 0.3f, 0.4f);
-        for (int i = 0; i < pixels.Length; i++) pixels[i] = shipColor;
-        tex.SetPixels(pixels);
-        tex.Apply();
-
+        // 400x240 px → ppu 100 → dünya boyutu 4 x 2.4 birim
         GameObject body = new GameObject("Body");
         body.transform.SetParent(transform, false);
         body.transform.localPosition = Vector3.zero;
         body.transform.localScale    = Vector3.one;
 
         SpriteRenderer sr = body.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 400, 100), new Vector2(0.5f, 0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.PlayerBody, 400, 240,
+                              new Color(0.3f, 0.3f, 0.4f));
         sr.sortingOrder = -10;
+        _bodyRenderer   = sr;
 
-        // Trigger collider — gövde hasarı için (sprite 4x1 birim)
+        // Trigger collider — gövde hasarı için (sprite 4x2.4 birim).
+        // Oyuncu tarafında hitbox siluetten KÜÇÜK olmalı: ana gemi kaçamadığı
+        // için kıl payı ıskalar oyuncunun lehine yorumlanır. Oran SkinEntry'de.
         BoxCollider2D col = gameObject.AddComponent<BoxCollider2D>();
-        col.size      = new Vector2(4f, 1f);
+        col.size      = new Vector2(4f, 2.4f);
         col.isTrigger = true;
+        SkinLibrary.TryApplyCollider(gameObject, SkinId.PlayerBody, isTrigger: true);
 
         // Kalkan küresi — gemiyi tamamen saran daire, EnemyBullet tarafından yakalanır
         var shieldGO = new GameObject("ShieldSphere");
@@ -63,19 +67,32 @@ public class PlayerShip : MonoBehaviour
         if (!TryGetComponent<ShipLoadout>(out _))
             gameObject.AddComponent<ShipLoadout>();
 
-        // World-space slot objeleri — gemi 4x1 birim koordinat sistemine göre
+        // World-space slot objeleri.
+        //
+        // Konumlar geminin YAPILARINI takip eder, düzgün bir ızgara değildir.
+        // Eskiden 3x3+1 ızgaraydı (y = ±0.8) ve gemi 4x1 birim olduğu için
+        // komponentler gövdenin tamamen DIŞINDA, boşlukta duruyordu. Izgarayı
+        // koruyup gemiyi büyütmek denendi: slotları kapsamak gövdenin dört
+        // köşede de tam yükseklikte olmasını gerektiriyor, yani siluet zorunlu
+        // olarak tuğlaya dönüyordu. Bunun yerine slotlar gövdeye taşındı.
+        //
+        // Her konum Tools/SkinGen/player.js'teki bir yapıya oturur; biri
+        // değişirse diğeri de değişmeli. Tuval ↔ dünya: canvas = (800+400x, 480+400y).
+        //
+        // Başlangıç donanımının slot numaraları ComponentCatalog.StartingLoadout'ta:
+        // jeneratör 0, kalkan 3, hangar 6 — yani makine bloğu ve hangar modülü.
         Vector2[] slotPositions = new Vector2[]
         {
-            new Vector2(-1.5f,  0.8f),  // 0 — Üst Sol
-            new Vector2( 0f,    0.8f),  // 1 — Üst Orta
-            new Vector2( 1.5f,  0.8f),  // 2 — Üst Sağ
-            new Vector2(-1.5f,  0f),    // 3 — Orta Sol
-            new Vector2(-0.5f,  0f),    // 4 — Orta OrtaSol
-            new Vector2( 0.5f,  0f),    // 5 — Orta OrtaSağ (Weapon)
-            new Vector2( 1.5f,  0f),    // 6 — Orta Sağ
-            new Vector2(-1.5f, -0.8f),  // 7 — Alt Sol
-            new Vector2( 0f,   -0.8f),  // 8 — Alt Orta
-            new Vector2( 1.5f, -0.8f),  // 9 — Alt Sağ
+            new Vector2(-1.29f,  0.75f), // 0 — Kıç makine bloğu, üst   (jeneratör)
+            new Vector2( 0.20f,  0.87f), // 1 — Sırt kulesi, ön         (ANA SİLAH)
+            new Vector2( 1.10f,  0.38f), // 2 — Baş, üst
+            new Vector2(-1.29f,  0.00f), // 3 — Kıç makine bloğu, orta  (kalkan)
+            new Vector2(-0.40f,  0.87f), // 4 — Sırt kulesi, arka
+            new Vector2(-0.45f, -0.15f), // 5 — Bel gövdesi, sol
+            new Vector2(-0.40f, -0.87f), // 6 — Karın hangar modülü     (hangar)
+            new Vector2(-1.29f, -0.75f), // 7 — Kıç makine bloğu, alt
+            new Vector2( 0.25f, -0.15f), // 8 — Bel gövdesi, sağ
+            new Vector2( 1.10f, -0.45f), // 9 — Baş, alt
         };
 
         for (int i = 0; i < slotPositions.Length; i++)
@@ -87,7 +104,7 @@ public class PlayerShip : MonoBehaviour
 
             var visual          = slotGO.AddComponent<SlotVisual>();
             visual.slotIndex    = i;
-            visual.isWeaponSlot = (i == 1);
+            visual.isWeaponSlot = (i == ShipLoadout.WeaponSlotIndex);
         }
 
     }
@@ -96,6 +113,39 @@ public class PlayerShip : MonoBehaviour
     {
         mountSlots = GetComponentsInChildren<MountSlot>().ToList();
         _healthBar = GetComponent<HealthBar>();
+
+        // Bar geometrisi GÖVDEDEN türer, sahnedeki sabitten değil. Sahnede
+        // barOffsetY = 0.7 yazıyor ve bu 4x1 birimlik eski gövdeye göreydi;
+        // gövde 2.4 birime çıkınca bar hull'un İÇİNDE kalırdı. Türetilmiş
+        // olması, görsel bir daha değiştiğinde elle güncelleme gerektirmez.
+        if (_healthBar != null && _bodyRenderer != null && _bodyRenderer.sprite != null)
+        {
+            Vector2 size = _bodyRenderer.sprite.bounds.size;
+            _healthBar.barWidth   = size.x * 0.55f;
+            _healthBar.barOffsetY = size.y * 0.5f + 0.15f;
+        }
+    }
+
+    /// <summary>
+    /// Gövde tavanını değiştirir (onarım biriminin "Zırh" statı çağırır).
+    /// Artan tavan mevcut HP'ye de eklenir: oyuncu zırhı satın aldığı anda
+    /// faydasını görmeli, onarım biriminin yetişmesini beklememeli. Azalan
+    /// tavanda HP kırpılır — zırhlı onarım birimini satmak gerçek bir kayıptır.
+    /// </summary>
+    public void SetMaxHull(float newMax)
+    {
+        newMax = Mathf.Max(1f, newMax);
+        float delta = newMax - maxHullHP;
+        maxHullHP = newMax;
+        currentHullHP = delta > 0f
+            ? currentHullHP + delta
+            : Mathf.Min(currentHullHP, maxHullHP);
+
+        if (_healthBar != null)
+        {
+            _healthBar.maxHealth     = maxHullHP;
+            _healthBar.currentHealth = currentHullHP;
+        }
     }
 
     public void TakeDamage(float amount, bool bypassShields = false)
@@ -116,6 +166,20 @@ public class PlayerShip : MonoBehaviour
 
         if (_healthBar != null)
             _healthBar.currentHealth = currentHullHP;
+
+        // Ölüm sebebi dağılımı: gelen hasarın ne kadarını kalkan yuttu, ne kadarı
+        // gövdeye geçti. Bir tipin toplam hasar payı %30'u aşıyorsa o tipin
+        // fiyatı yanlış demektir — tehdit puanının ikinci bileşeni budur.
+        // Boost etiketi burada da gerekli: kalkan boost'u şarj hızını ×3
+        // yapıyor, yani aynı hasar akışını farklı bir kalkanla karşılıyoruz.
+        BalanceLog.Event("player_damage")
+                  .Num("gelen",  amount)
+                  .Num("govde",  remaining)
+                  .Num("kalkan", amount - remaining)
+                  .Str("boost",  BoostController.Mode.ToString())
+                  .Bool("bypass", bypassShields)
+                  .Num("kalanHP", currentHullHP)
+                  .End();
     }
 
     public MountSlot GetRandomOperationalSlot()

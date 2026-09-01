@@ -36,6 +36,17 @@ public class PlasmaBeam : MonoBehaviour
     readonly List<Collider2D> _buffer = new();
     readonly HashSet<int>     _hitSet = new();
 
+    // Plazma alan hasarını HER KARE uyguluyor; kıvılcımı da her kare çıkarmak
+    // tek bir bolt için saniyede yüzlerce parçacık demek olurdu. Lazerle aynı
+    // yaklaşım: emisyon sayaçla kısılır.
+    float       _sparkTimer;
+    const float SparkInterval = 0.05f;
+
+    // Hasar HER KAREDE uygulanır; zırh LaserBeam ile aynı modelle, ORAN olarak
+    // hesaplanır (BalanceConfig.BeamArmorEfficiency). Bkz. LaserBeam.ApplyDamage.
+
+    static readonly Color PlasmaSparkColor = new Color(0.55f, 1f, 0.4f);
+
     // ── Başlatma ──────────────────────────────────────────────────────────────
 
     void Awake()
@@ -125,6 +136,8 @@ public class PlasmaBeam : MonoBehaviour
         // ── Alan hasarı (Fading'de de kuyruk geçerken hasar verebilir) ────────
         if (totalEnergy <= 0f) return;
 
+        _sparkTimer -= Time.deltaTime;
+
         _hitSet.Clear();
         int count = Physics2D.OverlapBox(
             (Vector2)transform.position,
@@ -137,7 +150,8 @@ public class PlasmaBeam : MonoBehaviour
         {
             var col = _buffer[i];
 
-            bool isEnemy = col.GetComponent<EnemyBot>()      != null
+            bool isEnemy = col.GetComponent<EnemyBot>()       != null
+                        || col.GetComponent<BarrierShield>()  != null
                         || col.GetComponent<BossHardpoint>()  != null
                         || col.GetComponent<BossShip>()       != null;
             if (!isEnemy) continue;
@@ -148,8 +162,19 @@ public class PlasmaBeam : MonoBehaviour
             float tickDmg = Mathf.Min(dps * Time.deltaTime, totalEnergy);
             if (tickDmg <= 0f) break;
 
-            DamageUtil.TryDamage(col, tickDmg, weaponType);
+            // Zırh oran olarak: enerji bütçesinden düşen HAM hasardır, hedefe
+            // varan ise zırhla ölçeklenmiş olanı. Işın zırhlı hedefte daha çabuk
+            // tükenir — kalkan gibi delinmesi gereken bir engel olarak durur.
+            float efficiency = BalanceConfig.Instance.BeamArmorEfficiency(
+                dps, DamageUtil.ArmorOf(col));
+
+            DamageUtil.TryDamage(col, tickDmg * efficiency, weaponType,
+                                 armorPreApplied: true);
             totalEnergy -= tickDmg;
+
+            if (_sparkTimer <= 0f)
+                HitEffect.SpawnLaserSparks(col.transform.position, _firingDir,
+                                           -(Vector2)_firingDir, PlasmaSparkColor);
 
             if (totalEnergy <= 0f)
             {
@@ -157,5 +182,9 @@ public class PlasmaBeam : MonoBehaviour
                 break;
             }
         }
+
+        // Kıvılcım sayacı döngüden SONRA sıfırlanır: aynı karede birden fazla
+        // hedefi yakan bir bolt hepsinde kıvılcım çıkarsın, yalnızca ilkinde değil.
+        if (_sparkTimer <= 0f) _sparkTimer = SparkInterval;
     }
 }

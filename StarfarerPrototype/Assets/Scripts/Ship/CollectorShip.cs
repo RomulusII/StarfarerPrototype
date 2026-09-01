@@ -8,6 +8,8 @@ using UnityEngine;
 ///   - Enkaz hangardan MaxDebrisRange'den uzaksa hedef almaz / bırakır.
 ///   - Tip ayrımı yapmaz: ne bulursa toplar. Kargo tipe göre ayrı sayılır ama
 ///     kapasite toplam üzerinden işler; hangara varınca hepsi birden boşaltılır.
+///   - TEK istisna: deposu DOLU olan kaynağı hedef almaz. Bir kaynağın dolması
+///     diğerinin toplanmasını durdurmamalı.
 ///   - Kargo dolunca Returning'e geçer.
 ///   - Kapasite dolmamışsa aynı seferde birden fazla enkaz toplayabilir.
 ///   - Toplanacak enkaz kalmadıysa ve kargoda bir şey varsa boşta beklemez —
@@ -32,11 +34,15 @@ public class CollectorShip : MonoBehaviour
     ShipMovement _movement;
     float        _hoverPhase;
 
-    // Kargo tip başına ayrı tutulur; kapasite toplam üzerinden kontrol edilir
+    // Kargo tip başına ayrı tutulur; kapasite toplam üzerinden kontrol edilir.
+    //
+    // Miktarlar KESİRLİDİR. Eskiden kargo tam birime yuvarlanıyor, artan kesir
+    // ayrı bir birikeçte bekliyor ve boşaltmada SIFIRLANIYORDU. Level 1'de bir
+    // asteroit parçası 0.5 kaynak düşürür — yani kristalin tamamı, metalin de
+    // her seferin artığı yuvarlamada yanıyordu.
     static readonly int TypeCount = System.Enum.GetValues(typeof(ResourceType)).Length;
-    int[]   _cargo;         // tip başına tam birim kargo
-    float[] _accumulator;   // tip başına kesirli birikim
-    int     _cargoTotal;    // tüm tiplerin toplamı — kapasite bunun üzerinden
+    float[] _cargo;         // tip başına kargo
+    float   _cargoTotal;    // tüm tiplerin toplamı — kapasite bunun üzerinden
 
     const float Mass          = 1.5f;
     const float MaxDebrisRange = 12f;   // hangardan max enkaz takip mesafesi
@@ -44,8 +50,7 @@ public class CollectorShip : MonoBehaviour
     void Awake()
     {
         _hoverPhase  = Random.Range(0f, Mathf.PI * 2f);
-        _cargo       = new int[TypeCount];
-        _accumulator = new float[TypeCount];
+        _cargo       = new float[TypeCount];
         BuildVisual();
 
         var col       = gameObject.AddComponent<CircleCollider2D>();
@@ -80,16 +85,17 @@ public class CollectorShip : MonoBehaviour
         switch (_phase)
         {
             case Phase.Idle:
-                if (_cargoTotal >= (int)maxCargo) { _phase = Phase.Returning; break; }
+                if (_cargoTotal >= maxCargo) { _phase = Phase.Returning; break; }
                 var d = FindClosestDebris();
                 if (d != null) { _target = d; _phase = Phase.GoToDebris; }
-                else if (_cargoTotal > 0) _phase = Phase.Returning; // toplanacak yok → boşalt
+                else if (_cargoTotal > 0f) _phase = Phase.Returning; // toplanacak yok → boşalt
                 else HoverNearHangar();
                 break;
 
             case Phase.GoToDebris:
                 if (_target == null || _target.IsEmpty) { _target = null; _phase = Phase.Idle; break; }
                 if (DebrisTooFar(_target))               { _target = null; _phase = Phase.Idle; break; }
+                if (!Collectable(_target))               { _target = null; _phase = Phase.Idle; break; }
                 _movement.MoveToward(_target.transform.position);
                 if (Vector2.Distance(transform.position, _target.transform.position) < 0.3f)
                     _phase = Phase.Collecting;
@@ -99,20 +105,20 @@ public class CollectorShip : MonoBehaviour
                 if (_target == null || _target.IsEmpty) { _target = null; _phase = Phase.Idle; break; }
                 // Enkaz sola kayarken toplayıcıyı menzil dışına sürüklemesin
                 if (DebrisTooFar(_target))              { _target = null; _phase = Phase.Idle; break; }
-                if (_cargoTotal >= (int)maxCargo)        { _phase = Phase.Returning; break; }
+                // Depo toplama SIRASINDA dolabilir — kalanı almanın anlamı yok
+                if (!Collectable(_target))              { _target = null; _phase = Phase.Idle; break; }
+                if (_cargoTotal >= maxCargo)            { _phase = Phase.Returning; break; }
                 // Enkaz ile birlikte sürüklen — motor kapalı, kalan hız sıfırlanır
                 _movement.Halt();
                 transform.position += (Vector3)(_target.Velocity * Time.deltaTime);
 
-                int ti = (int)_target.resourceType;
-                _accumulator[ti] += _target.Collect(salvageRate * Time.deltaTime);
-                while (_accumulator[ti] >= 1f)
-                {
-                    _accumulator[ti] -= 1f;
-                    _cargo[ti]++;
-                    _cargoTotal++;
-                }
-                if (_cargoTotal >= (int)maxCargo) _phase = Phase.Returning;
+                int   ti   = (int)_target.resourceType;
+                float take = Mathf.Min(salvageRate * Time.deltaTime, maxCargo - _cargoTotal);
+                float got  = _target.Collect(take);
+                _cargo[ti]  += got;
+                _cargoTotal += got;
+
+                if (_cargoTotal >= maxCargo) _phase = Phase.Returning;
                 break;
 
             case Phase.Returning:
@@ -132,12 +138,25 @@ public class CollectorShip : MonoBehaviour
     {
         for (int i = 0; i < _cargo.Length; i++)
         {
-            if (_cargo[i] > 0)
+            if (_cargo[i] > 0f)
                 ResourceInventory.Instance?.Add((ResourceType)i, _cargo[i]);
-            _cargo[i]       = 0;
-            _accumulator[i] = 0f;
+            _cargo[i] = 0f;
         }
-        _cargoTotal = 0;
+        _cargoTotal = 0f;
+    }
+
+    /// <summary>
+    /// Bu enkazın kaynağı depoya SIĞIYOR mu? Dolu bir tipi toplamak kaynağı
+    /// yakmakla kalmıyordu: toplayıcı kargosunu o tiple doldurup boşaltmaya
+    /// dönüyor, dönüşte yine aynı tipi alıyordu — yani metal dolduğu anda
+    /// kristal toplama pratikte duruyordu. Tip ayrımı yalnızca burada,
+    /// DEPO DOLUYKEN yapılır; boş depoda toplayıcı hâlâ ne bulursa alır.
+    /// </summary>
+    static bool Collectable(Debris d)
+    {
+        if (d == null) return false;
+        var inv = ResourceInventory.Instance;
+        return inv == null || !inv.IsFull(d.resourceType);
     }
 
     bool DebrisTooFar(Debris d)
@@ -169,6 +188,7 @@ public class CollectorShip : MonoBehaviour
         {
             if (claimed.Contains(d)) continue;
             if (DebrisTooFar(d)) continue;
+            if (!Collectable(d)) continue;
             float dist = Vector2.Distance(transform.position, d.transform.position);
             if (dist < bestD) { bestD = dist; best = d; }
         }
@@ -188,12 +208,9 @@ public class CollectorShip : MonoBehaviour
 
     void BuildVisual()
     {
-        var tex = new Texture2D(24, 12);
-        var px  = new Color[24 * 12];
-        for (int i = 0; i < px.Length; i++) px[i] = new Color(0.30f, 0.75f, 0.40f);
-        tex.SetPixels(px); tex.Apply();
         var sr        = gameObject.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 24, 12), new Vector2(0.5f, 0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.Collector, 24, 12,
+                              new Color(0.30f, 0.75f, 0.40f));
         sr.sortingOrder = 5;
     }
 }

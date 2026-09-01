@@ -32,23 +32,101 @@ public abstract class ShipComponentBase : MonoBehaviour
     // ── Stat upgrade sistemi ──────────────────────────────────────────────────
 
     public readonly Dictionary<string, int> StatLevels = new();
-    public const int MaxStatLevel = 8;
 
+    /// <summary>
+    /// Stat tavanı. Tier zincirleri kaldırılınca 8'den 10'a çıkarıldı — tier'ların
+    /// taşıdığı güç stat eğrisine devredildi. Tavanı 10 tutmak, komponent
+    /// tavanlarını eski Mk3 + Sv8 seviyesinin yakınında bırakır.
+    /// </summary>
+    public const int MaxStatLevel = 10;
+
+    /// <summary>
+    /// Seviye başına güç çarpanı. Sabit 1.5 idi; BalanceConfig'e taşındı çünkü
+    /// hasar ve ateş hızı ikisi de DPS'e çarpımsal giriyor ve 1.5 ile oyuncu
+    /// üstünlüğü kampanya boyunca 6× kayıyordu.
+    /// </summary>
     public float GetMultiplier(string key) =>
-        Mathf.Pow(1.5f, StatLevels.TryGetValue(key, out var lvl) ? lvl : 0);
+        BalanceConfig.Instance.StatMultiplier(GetStatLevel(key));
 
     public int GetStatLevel(string key) =>
         StatLevels.TryGetValue(key, out var lvl) ? lvl : 0;
+
+    /// <summary>
+    /// En yüksek stat seviyesi. Enerji tüketimi buna bağlanır — statların
+    /// TOPLAMINA bağlansaydı yedi izli Hangar, iki izli turretten katbekat
+    /// fazla enerji yerdi; oysa ikisi de "aynı derecede yükseltilmiş".
+    /// </summary>
+    public int HighestStatLevel
+    {
+        get
+        {
+            int max = 0;
+            foreach (var lvl in StatLevels.Values) if (lvl > max) max = lvl;
+            return max;
+        }
+    }
 
     public void ApplyStatUpgrade(string key)
     {
         int cur = GetStatLevel(key);
         if (cur >= MaxStatLevel) return;
         StatLevels[key] = cur + 1;
+        RefreshEnergyDraw();
         OnStatUpgraded(key);
     }
 
     public virtual void OnStatUpgraded(string key) { }
+
+    /// <summary>Tüm stat izlerini olduğu gibi kopyalar.</summary>
+    public void CopyStatLevelsFrom(ShipComponentBase other)
+    {
+        if (other == null) return;
+        StatLevels.Clear();
+        foreach (var kv in other.StatLevels) StatLevels[kv.Key] = kv.Value;
+        RefreshEnergyDraw();
+        foreach (var key in StatLevels.Keys) OnStatUpgraded(key);
+    }
+
+    // ── Enerji tüketimi ───────────────────────────────────────────────────────
+    //
+    // EnergyBus'ın üretim/tüketim muhasebesi uzun süre yazılıydı ama kapalıydı:
+    // her komponent Awake'de energyConsumption = 0f yapıyordu, dolayısıyla
+    // TotalConsumption her zaman sıfırdı. Artık besleniyor.
+
+    /// <summary>Sv0 tüketimi — ShipLoadout kurulumda ComponentDefinition'dan verir.</summary>
+    public float baseEnergyCost = 0f;
+
+    public float EnergyDrawAt(int statLevel)
+        => baseEnergyCost * BalanceConfig.Instance.EnergyMultiplier(statLevel);
+
+    /// <summary>Bir sonraki stat seviyesinin getireceği EK enerji yükü.</summary>
+    public float NextUpgradeEnergyDelta(string key)
+    {
+        // Yalnızca EN YÜKSEK izi zorlamak tüketimi artırır; geride kalan bir izi
+        // yükseltmek bedavadır. Tüketim zaten en yüksek seviyeye bağlı.
+        int next = Mathf.Max(HighestStatLevel, GetStatLevel(key) + 1);
+        return EnergyDrawAt(next) - EnergyDrawAt(HighestStatLevel);
+    }
+
+    /// <summary>Taban tüketimi ayarlar ve EnergyBus kaydını tazeler.</summary>
+    public void SetEnergyBase(float value)
+    {
+        baseEnergyCost = value;
+        RefreshEnergyDraw();
+    }
+
+    protected void RefreshEnergyDraw()
+    {
+        float next = EnergyDrawAt(HighestStatLevel);
+        if (Mathf.Approximately(next, energyConsumption)) return;
+
+        if (EnergyBus.Instance != null && IsOperational)
+        {
+            EnergyBus.Instance.UnregisterConsumer(energyConsumption);
+            EnergyBus.Instance.RegisterConsumer(next);
+        }
+        energyConsumption = next;
+    }
 
     // ── Görsel sabitler ───────────────────────────────────────────────────────
 
@@ -60,6 +138,25 @@ public abstract class ShipComponentBase : MonoBehaviour
 
     static readonly Color k_ringNormal      = new Color(0.45f, 0.85f, 1f,  0.25f);
     static readonly Color k_ringDeactivated = new Color(0.80f, 0.12f, 0.1f, 0.40f);
+
+    /// <summary>
+    /// Komponentin skin anahtari - sinif adindan turer
+    /// (GeneratorComponent -> "component.generator").
+    /// </summary>
+    protected virtual string SkinKey => SkinId.ForComponent(GetType().Name);
+
+    /// <summary>
+    /// Halka rengi. Prosedurel halka BEYAZ dokudur, rengini buradan alir ve
+    /// kasten soluktur (yalnizca konum gostergesi). Skin varsa sprite kendi
+    /// rengini tasir, o yuzden normalde tam beyaz gecilir - yoksa ikon soluklasir.
+    /// Deaktif durum her iki yolda da kirmiziya doner.
+    /// </summary>
+    Color RingColor(bool deactivated)
+    {
+        bool skinned = SkinLibrary.Has(SkinKey);
+        if (deactivated) return skinned ? new Color(1f, 0.35f, 0.30f, 1f) : k_ringDeactivated;
+        return skinned ? Color.white : k_ringNormal;
+    }
 
     SpriteRenderer _ringRenderer;
     Transform      _hpBg;
@@ -123,7 +220,7 @@ public abstract class ShipComponentBase : MonoBehaviour
         if (_deactivated && currentHP >= maxHP)
         {
             _deactivated = false;
-            if (_ringRenderer != null) _ringRenderer.color = k_ringNormal;
+            if (_ringRenderer != null) _ringRenderer.color = RingColor(deactivated: false);
             if (EnergyBus.Instance != null)
                 EnergyBus.Instance.RegisterConsumer(energyConsumption);
         }
@@ -134,7 +231,7 @@ public abstract class ShipComponentBase : MonoBehaviour
         if (DifficultyManager.Current == Difficulty.Easy)
         {
             _deactivated = true;
-            if (_ringRenderer != null) _ringRenderer.color = k_ringDeactivated;
+            if (_ringRenderer != null) _ringRenderer.color = RingColor(deactivated: true);
             if (EnergyBus.Instance != null)
                 EnergyBus.Instance.UnregisterConsumer(energyConsumption);
         }
@@ -168,8 +265,8 @@ public abstract class ShipComponentBase : MonoBehaviour
         ringGo.transform.localPosition = Vector3.zero;
         ringGo.transform.localScale    = Vector3.one * k_ringSize;
         _ringRenderer              = ringGo.AddComponent<SpriteRenderer>();
-        _ringRenderer.sprite       = GetRingSprite();
-        _ringRenderer.color        = k_ringNormal;
+        _ringRenderer.sprite       = SkinLibrary.GetOrNull(SkinKey) ?? GetRingSprite();
+        _ringRenderer.color        = RingColor(deactivated: false);
         _ringRenderer.sortingOrder = -5;
 
         // HP barı — zemin (kırmızı), başlangıçta gizli

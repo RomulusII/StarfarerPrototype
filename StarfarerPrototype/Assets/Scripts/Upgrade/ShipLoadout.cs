@@ -10,6 +10,18 @@ public class ShipLoadout : MonoBehaviour
 {
     public int slotCount = 10;
 
+    /// <summary>
+    /// Ana silahın slotu. SABİT bir gerçektir, türetilmez.
+    ///
+    /// Eskiden UpgradeUI bunu _slotsByType[Weapon]'dan türetiyordu ve kayıt
+    /// yüklendikten sonra o liste BOŞ kalıyordu: SaveSystem.Apply önce
+    /// ClearAllSlots() çağırıyor, sonra slotları geri kuruyor — ama silahlar
+    /// slot olarak KAYDEDİLMİYOR (ayrı listede tutuluyorlar). Sonuç: kayıttan
+    /// devam eden oyuncuda WeaponSlot = -1 oluyor, slot 1 "Boş" görünüyor,
+    /// ana silah paneli hiç açılmıyor ve o slota kalkan/turret kurulabiliyordu.
+    /// </summary>
+    public const int WeaponSlotIndex = 1;
+
     private ShipComponentBase[]   _slots;
     private ComponentDefinition[] _installedDefs;
     private GameObject[]          _slotObjects;
@@ -32,6 +44,10 @@ public class ShipLoadout : MonoBehaviour
 
     void Awake()
     {
+        // Statikler sahne yeniden yüklenince hayatta kalır; yeni gemi yeni
+        // kalkan durumuyla başlamalı.
+        ShieldGeneratorComponent.ResetStatics();
+
         _slots         = new ShipComponentBase[slotCount];
         _installedDefs = new ComponentDefinition[slotCount];
         _slotObjects   = new GameObject[slotCount];
@@ -40,8 +56,8 @@ public class ShipLoadout : MonoBehaviour
     void Start()
     {
         // Raylı Top başlangıçta ücretsiz kurulu gelir
-        InstallComponent(ComponentCatalog.WeaponChain(WeaponType.Kinetic)[0],
-                         slotIndex: 1, deductCost: false);
+        InstallComponent(ComponentCatalog.Weapon(WeaponType.Kinetic),
+                         WeaponSlotIndex, deductCost: false);
 
         // Kalan başlangıç donanımı katalogdan gelir — bunlar mağazadakilerin
         // ta kendisidir, ayrı bir "başlangıç sürümü" yoktur.
@@ -49,9 +65,32 @@ public class ShipLoadout : MonoBehaviour
             InstallComponent(def, slot, deductCost: false);
     }
 
-    /// <summary>Bir silah tipinin Mk1 tanımını döner (unlock maliyeti dahil).</summary>
-    public static ComponentDefinition GetWeaponChainStart(WeaponType type)
-        => ComponentCatalog.WeaponChain(type)?[0];
+    /// <summary>Bir silah tipinin tanımı (unlock maliyeti dahil).</summary>
+    public static ComponentDefinition GetWeaponBase(WeaponType type)
+        => ComponentCatalog.Weapon(type);
+
+    /// <summary>
+    /// Stat upgrade'lerine harcanan toplam kaynak. Satış iadesi bunu da kapsar —
+    /// eskiden yalnızca komponentin sellValue'su dönüyordu, yani kalkana binlerce
+    /// kristal stat basıp satan oyuncu 18 kristal alıyordu.
+    /// </summary>
+    public static int StatSpent(ComponentDefinition def, ShipComponentBase comp)
+    {
+        if (def == null || comp == null) return 0;
+        int   baseCost = def.statCostBase > 0 ? def.statCostBase : def.cost;
+        var   cfg      = BalanceConfig.Instance;
+        int   total    = 0;
+        foreach (var kv in comp.StatLevels) total += cfg.StatTotalSpent(baseCost, kv.Value, kv.Key);
+        return total;
+    }
+
+    /// <summary>Satışta geri dönen miktar: kurulum iadesi + stat harcamasının bir kısmı.</summary>
+    public static int SellRefund(ComponentDefinition def, ShipComponentBase comp)
+    {
+        if (def == null) return 0;
+        int statRefund = Mathf.RoundToInt(StatSpent(def, comp) * BalanceConfig.Instance.sellRefundRatio);
+        return def.sellValue + statRefund;
+    }
 
     // -------------------------------------------------------------------------
     // Public API
@@ -63,6 +102,15 @@ public class ShipLoadout : MonoBehaviour
         if (def == null) return false;
         if (slotIndex < 0 || slotIndex >= slotCount) return false;
         if (!IsSlotEmpty(slotIndex)) return false;
+
+        // Ana silah slotu yalnızca silah kabul eder. Kayıt yüklendikten sonra
+        // slot kaydı boş kaldığı dönemde oraya kalkan kurulabiliyordu; slot
+        // sahiplenildiğinde de silah bir daha geri gelmiyordu.
+        bool isWeapon = def.componentType == ComponentType.Weapon;
+        if (isWeapon != (slotIndex == WeaponSlotIndex)) return false;
+
+        // Enerji kapısı — kuracak enerji yoksa kaynak da harcanmaz
+        if (deductCost && !HasEnergyHeadroom(def.baseEnergyCost)) return false;
 
         if (deductCost)
         {
@@ -128,6 +176,9 @@ public class ShipLoadout : MonoBehaviour
                 break;
         }
 
+        // Enerji kaydı: Awake/OnEnable sıfırla kaydolur, gerçek değeri burada alır
+        comp?.SetEnergyBase(def.baseEnergyCost);
+
         _slots[slotIndex]         = comp;
         _installedDefs[slotIndex] = def;
         _slotObjects[slotIndex]   = go;
@@ -150,8 +201,8 @@ public class ShipLoadout : MonoBehaviour
         if (_installedDefs[slotIndex] == null) return false;
 
         if (returnResources && ResourceInventory.Instance != null)
-            ResourceInventory.Instance.Add(_installedDefs[slotIndex].costResource,
-                                           _installedDefs[slotIndex].sellValue);
+            ResourceInventory.Instance.Add(defToSell.costResource,
+                                           SellRefund(defToSell, _slots[slotIndex]));
 
         if (_slotObjects[slotIndex] != null)
             Destroy(_slotObjects[slotIndex]);
@@ -167,31 +218,34 @@ public class ShipLoadout : MonoBehaviour
         return true;
     }
 
-    public bool UpgradeComponent(int slotIndex)
+    // -------------------------------------------------------------------------
+    // Enerji kapısı
+    // -------------------------------------------------------------------------
+
+    /// <summary>Ek tüketim jeneratörün üretimine sığıyor mu?</summary>
+    public static bool HasEnergyHeadroom(float additionalDraw)
+        => EnergyShortfall(additionalDraw) <= 0f;
+
+    /// <summary>Ne kadar enerji eksik? 0 = yeterli.</summary>
+    public static float EnergyShortfall(float additionalDraw)
     {
-        if (slotIndex < 0 || slotIndex >= slotCount) return false;
-        if (_installedDefs[slotIndex] == null) return false;
+        var bus = EnergyBus.Instance;
+        if (bus == null || additionalDraw <= 0f) return 0f;
+        return Mathf.Max(0f, bus.TotalConsumption + additionalDraw - bus.TotalProduction);
+    }
 
-        ComponentDefinition upgradeTo = _installedDefs[slotIndex].upgradeTo;
-        if (upgradeTo == null) return false;
-
-        // Oyuncu sadece farkı öder: yeni maliyet - eski satış değeri
-        int diffCost = upgradeTo.cost - _installedDefs[slotIndex].sellValue;
-        if (diffCost > 0)
-        {
-            if (ResourceInventory.Instance == null) return false;
-            if (!ResourceInventory.Instance.TrySpend(upgradeTo.costResource, diffCost)) return false;
-        }
-
-        ComponentDefinition upgradeTarget = upgradeTo;
-        SellComponent(slotIndex, returnResources: false); // eski komponenti yok et, para iade etme
-        return InstallComponent(upgradeTarget, slotIndex, deductCost: false);
+    /// <summary>Bu statı bir seviye yükseltmenin getireceği EK enerji yükü.</summary>
+    public float StatUpgradeEnergyDelta(int slotIndex, string key)
+    {
+        var comp = GetSlotComponent(slotIndex);
+        return comp != null ? comp.NextUpgradeEnergyDelta(key) : 0f;
     }
 
     public void SwitchWeapon(WeaponType type)
     {
-        if (!_unlockedWeapons.TryGetValue(type, out _)) return;
+        if (!_unlockedWeapons.TryGetValue(type, out var def)) return;
         _activeWeaponType = type;
+        _installedDefs[WeaponSlotIndex] = def;   // slot başlığı aktif silahı göstersin
         ApplyActiveWeaponStats();
     }
 
@@ -219,15 +273,16 @@ public class ShipLoadout : MonoBehaviour
         if (wc == null) return;
         wc.Configure(def);
         if (!_weaponStatLevels.TryGetValue(_activeWeaponType, out var stats)) return;
-        if (stats.TryGetValue("damage",   out var d)) wc.damage   *= Mathf.Pow(1.5f, d);
-        if (stats.TryGetValue("fireRate", out var f)) wc.fireRate /= Mathf.Pow(1.5f, f);
+        var cfg = BalanceConfig.Instance;
+        if (stats.TryGetValue("damage",   out var d)) wc.damage   *= cfg.StatMultiplier(d);
+        if (stats.TryGetValue("fireRate", out var f)) wc.fireRate /= cfg.StatMultiplier(f);
     }
 
     /// <summary>Yeni bir silah tipini satın alıp açar. Zaten açıksa false döner.</summary>
     public bool UnlockWeaponType(WeaponType type)
     {
         if (_unlockedWeapons.ContainsKey(type)) return false;
-        var def = GetWeaponChainStart(type);
+        var def = GetWeaponBase(type);
         if (def == null) return false;
         if (def.cost > 0)
         {
@@ -238,25 +293,7 @@ public class ShipLoadout : MonoBehaviour
         return true;
     }
 
-    /// <summary>Belirli bir silah tipini bağımsız olarak upgrade eder (aktif olmak zorunda değil).</summary>
-    public bool UpgradeWeaponType(WeaponType type)
-    {
-        if (!_unlockedWeapons.TryGetValue(type, out var current)) return false;
-        if (current.upgradeTo == null) return false;
-        var next    = current.upgradeTo;
-        int diff    = next.cost - current.sellValue;
-        if (diff > 0)
-        {
-            if (ResourceInventory.Instance == null) return false;
-            if (!ResourceInventory.Instance.TrySpend(next.costResource, diff)) return false;
-        }
-        _unlockedWeapons[type] = next;
-        if (_activeWeaponType == type)
-            GetComponentInChildren<WeaponController>()?.Configure(next);
-        return true;
-    }
-
-    /// <summary>Bir silah tipinin mevcut (en son upgrade edilmiş) tanımını döner.</summary>
+    /// <summary>Bir silah tipinin tanımını döner (açılmışsa null değil).</summary>
     public ComponentDefinition GetWeaponDef(WeaponType type) =>
         _unlockedWeapons.TryGetValue(type, out var d) ? d : null;
 
@@ -299,6 +336,87 @@ public class ShipLoadout : MonoBehaviour
         tc.Specialize(newSpec, newSpecDef);
         _installedDefs[slotIndex] = newSpecDef;
         return true;
+    }
+
+    // -------------------------------------------------------------------------
+    // Kayıt / yükleme desteği
+    // -------------------------------------------------------------------------
+
+    /// <summary>Kurulu her slotu tanımı ve komponentiyle birlikte gezer.</summary>
+    public IEnumerable<(int slot, ComponentDefinition def, ShipComponentBase comp)> EnumerateSlots()
+    {
+        for (int i = 0; i < slotCount; i++)
+            if (_installedDefs[i] != null)
+                yield return (i, _installedDefs[i], _slots[i]);
+    }
+
+    /// <summary>Tüm slotları boşaltır — yükleme öncesi temiz sayfa.</summary>
+    public void ClearAllSlots()
+    {
+        for (int i = 0; i < slotCount; i++)
+        {
+            if (_slotObjects[i] != null) Destroy(_slotObjects[i]);
+            _slots[i]         = null;
+            _installedDefs[i] = null;
+            _slotObjects[i]   = null;
+        }
+        _slotsByType.Clear();
+        StorageComponent.Invalidate();
+
+        // Slotları boşaltmak mevcut kalkan jeneratörünü de yok eder; onun
+        // artığının kayıttan gelen jeneratöre karışmaması gerekir.
+        ShieldGeneratorComponent.ResetStatics();
+    }
+
+    /// <summary>Kayıttan bir slotu stat seviyeleriyle birlikte geri kurar.</summary>
+    public bool RestoreSlot(int slotIndex, ComponentDefinition def, Dictionary<string, int> stats)
+    {
+        if (!InstallComponent(def, slotIndex, deductCost: false)) return false;
+
+        var comp = _slots[slotIndex];
+        if (comp != null && stats != null)
+        {
+            foreach (var kv in stats) comp.StatLevels[kv.Key] = kv.Value;
+            comp.SetEnergyBase(def.baseEnergyCost);
+            foreach (var key in stats.Keys) comp.OnStatUpgraded(key);
+        }
+        return true;
+    }
+
+    /// <summary>Kayıttan silah durumunu geri kurar.</summary>
+    public void RestoreWeapon(WeaponType type, int damageLevel, int fireRateLevel)
+    {
+        var def = ComponentCatalog.Weapon(type);
+        if (def == null) return;
+
+        _unlockedWeapons[type] = def;
+        _weaponStatLevels[type] = new Dictionary<string, int>
+        {
+            { "damage",   damageLevel   },
+            { "fireRate", fireRateLevel },
+        };
+    }
+
+    /// <summary>
+    /// Aktif silahı seçer, statlarını uygular ve silah SLOTUNU geri kaydeder
+    /// (yükleme sonu).
+    ///
+    /// Slot kaydı şart: ClearAllSlots kayıt yüklenirken slot 1'i de boşaltıyor
+    /// ama silahlar slot olarak kaydedilmiyor. Burada geri yazılmazsa slot 1
+    /// oyunun geri kalanı boyunca "boş" kalır.
+    /// </summary>
+    public void FinishRestore(WeaponType active)
+    {
+        if (_unlockedWeapons.ContainsKey(active)) _activeWeaponType = active;
+        ApplyActiveWeaponStats();
+
+        if (_unlockedWeapons.TryGetValue(_activeWeaponType, out var def))
+        {
+            _installedDefs[WeaponSlotIndex] = def;
+            if (!_slotsByType.TryGetValue(ComponentType.Weapon, out var list))
+                _slotsByType[ComponentType.Weapon] = list = new List<int>();
+            if (!list.Contains(WeaponSlotIndex)) list.Add(WeaponSlotIndex);
+        }
     }
 
     public ShipComponentBase GetSlotComponent(int slotIndex)

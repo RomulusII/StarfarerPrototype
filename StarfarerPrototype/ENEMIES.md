@@ -4,6 +4,40 @@ Mevcut isimler placeholder. İsimler ve hikaye uyumu için tartışma notları e
 
 ---
 
+### Barrier (Bariyer)
+**Kod adı:** `Barrier` · **Rol:** Bariyer · **Tehdit puanı:** 3 · **İlk çıkış:** level 12
+
+| Stat | Değer |
+|------|-------|
+| HP | 40 |
+| Kalkan | 170 (şarj 24/s, 2.5 sn gecikme) — ikisi de levelle ölçeklenir |
+| Kalkan şekli | Önde 100° HİLAL, yarıçap 2.0 (kiriş 3.06 birim) |
+| Kütle | 4 · Güç: 6 |
+| Silah | — (silahsız) |
+| Boyut | 46×62 px |
+| Enkaz | Ham madde + 17 kristal (kalkan × 0.1) |
+
+**Hareket:** Screen — ana gemi ile korunan filonun ARASINA, gemiden 5.5 birim
+uzağa yerleşir; filo hareket ettikçe koruma ekseni döner ve siper onunla kayar.
+Üstüne 1.6 birimlik, 10 saniyelik yavaş bir yanal salınım (strafe) biner.
+Manevra iticilidir: burnu (ve yay kalkanı) hep oyuncuda kalırken yana süzülür.
+Kalkanı bitince retro itkiyle geri çekilir, %90'a dolunca yeni bir yanal paydan
+geri gelir.
+
+**Dalga ilerlemesini engellemez** ve dalgada tehdit üreten kimse kalmayınca
+sahneden çekilir. Tek başına bir dalga oluşturamaz — refakat ettiği bir filo
+olmadan seçilmez.
+
+**Yönlü kalkan:** yalnızca öndeki yaydan giren mermiyi emer. Yandan/arkadan
+gelen mermi gövdeye ulaşır ve kalkanı hiç görmez.
+
+**Direnç (kalkan):** Kinetik ×1.5 · Lazer ×0.25
+
+**Ne zorlar:** Ateş hattı. Del, kenarından dolan ya da kalkanı boşalana kadar
+bekle — üçü de gerçek bir karar.
+
+---
+
 ## Uzak Saldırganlar
 Gemiye yaklaşır, periyodik ateş eder. Mermileri kalkandan hasar verir.
 
@@ -17,7 +51,6 @@ Gemiye yaklaşır, periyodik ateş eder. Mermileri kalkandan hasar verir.
 | HP | 20 |
 | Kalkan | — |
 | Kütle | 1 · Güç: 3 |
-| Temas hasarı | 20 |
 | Silah | Kinetik |
 | Ateş hasarı | 3 |
 | Ateş hızı | 5 sn |
@@ -44,7 +77,6 @@ Gemiye yaklaşır, periyodik ateş eder. Mermileri kalkandan hasar verir.
 | HP | 80 |
 | Kalkan | — |
 | Kütle | 5 · Güç: 7.5 |
-| Temas hasarı | 25 |
 | Silah | Top (Cannon) |
 | Ateş hasarı | 15 |
 | Ateş hızı | 6 sn |
@@ -72,7 +104,6 @@ Gemiye yaklaşır, periyodik ateş eder. Mermileri kalkandan hasar verir.
 | HP | 50 |
 | Kalkan | 40 |
 | Kütle | 3 · Güç: 6 |
-| Temas hasarı | 20 |
 | Silah | Lazer |
 | Ateş hasarı | 6 |
 | Ateş hızı | 3 sn |
@@ -105,7 +136,6 @@ Kalkan çemberini geçer, doğrudan komponentlere saldırır.
 | HP | 10 |
 | Kalkan | — |
 | Kütle | 2 · Güç: 7 |
-| Temas hasarı | 0 |
 | Silah | Komponent patlaması (ComponentBurst) |
 | Ateş hasarı | 2 (komponent başına) |
 | Ateş hızı | 1.8 sn |
@@ -133,7 +163,6 @@ Kalkan çemberini geçer, doğrudan komponentlere saldırır.
 | HP | 35 |
 | Kalkan | — |
 | Kütle | 2 · Güç: 5 |
-| Temas hasarı | 0 |
 | Silah | Bomba (Bomb.cs) |
 | Bomba hasarı | 30 |
 | Ateş hızı | 2.5 sn |

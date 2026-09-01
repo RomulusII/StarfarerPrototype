@@ -36,6 +36,14 @@ public class BoostHUD : MonoBehaviour
         _weaponBtn = BuildButton("WeaponBoostBtn", "SİLAH\nBOOST",
             new Vector2(0.51f, 0.02f), new Vector2(0.62f, 0.10f),
             () => OnToggle(BoostMode.Weapon));
+
+        // Upgrade ekranının tek girişi Tab tuşuydu; Android'de klavye yok, yani
+        // telefonda ekran hiç açılamıyordu. Düğme boost şeridinin yanına konur —
+        // ikisi de "oyun içi eylem" bandı. Kapatma düğmesi upgrade ekranının
+        // KENDİ içindedir, çünkü bu şerit o ekran açıkken gizleniyor.
+        BuildButton("UpgradeBtn", "YÜKSELT",
+            new Vector2(0.64f, 0.02f), new Vector2(0.74f, 0.10f),
+            () => FindFirstObjectByType<UpgradeUI>()?.Toggle());
     }
 
     void Update()

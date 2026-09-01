@@ -17,7 +17,13 @@ using UnityEngine.UI;
 /// </summary>
 public class StartMenuUI : MonoBehaviour
 {
-    public enum GameMode { Campaign, FreePlay }
+    public enum GameMode { Campaign, FreePlay, Continue }
+
+    /// <summary>
+    /// Kampanyanın başlayacağı level. 100 levellik eğriyi baştan oynayarak test
+    /// etmek imkânsız olduğu için var; ulaşılmış en yüksek levelle sınırlıdır.
+    /// </summary>
+    public static int SelectedStartLevel { get; private set; } = 1;
 
     /// <summary>Menü açıkken oyun girdileri (Tab / upgrade ekranı) kilitlidir.</summary>
     public static bool IsOpen { get; private set; }
@@ -25,6 +31,8 @@ public class StartMenuUI : MonoBehaviour
     Action<GameMode> _onStart;
     GameObject       _panel;
     Button           _easyBtn, _normalBtn, _hardBtn;
+    Text             _levelText;
+    int              _startLevel = 1;
 
     static readonly Color Selected   = new Color(1f, 0.85f, 0.25f);
     static readonly Color Unselected = new Color(0.30f, 0.30f, 0.34f);
@@ -79,24 +87,35 @@ public class StartMenuUI : MonoBehaviour
 
         MakeText(_panel.transform, "DifficultyLabel", "ZORLUK", 22,
                  new Color(0.55f, 0.55f, 0.60f),
-                 new Vector2(0f, 0.55f), new Vector2(1f, 0.60f));
+                 new Vector2(0f, 0.58f), new Vector2(1f, 0.63f));
 
         BuildDifficultyButtons();
 
-        MakeButton("StartButton", "BAŞLA", 34,
+        BuildLevelSelect();
+
+        MakeButton("StartButton", "BAŞLA", 32,
                    new Color(0.13f, 0.42f, 0.22f),
-                   new Vector2(0.34f, 0.25f), new Vector2(0.66f, 0.34f),
+                   new Vector2(0.34f, 0.25f), new Vector2(0.66f, 0.33f),
                    () => Choose(GameMode.Campaign));
 
-        MakeButton("FreePlayButton", "SERBEST MOD", 24,
+        // Kayıt varsa devam etmek asıl akıştır; yeni başlamak kaydı siler
+        if (SaveSystem.HasSave)
+        {
+            MakeButton("ContinueButton", $"DEVAM ET  (Level {SaveSystem.SavedLevel})", 24,
+                       new Color(0.15f, 0.28f, 0.45f),
+                       new Vector2(0.34f, 0.17f), new Vector2(0.66f, 0.24f),
+                       () => Choose(GameMode.Continue));
+        }
+
+        MakeButton("FreePlayButton", "SERBEST MOD", 22,
                    new Color(0.28f, 0.24f, 0.12f),
-                   new Vector2(0.38f, 0.15f), new Vector2(0.62f, 0.22f),
+                   new Vector2(0.38f, 0.09f), new Vector2(0.62f, 0.15f),
                    () => Choose(GameMode.FreePlay));
 
         MakeText(_panel.transform, "FreePlayHint",
                  "Serbest mod: bölüm sistemi olmadan sürekli düşman akışı — test içindir",
-                 18, new Color(0.40f, 0.42f, 0.48f),
-                 new Vector2(0f, 0.09f), new Vector2(1f, 0.14f));
+                 17, new Color(0.40f, 0.42f, 0.48f),
+                 new Vector2(0f, 0.04f), new Vector2(1f, 0.08f));
 
         RefreshDifficultyButtons();
 
@@ -123,13 +142,58 @@ public class StartMenuUI : MonoBehaviour
         {
             var d   = defs[i];
             var btn = MakeButton($"Diff_{d.label}", d.label, 22, Unselected,
-                                 new Vector2(xMin[i], 0.45f), new Vector2(xMax[i], 0.53f),
+                                 new Vector2(xMin[i], 0.49f), new Vector2(xMax[i], 0.56f),
                                  () => SelectDifficulty(d.diff));
 
             if (d.diff == Difficulty.Easy)   _easyBtn   = btn;
             if (d.diff == Difficulty.Normal) _normalBtn = btn;
             if (d.diff == Difficulty.Hard)   _hardBtn   = btn;
         }
+    }
+
+    /// <summary>
+    /// Başlangıç leveli seçimi. Ulaşılmış en yüksek levele kadar açıktır —
+    /// istenen her levele atlamak testi kolaylaştırırdı ama ilerlemeyi
+    /// anlamsız kılardı. Bölüm başlarına atlar (1, 11, 21 …) çünkü bölüm
+    /// ortasından başlamak yeni düşman tipini tanıtan leveli atlamak demek.
+    /// </summary>
+    void BuildLevelSelect()
+    {
+        int maxLevel = SaveSystem.MaxReachedLevel;
+        if (maxLevel <= 1) return;   // henüz seçilecek bir şey yok
+
+        MakeText(_panel.transform, "LevelLabel", "BAŞLANGIÇ LEVELİ", 20,
+                 new Color(0.55f, 0.55f, 0.60f),
+                 new Vector2(0f, 0.42f), new Vector2(1f, 0.47f));
+
+        MakeButton("LevelDown", "◀", 24, Unselected,
+                   new Vector2(0.38f, 0.35f), new Vector2(0.44f, 0.41f),
+                   () => StepLevel(-GameProgress.LevelsPerChapter));
+
+        _levelText = MakeText(_panel.transform, "LevelValue", "", 26,
+                              new Color(0.85f, 0.92f, 1f),
+                              new Vector2(0.44f, 0.35f), new Vector2(0.56f, 0.41f));
+
+        MakeButton("LevelUp", "▶", 24, Unselected,
+                   new Vector2(0.56f, 0.35f), new Vector2(0.62f, 0.41f),
+                   () => StepLevel(GameProgress.LevelsPerChapter));
+
+        RefreshLevelText();
+    }
+
+    void StepLevel(int delta)
+    {
+        int per      = GameProgress.LevelsPerChapter;
+        int maxStart = ((SaveSystem.MaxReachedLevel - 1) / per) * per + 1;
+        _startLevel  = Mathf.Clamp(_startLevel + delta, 1, Mathf.Max(1, maxStart));
+        RefreshLevelText();
+    }
+
+    void RefreshLevelText()
+    {
+        if (_levelText == null) return;
+        int chapter = GameProgress.ChapterOf(_startLevel);
+        _levelText.text = $"Level {_startLevel}  ·  Bölüm {chapter}";
     }
 
     // ── Etkileşim ─────────────────────────────────────────────────────────────
@@ -156,6 +220,7 @@ public class StartMenuUI : MonoBehaviour
     void Choose(GameMode mode)
     {
         IsOpen = false;
+        SelectedStartLevel = mode == GameMode.Campaign ? _startLevel : 1;
 
         // Oyun 1x hızda başlasın
         if (SpeedController.Instance != null) SpeedController.Instance.Reset();
@@ -196,7 +261,7 @@ public class StartMenuUI : MonoBehaviour
         return btn;
     }
 
-    static void MakeText(Transform parent, string objName, string content,
+    static Text MakeText(Transform parent, string objName, string content,
                          int fontSize, Color color, Vector2 anchorMin, Vector2 anchorMax)
     {
         var go = new GameObject(objName);
@@ -215,5 +280,7 @@ public class StartMenuUI : MonoBehaviour
         r.anchorMax = anchorMax;
         r.offsetMin = Vector2.zero;
         r.offsetMax = Vector2.zero;
+
+        return txt;
     }
 }

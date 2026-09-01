@@ -1,4 +1,15 @@
-using UnityEngine;
+﻿using UnityEngine;
+
+/// <summary>
+/// Enkazın nereden koptuğu. Kaynak tipinden (ham madde / kristal) BAĞIMSIZ
+/// bir eksen: köken ŞEKLİ, kaynak tipi RENGİ belirler. Bir gemi hem metal hem
+/// kristal enkaz bırakabilir ve ikisi de gemi parçasına benzemelidir.
+/// </summary>
+public enum DebrisOrigin
+{
+    Ship,   // gemi parçası — çizgiler, plakalar, kirişler
+    Rock,   // kaya parçası — yalnızca şekilsiz silik lekeler
+}
 
 /// <summary>
 /// Düşman gemisi veya asteroit parçalandığında geride kalan enkaz.
@@ -9,7 +20,8 @@ using UnityEngine;
 ///     Patlama itmesi hızla söner ama enkaz durmaz — yavaşça sola kayar ve
 ///     vaktinde toplanmazsa sahneden çıkar. Tamamen dursaydı ekranın sağında
 ///     kalan enkaz toplayıcının menzili dışında sonsuza dek asılı kalırdı.
-///   - Kaynak tipine göre renklenir: ham madde kahverengi, kristal mavimsi gri.
+///   - Kaynak tipine göre renklenir: ham madde kahverengi, kristal parlak camgöbeği.
+///     Kristal daha nadir düştüğü için daha da iri çizilir.
 ///   - İki şekilde kaybolur: soldan çıkarak (asıl yol) veya ömrü dolarak (emniyet).
 ///     Görsel uyarı hangisi önce gelecekse ona göre işler — enkaz kaybolmasına
 ///     yaklaşırken solar, son saniyelerde yanıp söner.
@@ -18,10 +30,12 @@ public class Debris : MonoBehaviour
 {
     public ResourceType resourceType   = ResourceType.RawMaterial;
     public float        resourceAmount = 10f;
+    public DebrisOrigin origin         = DebrisOrigin.Ship;
 
     Vector2        _scatter;   // patlama itmesi — sönümlenir
     float          _life;
     SpriteRenderer _sr;
+    int            _variant;  // kökenin hangi görseli — doğarken seçilir
 
     const float LifeTime   = 180f;  // toplanmazsa kaybolma süresi
     const float FadeStart  = 25f;   // kaybolmaya bu kadar kala solmaya başlar
@@ -32,20 +46,58 @@ public class Debris : MonoBehaviour
     const float DriftSpeed = 0.3f;  // sabit sola kayma (birim/sn) — asla durmaz
     const float DespawnX   = -17f;  // soldan çıkınca yok olur
 
+    /// <summary>
+    /// Skin sprite'ı tek boyutta üretilir (ham madde ölçüsü). Kristalin daha
+    /// iri çizilmesi prosedürel yolda PxW/PxH farkından geliyordu; skin yolunda
+    /// ölçekten gelmek zorunda. Uniform tutulur — proje kuralı.
+    /// </summary>
+    const float CrystalScale = 1.35f;
+
     static readonly Color MetalColor   = new Color(0.55f, 0.45f, 0.30f);
-    static readonly Color CrystalColor = new Color(0.52f, 0.70f, 0.85f);
+
+    // Kristal PARLAK camgöbeği, mavimsi gri değil. Eski ton (0.52, 0.70, 0.85)
+    // ekranda ~7 pikselken kahverengi metalden ayırt edilemiyordu; oyuncu kristal
+    // düştüğünü göremiyordu. Skin'lerdeki sensör lensiyle aynı renk dili — oyunda
+    // camgöbeği "enerji" demek.
+    static readonly Color CrystalColor = new Color(0.35f, 0.88f, 1.00f);
+
+    // Kristal daha nadir düşer, o yüzden daha iri çizilir — kaçırılmamalı.
+    //
+    // Ölçüler %50 büyütüldü (12x10 -> 18x15): 0.12 birim ekranda ~9 piksel,
+    // yani enkazın silueti okunmadan toplanıp gidiyordu. Skin tarafındaki
+    // DebrisScale ile aynı oran — iki yol aynı boyu vermeli.
+    int PxW => resourceType == ResourceType.EnergyCrystal ? 24 : 18;
+    int PxH => resourceType == ResourceType.EnergyCrystal ? 21 : 15;
 
     public bool IsEmpty => resourceAmount <= 0f;
 
     /// <summary>Toplam hız — CollectorShip toplarken enkazla birlikte sürüklenir.</summary>
     public Vector2 Velocity => _scatter + Vector2.left * DriftSpeed;
 
-    public void Init(Vector2 velocity, float amount, ResourceType type = ResourceType.RawMaterial)
+    /// <summary>Kökene ve doğarken seçilen varyanta göre skin anahtarı.</summary>
+    string SkinKey => SkinId.ForDebris(origin, _variant);
+
+    public void Init(Vector2 velocity, float amount,
+                     ResourceType type   = ResourceType.RawMaterial,
+                     DebrisOrigin source = DebrisOrigin.Ship)
     {
         _scatter       = velocity;
         resourceAmount = amount;
         resourceType   = type;
-        ApplyTint(1f);
+        origin         = source;
+
+        // Gelirin KAYNAĞI. resource/toplandi ile farkı, toplayıcıların
+        // yetişemediği (soldan çıkan veya ömrü dolan) kaynağı verir.
+        BalanceLog.Event("resource")
+                  .Str("tip",    type.ToString())
+                  .Str("olay",   "dustu")
+                  .Str("koken",  source.ToString())
+                  .Num("miktar", amount)
+                  .End();
+        _variant       = Random.Range(0, SkinId.DebrisVariantCount(source));
+
+        // Köken ve resourceType Awake'den SONRA belli olur — görsel burada kesinleşir
+        RefreshVisual();
     }
 
     void Awake()
@@ -104,6 +156,10 @@ public class Debris : MonoBehaviour
         if (_sr == null) return;
         Color c = resourceType == ResourceType.EnergyCrystal ? CrystalColor : MetalColor;
         c.a     = alpha;
+        // Enkaz sprite'ları GRİ TONLAMALIDIR — rengi kaynak tipi verir.
+        // SkinLibrary.Tint KULLANILMAZ: o, skin varken beyaza düşürür ve
+        // metal/kristal ayrımını silerdi. Şekil kökenden, renk kaynaktan gelir;
+        // iki eksen birbirine karışmamalı.
         _sr.color = c;
     }
 
@@ -119,16 +175,25 @@ public class Debris : MonoBehaviour
 
     void BuildVisual()
     {
-        // Doku beyaz; renk sr.color ile verilir — tip rengi ve solma tek yerden yönetilir
-        var tex = new Texture2D(12, 10);
-        var px  = new Color[12 * 10];
-        for (int i = 0; i < px.Length; i++) px[i] = Color.white;
-        tex.SetPixels(px);
-        tex.Apply();
-
+        // Doku beyaz/gri; renk sr.color ile verilir — tip rengi ve solma tek
+        // yerden yönetilir. Skin varken de öyle: enkaz sprite'ları gri tonlamalı.
         _sr = gameObject.AddComponent<SpriteRenderer>();
-        _sr.sprite       = Sprite.Create(tex, new Rect(0, 0, 12, 10), new Vector2(0.5f, 0.5f), 100f);
         _sr.sortingOrder = -1;
+        RefreshVisual();
+    }
+
+    /// <summary>Sprite'ı, ölçeği ve rengi mevcut köken/varyant/kaynak tipinden kurar.</summary>
+    void RefreshVisual()
+    {
+        if (_sr == null) return;
+
+        string key = SkinKey;
+        _sr.sprite = SkinLibrary.Get(key, PxW, PxH, Color.white);
+
+        bool crystalSkin = SkinLibrary.Has(key) &&
+                           resourceType == ResourceType.EnergyCrystal;
+        transform.localScale = Vector3.one * (crystalSkin ? CrystalScale : 1f);
+
         ApplyTint(1f);
     }
 }

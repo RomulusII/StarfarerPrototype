@@ -15,6 +15,7 @@ public class EnergyBar : MonoBehaviour
     Text          _energyText;
     Text          _metalText;
     Text          _crystalText;
+    Text          _warningText;
 
     void Awake()
     {
@@ -42,6 +43,37 @@ public class EnergyBar : MonoBehaviour
         (_crystalFill, _crystalText) = MakeBar("Crystal", 0.668f, 1.0f,
             new Color(0.18f, 0.22f, 0.28f, 0.88f),
             new Color(0.28f, 0.58f, 0.80f, 1.00f));
+
+        _warningText = MakeWarningLine();
+    }
+
+    /// <summary>
+    /// Barların hemen ALTINDAKİ uyarı satırı. Barın kendisi doluluğu zaten
+    /// gösteriyor ama oyuncu savaş sırasında üç barı da okumuyor: enerjinin
+    /// bittiğini atış yapamayınca, deponun dolduğunu ise HİÇ fark etmiyordu —
+    /// tavana çarpan kaynak sessizce yanıyor. Uyarı barların yanına değil
+    /// altına konur; üstteki şerit sayının yeri, bu satır olayın yeri.
+    /// </summary>
+    Text MakeWarningLine()
+    {
+        var go = new GameObject("Warnings");
+        go.transform.SetParent(transform, false);
+
+        var txt       = go.AddComponent<Text>();
+        txt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        txt.fontSize  = 26;
+        txt.fontStyle = FontStyle.Bold;
+        txt.alignment = TextAnchor.MiddleCenter;
+        txt.raycastTarget = false;   // oynanışa dokunmaz
+        txt.text      = "";
+
+        var tr = go.GetComponent<RectTransform>();
+        tr.anchorMin        = new Vector2(0f, 1f);
+        tr.anchorMax        = new Vector2(1f, 1f);
+        tr.pivot            = new Vector2(0.5f, 1f);
+        tr.anchoredPosition = new Vector2(0f, -BarH - 6f);
+        tr.sizeDelta        = new Vector2(0f, 34f);
+        return txt;
     }
 
     (RectTransform fill, Text label) MakeBar(string id, float xMin, float xMax, Color bgCol, Color fillCol)
@@ -106,6 +138,93 @@ public class EnergyBar : MonoBehaviour
             SetBar(_metalFill,   _metalText,   ResourceInventory.Instance.metal,   ResourceInventory.Instance.maxMetal,   "METAL");
             SetBar(_crystalFill, _crystalText, ResourceInventory.Instance.crystal, ResourceInventory.Instance.maxCrystal, "KRİSTAL");
         }
+
+        UpdateWarnings(eCur, eMax);
+    }
+
+    // ── Uyarılar ──────────────────────────────────────────────────────────────
+
+    /// <summary>Enerjinin "az" sayıldığı oran.</summary>
+    const float LowEnergyRatio = 0.10f;
+
+    static readonly Color WarnColor     = new Color(1.00f, 0.75f, 0.20f, 1f); // sarı: yaklaşıyor
+    static readonly Color CriticalColor = new Color(1.00f, 0.32f, 0.24f, 1f); // kırmızı: oldu
+
+    /// <summary>
+    /// İki kademe: YAKLAŞIYOR (sarı, sabit) ve OLDU (kırmızı, yanıp söner).
+    /// Ayrım anlamlıdır — birincisi "önlem al", ikincisi "şu an kaybediyorsun".
+    /// Aynı anda birden fazla uyarı olabilir; en yüksek kademe rengi belirler.
+    ///
+    /// Yanıp sönme <c>unscaledTime</c> ile sürer: upgrade ekranı açıkken oyun
+    /// duruyor ama uyarı orada da okunmalı — zaten oyuncunun sorunu çözmek için
+    /// gideceği yer o ekran.
+    /// </summary>
+    // Uyarılar bir BİT MASKESİNE indirilir ve metin yalnızca maske değiştiğinde
+    // yeniden kurulur. Her karede string üretmek HUD'un tamamı için kare başına
+    // çöp demekti; maske ayrıca "hangi kademe" sorusunu tek karşılaştırmaya
+    // indiriyor (sprite önbelleğiyle aynı gerekçe).
+    const int WNoEnergy    = 1 << 0;
+    const int WLowEnergy   = 1 << 1;
+    const int WMetalFull   = 1 << 2;
+    const int WMetalNear   = 1 << 3;
+    const int WCrystalFull = 1 << 4;
+    const int WCrystalNear = 1 << 5;
+
+    const int CriticalMask = WNoEnergy | WMetalFull | WCrystalFull;
+
+    int _warnMask = -1;   // -1 = henüz hiç kurulmadı
+
+    void UpdateWarnings(float energyCur, float energyMax)
+    {
+        int mask = 0;
+
+        if (EnergyBus.Instance != null)
+        {
+            if (energyCur <= 0.01f)                                            mask |= WNoEnergy;
+            else if (energyMax > 0f && energyCur / energyMax < LowEnergyRatio) mask |= WLowEnergy;
+        }
+
+        var inv = ResourceInventory.Instance;
+        if (inv != null)
+        {
+            if (inv.IsFull(ResourceType.RawMaterial))              mask |= WMetalFull;
+            else if (inv.IsNearlyFull(ResourceType.RawMaterial))   mask |= WMetalNear;
+
+            if (inv.IsFull(ResourceType.EnergyCrystal))            mask |= WCrystalFull;
+            else if (inv.IsNearlyFull(ResourceType.EnergyCrystal)) mask |= WCrystalNear;
+        }
+
+        if (mask != _warnMask)
+        {
+            _warnMask         = mask;
+            _warningText.text = BuildWarningText(mask);
+        }
+
+        if (mask == 0) return;
+
+        var c = (mask & CriticalMask) != 0 ? CriticalColor : WarnColor;
+        if ((mask & CriticalMask) != 0)
+            // 2.2 Hz nabız — dikkat çeker ama tamamen kaybolmaz (taban 0.45)
+            c.a = 0.45f + 0.55f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * Mathf.PI * 2.2f));
+
+        _warningText.color = c;
+    }
+
+    static string BuildWarningText(int mask)
+    {
+        if (mask == 0) return "";
+
+        var sb = new System.Text.StringBuilder();
+        void Add(string s) { if (sb.Length > 0) sb.Append("    "); sb.Append(s); }
+
+        if ((mask & WNoEnergy)    != 0) Add("NO ENERGY");
+        if ((mask & WLowEnergy)   != 0) Add("LOW ENERGY");
+        if ((mask & WMetalFull)   != 0) Add("METAL FULL");
+        if ((mask & WMetalNear)   != 0) Add("METAL NEARLY FULL");
+        if ((mask & WCrystalFull) != 0) Add("CRYSTAL FULL");
+        if ((mask & WCrystalNear) != 0) Add("CRYSTAL NEARLY FULL");
+
+        return sb.ToString();
     }
 
     void SetBar(RectTransform fill, Text lbl, float cur, float max, string name)

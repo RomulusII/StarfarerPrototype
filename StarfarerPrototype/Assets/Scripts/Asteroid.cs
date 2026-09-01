@@ -35,10 +35,41 @@ public class Asteroid : MonoBehaviour, ITurretTarget
     const float SmallDmg = 8f,  MediumDmg = 18f, LargeDmg = 30f;
 
     // Small parçalanınca düşen kaynak ve bunun kristal çıkma olasılığı.
-    // Hedef: tamamen parçalanan bir BÜYÜK asteroit ≈ bir kalkanlı düşman kadar
-    // kristal versin (~4 kristal). Kristal ekonomisinin ayar noktası burasıdır.
-    const float SmallResourceAmount = 5f;
-    const float CrystalChance       = 0.12f;
+    //
+    // Miktar artık SABİT DEĞİL — levelle ölçeklenir. Eskiden sabit 5'ti ve
+    // asteroit geliri süre bazlı olduğu için düşman gelirinin 3 katına çıkıyordu:
+    // oyuncu bölümü uzatarak sınırsız farm edebiliyordu. Artık asteroit toplam
+    // gelirin ~%18'i olacak şekilde levelden türer ve düşman geliriyle birlikte
+    // büyür — ilerlemeden zenginleşmek mümkün değil.
+    //
+    // ~6.25 küçük parça / büyük asteroit varsayımıyla:
+    //   parça başına = levelin asteroit bütçesi / (dakikadaki büyük × 6.25)
+    const float SmallsPerLarge   = 6.25f;
+    const float LargesPerLevel   = 14f;   // ~3.5 dakikalık level, ~4/dk
+    const float CrystalChance    = 0.12f;
+
+    // Kristal parçası KENDİ tabanını taşır, metalinkini değil.
+    //
+    // İkisi aynı miktarı paylaşıyordu ama bu hiç gerekçelendirilmemişti — tek
+    // bir kod yolunu paylaşmalarından düşmüştü. Sonuç: level 1'de parça başına
+    // 0.5 kaynak × %12 düşme olasılığı, yani tam parçalanmış bir büyük asteroit
+    // 0.37 kristal veriyordu. Sayaç kıpırdamıyordu; oyuncu için asteroitler
+    // kristal DÜŞÜRMÜYOR demekti.
+    //
+    // Nadir düşen şey İRİ düşmeli: %12'lik bir olay, gerçekleştiğinde görünür
+    // olmalı. 3 birimlik taban, tam parçalanmış büyük asteroidi ~2.3 kristale
+    // çıkarır — dokümante edilen ~3.7 hedefinin mertebesinde.
+    const float CrystalMinAmount = 3f;
+
+    static float SmallResourceAmount
+    {
+        get
+        {
+            float levelBudget = BalanceConfig.Instance
+                .AsteroidYieldPerLevel(GameProgress.CurrentLevel);
+            return Mathf.Max(0.5f, levelBudget / (LargesPerLevel * SmallsPerLarge));
+        }
+    }
 
     // Bölünme
     const int   MinFragments    = 2;
@@ -52,7 +83,9 @@ public class Asteroid : MonoBehaviour, ITurretTarget
     const float KineticMultiplier = 2.0f;
     const float LaserMultiplier   = 0.25f;
 
-    const float DespawnX = -17f;
+    // Sabit -17 idi; kadrajın sol kenarı zoom-out'ta -18'e kadar açılıyor,
+    // yani asteroit ekranın İÇİNDE yok oluyordu.
+    static float DespawnX => ViewBounds.DespawnX;
 
     static readonly Color RockColor = new Color(0.45f, 0.40f, 0.34f);
 
@@ -130,7 +163,10 @@ public class Asteroid : MonoBehaviour, ITurretTarget
     public float ThreatValue => ImpactDamageFor(size) / 20f;
 
     /// <summary>Küçük parçalar hızlı ve gemiye yakın olabilir — PD onları da alsın.</summary>
-    public bool IsPointDefencePriority => size == Size.Small;
+    public PointDefenceClass PdClass =>
+        size == Size.Small ? PointDefenceClass.Small : PointDefenceClass.None;
+
+    public float ArmorValue => 0f;   // kaya zırhsız; direnç sistemi zaten var
 
     public float RawDamageToKill(WeaponType weaponType)
         => hp / Mathf.Max(ResistanceFor(weaponType), 0.01f);
@@ -182,15 +218,19 @@ public class Asteroid : MonoBehaviour, ITurretTarget
 
     void DropDebris()
     {
-        var type = Random.value < CrystalChance
-            ? ResourceType.EnergyCrystal
-            : ResourceType.RawMaterial;
+        bool crystal = Random.value < CrystalChance;
+        var  type    = crystal ? ResourceType.EnergyCrystal : ResourceType.RawMaterial;
+        float amount = crystal
+            ? Mathf.Max(CrystalMinAmount, SmallResourceAmount)
+            : SmallResourceAmount;
 
-        var go = new GameObject(type == ResourceType.EnergyCrystal ? "Debris_Crystal" : "Debris");
+        var go = new GameObject(crystal ? "Debris_Crystal" : "Debris");
         go.transform.position = transform.position;
+        // Köken Rock: kaya enkazı yalnızca şekilsiz silik lekelerden seçilir —
+        // gemi parçasına benzeyen çizgiler ve plakalar yalnızca gemilerden kopar.
         go.AddComponent<Debris>().Init(
             Velocity * 0.4f + Random.insideUnitCircle.normalized * Random.Range(0.15f, 0.4f),
-            SmallResourceAmount, type);
+            amount, type, DebrisOrigin.Rock);
     }
 
     // ── Gemiye çarpma ─────────────────────────────────────────────────────────
@@ -208,7 +248,7 @@ public class Asteroid : MonoBehaviour, ITurretTarget
             if (shielded == null) return;
 
             ShieldEffect.Spawn(transform.position, shielded.transform.position);
-            HitShip(shielded);
+            HitShip(shielded, ImpactSurface.Shield);
             return;
         }
 
@@ -218,14 +258,22 @@ public class Asteroid : MonoBehaviour, ITurretTarget
         if (ship == null) ship = other.GetComponentInParent<PlayerShip>();
         if (ship == null) return;
 
-        HitShip(ship);
+        HitShip(ship, ImpactSurface.Hull);
     }
 
-    /// <summary>Çarpma: hasar verir ve dağılır — bölünmez, kaynak bırakmaz.</summary>
-    void HitShip(PlayerShip ship)
+    /// <summary>
+    /// Çarpma: hasar verir ve dağılır — bölünmez, kaynak bırakmaz.
+    /// Kaya enkazının yanına bir de çarpma patlaması gelir; asteroit eskiden
+    /// sessizce hasar veriyordu ve oyuncu vurulduğunu ancak bardan anlıyordu.
+    /// </summary>
+    void HitShip(PlayerShip ship, ImpactSurface surface)
     {
         _dead = true;
-        ship.TakeDamage(ImpactDamageFor(size));
+        float dmg = ImpactDamageFor(size);
+        ship.TakeDamage(dmg);
+
+        HitEffect.SpawnImpact(transform.position, Velocity.normalized,
+                              ship.transform.position, surface, dmg);
         DeathEffect.Spawn(transform.position, RockColor, PxFor(size), PxFor(size));
         Destroy(gameObject);
     }
@@ -266,7 +314,21 @@ public class Asteroid : MonoBehaviour, ITurretTarget
 
     void BuildVisual()
     {
-        int px  = PxFor(size);
+        int px = PxFor(size);
+
+        // Skin varsa onu kullan. Yoksa her asteroide özgü rastgele kaya üretilir —
+        // bu üretim ÖNBELLEĞE ALINMAZ, çeşitlilik kasıtlıdır.
+        if (SkinLibrary.Has(SkinId.Asteroid))
+        {
+            var skinBody = new GameObject("Body");
+            skinBody.transform.SetParent(transform, false);
+            var skinSR = skinBody.AddComponent<SpriteRenderer>();
+            skinSR.sprite       = SkinLibrary.Get(SkinId.Asteroid, px, px, RockColor);
+            skinSR.sortingOrder = 1;
+            SkinLibrary.FitToSize(skinBody.transform, skinSR.sprite, px, px);
+            return;
+        }
+
         var tex = new Texture2D(px, px);
         tex.filterMode = FilterMode.Point;
         var buf = new Color[px * px];

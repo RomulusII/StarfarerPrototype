@@ -14,11 +14,14 @@ public class Bomb : MonoBehaviour, ITurretTarget
 
     static readonly Color BombColor = new Color(1f, 0.35f, 0f);
 
+    // Çerçeve bombanın kendi renginden AÇIK: bombanın üstünde okunması gerek,
+    // ona karışması değil.
+    static readonly Color MarkerColor = new Color(1f, 0.85f, 0.45f);
+
     void Awake()
     {
         var sr = gameObject.AddComponent<SpriteRenderer>();
-        sr.sprite       = Sprite.Create(MakeTex(14, 14, BombColor),
-                              new Rect(0, 0, 14, 14), new Vector2(0.5f, 0.5f), 100f);
+        sr.sprite       = SkinLibrary.Get(SkinId.Bomb, 14, 14, BombColor);
         sr.sortingOrder = 3;
 
         var col    = gameObject.AddComponent<CircleCollider2D>();
@@ -28,6 +31,11 @@ public class Bomb : MonoBehaviour, ITurretTarget
         var rb = gameObject.AddComponent<Rigidbody2D>();
         rb.bodyType     = RigidbodyType2D.Kinematic;
         rb.gravityScale = 0f;
+
+        // Bomba oyundaki TEK vurulabilir mermi. Düşman mermisiyle neredeyse aynı
+        // renkte (ikisi de sıcak turuncu) olduğu için oyuncu hangisinin
+        // durdurulabileceğini göremiyordu; yanıp sönen çerçeve o farkı söyler.
+        ShootableMarker.Attach(transform, 0.30f, MarkerColor, sortingOrder: 2);
 
         Destroy(gameObject, 8f);
     }
@@ -42,9 +50,11 @@ public class Bomb : MonoBehaviour, ITurretTarget
     public Vector2   TargetVelocity         => Velocity;
     public bool      IsValidTarget          => this != null && isActiveAndEnabled;
     public float     ThreatValue            => Mathf.Max(1f, damage / 2f);
-    public bool      IsPointDefencePriority => true;
+    public PointDefenceClass PdClass => PointDefenceClass.Munition;
 
     public float RawDamageToKill(WeaponType weaponType) => 1f;
+
+    public float ArmorValue => 0f;   // bomba zırhsız — her atış tam geçer
 
     public void SetDirection(Vector2 dir) => _dir = dir.normalized;
 
@@ -64,22 +74,31 @@ public class Bomb : MonoBehaviour, ITurretTarget
     {
         if (other.CompareTag("Player"))
         {
-            other.GetComponent<PlayerShip>()?.TakeDamage(damage);
+            var ship = other.GetComponent<PlayerShip>();
+            if (ship == null) return;
+
+            // Bombanın kendi kalkan küresi dalı yok — kalkanın içinden geçip
+            // gövdede patlar, ama hasarı yine kalkandan geçer (TakeDamage).
+            // Efekt de bunu izlemeli: kalkan ayaktaysa kalkan patlaması.
+            bool onShield = ShieldGeneratorComponent.AnyShieldActive();
+            if (onShield)
+                ShieldEffect.Spawn(transform.position, ship.transform.position);
+
+            ship.TakeDamage(damage);
+            HitEffect.SpawnImpact(transform.position, _dir, ship.transform.position,
+                                  onShield ? ImpactSurface.Shield : ImpactSurface.Hull,
+                                  damage);
             Destroy(gameObject);
             return;
         }
 
         var collector = other.GetComponent<CollectorShip>();
-        if (collector != null) { collector.TakeDamage(damage); Destroy(gameObject); }
-    }
-
-    static Texture2D MakeTex(int w, int h, Color c)
-    {
-        var tex = new Texture2D(w, h);
-        var px  = new Color[w * h];
-        for (int i = 0; i < px.Length; i++) px[i] = c;
-        tex.SetPixels(px);
-        tex.Apply();
-        return tex;
+        if (collector != null)
+        {
+            collector.TakeDamage(damage);
+            HitEffect.SpawnImpact(transform.position, _dir, other.transform.position,
+                                  ImpactSurface.Hull, damage);
+            Destroy(gameObject);
+        }
     }
 }

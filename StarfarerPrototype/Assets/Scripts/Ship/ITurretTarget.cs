@@ -1,6 +1,24 @@
 using UnityEngine;
 
 /// <summary>
+/// Point Defence'in bir hedefe nasıl baktığı.
+///
+/// Tek bir bool yetmiyordu: PD'nin "önce mühimmat, o yoksa küçük gemi, büyük
+/// gövdeye ASLA" kuralı üç durumlu ve bool yalnızca ikisini anlatabiliyordu.
+/// </summary>
+public enum PointDefenceClass
+{
+    /// <summary>PD ateş etmez. Büyük ve zırhlı gövdeler — DPS'i orada boşa gider.</summary>
+    None,
+
+    /// <summary>Küçük, hafif gemiler ve asteroit parçaları. Mühimmat yoksa hedeftir.</summary>
+    Small,
+
+    /// <summary>Bomba ve füze. HER ZAMAN önceliklidir; kilit histerezisi bile geciktirmez.</summary>
+    Munition,
+}
+
+/// <summary>
 /// Turretlerin nişan alabileceği her şey. EnemyBot, BossShip, Asteroid ve Bomb
 /// bu arayüzü uygular; TurretTargeting yalnızca bunun üzerinden çalışır.
 ///
@@ -31,7 +49,15 @@ public interface ITurretTarget
     float ThreatValue { get; }
 
     /// <summary>
-    /// Point Defence'in öncelikli hedefi mi? (bomba, kalkan içine girmiş küçük gemiler)
+    /// Point Defence bu hedefe nasıl bakar? Bkz. <see cref="PointDefenceClass"/>.
     /// </summary>
-    bool IsPointDefencePriority { get; }
+    PointDefenceClass PdClass { get; }
+
+    /// <summary>
+    /// Atış başına sabit hasar düşüşü. Zırhın etkisi turretin ATIŞ hasarına
+    /// bağlıdır: aynı zırh, güçlü tek atışı biraz, zayıf çok atışı tamamen
+    /// yer. Bu yüzden zırh RawDamageToKill'e gömülemez — turret kendi atış
+    /// hasarını bilerek cezayı kendisi hesaplar (bkz. TurretTargeting.Score).
+    /// </summary>
+    float ArmorValue { get; }
 }

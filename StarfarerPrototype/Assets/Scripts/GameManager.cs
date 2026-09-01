@@ -22,6 +22,10 @@ public class GameManager : MonoBehaviour
 
     void Awake()
     {
+        // Kadraj önbelleği statiktir; sahne yeniden yüklenince (ölüm → restart)
+        // hayatta kalır ve eski en-boy oranıyla hesaplanmış kalırdı.
+        ViewBounds.Invalidate();
+
         if (FindFirstObjectByType<EnergyBar>() == null)
         {
             var go = new GameObject("EnergyBarHUD");
@@ -57,6 +61,7 @@ public class GameManager : MonoBehaviour
         BuildUpgradeUI();
         BuildBoostHUD();
         BuildSpeedHUD();
+        BuildEnemyInfoHUD();
 
         // Oyun açılış menüsünden başlar; seçim yapılana kadar bölüm sistemi
         // kurulmaz, dolayısıyla arkada düşman spawn olmaz.
@@ -128,6 +133,26 @@ public class GameManager : MonoBehaviour
             return;
         }
 
+        // Kaydı uygulamak ShipLoadout.Start()'tan SONRA olmalı — yoksa
+        // başlangıç donanımı kaydın üstüne kurulur. Bir kare beklemek yeterli.
+        StartCoroutine(BeginCampaign(mode));
+    }
+
+    System.Collections.IEnumerator BeginCampaign(StartMenuUI.GameMode mode)
+    {
+        yield return null;   // ShipLoadout.Start() bu karede çalışır
+
+        if (mode == StartMenuUI.GameMode.Continue)
+        {
+            if (!SaveSystem.Apply(SaveSystem.Load()))
+                GameProgress.Reset();   // kayıt bozuksa baştan başla
+        }
+        else
+        {
+            // Yeni oyun: seçilen levelden başla, eski kaydın üstüne yazılacak
+            GameProgress.CurrentLevel = StartMenuUI.SelectedStartLevel;
+        }
+
         BuildChapterSystem();
     }
 
@@ -149,7 +174,7 @@ public class GameManager : MonoBehaviour
     /// <summary>
     /// Serbest mod: bölüm sistemi kurulmaz, EnemySpawner'ın test modu açılır.
     /// Bölüm çarpanı olmadığı için düşmanlar ham (ölçeklenmemiş) gelir;
-    /// belirli bir bölümün zorluğunu test etmek için spawner'ın debugChapter
+    /// belirli bir levelin zorluğunu test etmek için spawner'ın debugLevel
     /// alanı Inspector'dan doldurulabilir.
     /// </summary>
     void BeginFreePlay()
@@ -162,7 +187,14 @@ public class GameManager : MonoBehaviour
         }
 
         spawner.debugFreeSpawn = true;
+        BalanceLog.Begin("serbest");
+        BalanceUploader.EnsureExists();
     }
+
+    // Kayıt tamponu diske ancak kapanışta boşalır. Editörde Play'den çıkmak
+    // OnApplicationQuit tetikler; bu olmadan son satırlar kaybolurdu.
+    void OnApplicationQuit() => BalanceLog.Close();
+    void OnDisable()         => BalanceLog.Close();
 
     static void EnsureEventSystem()
     {
@@ -221,6 +253,12 @@ public class GameManager : MonoBehaviour
     {
         var go = new GameObject("BoostHUD");
         go.AddComponent<BoostHUD>();
+    }
+
+    void BuildEnemyInfoHUD()
+    {
+        var go = new GameObject("EnemyInfoHUD");
+        go.AddComponent<EnemyInfoHUD>();
     }
 
     void BuildGameOverUI()

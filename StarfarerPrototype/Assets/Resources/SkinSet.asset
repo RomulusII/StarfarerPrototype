@@ -1,0 +1,517 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c30d90c098fbbc740b33327ff4563493, type: 3}
+  m_Name: SkinSet
+  m_EditorClassIdentifier: Assembly-CSharp::SkinSet
+  enabled: 1
+  showHitboxOverlay: 0
+  entries:
+  - id: enemy.swarm
+    sprite: {fileID: 21300000, guid: 70ee47fe72dae253d237c74a381b0950, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 23
+      y: 8
+      width: 188
+      height: 64
+    hitboxScale: 1
+  - id: enemy.armored
+    sprite: {fileID: 21300000, guid: 59affe891e5920640a5d89b7b4ce380a, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 45
+      y: 42
+      width: 252
+      height: 136
+    hitboxScale: 1
+  - id: enemy.shield
+    sprite: {fileID: 21300000, guid: a976469318585194b9c6f947b624730c, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 41
+      y: 27
+      width: 221
+      height: 146
+    hitboxScale: 1
+  - id: enemy.barrier
+    sprite: {fileID: 21300000, guid: dc965ad6c5f38a8267d28a467d311803, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 33
+      y: 72
+      width: 134
+      height: 104
+    hitboxScale: 0.9
+  - id: enemy.bomber
+    sprite: {fileID: 21300000, guid: 875f0aaeb2e8ee94a9a63e29190c064d, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 20
+      y: 3
+      width: 137
+      height: 42
+    hitboxScale: 1
+  - id: enemy.bombrunner
+    sprite: {fileID: 21300000, guid: a3e542e78cd2c0947b18abf36ded084e, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 36
+      y: 19
+      width: 186
+      height: 142
+    hitboxScale: 1
+  - id: enemy.interceptor
+    sprite: {fileID: 21300000, guid: b765254521220e34683a23cc434e3f6d, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 16
+      y: 8
+      width: 165
+      height: 56
+    hitboxScale: 1
+  - id: enemy.artillery
+    sprite: {fileID: 21300000, guid: fd71c5e1debb90a4492ec41477eb5651, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 33
+      y: 17
+      width: 277
+      height: 150
+    hitboxScale: 1
+  - id: enemy.jammer
+    sprite: {fileID: 21300000, guid: 1324ba759a25c0f43ba29edfc9d74d02, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 17
+      y: 34
+      width: 214
+      height: 140
+    hitboxScale: 1
+  - id: enemy.phantom
+    sprite: {fileID: 21300000, guid: db2181b551ad7dd43b1b8b87b765b50c, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 20
+      y: 29
+      width: 187
+      height: 62
+    hitboxScale: 1
+  - id: enemy.regenerator
+    sprite: {fileID: 21300000, guid: fcc3fd0686ba97948a9d32381b895345, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 36
+      y: 34
+      width: 255
+      height: 164
+    hitboxScale: 1
+  - id: enemy.leech
+    sprite: {fileID: 21300000, guid: ca639ec3a1324db439b9413e9591809a, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 20
+      y: 13
+      width: 125
+      height: 62
+    hitboxScale: 1
+  - id: enemy.splitter
+    sprite: {fileID: 21300000, guid: b504bca8ebdf7b947b18df17583326cb, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 38
+      y: 33
+      width: 198
+      height: 150
+    hitboxScale: 1
+  - id: enemy.juggernaut
+    sprite: {fileID: 21300000, guid: 59442c98838ec784c90f53c25d3fc43c, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 57
+      y: 45
+      width: 351
+      height: 198
+    hitboxScale: 1
+  - id: player.body
+    sprite: {fileID: 21300000, guid: 7e66a84fbaaf63c47bbf55c71b87c460, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 50
+      y: 79
+      width: 1430
+      height: 802
+    hitboxScale: 0.9
+  - id: player.barrel
+    sprite: {fileID: 21300000, guid: 865cdc03b6f089b4299edfa8f020d6e1, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 18
+      y: 4
+      width: 44
+      height: 312
+    hitboxScale: 1
+  - id: component.generator
+    sprite: {fileID: 21300000, guid: 1f0d85734f96f084c855d758511d2211, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 7
+      y: 7
+      width: 114
+      height: 114
+    hitboxScale: 1
+  - id: component.shieldgenerator
+    sprite: {fileID: 21300000, guid: 2fc79b7d6c01e0f41bcd70302ba2278d, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 7
+      y: 7
+      width: 114
+      height: 114
+    hitboxScale: 1
+  - id: component.repairunit
+    sprite: {fileID: 21300000, guid: 5ffddad56ba407b449d277b99225ef50, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 7
+      y: 7
+      width: 114
+      height: 114
+    hitboxScale: 1
+  - id: component.storage
+    sprite: {fileID: 21300000, guid: 97612e17538d4334d86d4127c077fa0a, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 7
+      y: 7
+      width: 114
+      height: 114
+    hitboxScale: 1
+  - id: component.capacitor
+    sprite: {fileID: 21300000, guid: ae63bcdc91624c24d80e0a9901f5064f, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 6
+      y: 6
+      width: 116
+      height: 116
+    hitboxScale: 1
+  - id: enemy.bomb
+    sprite: {fileID: 21300000, guid: af0c6cf058427ca01305cd307b440712, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 10
+      y: 10
+      width: 36
+      height: 36
+    hitboxScale: 1
+  - id: enemy.bullet.hull
+    sprite: {fileID: 21300000, guid: 12b8dbc2b3528770a43854ebe8103810, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 5
+      y: 5
+      width: 22
+      height: 22
+    hitboxScale: 1
+  - id: enemy.bullet.component
+    sprite: {fileID: 21300000, guid: a5120bb9d5826ad5c4e8889550d76433, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 5
+      y: 5
+      width: 22
+      height: 22
+    hitboxScale: 1
+  - id: player.bullet.kinetic
+    sprite: {fileID: 21300000, guid: 50c173a2713f23ef7e9bdfa76b77c538, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 8
+      y: 10
+      width: 24
+      height: 100
+    hitboxScale: 1
+  - id: turret.bullet
+    sprite: {fileID: 21300000, guid: edaaa03171dda1efb37c7e0d57ffba10, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 2
+      y: 4
+      width: 27
+      height: 8
+    hitboxScale: 1
+  - id: player.fighter.bullet
+    sprite: {fileID: 21300000, guid: a109282d27ee3dc9933aed83ee212044, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 2
+      y: 4
+      width: 27
+      height: 8
+    hitboxScale: 1
+  - id: turret.bullet.homingrocket
+    sprite: {fileID: 21300000, guid: 39665d1a898cefd445b5e5bc93fadc62, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 3
+      y: 5
+      width: 48
+      height: 14
+    hitboxScale: 1
+  - id: turret.base
+    sprite: {fileID: 21300000, guid: aa8bb8a1d8f437e5f45f5f5146cb85ce, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 10
+      y: 10
+      width: 100
+      height: 100
+    hitboxScale: 1
+  - id: turret.barrel
+    sprite: {fileID: 21300000, guid: 82b891bbdb99eb10bcb322504339b5d2, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 1
+      y: 5
+      width: 77
+      height: 22
+    hitboxScale: 1
+  - id: player.fighter
+    sprite: {fileID: 21300000, guid: c288a3938597e8e76785ded22b9330c5, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 9
+      y: 3
+      width: 68
+      height: 34
+    hitboxScale: 1
+  - id: player.collector
+    sprite: {fileID: 21300000, guid: 8a0b5e8b96da4cc37d82083f2a5bc16a, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 7
+      y: 10
+      width: 85
+      height: 28
+    hitboxScale: 1
+  - id: player.hangar
+    sprite: {fileID: 21300000, guid: 6d0cec2bea503ba1a9e546903993ceab, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 6
+      y: 11
+      width: 132
+      height: 74
+    hitboxScale: 1
+  - id: fx.shootable
+    sprite: {fileID: 21300000, guid: 37d7e193092591dc50f81dcc1c608c9a, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 5
+      y: 5
+      width: 110
+      height: 110
+    hitboxScale: 1
+  - id: world.debris.ship.0
+    sprite: {fileID: 21300000, guid: da5b72246df22dc7755424ae8bddf388, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 12
+      y: 13
+      width: 38
+      height: 34
+    hitboxScale: 1
+  - id: world.debris.ship.1
+    sprite: {fileID: 21300000, guid: 4d08fa2d4b56ea4a9af97e2ea910e457, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 9
+      y: 13
+      width: 53
+      height: 34
+    hitboxScale: 1
+  - id: world.debris.ship.2
+    sprite: {fileID: 21300000, guid: 1fa5f172bd466f96e8fe1a8bae31dd5d, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 15
+      y: 14
+      width: 44
+      height: 32
+    hitboxScale: 1
+  - id: world.debris.ship.3
+    sprite: {fileID: 21300000, guid: 837a67a215027ec289276307456ee15c, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 17
+      y: 14
+      width: 40
+      height: 32
+    hitboxScale: 1
+  - id: world.debris.ship.4
+    sprite: {fileID: 21300000, guid: c488c04d54baf977bba262b20013e3c4, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 11
+      y: 5
+      width: 43
+      height: 50
+    hitboxScale: 1
+  - id: world.debris.ship.5
+    sprite: {fileID: 21300000, guid: d0cf88cda3d9d82ee2ea1df59bb45928, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 13
+      y: 13
+      width: 43
+      height: 34
+    hitboxScale: 1
+  - id: world.debris.rock.0
+    sprite: {fileID: 21300000, guid: d80909c59783bce9926ba4b6a866fe2c, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 9
+      y: 10
+      width: 45
+      height: 40
+    hitboxScale: 1
+  - id: world.debris.rock.1
+    sprite: {fileID: 21300000, guid: 5f718d0421ef3434faa3c3865c5a7eed, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 13
+      y: 5
+      width: 49
+      height: 50
+    hitboxScale: 1
+  - id: world.debris.rock.2
+    sprite: {fileID: 21300000, guid: 57ceb72c12073afc7d4037530a8c794e, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 7
+      y: 8
+      width: 52
+      height: 44
+    hitboxScale: 1
+  - id: world.debris.rock.3
+    sprite: {fileID: 21300000, guid: fa9fe427122f82d882dbc457f34bedea, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 21
+      y: 6
+      width: 39
+      height: 48
+    hitboxScale: 1
+  - id: boss.body
+    sprite: {fileID: 21300000, guid: 1504a79f9d7bed88f6f68065a16ceb87, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 33
+      y: 90
+      width: 875
+      height: 316
+    hitboxScale: 1
+  - id: boss.hardpoint.cannon
+    sprite: {fileID: 21300000, guid: 47725b4fd78b6d575b6824e131fa7789, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 5
+      y: 15
+      width: 103
+      height: 50
+    hitboxScale: 1
+  - id: boss.hardpoint.laser
+    sprite: {fileID: 21300000, guid: 3b005d88a141daf2e34b62b9c61d1f9d, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 5
+      y: 13
+      width: 99
+      height: 54
+    hitboxScale: 1
+  - id: boss.hardpoint.shieldgenerator
+    sprite: {fileID: 21300000, guid: 7c6fd34b0c35c27af9ed5ccd5c6f650b, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 12
+      y: 12
+      width: 120
+      height: 120
+    hitboxScale: 1
+  - id: boss.hardpoint.dronebay
+    sprite: {fileID: 21300000, guid: 4d820615382065822b7f64669d88ba16, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 9
+      y: 10
+      width: 142
+      height: 100
+    hitboxScale: 1
+  - id: boss.hardpoint.repairbay
+    sprite: {fileID: 21300000, guid: 578c78a3d0b917b79e2f82e70f261012, type: 3}
+    colliderMode: 1
+    hitboxRect:
+      serializedVersion: 2
+      x: 7
+      y: 11
+      width: 122
+      height: 90
+    hitboxScale: 1

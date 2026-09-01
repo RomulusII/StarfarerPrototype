@@ -85,6 +85,30 @@ public class FormationTemplate : ScriptableObject
         return f;
     }
 
+    /// <summary>
+    /// Bariyer önde, filo arkasında. Bariyerin bütün anlamı arkasındakilere
+    /// siper olmasıdır — formasyonun en önünde durmazsa hiçbir şey ifade etmez.
+    /// </summary>
+    public static FormationTemplate CreateShieldWall()
+    {
+        var f = CreateInstance<FormationTemplate>();
+        f.formationName  = "ShieldWall";
+        f.defaultSide    = SpawnSide.Right;
+        f.preferredRoles = new[] { EnemyRole.Barrier };
+        f.slots = new RoleSlot[]
+        {
+            new RoleSlot { role = EnemyRole.Barrier,  offset = new Vector2( 0.7f,  0f)   },
+            new RoleSlot { role = EnemyRole.Barrier,  offset = new Vector2( 0.6f,  0.5f) },
+            new RoleSlot { role = EnemyRole.Barrier,  offset = new Vector2( 0.6f, -0.5f) },
+            new RoleSlot { role = EnemyRole.Center,   offset = new Vector2( 0f,    0f)   },
+            new RoleSlot { role = EnemyRole.Vanguard, offset = new Vector2( 0f,    0.5f) },
+            new RoleSlot { role = EnemyRole.Vanguard, offset = new Vector2( 0f,   -0.5f) },
+            new RoleSlot { role = EnemyRole.Rear,     offset = new Vector2(-0.5f,  0.3f) },
+            new RoleSlot { role = EnemyRole.Rear,     offset = new Vector2(-0.5f, -0.3f) },
+        };
+        return f;
+    }
+
     public static FormationTemplate CreateEscort()
     {
         var f = CreateInstance<FormationTemplate>();

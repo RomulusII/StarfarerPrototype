@@ -28,6 +28,35 @@ public class CameraController : MonoBehaviour
     [Tooltip("Mouse ile yatay kaydırma menzili (birim), kadraj tabanının etrafında.")]
     public float panRange = 8f;
 
+    [Header("Upgrade Kadrajı")]
+    [Tooltip("Upgrade ekranı açıkken gemi ekranın SOLUNDAN bu oranda dursun.\n\n" +
+             "Ekranın kenarları panellerle kaplı: GENEL şeridi solda 0.11'e kadar, " +
+             "OPSİYON DETAYI ve bileşen listesi sağda 0.785'ten sonra " +
+             "(bkz. UpgradeUI.BuildListPanel / BuildHoverDetailPanel). Geriye kalan " +
+             "boş bandın ortası 0.45 — ekranın ortası değil. Gemiyi 0.5'e koymak " +
+             "onu sağa, listenin dibine itiyordu.")]
+    [Range(0.05f, 0.95f)] public float upgradeShipScreenX = 0.45f;
+
+    [Tooltip("Upgrade ekranı açıkken gemi ekranın ÜSTÜNDEN bu oranda dursun.\n\n" +
+             "SLOT BİLGİSİ paneli üstteki %33'ü kaplıyor (UpgradeUI'da y 0.67–0.95). " +
+             "Gemi 5 birimlik görüş alanının 2.4 birimini, yani yüksekliğin " +
+             "%48'ini kaplıyor: üst kenarı panelin altında kalsın diye merkez " +
+             "0.57'nin altına inemez. 0.60 biraz pay bırakır — geminin sırt " +
+             "kulesi ve slot halkaları da panelin arkasına girmesin.")]
+    [Range(0.05f, 0.95f)] public float upgradeShipScreenY = 0.60f;
+
+    [Tooltip("Upgrade ekranındaki ortographic size.")]
+    public float upgradeZoomSize = 2.5f;
+
+    [Header("Zoom")]
+    [Tooltip("Dinlenme hâlindeki ortographic size.")]
+    public float minZoomSize = 5f;
+
+    [Tooltip("Tam zoom-out'taki ortographic size. ViewBounds bunu okuyup dünyanın " +
+             "ne kadar geniş olması gerektiğini hesaplar — doğum noktaları ve toz " +
+             "alanı buradan türer, o yüzden sabit değil ALAN olmalı.")]
+    public float maxZoomSize = 7f;
+
     PlayerShip _ship;
 
     private Camera _cam;
@@ -75,7 +104,7 @@ public class CameraController : MonoBehaviour
         transform.position = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * 3f);
 
         float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
-        float targetSize = Mathf.Lerp(5f, 7f, zoomT);
+        float targetSize = Mathf.Lerp(minZoomSize, maxZoomSize, zoomT);
         _cam.orthographicSize = Mathf.Lerp(_cam.orthographicSize, targetSize, Time.deltaTime * 3f);
     }
 
@@ -102,8 +131,17 @@ public class CameraController : MonoBehaviour
         _savedPosition  = transform.position;
         _savedSize      = _cam.orthographicSize;
 
-        _targetPosition = new Vector3(shipPosition.x, shipPosition.y, -10f);
-        _targetSize     = 2.5f;
+        // Kamerayı gemiye ORTALAMAK gemiyi ekranın ortasına koyar — ama ekranın
+        // ortası boş değil. Oyun içi kadrajla aynı formül kullanılır, yalnızca
+        // oranlar upgrade panellerine göredir.
+        float halfH = upgradeZoomSize;
+        float halfW = halfH * _cam.aspect;
+
+        _targetPosition = new Vector3(
+            shipPosition.x + (0.5f - upgradeShipScreenX) * 2f * halfW,
+            shipPosition.y + (upgradeShipScreenY - 0.5f) * 2f * halfH,
+            -10f);
+        _targetSize     = upgradeZoomSize;
         _onZoomComplete = onComplete;
 
         _isRestoring   = false;

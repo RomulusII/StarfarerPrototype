@@ -26,8 +26,12 @@ public class WeaponController : MonoBehaviour
 
     void Start()
     {
-        _kineticSprite = MakeSprite(10, 30, Color.white);
-        _plasmaCircle  = MakeCircleSprite(32, Color.white); // renk runtime'da set edilir
+        _kineticSprite = SkinLibrary.Get(SkinId.PlayerBulletKinetic, 10, 30, Color.white);
+
+        // Plazma küresi yumuşak kenarlıdır; skin yoksa prosedürel daire kullanılır
+        _plasmaCircle  = SkinLibrary.Has(SkinId.PlayerBulletPlasma)
+                       ? SkinLibrary.Get(SkinId.PlayerBulletPlasma, 32, 32, Color.white)
+                       : MakeCircleSprite(32, Color.white); // renk runtime'da set edilir
     }
 
     void OnDestroy()
@@ -59,7 +63,7 @@ public class WeaponController : MonoBehaviour
 
     void UpdateKinetic()
     {
-        if (Mouse.current.leftButton.isPressed && Time.time >= _nextFireTime)
+        if (PointerInput.FireHeld && Time.time >= _nextFireTime)
         {
             _nextFireTime = Time.time + fireRate;
             SpawnBullet(_kineticSprite, WeaponType.Kinetic, speed: 6f);
@@ -72,7 +76,7 @@ public class WeaponController : MonoBehaviour
 
     void UpdateLaser()
     {
-        bool held = Mouse.current.leftButton.isPressed;
+        bool held = PointerInput.FireHeld;
 
         if (held && _activeLaserBeam == null)
         {
@@ -91,7 +95,8 @@ public class WeaponController : MonoBehaviour
             beam.weaponType      = WeaponType.Laser;
             beam.continuous      = true;
             beam.energyPerSecond = energyCostPerShot * energyMulti;
-            beam.maxRange        = 22f;
+            // Sabit 22 birim kadrajın yarısına bile ulaşmıyordu (bkz. ViewBounds)
+            beam.maxRange        = ViewBounds.MaxShotRange;
             beam.Init();
             _activeLaserBeam = beam;
         }
@@ -114,8 +119,8 @@ public class WeaponController : MonoBehaviour
 
     void UpdatePlasma()
     {
-        bool held     = Mouse.current.leftButton.isPressed;
-        bool released = Mouse.current.leftButton.wasReleasedThisFrame;
+        bool held     = PointerInput.FireHeld;
+        bool released = PointerInput.FireReleased;
 
         if (held)
         {
@@ -233,19 +238,26 @@ public class WeaponController : MonoBehaviour
         sr.sortingOrder = 20;
 
         var b = go.AddComponent<Bullet>();
-        b.speed      = speed;
-        b.damage     = damage * damageMulti;
-        b.weaponType = type;
-    }
+        b.speed       = speed;
+        b.damage      = damage * damageMulti;
+        b.weaponType  = type;
+        b.boostAtFire = BoostController.Mode;
 
-    static Sprite MakeSprite(int w, int h, Color color)
-    {
-        var tex    = new Texture2D(w, h);
-        var pixels = new Color[w * h];
-        for (int i = 0; i < pixels.Length; i++) pixels[i] = color;
-        tex.SetPixels(pixels);
-        tex.Apply();
-        return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
+        // İsabet oranının PAYDASI. Işınlar buraya girmez (ıskalamazlar), yani
+        // oran yalnızca mermili silahlar için anlamlıdır.
+        //
+        // Boost etiketi şart: silah boost'u hasarı ×2, mermi boyutunu ×1.5
+        // yapıyor; kalkan boost'u ise ×1/3 ve ×0.6. Yani boost, hem hasarı hem
+        // İSABET OLASILIĞINI değiştiriyor. Etiketsiz toplanan bir isabet oranı
+        // üç ayrı silahın karışımı olurdu.
+        BalanceLog.Event("shot_fired")
+                  .Str("kaynak", "ana")
+                  .Str("silah",  type.ToString())
+                  .Str("boost",  b.boostAtFire.ToString())
+                  .Num("hasar",  b.damage)
+                  .Num("boyut",  scaleMulti)
+                  .Num("hiz",    speed)
+                  .End();
     }
 
     // Dairesel (alpha kenar kesen) sprite — plazma küre ve bolt için
@@ -277,7 +289,7 @@ public class WeaponController : MonoBehaviour
         weaponType        = def.weaponType;
         damage            = def.weaponDamage            > 0 ? def.weaponDamage            : 10f;
         fireRate          = def.weaponFireRate           > 0 ? def.weaponFireRate           : 0.15f;
-        energyCostPerShot = def.weaponEnergyCostPerShot  > 0 ? def.weaponEnergyCostPerShot  : 3f;
+        energyCostPerShot = def.weaponEnergyCostPerShot;   // kinetik enerji yemez — fallback yok
         chargeTime        = def.weaponChargeTime         > 0 ? def.weaponChargeTime         : 2.0f;
     }
 }

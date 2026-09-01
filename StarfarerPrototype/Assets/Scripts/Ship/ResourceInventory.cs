@@ -13,7 +13,13 @@ public class ResourceInventory : MonoBehaviour
 
     [Header("Taban Kapasite (depo komponentleri bunun üstüne ekler)")]
     public float baseMetalCapacity   = 150f;
-    public float baseCrystalCapacity =  50f;
+
+    [Tooltip("Kristal, metalden çok daha yavaş akar: yalnızca kalkanlı " +
+             "düşmanlardan ve asteroitlerin %12'sinden geliyor. 50 tavanla " +
+             "oyuncu daha ilk kalkan yükseltmesini biriktiremeden tavana " +
+             "çarpıp kaynağı yakıyordu — depo kurulana kadar kristal " +
+             "toplamanın anlamı yoktu.")]
+    public float baseCrystalCapacity = 100f;
     public float maxEnergyScrap      = 200f;
 
     /// <summary>Taban kapasite + kurulu depoların toplamı.</summary>
@@ -66,13 +72,34 @@ public class ResourceInventory : MonoBehaviour
         }
     }
 
-    public void Add(ResourceType type, int amount)
+    /// <summary>
+    /// Miktar KESİRLİ tutulur. Eskiden int'ti ve toplayıcı kargosunu tam birime
+    /// yuvarlamak zorundaydı: level 1'de asteroit parçası 0.5 kaynak düşürdüğü
+    /// için kristalin tamamı yuvarlamada kayboluyordu.
+    /// </summary>
+    public void Add(ResourceType type, float amount)
     {
+        // Tavana çarpan kısım YANAR. Gelirin ne kadarının boşa gittiğini ancak
+        // burada görebiliriz: Add() sessizce kırpıyor, kimse haber vermiyordu.
+        // "Depo baskısı ilginç bir karar mı, yoksa vergi mi" sorusunun cevabı
+        // yanan/düşen oranıdır.
+        float before = AmountOf(type);
+
         switch (type)
         {
             case ResourceType.RawMaterial:   AddMetal(amount);   break;
             case ResourceType.EnergyCrystal: AddCrystal(amount); break;
         }
+
+        float gained = AmountOf(type) - before;
+        BalanceLog.Event("resource")
+                  .Str("tip",    type.ToString())
+                  .Str("olay",   "toplandi")
+                  .Num("miktar", gained)
+                  .Num("yanan",  amount - gained)
+                  .Num("stok",   AmountOf(type))
+                  .Num("tavan",  CapacityOf(type))
+                  .End();
     }
 
     public int Get(ResourceType type)
@@ -84,4 +111,44 @@ public class ResourceInventory : MonoBehaviour
             default: return 0;
         }
     }
+
+    // ── Doluluk ───────────────────────────────────────────────────────────────
+    //
+    // Tavana çarpan kaynak SESSİZCE yanıyordu: Add() kırpıyor, kimse haber
+    // vermiyor, toplayıcı da dolu bir tipi toplamayı sürdürüyordu. Doluluk
+    // bilgisinin sahibi envanterdir — HUD uyarısı da toplayıcının hedef
+    // seçimi de buradan okur, iki ayrı eşik yazılmaz.
+
+    /// <summary>"Dolmak üzere" eşiği — HUD bu orandan sonra uyarır.</summary>
+    public const float NearFullRatio = 0.90f;
+
+    public float AmountOf(ResourceType type) => type switch
+    {
+        ResourceType.RawMaterial   => metal,
+        ResourceType.EnergyCrystal => crystal,
+        _                          => 0f,
+    };
+
+    public float CapacityOf(ResourceType type) => type switch
+    {
+        ResourceType.RawMaterial   => maxMetal,
+        ResourceType.EnergyCrystal => maxCrystal,
+        _                          => 0f,
+    };
+
+    /// <summary>Doluluk oranı (0–1). Kapasite yoksa dolu sayılır.</summary>
+    public float FillRatio(ResourceType type)
+    {
+        float cap = CapacityOf(type);
+        return cap > 0f ? Mathf.Clamp01(AmountOf(type) / cap) : 1f;
+    }
+
+    /// <summary>
+    /// Bu tipten bir birim daha alacak yer var mı? Tam eşitlik yerine küçük bir
+    /// pay bırakılır: kesirli miktarlar tavana asla tam oturmaz ve toplayıcı
+    /// "neredeyse dolu" bir depoya sonsuza dek sefer yapardı.
+    /// </summary>
+    public bool IsFull(ResourceType type) => AmountOf(type) >= CapacityOf(type) - 0.01f;
+
+    public bool IsNearlyFull(ResourceType type) => FillRatio(type) >= NearFullRatio;
 }

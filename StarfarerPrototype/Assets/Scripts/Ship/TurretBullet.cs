@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -20,6 +21,13 @@ public class TurretBullet : MonoBehaviour
 
     Vector2 _dir;
 
+    /// <summary>Collider yarıçapı — süpürme mesafesi buna göre uzatılır.</summary>
+    const float Radius = 0.07f;
+
+    // Süpürme sonuçları paylaşılan bir tamponda toplanır; her mermi her karede
+    // dizi ayırsaydı hızlı ateş eden turretlerde GC yükü olurdu.
+    static readonly List<RaycastHit2D> _sweep = new();
+
     public void TakeDamage(float amount)
     {
         if (hp <= 0f) return;
@@ -30,7 +38,7 @@ public class TurretBullet : MonoBehaviour
     void Awake()
     {
         var col    = gameObject.AddComponent<CircleCollider2D>();
-        col.radius    = 0.07f;
+        col.radius    = Radius;
         col.isTrigger = true;
 
         var rb = gameObject.AddComponent<Rigidbody2D>();
@@ -86,7 +94,38 @@ public class TurretBullet : MonoBehaviour
             }
         }
 
-        transform.Translate(_dir * speed * Time.deltaTime, Space.World);
+        Sweep(speed * Time.deltaTime);
+    }
+
+    /// <summary>
+    /// Yolu SÜPÜREREK ilerler. Mermi Update'te hareket ediyor ama trigger
+    /// tespiti fizik adımında (0.02 sn) yapılıyor; hızlı mermi iki adım arasında
+    /// hedefin ÜSTÜNDEN atlıyordu.
+    ///
+    /// Point Defence mermisi (hız 20) fizik adımı başına 0.40 birim gidiyor,
+    /// bombayla çakışma penceresi ise (0.07 + 0.10) × 2 = 0.34 birim. Yani
+    /// vuruşların çoğu hiç kaydedilmiyor ve PD'nin VARLIK SEBEBİ — bombayı
+    /// kalkana varmadan düşürmek — işlemiyordu.
+    ///
+    /// Çözüm collider'ı şişirmek değil (o, mermiyi her şeye karşı şişmanlatır)
+    /// yolun taranmasıdır: mermi ne kadar hızlanırsa hızlansın aradaki her şeyi
+    /// görür. OnTriggerEnter2D yerinde kalır — merminin ÜSTÜNE gelen hedefler
+    /// için gerekli.
+    /// </summary>
+    void Sweep(float distance)
+    {
+        if (distance <= 0f) return;
+
+        int count = Physics2D.Raycast(transform.position, _dir,
+                                      ContactFilter2D.noFilter, _sweep, distance + Radius);
+        if (count > 0)
+        {
+            _sweep.Sort((a, b) => a.distance.CompareTo(b.distance));
+            for (int i = 0; i < _sweep.Count; i++)
+                if (TryHit(_sweep[i].collider, _sweep[i].point)) return;
+        }
+
+        transform.Translate(_dir * distance, Space.World);
     }
 
     static Vector2 Rotate(Vector2 v, float degrees)
@@ -102,17 +141,50 @@ public class TurretBullet : MonoBehaviour
         transform.rotation = Quaternion.Euler(0f, 0f, angle);
     }
 
-    void OnTriggerEnter2D(Collider2D other)
+    void OnTriggerEnter2D(Collider2D other) => TryHit(other, transform.position);
+
+    /// <summary>
+    /// Bu collider'a vurulabiliyorsa hasarı uygular ve true döner. Hem süpürme
+    /// hem trigger yolu buradan geçer — iki ayrı kopya zamanla birbirinden sapardı.
+    /// </summary>
+    bool TryHit(Collider2D other, Vector2 hitPos)
     {
+        if (other == null) return false;
+
         var bomb = other.GetComponent<Bomb>();
         if (bomb != null)
         {
             bomb.TakeDamage(damage);
+            // Bomba tek vuruşta gider: Point Defence'in işini yaptığı görünsün
+            HitEffect.SpawnImpact(hitPos, _dir, other.transform.position,
+                                  ImpactSurface.Hull, damage, lethal: true);
             Destroy(gameObject);
-            return;
+            return true;
         }
 
+        var surface = DamageUtil.SurfaceOf(other);
+
         if (DamageUtil.TryDamage(other, damage, weaponType))
+        {
+            bool lethal = other.GetComponent<HealthBar>()?.currentHealth <= 0f;
+
+            BalanceLog.Event("shot_hit")
+                      .Str("kaynak", "turret")
+                      .Str("silah",  weaponType.ToString())
+                      .Str("yuzey",  surface.ToString())
+                      .Str("hedef",  DamageUtil.TypeNameOf(other))
+                      .Num("hasar",  damage)
+                      .Bool("oldurdu", lethal)
+                      .End();
+
+            HitEffect.SpawnImpact(hitPos, _dir, other.transform.position,
+                                  surface, damage, lethal);
+            if (surface == ImpactSurface.Shield)
+                DamageUtil.ShieldFlash(other, hitPos);
             Destroy(gameObject);
+            return true;
+        }
+
+        return false;
     }
 }
