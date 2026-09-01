@@ -23,7 +23,7 @@ const outDir  = path.join(here, "logs");
 
 if (!fs.existsSync(cfgPath)) {
   console.error(`Yapılandırma yok: ${cfgPath}`);
-  console.error(`Örnek:\n{\n  "endpoint": "https://akinayan.de/starfarer/log.php",\n  "token": "..."\n}`);
+  console.error(`Örnek:\n{\n  "endpoint": "https://akinayan.de/starfarer/log/log.php",\n  "token": "..."\n}`);
   process.exit(1);
 }
 const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));

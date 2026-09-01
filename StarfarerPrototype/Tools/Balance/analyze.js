@@ -12,15 +12,29 @@ const os   = require("os");
 
 // ── Dosyayı bul ─────────────────────────────────────────────────────────────
 
+// İki kaynak var ve ikisine de bakılmalı:
+//   1. Kendi editör oturumların — Unity persistentDataPath
+//   2. pull.js ile sunucudan indirilenler (arkadaşların telefonları)
+// En YENİ dosya hangisiyse o seçilir; hangi klasörden geldiği önemli değil.
+function logDirs() {
+  return [
+    path.join(__dirname, "logs"),
+    path.join(os.homedir(), "AppData", "LocalLow",
+              "DefaultCompany", "StarfarerPrototype", "balance"),
+  ];
+}
+
 function latestLog() {
-  // Unity persistentDataPath: %USERPROFILE%/AppData/LocalLow/<sirket>/<urun>
-  const base = path.join(os.homedir(), "AppData", "LocalLow",
-                         "DefaultCompany", "StarfarerPrototype", "balance");
-  if (!fs.existsSync(base)) return null;
-  const files = fs.readdirSync(base).filter(f => f.endsWith(".jsonl"))
-    .map(f => ({ f, t: fs.statSync(path.join(base, f)).mtimeMs }))
-    .sort((a, b) => b.t - a.t);
-  return files.length ? path.join(base, files[0].f) : null;
+  let best = null;
+  for (const dir of logDirs()) {
+    if (!fs.existsSync(dir)) continue;
+    for (const f of fs.readdirSync(dir).filter(x => x.endsWith(".jsonl"))) {
+      const p = path.join(dir, f);
+      const t = fs.statSync(p).mtimeMs;
+      if (!best || t > best.t) best = { p, t };
+    }
+  }
+  return best ? best.p : null;
 }
 
 const file = process.argv[2] || latestLog();

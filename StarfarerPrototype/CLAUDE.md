@@ -2088,6 +2088,64 @@ Kristal çalışması sırasında çıkan, henüz kapatılmamış maddeler.
 
 ---
 
+## DEVAM NOKTASI — telemetri ve Android
+
+Bu bölüm oturum devri içindir; iş bitince silinir.
+
+### Çalışan ve doğrulanmış
+
+- **`BalanceLog`** ham olay kaydı üretiyor, gerçek veri alındı (4 level, 740 olay).
+  İlk ölçüm: **ana silah isabet oranı %52**, turret %86. Bugüne kadarki bütün
+  TTK ve tehdit hesabı %100 isabet varsayıyordu — yani tablodaki her süre ~1.93
+  ile çarpılmalı. `Tools/Balance/analyze.js` metrikleri basıyor.
+- **Ölçülen diğer sapmalar:** level süreleri 2.0/1.1/0.7 dk (hedef 3–4),
+  3.8 dakikada **sıfır yükseltme** (en ucuz komponent 20 metal, oyuncuda 29),
+  enkazın %23–27'si toplanamıyor (hedef <%15).
+- **Sunucu zinciri uçtan uca çalışıyor.** `Tools/Balance/server/log.php` →
+  akinayan.de (IIS/Plesk/**PHP 5.4.45**) → `Tools/Balance/pull.js` →
+  `Tools/Balance/logs/`. PHP 5.3 uyumlu yazıldı; `fn()`, `str_ends_with`,
+  `hash_equals` ve `foo()['x']` bu sunucuda ÇALIŞMAZ.
+- **Android girdisi** (`PointerInput`): `Mouse.current` telefonda null'dır ve
+  `WeaponController`/`WeaponMount` onu kontrolsüz okuyordu — ilk karede
+  çöküyordu. Upgrade ekranının tek girişi Tab tuşuydu; YÜKSELT (BoostHUD) ve
+  KAPAT (UpgradeUI) düğmeleri eklendi.
+
+### Yarım kalanlar
+
+- **`BalanceUploader` ve `UploadConfig` DERLENMEDİ.** Oturumun sonunda derleyici
+  çalıştırılamadı; gözle kontrol edildi, bir hata (CS1631, `yield break` catch
+  içinde) bulunup düzeltildi. Unity'de ilk Play konsolu kalanını söyler.
+- **`Assets/Resources/UploadConfig.asset` YOK** — asset olmadan gönderim
+  tamamen kapalı, yani oyundan sunucuya giden halka henüz bağlı değil.
+  Endpoint `https://akinayan.de/starfarer/log/log.php`.
+- **Player Settings → Application Identifier boş.** minSdk 25 ve ARM64 hazır.
+- **`UploadConfig.asset` ve `pull.config.json` token içerir.** Repo herkese
+  açık; `log.php`'nin repodaki kopyasında yer tutucu var, gerçek değer yalnızca
+  sunucuda. Asset'i oluştururken aynı kararı ver (gitignore veya boş bırak).
+
+### Sıradaki ölçümler
+
+1. Kampanyada **level 15'e kadar** oyna: Armored ve Bariyer verisi gelsin
+   (tip başına ~20-30 ölüm istatistiksel eşik).
+2. `dovus` alanı (ilk isabetten ölüme) yeni eklendi — tehdit doğrulamasının
+   asıl girdisi. "Yaşam süresi" yanlış ölçüydü: gemi sahnede 18 sn durup son
+   3 sn'de vurulmuş olabilir.
+3. Telefonda bir oturum: isabet oranı dokunmatikte büyük ihtimalle düşecek ve
+   tehdit kalibrasyonu cihaza göre ayrışacak.
+4. Toplanınca formülü veriye oturt: `gözlenen_tehdit ≈ α·oyuncu-saniyesi +
+   β·verilen hasar` regresyonu, artıklar hangi yetenek puanının yanlış
+   olduğunu söyler.
+
+### Bilinen açık soru
+
+Dalga bütçesi levelin bütçesinin ~%41'i, yani level 12'de en büyük dalga
+**4 puan**. Armored 9, Bomber 6, Kaleci 27 — ağır tipler uzun süre hiçbir
+dalgaya sığmıyor ve yalnızca `guaranteedType` sayesinde sahneye çıkıyor.
+Bütçe tabanı (7) yükseltilmeli mi, dalga sayısı azaltılmalı mı? **Ölçmeden
+karar verilmeyecek.**
+
+---
+
 ## Açık İşler — Sıradaki Oturum
 
 Sıra kararlaştırıldı: **hitbox ayrımı → denge testleri → skin'ler.**
