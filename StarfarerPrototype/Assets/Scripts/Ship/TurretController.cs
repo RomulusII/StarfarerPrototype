@@ -265,6 +265,14 @@ public class TurretController : ShipComponentBase
 
         tb.SetDirection(transform.right);
 
+        BalanceLog.Event("shot_fired")
+                  .Str("kaynak", "turret")
+                  .Str("spec",   specType.ToString())
+                  .Str("silah",  tb.weaponType.ToString())
+                  .Num("hasar",  tb.damage)
+                  .Num("hiz",    bulletSpeed)
+                  .End();
+
         BuildBulletVisual(go, specType);
         Destroy(go, bulletLifeTime);
     }

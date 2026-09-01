@@ -85,6 +85,15 @@ public class Debris : MonoBehaviour
         resourceAmount = amount;
         resourceType   = type;
         origin         = source;
+
+        // Gelirin KAYNAĞI. resource/toplandi ile farkı, toplayıcıların
+        // yetişemediği (soldan çıkan veya ömrü dolan) kaynağı verir.
+        BalanceLog.Event("resource")
+                  .Str("tip",    type.ToString())
+                  .Str("olay",   "dustu")
+                  .Str("koken",  source.ToString())
+                  .Num("miktar", amount)
+                  .End();
         _variant       = Random.Range(0, SkinId.DebrisVariantCount(source));
 
         // Köken ve resourceType Awake'den SONRA belli olur — görsel burada kesinleşir

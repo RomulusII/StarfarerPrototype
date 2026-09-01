@@ -79,32 +79,43 @@ public class UpgradeUI : MonoBehaviour
         if (StartMenuUI.IsOpen)      return;   // açılış menüsü → oyun girdileri kilitli
 
         if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
-        {
-            bool opening = !_canvas.enabled;
-
-            if (opening)
-            {
-                var cam = FindFirstObjectByType<CameraController>();
-                if (cam != null)
-                {
-                    Vector3 shipPos = _loadout != null ? _loadout.transform.position : Vector3.zero;
-                    cam.ZoomToShip(shipPos, null);
-                }
-                _canvas.enabled = true;
-                IsPaused        = true;
-                SpeedController.Instance?.Pause();
-            }
-            else
-            {
-                _canvas.enabled = false;
-                IsPaused        = false;
-                FindFirstObjectByType<CameraController>()?.RestoreFromUpgrade();
-                SpeedController.Instance?.Resume();
-            }
-        }
+            Toggle();
 
         if (_canvas != null && _canvas.enabled)
             UpdateStatBoxes();
+    }
+
+    /// <summary>
+    /// Upgrade ekranını açar/kapatır. Tab tuşu ve ekran düğmesi AYNI yoldan
+    /// geçer — Android'de klavye yok, yani Tab tek giriş kaldığı sürece upgrade
+    /// ekranı telefonda hiç açılamıyordu. İki ayrı kod yolu yazmak yerine tuş
+    /// da düğme de burayı çağırır.
+    /// </summary>
+    public void Toggle()
+    {
+        if (_canvas == null) return;
+
+        bool opening = !_canvas.enabled;
+
+        if (opening)
+        {
+            var cam = FindFirstObjectByType<CameraController>();
+            if (cam != null)
+            {
+                Vector3 shipPos = _loadout != null ? _loadout.transform.position : Vector3.zero;
+                cam.ZoomToShip(shipPos, null);
+            }
+            _canvas.enabled = true;
+            IsPaused        = true;
+            SpeedController.Instance?.Pause();
+        }
+        else
+        {
+            _canvas.enabled = false;
+            IsPaused        = false;
+            FindFirstObjectByType<CameraController>()?.RestoreFromUpgrade();
+            SpeedController.Instance?.Resume();
+        }
     }
 
     // =========================================================================
@@ -690,6 +701,18 @@ public class UpgradeUI : MonoBehaviour
 
         if (!ResourceInventory.Instance.TrySpend(def.costResource, cost)) return;
         comp.ApplyStatUpgrade(key);
+
+        // Yükseltme temposu: oyuncu gücünün gerçek eğrisi buradan çıkar.
+        // Simülasyon "en ucuz statı al" varsayıyor; gerçek oyuncunun ne zaman
+        // neyi aldığı ölçülmedi.
+        BalanceLog.Event("upgrade")
+                  .Str("komponent", comp.componentName)
+                  .Str("iz",        key)
+                  .Num("seviye",    comp.GetStatLevel(key))
+                  .Num("maliyet",   cost)
+                  .Str("kaynak",    def.costResource.ToString())
+                  .End();
+
         OnSlotClicked(slotIndex);
     }
 
@@ -1168,6 +1191,33 @@ public class UpgradeUI : MonoBehaviour
         BuildSlotInfoPanel();
         BuildHoverDetailPanel();
         BuildListPanel();
+        BuildCloseButton();
+    }
+
+    /// <summary>
+    /// Kapatma düğmesi — Android'de Tab yok. Panellerin DIŞINDA, sağ üst köşede:
+    /// üst şerit slot bilgisi panelinin bittiği yer (%95) ile ekran kenarı
+    /// arasındaki boşluk zaten boş duruyordu.
+    /// </summary>
+    void BuildCloseButton()
+    {
+        var go = new GameObject("CloseBtn", typeof(RectTransform));
+        go.transform.SetParent(transform, false);
+
+        var img = go.AddComponent<Image>();
+        img.color = new Color(0.55f, 0.16f, 0.16f, 1f);
+
+        var btn = go.AddComponent<Button>();
+        btn.targetGraphic = img;
+        btn.onClick.AddListener(Toggle);
+
+        var r = (RectTransform)go.transform;
+        r.anchorMin        = new Vector2(0.90f, 0.955f);
+        r.anchorMax        = new Vector2(0.995f, 0.998f);
+        r.anchoredPosition = Vector2.zero;
+        r.sizeDelta        = Vector2.zero;
+
+        AttachLabel(go.transform, "KAPAT", 26);
     }
 
     // Sol şerit — tam yükseklik, dar

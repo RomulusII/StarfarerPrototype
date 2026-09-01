@@ -167,6 +167,16 @@ public class TurretBullet : MonoBehaviour
         if (DamageUtil.TryDamage(other, damage, weaponType))
         {
             bool lethal = other.GetComponent<HealthBar>()?.currentHealth <= 0f;
+
+            BalanceLog.Event("shot_hit")
+                      .Str("kaynak", "turret")
+                      .Str("silah",  weaponType.ToString())
+                      .Str("yuzey",  surface.ToString())
+                      .Str("hedef",  DamageUtil.TypeNameOf(other))
+                      .Num("hasar",  damage)
+                      .Bool("oldurdu", lethal)
+                      .End();
+
             HitEffect.SpawnImpact(hitPos, _dir, other.transform.position,
                                   surface, damage, lethal);
             if (surface == ImpactSurface.Shield)

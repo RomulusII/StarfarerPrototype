@@ -76,6 +76,14 @@ public class EnemyTypeData : ScriptableObject
              "düşük değer = kavislerde dışa savrulan hantal gemi.")]
     [Range(0f, 1f)] public float grip = 0.9f;
 
+    [Tooltip("LEVELDEN gelen manevra çarpanı — hem enginePower'a hem agility'ye " +
+             "uygulanır (EnemySpawner.ApplyScaling doldurur, 1 = ölçeklenmemiş). " +
+             "Ayrı bir alan olmasının sebebi: agility aynı zamanda tipin KİMLİĞİ " +
+             "(PursuesFighters onu okur). Ölçek doğrudan agility'ye yazılsaydı " +
+             "erken levellerde Swarm'ın çevikliği 1.0'ın altına düşer ve gemi " +
+             "sessizce 'savaşçı kovalamaz' sınıfına geçerdi.")]
+    public float maneuverScale = 1f;
+
     [Tooltip("Nişan almadığı anlarda salınımın tepe açısı (derece). Desen rastgele " +
              "değil, deterministiktir — bu değer genliği belirler. 0 = salınım yok.")]
     public float evasionAngle = 15f;
@@ -139,7 +147,8 @@ public class EnemyTypeData : ScriptableObject
         weaponKind == EnemyWeaponKind.Kinetic || weaponKind == EnemyWeaponKind.Laser;
 
     [Header("Enkaz Kaynağı")]
-    [Tooltip("Ölünce bırakılan kaynak tipi. threatScore × 4 metal/kristal düşer.")]
+    [Tooltip("Ölünce bırakılan kaynak tipi. Miktar threatScore × " +
+             "BalanceConfig.DropPerThreat(level) — sabit ×4 DEĞİL, levelle büyür.")]
     public ResourceType debrisResourceType = ResourceType.RawMaterial;
 
     [Header("Hull Dirençleri")]
@@ -248,7 +257,12 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Armored";
         d.displayName   = "Armored";
         d.role          = EnemyRole.Rear;
-        d.threatScore   = 4;
+        // Tehdit 4 → 9 (bkz. CLAUDE.md "Tehdit Puanı — Formül"). Eski değer HAM
+        // HP'ye bakılarak konmuştu (80 = 4× Swarm) ve geminin bütün kimliğini,
+        // kinetik ×0.3 direncini yok sayıyordu: 5.6 dayanıklılık × 5.2 hasar.
+        // Direnç primi +2 — bir silaha karşı neredeyse bağışık olmak, oyuncuyu
+        // SİLAH DEĞİŞTİRMEYE zorlar; bu ayrı bir maliyettir.
+        d.threatScore   = 9;
         d.maxHP         = 80f;
         d.mass          = 5f;   d.enginePower   = 7.5f;
         d.bodyWidth     = 80;   d.bodyHeight    = 55;   d.sizeOrder = 3;
@@ -276,7 +290,7 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Shield";
         d.displayName   = "Shield";
         d.role          = EnemyRole.Center;
-        d.threatScore   = 5;
+        d.threatScore   = 7;
         d.maxHP         = 50f;  d.maxShield     = 40f;
         d.mass          = 3f;   d.enginePower   = 6f;
         d.bodyWidth     = 70;   d.bodyHeight    = 50;   d.sizeOrder = 5;
@@ -304,7 +318,7 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Bomber";
         d.displayName   = "Bomber";
         d.role          = EnemyRole.Flank;
-        d.threatScore   = 10;
+        d.threatScore   = 6;
         d.maxHP         = 10f;
         d.mass          = 2f;   d.enginePower   = 8f;
         d.bodyWidth     = 44;   d.bodyHeight    = 12;   d.sizeOrder = 6;
@@ -330,7 +344,7 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Interceptor";
         d.displayName   = "Avcı";
         d.role          = EnemyRole.Vanguard;
-        d.threatScore   = 6;
+        d.threatScore   = 4;
         d.maxHP         = 25f;
         d.mass          = 0.8f; d.enginePower   = 5.5f;
         d.bodyWidth     = 52;   d.bodyHeight    = 18;   d.sizeOrder = 8;
@@ -355,7 +369,7 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Artillery";
         d.displayName   = "Obüs";
         d.role          = EnemyRole.Rear;
-        d.threatScore   = 9;
+        d.threatScore   = 10;
         d.maxHP         = 60f;
         d.armor         = 3f;
         d.mass          = 6f;   d.enginePower   = 6f;
@@ -381,7 +395,7 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Jammer";
         d.displayName   = "Karıştırıcı";
         d.role          = EnemyRole.Center;
-        d.threatScore   = 11;
+        d.threatScore   = 10;
         d.maxHP         = 55f;  d.maxShield     = 30f;
         d.mass          = 3.5f; d.enginePower   = 6f;
         d.bodyWidth     = 66;   d.bodyHeight    = 52;   d.sizeOrder = 5;
@@ -412,7 +426,7 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Phantom";
         d.displayName   = "Hayalet";
         d.role          = EnemyRole.Flank;
-        d.threatScore   = 10;
+        d.threatScore   = 8;
         d.maxHP         = 45f;
         d.mass          = 1.6f; d.enginePower   = 5f;
         d.bodyWidth     = 58;   d.bodyHeight    = 30;   d.sizeOrder = 7;
@@ -437,7 +451,7 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Regenerator";
         d.displayName   = "Onarıcı";
         d.role          = EnemyRole.Rear;
-        d.threatScore   = 13;
+        d.threatScore   = 11;
         d.maxHP         = 90f;
         d.armor         = 4f;
         d.mass          = 5f;   d.enginePower   = 6f;
@@ -465,7 +479,7 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Leech";
         d.displayName   = "Sülük";
         d.role          = EnemyRole.Flank;
-        d.threatScore   = 8;
+        d.threatScore   = 7;
         d.maxHP         = 30f;
         d.mass          = 1.2f; d.enginePower   = 6.5f;
         d.bodyWidth     = 40;   d.bodyHeight    = 22;   d.sizeOrder = 7;
@@ -505,7 +519,7 @@ public class EnemyTypeData : ScriptableObject
         // gerçek ilk çıkışı ~level 40'tı. 3'e indi — refakat kuralı yüzünden
         // dalgada önce başka bir gemi seçilmesi gerektiği için etkin eşik 1+3=4,
         // bunu bölüm 2'nin son dalgaları (level 12+) karşılıyor.
-        d.threatScore   = 3;
+        d.threatScore   = 7;
         // Gövde kasten kırılgan: yayın kenarından dolanmak gerçekten ödüllendirmeli
         d.maxHP         = 40f;
         d.maxShield     = 170f;
@@ -548,7 +562,7 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Splitter";
         d.displayName   = "Bölünen";
         d.role          = EnemyRole.Center;
-        d.threatScore   = 12;
+        d.threatScore   = 8;
         d.maxHP         = 70f;
         d.mass          = 3f;   d.enginePower   = 5f;
         d.bodyWidth     = 72;   d.bodyHeight    = 54;   d.sizeOrder = 5;
@@ -574,7 +588,7 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Juggernaut";
         d.displayName   = "Kaleci";
         d.role          = EnemyRole.Center;
-        d.threatScore   = 20;
+        d.threatScore   = 27;
         d.maxHP         = 200f;
         d.armor         = 12f;
         d.mass          = 10f;  d.enginePower   = 9f;
@@ -604,7 +618,7 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "BombRunner";
         d.displayName   = "Bomb Runner";
         d.role          = EnemyRole.Flank;
-        d.threatScore   = 12;
+        d.threatScore   = 13;
         d.maxHP         = 35f;
         d.mass          = 2f;   d.enginePower   = 5f;
         d.bodyWidth     = 65;   d.bodyHeight    = 45;   d.sizeOrder = 6;

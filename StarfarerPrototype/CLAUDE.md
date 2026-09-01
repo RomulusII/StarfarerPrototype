@@ -63,6 +63,11 @@ Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 1), Otomatik Turretler, İki
 **Uzak saldırganlar** (hareket ederken periyodik ateş, mermileri kalkan üzerinden hasar verir):
 - **Swarm:** HP 30, hız 3, lazer'e kırılgan (×1.5). Ateş hızı ~4sn.
 - **Armored:** HP 80, hız 1.5, kinetike dirençli (×0.3), plazmaya zayıf (×1.8). Ateş hızı ~6sn, hasar 15.
+  **Tehdit 9** (eskiden 4): eski değer ham HP'ye bakıyor, geminin bütün kimliğini
+  — kinetik direncini — yok sayıyordu. Oyunun VARSAYILAN silahı bedava gelen raylı
+  toptur ve ona karşı Armored'ın efektif HP'si **267**: oyundaki ikinci en yüksek
+  değer, Kaleci'nin (333) %80'i. 4'te her bütçe Armored'ı iki-üç tane almaya
+  yetiyordu. Yeni değer formülden gelir (bkz. "Tehdit Puanı — Formül").
 - **Shield:** HP 50 + 40 kalkan, hız 2. Kalkana karşı kinetik (×1.5) kırar, lazer etkisiz (×0.25). Ateş hızı ~3sn.
 
 **Yakın saldırganlar** (geminin kalkan çemberine kadar girer, komponentlere doğrudan ateş eder):
@@ -74,15 +79,15 @@ Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 1), Otomatik Turretler, İki
 
 | Tip | Tehdit | Davranış | Neyi zorlar |
 |---|---|---|---|
-| **Interceptor** (Avcı) | 6 | Çok hızlı, kırılgan, yüksek kaçamak | Turret hedeflemesi ve isabet |
-| **Artillery** (Obüs) | 9 | Ekran kenarından uzun menzilli yavaş mermi | Menzil; oyuncuyu ilerlemeye zorlar |
-| **Jammer** (Karıştırıcı) | 11 | Menzilindeyken jeneratör üretimini %40 kısar | Enerji — öncelik hedefleme |
-| **Phantom** (Hayalet) | 10 | 4.5 sn'de bir 2 sn vurulamaz | Sürekli DPS yerine burst |
-| **Regenerator** (Onarıcı) | 13 | Çevresini saniyede 6 HP onarır | DPS eşiği — yavaş build duvara çarpar |
-| **Leech** (Sülük) | 8 | Komponentlere yapışır | Point Defence talebi |
-| **Splitter** (Bölünen) | 12 | Ölünce ikiye ayrılır (%50 HP) | Alan hasarı talebi |
-| **Juggernaut** (Kaleci) | 20 | Zırh +12, çok yavaş, 200 HP | Zırh eşiğinin doruk testi |
-| **Barrier** (Bariyer) | 8 | Silahsız; önünde YÖNLÜ yay kalkanı, ana geminin önüne park eder | Ateş hattı — del, dolan ya da bekle |
+| **Interceptor** (Avcı) | 4 | Çok hızlı, kırılgan, yüksek kaçamak | Turret hedeflemesi ve isabet |
+| **Artillery** (Obüs) | 10 | Ekran kenarından uzun menzilli yavaş mermi | Menzil; oyuncuyu ilerlemeye zorlar |
+| **Jammer** (Karıştırıcı) | 10 | Menzilindeyken jeneratör üretimini %40 kısar | Enerji — öncelik hedefleme |
+| **Phantom** (Hayalet) | 8 | 4.5 sn'de bir 2 sn vurulamaz | Sürekli DPS yerine burst |
+| **Regenerator** (Onarıcı) | 11 | Çevresini saniyede 6 HP onarır | DPS eşiği — yavaş build duvara çarpar |
+| **Leech** (Sülük) | 7 | Komponentlere yapışır | Point Defence talebi |
+| **Splitter** (Bölünen) | 8 | Ölünce ikiye ayrılır (%50 HP) | Alan hasarı talebi |
+| **Juggernaut** (Kaleci) | 27 | Zırh +12, çok yavaş, 200 HP | Zırh eşiğinin doruk testi |
+| **Barrier** (Bariyer) | 7 | Silahsız; önünde YÖNLÜ yay kalkanı, ana geminin önüne park eder | Ateş hattı — del, dolan ya da bekle |
 
 Jammer `EnergyBus.JamFactor` üzerinden üretimi kısar; Phantom faz sırasında
 `IsValidTarget = false` döner (turretler boşa mermi harcamasın); Splitter
@@ -194,11 +199,13 @@ kampanya boyunca sabit (7.1 sn), yalnızca kırmak zorlaşıyor.
 | 50 | 526 | 74 | 7.1 sn |
 | 100 | 1662 | 235 | 7.1 sn |
 
-**Tehdit puanı 8 → 3.** 8'de bir DALGANIN bütçesi 8'e ulaşana kadar hiç
-seçilemiyordu; gerçek ilk çıkışı ~level 40'tı. Refakat kuralı yüzünden etkin
-eşik `en ucuz gemi (1) + tehdit` olduğundan 4'e inmek yetmezdi — 3 ile eşik 4
-oluyor ve bunu bölüm 2'nin son dalgaları karşılıyor. İlk çıkışı artık
-**level 12** (level 11 bölümün tanıtım leveli, yalnız Armored gelir).
+**Tehdit puanı 8 → 3 → 7.** Bir ara 3'e indirilmişti: 8'de bir DALGANIN bütçesi
+8'e ulaşana kadar hiç seçilemiyor, gerçek ilk çıkışı ~level 40'a kayıyordu.
+Ama bu, ÇIKMA SORUNUNU fiyatı bozarak çözmekti — 285 efektif HP taşıyan bir
+gemi dalga bütçesinden bir Swarm kadar yer kaplayamaz. Çıkma sorununu artık
+`WaveData.guaranteedType` (bölümün tipi her levelde garanti) ve serbest modun
+kendi kuralları çözüyor, dolayısıyla fiyat formüle geri döndü
+(bkz. "Tehdit Puanı — Formül").
 
 ### Düşman Kalkanlarının Görünümü — Tasarım Kararları
 
@@ -404,6 +411,82 @@ Eski değerin gerekçesi "ışın hiç ıskalamaz, çarpanı 3.0" idi; o çarpan
 zaman ölçülmemişti ve mermili turretler de çoğu hedefi vuruyor. Isınma
 1.35 kabul edildi. Ana lazer 40 → 46.
 
+### Tehdit Puanı — Formül
+
+`threatScore` oyunun en çok iş yapan sayısı: **dalga bütçesini** harcar
+(`ChapterManager.FillByBudget`), **geliri** belirler (`threatScore × dropPerThreat`)
+ve **serbest modun rampasını** ilerletir. Uzun süre elle konmuş sezgisel
+sayılardı ve ölçünce tutarsız oldukları görüldü — neredeyse yalnızca YETENEĞİ
+fiyatlıyor, dayanıklılığı hiç saymıyorlardı:
+
+- **Bomber:** 10 HP, 1.11 DPS → tehdit **10**. Oyunun en kırılgan gemisi,
+  Swarm'la aynı statta ama on katı fiyatta.
+- **Armored:** raylı topa karşı 267 efektif HP → tehdit **4**. Kaleci'den
+  sonraki en dayanıklı gemi, Kaleci'nin beşte biri fiyatta.
+- **Bariyer:** ortalama 285 efektif HP → tehdit **3**.
+
+Formül artık açık:
+
+    tehdit = dayanıklılık × (DPS + 1) + yetenek
+
+**dayanıklılık** ve **DPS** Swarm'a normalize edilmiş oranlardır (Swarm = 1).
+Sonuç, toplam 127'de kalacak şekilde ölçeklenir (k ≈ 0.234) — böylece tabloyu
+düzeltmek gelir eğrisini ve dalga büyüklüklerini KAYDIRMAZ, yalnızca aralarındaki
+dağılımı düzeltir.
+
+**Dayanıklılık dirençlerden türer**, ham HP'den değil: gövde ve kalkanın üç
+silah tipine karşı efektif HP'sinin geometrik ortalaması. Ham HP kullanmak tam
+olarak Armored hatasını üretiyordu.
+
+**Çarpım, toplam değil.** Dayanıklı VE vurucu bir gemi, ikisinin toplamından
+fazlasıdır: uzun yaşadığı için toplam verdiği hasar da o kadar büyür. `+1`
+sıfır hasarlı gemiyi (Bariyer) formülden düşürmemek için: hasarı olmayan bir
+engel de temizlenmesi gereken bir şeydir, ama yalnızca dayanıklılığı kadar.
+
+**Yetenek puanı elle ve gerekçelidir** — üç kalemden oluşur:
+
+| Kalem | Ölçüt | Alanlar |
+|---|---|---|
+| Özel yetenek | mekaniğin kendisi | Bomber +6 (kalkan bypass), Onarıcı +7 (alan iyileştirme), Karıştırıcı +5 (enerji kısar), Hayalet +4 (vurulamazlık), Bölünen +4 (ikiye ayrılır), Sülük +4 (yapışır), Bariyer +3 (ateş hattı), Bomb Runner +3 (PD talebi), Kaleci +3 (zırh 12), Armored +2 (direnç primi), Obüs +1 (zırh 3) |
+| **Menzil** | `fireRange`, Swarm'ın 6.5'ine göre | Obüs +3 (10.5 — ekran dışından döver) |
+| **Manevra** | `hız × çeviklik`, Swarm'ın 4.5'ine göre | Avcı +3 (12.4), Sülük +1 (7.3) |
+
+Menzil ve manevra yetenek sayılır çünkü ikisi de statta görünmeyen bir ISABET
+maliyeti dayatır: menzil oyuncuyu ilerlemeye zorlar, manevra turretlerin ve elle
+nişanın ıskalamasına yol açar. İkisi de Swarm'a GÖRE ölçülür, yani referans gemi
+kendi kendine prim yazmaz.
+
+| tip | dayanıklılık | DPS oranı | stat | yetenek | **tehdit** | (eski) |
+|---|---|---|---|---|---|---|
+| Swarm | 1.00 | 1.00 | 0.5 | 0 | **1** | 1 |
+| Avcı | 1.43 | 1.90 | 1.0 | +3 | **4** | 6 |
+| Bomber | 0.57 | 1.85 | 0.4 | +6 | **6** | 10 |
+| Bariyer | 16.32 | 0.00 | 3.8 | +3 | **7** | 3 |
+| Shield | 6.48 | 3.33 | 6.6 | 0 | **7** | 5 |
+| Sülük | 1.72 | 3.57 | 1.8 | +5 | **7** | 8 |
+| Hayalet | 2.58 | 5.00 | 3.6 | +4 | **8** | 10 |
+| Bölünen | 4.01 | 3.75 | 4.5 | +4 | **8** | 12 |
+| Armored | 5.62 | 4.17 | 6.8 | +2 | **9** | 7 |
+| Obüs | 3.43 | 6.19 | 5.8 | +4 | **10** | 9 |
+| Karıştırıcı | 5.94 | 2.92 | 5.4 | +5 | **10** | 11 |
+| Onarıcı | 5.15 | 2.67 | 4.4 | +7 | **11** | 13 |
+| Bomb Runner | 2.00 | 20.00 | 9.8 | +3 | **13** | 12 |
+| Kaleci | 12.13 | 7.33 | 23.6 | +3 | **27** | 20 |
+
+**Bariyer 3 → 7 bilinçli bir geri dönüştür.** Daha önce 8'den 3'e indirilmişti
+çünkü 8'de bir dalganın bütçesine hiç sığmıyor ve ~level 40'a kadar hiç
+çıkamıyordu. O sorunu artık `WaveData.guaranteedType` ve serbest modun kendi
+kuralları çözüyor; fiyatı yapay olarak düşük tutmak gerekmiyor. 285 efektif HP
+taşıyan bir gemi dalga bütçesinden bir Swarm kadar yer kaplayamaz.
+
+**Bomb Runner'ın 20× DPS'i abartılıdır** — o sayı bomba hasarıdır (30 hasar /
+2.5 sn) ve bomba VURULABİLİR. Formül onu 13'e çıkarıyor; gerçekte Point
+Defence'li bir oyuncu için çok daha ucuz. Ölçülüp elle düşürülebilir.
+
+**Kaleci 27**, formülün doğal sonucu: 12× dayanıklılık ve 7× hasar çarpılıyor.
+Bir dalga bütçesi 27'ye ancak çok geç ulaşır, ama bölüm 10'un tanıtılan tipi
+olduğu için `guaranteedType` onu her levelde sahneye koyar.
+
 ### Zırh Eşiği — Tasarım Kararları
 
 ```
@@ -497,14 +580,20 @@ yani oyundaki en zayıf yükseltmeydi.
 Taban EnergyBus'tan OKUNUR, sabit yazılmaz — "her seviye +%50" ifadesi taban
 kapasite değiştiğinde de doğru kalsın diye.
 
-| Sv | Max enerji | O seviyenin fiyatı |
-|---|---|---|
-| 0 | 50 | — |
-| 1 | 75 | 98 |
-| 5 | 380 | 726 |
-| 10 | 2.883 | 8.883 |
+**Maliyeti jeneratörün ÜRETİM izinin yarısıdır** (`capacitorStatCostFactor`
+= 0.5). İkisi aynı tabanı paylaşıyordu ama aynı şeyi satmıyorlar: üretim her
+saniyeye dokunur, tampon yalnızca BURST anlarına. Aynı fiyata üretim almak
+neredeyse her zaman daha doğruydu — yani tampon bir seçenek değil, tuzaktı.
 
-İzi sonuna kadar götürmek 22.400 metal — kampanya gelirinin yaklaşık yarısı.
+| Sv | Max enerji | O seviyenin fiyatı | (eski) |
+|---|---|---|---|
+| 0 | 50 | — | — |
+| 1 | 75 | **49** | 98 |
+| 5 | 380 | **363** | 726 |
+| 10 | 2.883 | **4.442** | 8.883 |
+
+İzi sonuna kadar götürmek 11.200 metal — kampanya gelirinin (~45.800) dörtte
+biri. Eskiden 22.400'dü, yani tek başına gelirin yarısı.
 Sv10 tamponu, Sv10 jeneratörün 17 saniyelik tam üretimini depolar.
 
 Büyüme seviye içinde çarpımsal, **jeneratörler arası toplamsaldır** (zırh iziyle
@@ -541,6 +630,7 @@ Sayıların sahibi `BalanceConfig`.
 | `statStep` | 1.25 | seviye başına güç (sabit) |
 | `statCostGrowth` | **1.65** | seviye başına maliyet; eskiden 2.5 |
 | `armorStatCostFactor` | 3.0 | zırh izinin maliyet çarpanı |
+| `capacitorStatCostFactor` | **0.5** | kapasitör izi — tampon üretimin yarı fiyatına |
 | `sellRefundRatio` | 0.40 | kurulum + stat harcamasının iadesi |
 | `energyGrowth` | 1.30 | seviye başına enerji tüketimi |
 
@@ -704,6 +794,13 @@ savaşçının onu görmezden gelmesi için sebep yok.
   parça başına %12 olasılıkla düştüğü için neredeyse hep tek başına kalıyor
   ve tam birime hiç ulaşamıyordu: oyuncu asteroitlerden hiç kristal alamıyordu.
   `ResourceInventory.Add` de artık `float` alır.
+- **DOLU deposu olan kaynağı hedef almaz.** Tip ayrımının tek istisnası budur ve
+  dolu depoda ortaya çıkar: toplayıcı ne bulursa aldığı için kargosunu dolmuş
+  tiple dolduruyor, boşaltmaya dönüyor (kaynak tavanda yanıyor), dönüşte yine
+  aynı tipi alıyordu. Yani **metal dolduğu anda kristal toplama pratikte
+  duruyordu** — hâlbuki bir kaynağın dolması diğerini engellememeli. Doluluğun
+  sahibi envanterdir (`ResourceInventory.IsFull`), hedef seçimi de HUD uyarısı
+  da oradan okur; iki ayrı eşik yazılsaydı biri diğerinden sapardı.
 
 **Geminin kendi kristal ambarı 50 → 100.** Kristal metalden çok daha yavaş
 akıyor: yalnızca kalkanlı düşmanlardan ve asteroitlerin %12'sinden geliyor.
@@ -893,6 +990,33 @@ kaçışta radyal yönden ~26° sapma.
 `agility` dönüş hızı çarpanıdır, kavis yarıçapı ile ters orantılıdır.
 Referans dönüş hızı = `enginePower / mass × 30 × agility` derece/sn.
 
+**Kaçamak eğrisi UÇUŞUN KENDİSİNİ de kapsar** (`LevelCurve.MobilityMultiplier`).
+Uzun süre yalnızca SALINIM açısına uygulanıyordu: 1. levelde `evasionAngle` 0'a
+iniyor, ama gemi hâlâ 3 birim/sn giden ve **135°/sn** dönen bir Swarm'dı. Yani
+"ilk leveller düz uçar" kuralı kağıt üstünde geçerliydi; oyuncunun ıskaladığı
+şey salınım değil, DAR KAVİSTİ.
+
+Çarpan hem `enginePower`'a hem `agility`'ye uygulanır. Dönüş hızı ikisinin
+ÇARPIMI olduğu için gemi çarpanın **karesi** kadar hantallaşır:
+
+| Denk level | 1 | 5 | 9 | 13 | 25+ |
+|---|---|---|---|---|---|
+| Manevra çarpanı (`startMobility` 0.7 → 1) | 0.70 | 0.75 | 0.80 | 0.85 | 1.00 |
+| Swarm hızı | 2.10 | 2.25 | 2.40 | 2.55 | 3.00 |
+| Swarm dönüş hızı | **66°/sn** | 76 | 86 | 98 | **135°/sn** |
+| Swarm min kavis yarıçapı | 2.80 | 2.61 | 2.45 | 2.30 | 1.96 |
+
+Kavis yarıçapı `orbitRadius`'un (Swarm: 3.5) altında kaldığı için `ShipBrain`'in
+yörünge davranışı değişmez — gemi aynı deseni uçar, yalnızca daha yayvan ve
+tahmin edilebilir uçar.
+
+**Çarpan `agility`'nin ÜSTÜNE YAZILMAZ**, ayrı bir alanda taşınır
+(`EnemyTypeData.maneuverScale`). Sebebi mekanik: `agility` aynı zamanda tipin
+KİMLİĞİDİR — `PursuesFighters` eşiği (≥ 1.0) onu okur. Ölçek doğrudan agility'ye
+yazılsaydı erken levellerde Swarm'ın çevikliği 1.5 → 1.05 → 1.0'ın altına iner
+ve gemi sessizce "savaşçı kovalamaz" sınıfına geçerdi; bir levelin zorluğu bir
+tipin davranış kuralını değiştiremez.
+
 **İstisna — `omniThrust`:** Boss/taşıyıcı gibi devasa gemiler manevra iticileriyle
 her yöne itebilir, burun yönü hareketten bağımsızdır. Bu gemiler kavis çizmez,
 mevki tutar. 1–5, 8 ve 9 numaralı kurallar onlar için geçerli değildir.
@@ -1059,26 +1183,74 @@ dolayısıyla arkada düşman spawn olmaz.
 Zorluk seçimi buraya taşındı; daha önce yalnızca Game Over panelindeydi ve oyuncu
 zorluğu ancak öldükten sonra değiştirebiliyordu. Game Over'daki butonlar duruyor.
 
-**Serbest modun kendi zorluk rampası vardır** — baştan her tipi boca etmez.
-Geçen süreden bir *seviye* hesaplanır (`levelDuration` = 40 sn) ve dört şey
-birlikte artar:
+**Serbest modun zorluğu SAATTEN DEĞİL, YOK EDİLEN DÜŞMANDAN gelir.**
 
-| | Formül | 0:00 | 2:00 | 4:00 | 5:20+ |
-|---|---|---|---|---|---|
-| Açık tipler | `threatScore ≤ 1 + seviye × 1.5` | Swarm | +Armored, Shield | +Bomber | +BombRunner |
-| Spawn aralığı | 4.5 → 1.0 sn (seviye 8'de) | 4.5 sn | 3.2 sn | 1.9 sn | 1.0 sn |
-| Aynı anda sahada | `3 + seviye × 1.2` (tavan 14) | 3 | 5 | 9 | 11 → 14 |
-| HP / hasar / kaçamak | `1+0.10L` / `1+0.07L` / `L/7` | 1.00 / 1.00 / 0 | 1.30 / 1.21 / 0.43 | 1.60 / 1.42 / 0.86 | 1.80+ / 1.56+ / 1.00 |
+Eskiden geçen süreden bir *seviye* hesaplanıyordu (`_freeElapsed += Time.deltaTime`).
+O saat oyuncunun yaptığı hiçbir şeye bakmıyordu: gemileri öldürebilsen de
+öldüremesen de, kaynak toplasan da toplamasan da düşmanlar güçleniyordu. Geri
+düşen oyuncu bir daha toparlayamıyordu ve bunun kendini besleyen bir tarafı
+vardı — saha dolduğu için enkaz düşmüyor, yani toparlanmak için gereken kaynak
+da akmıyordu.
 
-Tipler tehdit puanına göre açılır: Armored 1:20, Shield 1:47, Bomber 4:00,
-BombRunner 4:53. Tam zorluğa ~5.5 dakikada varılır.
+Ölçü artık oyuncunun **temizlediği tehdit puanı**: kampanyanın dalga kurarken
+kullandığı para biriminin AYNISI (`ThreatBudget`). Kaleci öldürmek 20 puan,
+Swarm öldürmek 1 puan ilerletir; `threatPerRampLevel` (10) puan bir seviye eder.
+Yalnızca gerçek ölüm sayılır — ekrandan çıkarak kaybolan gemi oyuncunun
+kazanımı değildir. Sonuç kendini dengeler: takılan oyuncuda zorluk durur, hızlı
+temizleyende hızlı yükselir.
 
-**"Aynı anda sahada" tavanı** rampanın en önemli parçası: oyuncu temizleyemezse
-spawn durur, yığılma olmaz.
+Zaman yalnızca **spawn aralığını** ölçer. "Ne sıklıkta gelsin" bir tempo
+sorusudur; "ne kadar güçlü gelsin" ise bir kazanım sorusu.
 
-Çarpanlar sentetik bir `ChapterData` üzerinden uygulanır — serbest mod da
-kampanyayla **aynı ölçekleme yolunu** kullanır, ayrı bir formül yoktur.
-`EnemySpawner.debugChapter` doldurulursa rampa devre dışı kalır ve o bölümün
+| | Formül | 0 puan | 90 | 150 | 250 | 350 |
+|---|---|---|---|---|---|---|
+| Açık tipler | `threatScore ≤ 1 + seviye × 0.7` | Swarm | +Avcı | +Bomber | +Bariyer, Shield, Sülük, Hayalet, Bölünen, **Armored** | +Obüs, Karıştırıcı, Onarıcı, BombRunner |
+| Aynı anda sahada | `2 + seviye × 0.5` (tavan 8) | **2** | 4 | 5 | 8 | 8 |
+| Spawn aralığı | 3.5 → 1.5 sn (seviye 20'de) | 3.5 | 3.0 | 2.8 | 2.3 | 1.8 |
+| Denk kampanya leveli | `1 + seviye × 1.5` | 1 | 8 | 12 | 20 | 27 |
+| HP / zırh | o levelin `LevelCurve` değerleri | 1.00 / 0.0 | 1.17 / 0.4 | 1.29 / 0.7 | 1.55 / 1.5 | 1.82 / 2.5 |
+
+`threatPerLevel` 0.4 → 0.7: tehdit tablosu formüle geçince tüm sayılar yükseldi
+(Armored 7 → 9, Bariyer 3 → 7), yani AYNI kilit oranı tipleri çok daha geriye
+atıyordu. Kilit tehdit puanı cinsinden ölçüldüğü için tablo değişince onun da
+ölçeklenmesi gerekti — açılış sırası ve mesafeleri korundu.
+
+**SAYI ile TİP ayrı kollardır.** Rampa iki kez toptan yavaşlatıldı ve ikisinde de
+oyunun başı sıkıcı hâle geldi: sahada tek bir Swarm, altı saniyede bir yenisi.
+Oysa bir Swarm daha eklemek TEMPO'yu artırır, yeni bir TİP açmak DUVAR örer.
+Şimdi sayı hızlı büyüyor (taban 2, aralık 3.5 sn), tipler yavaş açılıyor.
+
+**Rampa kendi ölçekleme formülünü YAZMIYOR**, yalnızca bir kampanya leveli
+seçiyor (`EquivalentLevel`) ve çarpanları `LevelCurve`'den okuyor. Ayrı
+formülün en tehlikeli parçası zırhtı: `armor = seviye × 1.2` ile birkaç
+dakikada **6 zırh** oluşuyordu; kampanyada 6 zırha ancak ~level 45'te ulaşılır,
+oysa oyuncu serbest modda başlangıç donanımıyla.
+
+**Açılış SIRASI artık doğru.** Tehdit tablosu formülden gelince sıra
+kendiliğinden düzeldi: Avcı (4) → Bomber (6) → Shield/Sülük (7) → **Armored (9)**.
+Gerçek zorluk sırası da bu — Avcı 25 HP'lik bir kağıt uçak, Shield'in kalkanını
+kinetik ×1.5 ile kırarsın, Armored ise başlangıç silahına karşı 267 efektif
+HP'lik bir duvar. Eskiden tehdit 4'le Armored hepsinden ÖNCE geliyordu.
+
+**AĞIR TİP YALNIZ GELİR** (`heavySoloRatio` = 0.5). Tehdit puanı o anki tavanın
+yarısından büyük olan tipten sahada en fazla BİR tane bulunur. Ölçü mutlak değil
+görelidir: yeni açılan tip tanım gereği tavanın tepesindedir, yani hep yalnız
+gelir; havuz büyüyüp o tip sıradanlaştıkça kendiliğinden çoğalır. Armored ~229
+puanda açılıyor, ÇİFT gelebilmesi için tavanın 18'e çıkması — yani ~487 puanlık
+bir temizlik — gerekiyor. Yeni açılan ağır bir tipin AÇILDIĞI AN çifter gelmesi,
+oyuncunun eline yeni bir cevap geçmeden iki katı duvar demekti.
+
+**Siper gemisi serbest modda da iki kurala tabidir** (`RollUnlockedType`):
+yalnız gelmez ve aynı anda en fazla `maxBarriersAlive` (1) tane bulunur.
+Birincisi kampanyada zaten vardı (`FillByBudget`), serbest modda HİÇ YOKTU —
+oysa gerekçe modun değil, gemi tipinin kendisine ait. İkincisi yeni ve serbest
+moda özgü bir boşluğu kapatıyor: kampanyada dalga bittiğinde siperlere çekilme
+emri verilir (`Withdraw`), serbest modda dalga diye bir şey yok. Siper hiç hasar
+vermez, ölmez (kalkanı boşalınca çekilip şarj olur) ve sayılmaz — yani hiçbir
+şey onu sahneden çıkarmıyordu. Üç siper bir DUVAR eder: oyuncunun ateş hattı
+tamamen kapanır ve yapabileceği bir şey kalmaz.
+
+`EnemySpawner.debugLevel` doldurulursa rampa devre dışı kalır ve o levelin
 sabit zorluğu kullanılır.
 
 Serbest modda küçük bir asteroit alanı da kurulur (3 asteroit) — yoksa hiç
@@ -1197,6 +1369,15 @@ Ayrıntı: "Formasyon Sistemi" bölümü.
 | 9 | 81–90 | Bölünen Sürü | Splitter | İkiz Dreadnought (×2) | hedef bölme |
 | 10 | 91–100 | Kovan Zihni | Juggernaut | Kovan Zihni | hepsi (zırh 20) |
 
+**Bölümün TANITILAN TİPİ her levelde garanti** (`WaveData.guaranteedType`, son
+dalgaya konur). Dalga bütçesi levelin bütçesinin ~%40'ı olduğu için ağır bir tip
+uzun süre HİÇBİR dalgaya sığmaz: level 12'de en büyük dalga 4 puanken Armored 7,
+Bomber 10, Jammer 11 puan. Yani "Zırhlı birimler tespit edildi" diyen bölüm 2,
+tanıtım levelinden sonra tek bir zırhlı göstermeden bitiyordu — bölüm kimliğini
+yalnızca ilk levelinde taşıyordu. Garanti, `FillByBudget`'ın boş-dalga kuralıyla
+aynı gerekçeye dayanır: bütçeyi bir tip kadar aşmak, bölümün kimliğini hiç
+göstermemekten iyidir.
+
 **Boss'lar formülden türer** (`BossShipData.CreateForChapter`): gövde
 `500 × HpMultiplier(n)`, hardpoint sayısı `2 + bölüm/2`, her biri
 `120 × HpMultiplier(n)`. Elle yazılan tek şey mekanik ve isimdir.
@@ -1250,7 +1431,8 @@ bırakıldı.
 | LevelBannerUI.cs | Her level başında üstte 2–3 sn görünen level / bölüm bandı |
 | ComponentCatalog.cs | Tüm komponent tanımlarının tek sahibi — ne var, kaça, hangi zincirle |
 | BalanceConfig.cs | Gelir ve zırh eğrilerinin tek sahibi (SO; asset yoksa varsayılan) |
-| LevelCurve.cs | Düşman ölçeklemesi: HP, hasar, zırh, kaçamak — levelden türer |
+| LevelCurve.cs | Düşman ölçeklemesi: HP, hasar, zırh, kaçamak, manevra — levelden türer |
+| BalanceLog.cs | Denge ölçümü — ham olay kaydı (JSONL), editörde açık |
 | GameProgress.cs | Kampanyadaki yer: 100 level, 10 bölüm, bölüm başına 1 boss |
 | SaveSystem.cs | Kampanya kaydı (PlayerPrefs), level sınırlarında yazılır |
 | StorageComponent.cs | Depo — kurulu olduğu sürece kaynak tavanını yükseltir |
@@ -1281,6 +1463,7 @@ bırakıldı.
 | UpgradeUI.cs | Tab ile açılan upgrade ekranı, 4 panel layout |
 | SlotVisual.cs | World-space slot göstergesi — dolu slotta halka, boş slotta daire |
 | EnemyInfoHUD.cs | Fare düşman üstündeyken sol üstte açılan bilgi kutusu |
+| EnergyBar.cs | Üst HUD şeridi: enerji + metal + kristal barları ve uyarı satırı |
 | HitEffect.cs | Çarpma kıvılcımlarının tek giriş noktası (`SpawnImpact`) + DeathEffect |
 | SkinLibrary.cs | TÜM görsel üretiminin tek giriş noktası — skin varsa sprite, yoksa prosedürel dikdörtgen |
 | SkinSet.cs | Skin'lerin tek sahibi (SO; Resources/SkinSet.asset). Ana aç/kapa anahtarı burada |
@@ -1305,6 +1488,7 @@ varmıyordu.
 | Kinetik | 18 birim (3 sn ömür) | 36 birim (5.9 sn ömür) |
 | Lazer | 22 birim | 36 birim |
 | Plazma | 60 birim | değişmedi — zaten yeterliydi |
+
 
 Turret menzilleri BİLEREK dokunulmadı: onlar `bulletLifeTime × bulletSpeed`
 ile tanımlı birer DENGE değeri, kadraj sınırı değil.
@@ -1350,6 +1534,69 @@ float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
 ```
 
 ---
+
+## Denge Ölçümü — `BalanceLog`
+
+Bugüne kadarki bütün denge sayıları **%100 isabet** varsayımıyla kalibre edildi
+ve hiçbiri oyunda ölçülmedi. Tehdit puanı formüle bağlandı (bkz. "Tehdit
+Puanı — Formül") ama formülün kendisi de doğrulanmadı. Ölçüm altyapısı bunun
+için var.
+
+**Ham olay kaydedilir, özet değil.** "Ortalama TTK" kaydetseydik sonradan
+"peki KİNETİK ile Armored'a karşı TTK neydi" diye soramazdık. Ham olaydan her
+özet türetilebilir, tersi olmaz. Format JSONL (satır başına bir JSON),
+`Application.persistentDataPath/balance/<tarih>-<mod>.jsonl`.
+
+**Editörde açık, build'de kapalı.** Ölçüm bir geliştirme aracı; oyuncunun
+diskine yazmasının anlamı yok.
+
+| Olay | Ne verir |
+|---|---|
+| `enemy_spawn` / `enemy_death` | **TTK**, yaşam süresi, yenen hasar → tehdidin doğrulanması |
+| `shot_fired` / `shot_hit` | **İsabet oranı** (kaynak × silah × hedef tipi) |
+| `player_damage` | Ölüm sebebi dağılımı; kalkanın yuttuğu / gövdeye geçen |
+| `resource` (`dustu` / `toplandi`) | Gelir, toplama oranı, **tavanda yanan kaynak** |
+| `upgrade` | Yükseltme temposu — oyuncu güç eğrisinin gerçeği |
+| `wave` | Kağıttaki bütçe ile sahneye çıkan KADRO farkı |
+| `level_start` / `level_end` | **Level süresi**, biterken HP ve envanter |
+
+Ölçmek istediğimiz asıl şey tehdit puanının doğrulanmasıdır:
+
+    gözlenen_tehdit ≈ α · (o gemiye harcanan oyuncu-saniyesi)
+                    + β · (o geminin oyuncuya verdiği hasar)
+
+Formülün çıktısı bununla karşılaştırılınca **artıklar** hangi yetenek puanının
+yanlış olduğunu doğrudan söyler. Bomb Runner'ın 13'ü fazla mı, Kaleci'nin 27'si
+az mı — tahminle değil kalıntıyla anlaşılır.
+
+**İsabet oranı ölçülmemiş tek kritik bilinmeyendir** ve bütün TTK'ları doğrudan
+çarpar: gerçek oran %60 ise tablodaki her süre 1.67 katına çıkar. Işınlar
+paydaya girmez, ıskalamazlar.
+
+**Satırlar iç içe geçemez** — tek paylaşılan StringBuilder. Alan değerlerinde
+başka bir şey loglayan metot çağrılmamalı.
+
+### Sonraki adımlar
+
+- **Analiz scripti** (`Tools/Balance/analyze.js`) — JSONL okur, metrik tablolarını
+  basar. İlk gerçek log dosyası görülmeden yazılmayacak; formatı varsayıp
+  yazmak, aynı hatayı bir kez daha yapmak olur.
+- **Headless simülasyon** — Unity `-batchmode`, sahte oyuncu politikası, binlerce
+  koşu. Ama önce gerçek oyundan **isabet oranı** ölçülmeli: simülasyona onu
+  koymadan kurmak, kendi varsayımını doğrulamak olur.
+- **Seed'li rastgelelik** — A/B karşılaştırması için şart. Şu an yok.
+- **Duyarlılık analizi** — her parametreyi ±%20 oynatıp hedef metrikteki
+  değişimi ölç. En duyarlı üç parametre gerçek kollardır; gerisi gürültü.
+
+### Hedef eğriler (ne "denge" sayılır)
+
+| Metrik | Hedef | Neden |
+|---|---|---|
+| Level süresi | 3–4 dk | Asteroit geliri zaten buna dayanıyor |
+| Oyuncu/düşman güç oranı | kampanya boyunca 4–5 arası düz | Zaten yazılı hedef |
+| Kaynak yanması | < %15 | Üstü toplayıcı/depo sorunudur |
+| Bir tipin toplam hasar payı | < %30 | Üstü o tipin fiyatı yanlış |
+| Tehdit tahmin hatası | R² > 0.8 | Formül işini yapıyor demek |
 
 ## Skin Sistemi
 
@@ -1690,6 +1937,35 @@ hasarı · hareket deseni · gövde ve kalkan dirençleri · savaşçılara kar�
 yerini zırh aldı; bu levelde vurmayı belirleyen sayı odur. Değerler ölçeklenmiş
 runtime kopyasından okunur, yani asset'teki taban değil bu levelde gerçekten
 geçerli olan sayı görünür. Boss ve hardpoint'leri de kutu açar.
+
+## HUD Uyarıları — Tasarım Kararları
+
+Barların hemen altında, tek satır (`EnergyBar`). İki kademe var ve ayrım
+anlamlıdır:
+
+| Kademe | Görünüm | Ne diyor |
+|---|---|---|
+| YAKLAŞIYOR | sarı, sabit | "önlem al" — `LOW ENERGY`, `METAL NEARLY FULL` |
+| OLDU | kırmızı, 2.2 Hz nabız | "şu an kaybediyorsun" — `NO ENERGY`, `METAL FULL` |
+
+Neden var: bar zaten doluluğu gösteriyor ama oyuncu savaş sırasında üç barı da
+okumuyor. Enerjinin bittiğini ateş edemeyince anlıyordu; **deponun dolduğunu
+ise hiç anlamıyordu** — tavana çarpan kaynak `Add()` içinde sessizce kırpılıyor,
+toplayıcılar boşuna sefer yapıyordu. Uyarı barların yanına değil ALTINA konur:
+üstteki şerit sayının yeri, bu satır olayın yeri.
+
+Eşikler: enerji < %10, depo ≥ %90 (`ResourceInventory.NearFullRatio`). Depo
+eşiği toplayıcının hedef seçimiyle **aynı kaynaktan** okunur — HUD "dolu" derken
+toplayıcının hâlâ toplaması, ikisinin ayrı eşik yazmasının doğal sonucu olurdu.
+
+Nabız `unscaledTime` ile sürer: upgrade ekranı açıkken oyun duruyor ama uyarı
+orada da okunmalı — zaten oyuncunun sorunu çözmek için gideceği yer o ekran.
+Uyarılar bir BİT MASKESİNE indirilir ve metin yalnızca maske değiştiğinde
+yeniden kurulur; her karede string üretmek kare başına çöp demekti.
+
+Metinler İNGİLİZCE ("NO ENERGY", "METAL FULL") — HUD'un geri kalanı Türkçe
+etiketler taşıyor (ENERJİ / METAL / KRİSTAL), uyarı satırı ayrı bir öğe olarak
+kendi içinde tutarlı. Tek yerden değiştirilebilir: `BuildWarningText`.
 
 ## HealthBar Sistemi
 - SpriteRenderer tabanlı, Canvas kullanılmaz

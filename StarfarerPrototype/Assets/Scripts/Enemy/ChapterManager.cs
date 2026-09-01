@@ -54,6 +54,9 @@ public class ChapterManager : MonoBehaviour
         foreach (var s in FindObjectsByType<EnemySpawner>(FindObjectsSortMode.None))
             s.DisableFreeSpawn();
 
+        BalanceLog.Begin("kampanya");
+        BalanceUploader.EnsureExists();
+
         _asteroids    = gameObject.AddComponent<AsteroidSpawner>();
         _transitionUI = FindFirstObjectByType<ChapterTransitionUI>();
 
@@ -105,11 +108,20 @@ public class ChapterManager : MonoBehaviour
 
         _asteroids?.Configure(chapter.asteroidCount, chapter.asteroidInterval);
 
-        _levelWaves = BuildWaves(level, chapter);
-        _waveIndex  = 0;
+        _levelWaves     = BuildWaves(level, chapter);
+        _waveIndex      = 0;
+        _levelStartedAt = Time.time;
+
+        BalanceLog.Event("level_start")
+                  .Num("butce", BalanceConfig.Instance.ThreatBudget(level))
+                  .Num("dalga", _levelWaves.Count)
+                  .End();
 
         BeginWave();
     }
+
+    /// <summary>Level süresini ölçmek için — bkz. CompleteLevel.</summary>
+    float _levelStartedAt;
 
     /// <summary>
     /// Levelin tehdit bütçesini wave'lere böler.
@@ -151,6 +163,15 @@ public class ChapterManager : MonoBehaviour
         // tırmanıyor.
         foreach (int waveBudget in cfg.SplitWaveBudget(budget, WaveCountFor(level)))
             waves.Add(Wave(waveBudget, pool));
+
+        // Bölümün KİMLİĞİ her levelde en az bir kez görünmeli. Dalga bütçesi
+        // levelin bütçesinin ~%40'ı olduğu için ağır bir tip (Armored 7,
+        // Bomber 10, Jammer 11) bütçeye uzun süre HİÇ sığmaz: "Zırhlı birimler
+        // tespit edildi" diyen bölüm 2, tanıtım levelinden sonra tek bir zırhlı
+        // göstermeden bitiyordu. Garanti son dalgaya konur — level bir tırmanış,
+        // bölümün imzası da zirvesinde durmalı.
+        if (waves.Count > 0 && chapter.introducedType != null)
+            waves[waves.Count - 1].guaranteedType = chapter.introducedType;
 
         return waves;
     }
@@ -199,8 +220,28 @@ public class ChapterManager : MonoBehaviour
             FillByBudget(_pendingSpawns, pool,
                 Random.Range(wave.budgetMin, wave.budgetMax + 1));
 
+            // Bölümün tanıtılan tipi bütçeye sığmadıysa bir tane zorla eklenir
+            // (bkz. BuildWaves). Bütçeyi bir tip kadar aşmak, bölümün kimliğini
+            // hiç göstermemekten iyidir — boş dalga kuralıyla aynı gerekçe.
+            if (wave.guaranteedType != null && !_pendingSpawns.Contains(wave.guaranteedType))
+                _pendingSpawns.Add(wave.guaranteedType);
+
             var formation = wave.formation ?? PickFormation(_pendingSpawns, _formations);
             SortByFormation(_pendingSpawns, formation);
+
+            // Dalganın GERÇEKTEN ne ürettiği: bütçe küçük ve tipler pahalı
+            // olduğu için kadro çoğu zaman bütçenin söylediği şey değildir
+            // (boş-dalga taşması ve guaranteedType). Kağıt üstündeki bütçeyle
+            // sahneye çıkan kadroyu ancak yan yana koyunca görebiliriz.
+            int kadroTehdit = 0;
+            foreach (var t in _pendingSpawns) if (t != null) kadroTehdit += t.threatScore;
+            BalanceLog.Event("wave")
+                      .Num("index",  _waveIndex)
+                      .Num("butce",  wave.budgetMax)
+                      .Num("kadro",  _pendingSpawns.Count)
+                      .Num("tehdit", kadroTehdit)
+                      .End();
+
             SpawnFormation(_pendingSpawns, formation, wave.spawnSide);
         }
 
@@ -317,6 +358,23 @@ public class ChapterManager : MonoBehaviour
     void CompleteLevel()
     {
         _phase = Phase.Transition;
+
+        // Level SÜRESİ ölçülmemiş en pahalı varsayım: asteroit geliri ~3.5
+        // dakikalık bir level varsayımına dayanıyor (bkz. Gelir Eğrisi). Gerçek
+        // süre saparsa asteroit payı da sapar.
+        var ship = FindFirstObjectByType<PlayerShip>();
+        var inv  = ResourceInventory.Instance;
+        BalanceLog.Event("level_end")
+                  .Num("sure",    Time.time - _levelStartedAt)
+                  .Num("dalga",   _levelWaves != null ? _levelWaves.Count : 0)
+                  .Num("hp",      ship != null ? ship.currentHullHP : -1f)
+                  .Num("metal",   inv != null ? inv.metal   : -1f)
+                  .Num("kristal", inv != null ? inv.crystal : -1f)
+                  .End();
+
+        // Level sınırı doğal gönderim noktası: oyun zaten duruyor ve kayıt
+        // tutarlı bir yerde kesiliyor.
+        BalanceUploader.Flush();
 
         if (GameProgress.IsLastLevel)
         {

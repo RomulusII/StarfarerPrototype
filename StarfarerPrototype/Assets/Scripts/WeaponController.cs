@@ -63,7 +63,7 @@ public class WeaponController : MonoBehaviour
 
     void UpdateKinetic()
     {
-        if (Mouse.current.leftButton.isPressed && Time.time >= _nextFireTime)
+        if (PointerInput.FireHeld && Time.time >= _nextFireTime)
         {
             _nextFireTime = Time.time + fireRate;
             SpawnBullet(_kineticSprite, WeaponType.Kinetic, speed: 6f);
@@ -76,7 +76,7 @@ public class WeaponController : MonoBehaviour
 
     void UpdateLaser()
     {
-        bool held = Mouse.current.leftButton.isPressed;
+        bool held = PointerInput.FireHeld;
 
         if (held && _activeLaserBeam == null)
         {
@@ -119,8 +119,8 @@ public class WeaponController : MonoBehaviour
 
     void UpdatePlasma()
     {
-        bool held     = Mouse.current.leftButton.isPressed;
-        bool released = Mouse.current.leftButton.wasReleasedThisFrame;
+        bool held     = PointerInput.FireHeld;
+        bool released = PointerInput.FireReleased;
 
         if (held)
         {
@@ -238,9 +238,26 @@ public class WeaponController : MonoBehaviour
         sr.sortingOrder = 20;
 
         var b = go.AddComponent<Bullet>();
-        b.speed      = speed;
-        b.damage     = damage * damageMulti;
-        b.weaponType = type;
+        b.speed       = speed;
+        b.damage      = damage * damageMulti;
+        b.weaponType  = type;
+        b.boostAtFire = BoostController.Mode;
+
+        // İsabet oranının PAYDASI. Işınlar buraya girmez (ıskalamazlar), yani
+        // oran yalnızca mermili silahlar için anlamlıdır.
+        //
+        // Boost etiketi şart: silah boost'u hasarı ×2, mermi boyutunu ×1.5
+        // yapıyor; kalkan boost'u ise ×1/3 ve ×0.6. Yani boost, hem hasarı hem
+        // İSABET OLASILIĞINI değiştiriyor. Etiketsiz toplanan bir isabet oranı
+        // üç ayrı silahın karışımı olurdu.
+        BalanceLog.Event("shot_fired")
+                  .Str("kaynak", "ana")
+                  .Str("silah",  type.ToString())
+                  .Str("boost",  b.boostAtFire.ToString())
+                  .Num("hasar",  b.damage)
+                  .Num("boyut",  scaleMulti)
+                  .Num("hiz",    speed)
+                  .End();
     }
 
     // Dairesel (alpha kenar kesen) sprite — plazma küre ve bolt için

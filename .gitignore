@@ -87,3 +87,9 @@ StarfarerPrototype/.claude/worktrees/
 
 # SkinGen onizleme ciktilari - uretilebilir, repoya girmez
 /StarfarerPrototype/Tools/SkinGen/*.png
+
+# Denge kayitlari - sunucudan indirilir, uretilebilir veri
+/StarfarerPrototype/Tools/Balance/logs/
+
+# Indirici yapilandirmasi - TOKEN icerir, repoya GIRMEMELI
+/StarfarerPrototype/Tools/Balance/pull.config.json

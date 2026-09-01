@@ -29,6 +29,32 @@ public static class DamageUtil
     /// Hedef tespitiyle aynı dosyada durur: iki soru da "bu collider ne"
     /// sorusunun parçası ve ayrı yerlerde yaşasalardı biri diğerinden sapardı.
     /// </summary>
+    /// <summary>
+    /// Denge kaydı için hedefin TİP ADI. "Bu silah neyi vuruyor" sorusu isabet
+    /// oranını hedef tipine göre ayırmak için gerekli — kıvrak bir Avcı ile
+    /// duran bir asteroit aynı sayıya karışmamalı.
+    ///
+    /// Yüzey tespitiyle (<see cref="SurfaceOf"/>) aynı dosyada durur: ikisi de
+    /// "bu collider ne" sorusunun parçası.
+    /// </summary>
+    public static string TypeNameOf(Collider2D other)
+    {
+        if (other == null) return "?";
+
+        var shieldOwner = ShieldOwnerOf(other);
+        if (shieldOwner != null && shieldOwner.data != null) return shieldOwner.data.name;
+
+        var enemy = other.GetComponent<EnemyBot>();
+        if (enemy != null && enemy.data != null) return enemy.data.name;
+
+        if (other.GetComponent<BossHardpoint>() != null) return "Hardpoint";
+        if (other.GetComponent<BossShip>()      != null) return "Boss";
+        if (other.GetComponent<Asteroid>()      != null) return "Asteroit";
+        if (other.GetComponent<Bomb>()          != null) return "Bomba";
+
+        return other.name;
+    }
+
     public static ImpactSurface SurfaceOf(Collider2D other)
     {
         if (other == null) return ImpactSurface.Hull;

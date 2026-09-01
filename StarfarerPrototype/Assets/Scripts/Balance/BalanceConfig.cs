@@ -102,6 +102,13 @@ public class BalanceConfig : ScriptableObject
              "alan bir iz olarak açık ara en verimli yükseltme olurdu.")]
     public float armorStatCostFactor = 3f;
 
+    [Tooltip("Kapasitör (enerji tamponu) statının maliyet çarpanı. Jeneratörün " +
+             "üretim iziyle aynı tabanı paylaşıyordu, oysa ikisi aynı şeyi " +
+             "satmıyor: üretim her saniyeye, tampon yalnızca BURST anlarına " +
+             "dokunur. Aynı fiyata üretim almak neredeyse her zaman daha " +
+             "doğruydu — yani tampon bir seçenek değil, tuzaktı.")]
+    public float capacitorStatCostFactor = 0.5f;
+
     [Tooltip("Satışta iade oranı — kurulum + stat harcamalarının toplamına uygulanır.")]
     public float sellRefundRatio = 0.40f;
 
@@ -115,10 +122,16 @@ public class BalanceConfig : ScriptableObject
     public float StatMultiplier(int level) => Mathf.Pow(statStep, Mathf.Max(0, level));
 
     /// <summary>
-    /// Statın kendi maliyet çarpanı. Çoğu iz 1.0'dır; ayrıcalıklı izler (zırh)
-    /// aynı komponentin tabanını paylaşmak yerine burada pahalılaşır.
+    /// Statın kendi maliyet çarpanı. Çoğu iz 1.0'dır; komponentin tabanını
+    /// paylaşmanın yanlış olduğu izler burada ayrışır — zırh pahalılaşır
+    /// (doğrudan hayatta kalma satıyor), kapasitör ucuzlar (yalnızca burst).
     /// </summary>
-    public float StatCostFactor(string key) => key == "armor" ? armorStatCostFactor : 1f;
+    public float StatCostFactor(string key) => key switch
+    {
+        "armor"     => armorStatCostFactor,
+        "capacitor" => capacitorStatCostFactor,
+        _           => 1f,
+    };
 
     public int StatUpgradeCost(int baseCost, int currentLevel, string key = null)
         => Mathf.RoundToInt(Mathf.Max(5, baseCost) * StatCostFactor(key)

@@ -23,4 +23,8 @@ public class WaveData
 
     [Tooltip("Set edilirse bu boss gemi bu wave'de spawn edilir. allowedTypes ile birlikte kullanılabilir (escort).")]
     public BossShipData bossType;
+
+    [Tooltip("Bütçeye sığmasa bile bu dalgada EN AZ BİR tane bulunması garanti " +
+             "edilen tip. Bölümün kimliğini taşıyan tip için kullanılır.")]
+    public EnemyTypeData guaranteedType;
 }

@@ -142,6 +142,7 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         rb.bodyType    = RigidbodyType2D.Kinematic;
         rb.gravityScale = 0f;
         _movement      = gameObject.AddComponent<ShipMovement>();
+        _bornAt        = Time.time;
     }
 
     void Start()
@@ -152,9 +153,17 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         _healthBar  = GetComponent<HealthBar>();
         _playerShip = FindFirstObjectByType<PlayerShip>();
 
+        // Manevra çarpanı HEM hıza HEM çevikliğe uygulanır. Dönüş hızı
+        // (ShipMovement.TurnRate) ikisinin ÇARPIMI olduğu için gemi erken
+        // levellerde çarpanın KARESİ kadar hantallaşır: Swarm 0.7'de 3 → 2.1
+        // birim/sn giderken 135 → 66 °/sn döner, yani kavis yarıçapı 1.96'dan
+        // 2.80'e çıkar. Aranan şey buydu — "ilk leveller düz uçar" kuralı
+        // yalnızca salınım açısına uygulanıyordu, oysa oyuncunun ıskaladığı şey
+        // salınım değil DAR KAVİSTİ.
+        float mob             = Mathf.Max(data.maneuverScale, 0.05f);
         _movement.mass        = data.mass;
-        _movement.enginePower = data.enginePower;
-        _movement.agility     = data.agility;
+        _movement.enginePower = data.enginePower * mob;
+        _movement.agility     = data.agility     * mob;
         _movement.grip        = data.grip;
         _movement.wanderAngle  = data.evasionAngle;
         _movement.wanderPeriod = data.evasionPeriod;
@@ -1034,15 +1043,44 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         ApplyHullDamage(ApplyShieldLayer(shot, weaponType));
     }
 
+    // Denge ölçümü: bu gemiye harcanan oyuncu emeğini ölçebilmek için doğum
+    // anı ve toplam yediği hasar tutulur. Tehdit puanının doğrulanması bu iki
+    // sayıya dayanır (bkz. BalanceLog).
+    float _bornAt = -1f;
+    float _damageTaken;
+
+    // İlk isabet anı. "Yaşam süresi" tehdit hesabı için YANLIŞ ölçüdür: gemi
+    // sahnede 18 saniye durup son 3 saniyesinde vurulmuş olabilir. Tehdidin
+    // asıl bileşeni oyuncunun ona harcadığı süredir — ilk isabetten ölüme.
+    float _firstHitAt = -1f;
+
     void ApplyHullDamage(float hull)
     {
         if (hull <= 0f) return;
+        _damageTaken += hull;
+        if (_firstHitAt < 0f) _firstHitAt = Time.time;
 
         _healthBar.TakeDamage(hull);
         if (_healthBar.currentHealth <= 0f)
         {
             SpawnSplitFragments();
             SpawnDebris();
+            // Serbest modun zorluk ilerlemesi buradan beslenir. Yalnızca GERÇEK
+            // ölüm sayılır: ekrandan çıkarak veya çekilerek yok olan gemi
+            // (diğer Destroy çağrıları) oyuncunun bir kazanımı değildir.
+            EnemySpawner.ReportKill(data);
+
+            BalanceLog.Event("enemy_death")
+                      .Str("tip",    data.name)
+                      .Num("tehdit", data.threatScore)
+                      .Num("maxHP",  data.maxHP)
+                      .Num("kalkan", data.maxShield)
+                      .Num("zirh",   EffectiveArmor)
+                      .Num("yasam",  _bornAt >= 0f ? Time.time - _bornAt : -1f)
+                      .Num("dovus",  _firstHitAt >= 0f ? Time.time - _firstHitAt : -1f)
+                      .Num("yenen",  _damageTaken)
+                      .End();
+
             Destroy(gameObject);
         }
     }

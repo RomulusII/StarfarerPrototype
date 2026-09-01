@@ -8,6 +8,8 @@ using UnityEngine;
 ///   - Enkaz hangardan MaxDebrisRange'den uzaksa hedef almaz / bırakır.
 ///   - Tip ayrımı yapmaz: ne bulursa toplar. Kargo tipe göre ayrı sayılır ama
 ///     kapasite toplam üzerinden işler; hangara varınca hepsi birden boşaltılır.
+///   - TEK istisna: deposu DOLU olan kaynağı hedef almaz. Bir kaynağın dolması
+///     diğerinin toplanmasını durdurmamalı.
 ///   - Kargo dolunca Returning'e geçer.
 ///   - Kapasite dolmamışsa aynı seferde birden fazla enkaz toplayabilir.
 ///   - Toplanacak enkaz kalmadıysa ve kargoda bir şey varsa boşta beklemez —
@@ -93,6 +95,7 @@ public class CollectorShip : MonoBehaviour
             case Phase.GoToDebris:
                 if (_target == null || _target.IsEmpty) { _target = null; _phase = Phase.Idle; break; }
                 if (DebrisTooFar(_target))               { _target = null; _phase = Phase.Idle; break; }
+                if (!Collectable(_target))               { _target = null; _phase = Phase.Idle; break; }
                 _movement.MoveToward(_target.transform.position);
                 if (Vector2.Distance(transform.position, _target.transform.position) < 0.3f)
                     _phase = Phase.Collecting;
@@ -102,6 +105,8 @@ public class CollectorShip : MonoBehaviour
                 if (_target == null || _target.IsEmpty) { _target = null; _phase = Phase.Idle; break; }
                 // Enkaz sola kayarken toplayıcıyı menzil dışına sürüklemesin
                 if (DebrisTooFar(_target))              { _target = null; _phase = Phase.Idle; break; }
+                // Depo toplama SIRASINDA dolabilir — kalanı almanın anlamı yok
+                if (!Collectable(_target))              { _target = null; _phase = Phase.Idle; break; }
                 if (_cargoTotal >= maxCargo)            { _phase = Phase.Returning; break; }
                 // Enkaz ile birlikte sürüklen — motor kapalı, kalan hız sıfırlanır
                 _movement.Halt();
@@ -140,6 +145,20 @@ public class CollectorShip : MonoBehaviour
         _cargoTotal = 0f;
     }
 
+    /// <summary>
+    /// Bu enkazın kaynağı depoya SIĞIYOR mu? Dolu bir tipi toplamak kaynağı
+    /// yakmakla kalmıyordu: toplayıcı kargosunu o tiple doldurup boşaltmaya
+    /// dönüyor, dönüşte yine aynı tipi alıyordu — yani metal dolduğu anda
+    /// kristal toplama pratikte duruyordu. Tip ayrımı yalnızca burada,
+    /// DEPO DOLUYKEN yapılır; boş depoda toplayıcı hâlâ ne bulursa alır.
+    /// </summary>
+    static bool Collectable(Debris d)
+    {
+        if (d == null) return false;
+        var inv = ResourceInventory.Instance;
+        return inv == null || !inv.IsFull(d.resourceType);
+    }
+
     bool DebrisTooFar(Debris d)
     {
         if (_hangar == null) return false;
@@ -169,6 +188,7 @@ public class CollectorShip : MonoBehaviour
         {
             if (claimed.Contains(d)) continue;
             if (DebrisTooFar(d)) continue;
+            if (!Collectable(d)) continue;
             float dist = Vector2.Distance(transform.position, d.transform.position);
             if (dist < bestD) { bestD = dist; best = d; }
         }

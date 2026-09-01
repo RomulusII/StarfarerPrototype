@@ -36,6 +36,14 @@ public class LevelCurve : ScriptableObject
              "oyuncu nişan almayı öğrenirken düz uçan hedeflerle başlar.")]
     public int evasionFullLevel = 25;
 
+    [Tooltip("1. levelde manevra kabiliyetinin çarpanı — hem hıza hem çevikliğe " +
+             "uygulanır. Dönüş hızı ikisinin ÇARPIMI olduğu için kavis kabiliyeti " +
+             "bu sayının KARESİ kadar düşer: 0.7 ile Swarm 135°/sn yerine " +
+             "66°/sn döner. Kaçamak açısı 1. levelde zaten 0'dı ama gemi hâlâ " +
+             "kıvraktı — 'ilk leveller düz uçar' kuralı yalnızca SALINIMA " +
+             "uygulanıyordu, uçuşun kendisine değil.")]
+    public float startMobility = 0.7f;
+
     // ── Singleton ─────────────────────────────────────────────────────────────
 
     static LevelCurve _instance;
@@ -62,6 +70,19 @@ public class LevelCurve : ScriptableObject
     public float EvasionMultiplier(int n)
         => Mathf.InverseLerp(1f, Mathf.Max(2, evasionFullLevel), n);
 
+    /// <summary>
+    /// Manevra kabiliyeti — hız ve çeviklik ORTAK çarpanı. Kaçamak salınımıyla
+    /// aynı eğriyi kullanır: "erken leveller düz ve hantal uçar" tek bir kural
+    /// olmalı, iki ayrı eğri zamanla birbirinden sapardı.
+    ///
+    /// Neden gerekti: salınım açısı 1. levelde 0'a iniyordu ama gemi hâlâ
+    /// 135°/sn dönen, 3 birim/sn giden bir Swarm'dı. Oyuncunun gördüğü kaçamak
+    /// davranış salınım değil, DAR KAVİSTİ — "ilk levellerde düz uçarlar"
+    /// kuralı yalnızca kağıt üstünde geçerliydi.
+    /// </summary>
+    public float MobilityMultiplier(int n)
+        => Mathf.Lerp(Mathf.Clamp(startMobility, 0.2f, 1f), 1f, EvasionMultiplier(n));
+
     /// <summary>Boss gövde HP'si — bölüm kapanış dövüşü.</summary>
     public float BossHullHP(int n) => 500f * HpMultiplier(n);
 
@@ -84,9 +105,12 @@ public struct EnemyScaling
     public float evasion;
     public float armor;
 
+    /// <summary>Hız ve çevikliğin ortak çarpanı. 1 = tipin kendi değeri.</summary>
+    public float mobility;
+
     public static EnemyScaling None => new EnemyScaling
     {
-        hp = 1f, damage = 1f, evasion = 1f, armor = 0f,
+        hp = 1f, damage = 1f, evasion = 1f, armor = 0f, mobility = 1f,
     };
 
     public static EnemyScaling ForLevel(int gameLevel)
@@ -94,10 +118,11 @@ public struct EnemyScaling
         var c = LevelCurve.Instance;
         return new EnemyScaling
         {
-            hp      = c.HpMultiplier(gameLevel),
-            damage  = c.DamageMultiplier(gameLevel),
-            evasion = c.EvasionMultiplier(gameLevel),
-            armor   = c.Armor(gameLevel),
+            hp       = c.HpMultiplier(gameLevel),
+            damage   = c.DamageMultiplier(gameLevel),
+            evasion  = c.EvasionMultiplier(gameLevel),
+            armor    = c.Armor(gameLevel),
+            mobility = c.MobilityMultiplier(gameLevel),
         };
     }
 }

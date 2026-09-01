@@ -187,7 +187,14 @@ public class GameManager : MonoBehaviour
         }
 
         spawner.debugFreeSpawn = true;
+        BalanceLog.Begin("serbest");
+        BalanceUploader.EnsureExists();
     }
+
+    // Kayıt tamponu diske ancak kapanışta boşalır. Editörde Play'den çıkmak
+    // OnApplicationQuit tetikler; bu olmadan son satırlar kaybolurdu.
+    void OnApplicationQuit() => BalanceLog.Close();
+    void OnDisable()         => BalanceLog.Close();
 
     static void EnsureEventSystem()
     {

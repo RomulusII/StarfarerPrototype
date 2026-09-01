@@ -37,9 +37,13 @@ public class WeaponMount : MonoBehaviour
     void Update()
     {
         if (UpgradeUI.IsPaused) return;
-        Vector2 mouseScreen = Mouse.current.position.ReadValue();
+
+        // Fare YOKSA (Android) namlu son yönünde kalır — eskiden Mouse.current
+        // kontrolsüz okunuyordu ve telefonda ilk karede patlıyordu.
+        if (!PointerInput.TryPosition(out Vector2 pointerScreen)) return;
+
         Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(
-            new Vector3(mouseScreen.x, mouseScreen.y, 0f));
+            new Vector3(pointerScreen.x, pointerScreen.y, 0f));
         Vector2 direction = (Vector2)(mouseWorld - transform.position);
         float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
         transform.rotation = Quaternion.Euler(0f, 0f, angle);

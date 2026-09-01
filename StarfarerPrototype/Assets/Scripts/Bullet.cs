@@ -10,6 +10,15 @@ public class Bullet : MonoBehaviour
     public float      damage     = 10f;
     public WeaponType weaponType = WeaponType.Kinetic;
 
+    /// <summary>
+    /// Ateşlendiği andaki boost modu — denge kaydı için. ANLIK moda bakılamaz:
+    /// mermi yolda giderken oyuncu boost'u kapatabilir, oysa bu merminin boyutu
+    /// ve hasarı ateşlendiği anda belirlendi. İsabet oranı boost'a göre
+    /// ayrıştırılacaksa (mermi boyutu ×0.6 ile ×1.5 arasında değişiyor) etiketin
+    /// mermiyle birlikte TAŞINMASI gerekir.
+    /// </summary>
+    public BoostMode boostAtFire = BoostMode.None;
+
     void Awake()
     {
         BoxCollider2D col = gameObject.AddComponent<BoxCollider2D>();
@@ -43,6 +52,20 @@ public class Bullet : MonoBehaviour
         if (DamageUtil.TryDamage(other, damage, weaponType))
         {
             bool lethal = other.GetComponent<HealthBar>()?.currentHealth <= 0f;
+
+            // İsabet oranının payı. Payda shot_fired'dır: ıskalayan mermi ömrü
+            // dolunca sessizce yok olur, yani "ateşlendi ama isabet yok" farkı
+            // ıskalamayı verir. Işınlar bu sayıma GİRMEZ — ıskalamazlar.
+            BalanceLog.Event("shot_hit")
+                      .Str("kaynak", "ana")
+                      .Str("silah",  weaponType.ToString())
+                      .Str("boost",  boostAtFire.ToString())
+                      .Str("yuzey",  surface.ToString())
+                      .Str("hedef",  DamageUtil.TypeNameOf(other))
+                      .Num("hasar",  damage)
+                      .Bool("oldurdu", lethal)
+                      .End();
+
             HitEffect.SpawnImpact(transform.position, transform.up, other.transform.position,
                                   surface, damage, lethal);
             if (surface == ImpactSurface.Shield)

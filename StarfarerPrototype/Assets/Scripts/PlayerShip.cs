@@ -166,6 +166,20 @@ public class PlayerShip : MonoBehaviour
 
         if (_healthBar != null)
             _healthBar.currentHealth = currentHullHP;
+
+        // Ölüm sebebi dağılımı: gelen hasarın ne kadarını kalkan yuttu, ne kadarı
+        // gövdeye geçti. Bir tipin toplam hasar payı %30'u aşıyorsa o tipin
+        // fiyatı yanlış demektir — tehdit puanının ikinci bileşeni budur.
+        // Boost etiketi burada da gerekli: kalkan boost'u şarj hızını ×3
+        // yapıyor, yani aynı hasar akışını farklı bir kalkanla karşılıyoruz.
+        BalanceLog.Event("player_damage")
+                  .Num("gelen",  amount)
+                  .Num("govde",  remaining)
+                  .Num("kalkan", amount - remaining)
+                  .Str("boost",  BoostController.Mode.ToString())
+                  .Bool("bypass", bypassShields)
+                  .Num("kalanHP", currentHullHP)
+                  .End();
     }
 
     public MountSlot GetRandomOperationalSlot()
