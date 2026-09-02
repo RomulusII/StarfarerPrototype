@@ -45,14 +45,16 @@ using UnityEngine;
 public static class BalanceLog
 {
     /// <summary>
-    /// Editörde varsayılan AÇIK, build'de kapalı. Ölçüm bir geliştirme aracı;
-    /// oyuncunun diskine yazmasının bir anlamı yok.
+    /// Her yerde AÇIK: editör, PC ve Android build'i. Eskiden build'de kapalıydı
+    /// ("ölçüm bir geliştirme aracı") ama bu, ölçümü tek kişiye hapsediyordu.
+    /// İsabet oranı gibi sayılar oyuncudan oyuncuya değişir; denge ancak
+    /// dağıtılan build'lerden veri gelirse kalibre edilebilir.
+    ///
+    /// Kayıt HER ZAMAN yalnızca diske yazılır. Sunucuya gitmesi AYRI bir
+    /// karardır ve <see cref="UploadConfig"/> asset'inin varlığına bağlıdır:
+    /// asset yoksa dosya cihazda durur, hiçbir ağ isteği açılmaz.
     /// </summary>
-#if UNITY_EDITOR
     public static bool Enabled = true;
-#else
-    public static bool Enabled = false;
-#endif
 
     static StreamWriter _writer;
     static string       _path;
@@ -75,6 +77,7 @@ public static class BalanceLog
 
         var dir = Path.Combine(Application.persistentDataPath, "balance");
         Directory.CreateDirectory(dir);
+        Prune(dir);
 
         _path   = Path.Combine(dir, $"{System.DateTime.Now:yyyyMMdd-HHmmss}-{mode}.jsonl");
         _writer = new StreamWriter(_path, append: false);
@@ -99,6 +102,33 @@ public static class BalanceLog
         _writer.Flush();
         _writer.Dispose();
         _writer = null;
+    }
+
+    /// <summary>Diskte tutulan en fazla oturum sayısı.</summary>
+    const int KeepFiles = 30;
+
+    /// <summary>
+    /// Klasörün sınırsız büyümesini engeller. Gönderim AÇIKSA yükleyici
+    /// başarıyla giden dosyayı zaten siler ve burası hiç iş yapmaz. Gönderim
+    /// KAPALIYSA (UploadConfig asset'i yok) kimse temizlemez; o zaman oyuncunun
+    /// cihazında oturum başına bir dosya sonsuza kadar birikirdi.
+    ///
+    /// Dosya adı zaman damgasıyla başlar, yani sözlük sırası kronolojik sıradır.
+    /// Yeni dosya HENÜZ açılmadan çağrılır: kendini silme riski yok.
+    /// </summary>
+    static void Prune(string dir)
+    {
+        try
+        {
+            var files = Directory.GetFiles(dir, "*.jsonl");
+            if (files.Length <= KeepFiles) return;
+            System.Array.Sort(files);
+            for (int i = 0; i < files.Length - KeepFiles; i++) File.Delete(files[i]);
+        }
+        catch (IOException)
+        {
+            // Temizlik başarısız olsa bile kaydın açılmasını engellememeli.
+        }
     }
 
     // ── Satır kurma ───────────────────────────────────────────────────────────

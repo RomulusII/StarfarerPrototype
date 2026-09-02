@@ -1584,6 +1584,7 @@ başka bir şey loglayan metot çağrılmamalı.
 - **Headless simülasyon** — Unity `-batchmode`, sahte oyuncu politikası, binlerce
   koşu. Ama önce gerçek oyundan **isabet oranı** ölçülmeli: simülasyona onu
   koymadan kurmak, kendi varsayımını doğrulamak olur.
+  Ayrıntılı görev tanımı: "GÖREV — Headless denge simülasyonu".
 - **Seed'li rastgelelik** — A/B karşılaştırması için şart. Şu an yok.
 - **Duyarlılık analizi** — her parametreyi ±%20 oynatıp hedef metrikteki
   değişimi ölç. En duyarlı üç parametre gerçek kollardır; gerisi gürültü.
@@ -2088,6 +2089,75 @@ Kristal çalışması sırasında çıkan, henüz kapatılmamış maddeler.
 
 ---
 
+## GÖREV — Headless denge simülasyonu
+
+**Bu görev başka bir makinede yapılacak.** Kurulduğu makine bu repoyu klonlayıp
+Unity'yi kurmuş olmalı; simülasyon binlerce koşu demek ve CPU'ya bağlıdır.
+
+### Amaç
+
+Denge parametrelerini elle deneyerek değil, ölçerek ayarlamak. Bugün tehdit
+formülü, stat eğrisi ve gelir eğrisi kağıt üstünde tutarlı ama hiçbiri yeterli
+sayıda koşuyla doğrulanmadı.
+
+### ÖN KOŞUL — atlanırsa görev anlamsızlaşır
+
+Simülasyonun sahte oyuncusu gerçek bir **isabet oranı** ile beslenmeli. İlk
+gerçek ölçüm ana silahta %52, turretlerde %86 idi (4 level, 740 olay) — ama bu
+tek oturum ve yalnızca PC. Telefon oturumu henüz yok ve dokunmatikte oranın
+düşmesi bekleniyor.
+
+Bu sayı olmadan kurulan simülasyon, kendi varsayımını doğrular. Önce insan
+oynayışından veri toplanmalı; simülasyon o verinin YERİNE değil ÜSTÜNE kurulur.
+
+### Elde hazır olanlar
+
+| Ne | Nerede | Durum |
+|---|---|---|
+| Ham olay kaydı (JSONL) | `BalanceLog` | Çalışıyor; artık **her build'de açık**, editöre bağlı değil |
+| Kayıt yolu | `persistentDataPath/balance/<tarih>-<mod>.jsonl` | En fazla 30 oturum tutulur (`Prune`) |
+| Sunucuya gönderim | `BalanceUploader` + `Resources/UploadConfig.asset` | Çalışıyor; asset gitignore'da, token elle girilir |
+| Analiz | `Tools/Balance/analyze.js` | Metrik tablolarını basıyor |
+| Sunucu | `Tools/Balance/server/log.php` → akinayan.de | Ayakta (PHP 5.4.45) |
+| Batchmode build | `Tools/Build/build-android.cmd` | Çalışıyor |
+
+### Yazılacaklar
+
+1. **Sahte oyuncu politikası.** En az iki profil gerekir, çünkü tek bir politika
+   kendi tercihini denge sanır: "en ucuz statı al" (bugünkü simülasyon varsayımı)
+   ve "tek ize odaklan". Gerçek oyuncu ikisinin arasındadır.
+2. **İsabet modeli.** Ölçülen orana göre atışları ıskalat; hedefin hızı ve
+   çevikliğiyle ilişkilendir (ışınlar ıskalamaz, paydaya girmez).
+3. **Seed'li rastgelelik.** A/B karşılaştırması için şart, şu an yok.
+   Aynı seed aynı sonucu vermeli, yoksa iki koşu kıyaslanamaz.
+4. **Batchmode koşucu.** `-batchmode` + `-executeMethod`, koşu başına bir JSONL,
+   toplu çalıştırma scripti.
+5. **Duyarlılık analizi.** Her parametreyi ±%20 oynat, hedef metrikteki değişimi
+   ölç. En duyarlı üç parametre gerçek kollardır; gerisi gürültü.
+
+### Kabul kriteri
+
+Çıktı, "Hedef eğriler" tablosundaki metrikleri (level süresi, oyuncu/düşman güç
+oranı, kaynak yanması, tip başına hasar payı, tehdit tahmin hatası R²) koşu
+sayısıyla birlikte basmalı. Tek koşunun sayısı gürültüdür.
+
+Asıl sınav tehdit formülünün doğrulanmasıdır:
+
+    gözlenen_tehdit ≈ α · (o gemiye harcanan oyuncu-saniyesi)
+                    + β · (o geminin oyuncuya verdiği hasar)
+
+Artıklar hangi yetenek puanının yanlış olduğunu söyler.
+
+### Bu makineye özgü tuzaklar — BAŞKA MAKİNEDE GEÇERSİZ
+
+`Tools/Build/README.md` iki sorunu anlatır: Gradle'ın AF_UNIX/loopback hatası
+(`TEMP` düzeltmesi) ve Zscaler'in TLS'i açması (PKIX). **İkisi de yalnızca
+geliştirme makinesine özgüdür.** Yeni makinede bu belirtiler yoksa scriptlerdeki
+`TEMP` ayarı zararsızdır, dokunmaya gerek yok. Ayrıca simülasyon PC'de koşar,
+yani Android build'i hiç gerekmez.
+
+---
+
 ## DEVAM NOKTASI — telemetri ve Android
 
 Bu bölüm oturum devri içindir; iş bitince silinir.
@@ -2112,16 +2182,36 @@ Bu bölüm oturum devri içindir; iş bitince silinir.
 
 ### Yarım kalanlar
 
-- **`BalanceUploader` ve `UploadConfig` DERLENMEDİ.** Oturumun sonunda derleyici
-  çalıştırılamadı; gözle kontrol edildi, bir hata (CS1631, `yield break` catch
-  içinde) bulunup düzeltildi. Unity'de ilk Play konsolu kalanını söyler.
-- **`Assets/Resources/UploadConfig.asset` YOK** — asset olmadan gönderim
-  tamamen kapalı, yani oyundan sunucuya giden halka henüz bağlı değil.
-  Endpoint `https://akinayan.de/starfarer/log/log.php`.
-- **Player Settings → Application Identifier boş.** minSdk 25 ve ARM64 hazır.
-- **`UploadConfig.asset` ve `pull.config.json` token içerir.** Repo herkese
-  açık; `log.php`'nin repodaki kopyasında yer tutucu var, gerçek değer yalnızca
-  sunucuda. Asset'i oluştururken aynı kararı ver (gitignore veya boş bırak).
+Yukarıdakilerin çoğu KAPANDI; kalanlar aşağıda.
+
+- **Kapandı — derleme.** `BalanceUploader` ve `UploadConfig` dahil bütün
+  `Assets/Scripts` Unity'nin Roslyn'iyle derlendi: 0 hata. Duran tek şey iki
+  eski uyarı (`UpgradeUI._weaponDefs`, `EnemyBot._jamRefreshTimer`, CS0169).
+- **Kapandı — Application Identifier.** `com.akinayan.starfarer`.
+  minSdk 25, ARM64, IL2CPP. `ForceInternetPermission` 0 → 1 yapıldı: izin
+  manifest'e "Auto" modunda kod kırpmasının kararıyla giriyordu, oysa gönderim
+  artık gerçek build'lerin işi.
+- **Kapandı — kayıt build'lerde açık.** `BalanceLog.Enabled` artık koşulsuz;
+  eskiden `#if UNITY_EDITOR` ile build'de kapalıydı, yani dağıtılan bir
+  build'den veri gelmesi mümkün değildi.
+- **Kapandı — yeniden deneme.** `BalanceUploader.UploadPending()` eklendi.
+  Sınıfın dokümanı "başarısızsa sonraki oturumda tekrar denenir" diyordu ama
+  `Flush()` yalnızca AÇIK oturumun dosyasına bakıyor, yeni oturum yeni dosya
+  açıyordu: kopan gönderim kalıcı kayıptı. PC'de daha kritikti — masaüstünde
+  kapanışta coroutine bitirilmez, yani `OnApplicationQuit` gönderimi pratikte
+  hiç tamamlanmaz. Artık kapanışta yarışmıyoruz, açılışta topluyoruz.
+
+- **`UploadConfig.asset` oluşturuldu ama `token` alanı BOŞ.** Endpoint dolu.
+  Token girilene kadar sunucuya gönderim reddedilir; kayıtlar diskte birikir ve
+  token girildikten sonraki ilk açılışta toplanır, yani veri kaybolmaz.
+  Asset `.gitignore`'da — repo herkese açık, token repoya girmemeli
+  (`pull.config.json` ile aynı gerekçe).
+- **Release build'de kaydın yazıldığı DOĞRULANMADI.** APK kuruldu, açıldı,
+  Unity oyun döngüsü başladı, exception yok — ama `BalanceLog.Begin` ancak oyun
+  başlayınca çalışır ve telefonda henüz oynanmadı. `balance/` klasörü yok.
+- **Kurumsal ağ TLS'i açıyor** (`issuer: Zscaler Intermediate Root CA`). Bu
+  ağdaki bir PC build'i gönderim yaparken aynı duvara çarpabilir; ölçülmedi.
+  Çarparsa veri kaybolmaz, `UploadPending()` sonraki açılışta gönderir.
 
 ### Sıradaki ölçümler
 

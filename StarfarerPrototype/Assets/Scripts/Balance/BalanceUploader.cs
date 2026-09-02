@@ -61,6 +61,67 @@ public class BalanceUploader : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
+    void Start() => StartCoroutine(UploadPending());
+
+    /// <summary>
+    /// ÖNCEKİ oturumlardan kalan kayıtları gönderir ve gidenleri siler.
+    ///
+    /// Bu olmadan sınıfın "başarısızsa sonraki oturumda tekrar denenecek" sözü
+    /// tutulmuyordu: <see cref="Flush"/> yalnızca AÇIK oturumun dosyasına bakar,
+    /// yeni oturum ise yeni bir dosya açar — kopan gönderim kalıcı kayıptı.
+    ///
+    /// PC'de asıl kazanç bu. Masaüstünde oyun kapanırken coroutine'in bitmesine
+    /// izin verilmez, yani <c>OnApplicationQuit</c> içindeki gönderim pratikte
+    /// hiç tamamlanmaz. Kapanışta yarışmak yerine bir sonraki AÇILIŞTA toplamak
+    /// o yarışı tamamen ortadan kaldırır.
+    ///
+    /// Tekrar göndermek zararsız: sunucu dosyayı ADIYLA yazar
+    /// (log.php → file_put_contents), yani aynı oturum iki kez giderse üzerine
+    /// yazılır, çift kayıt oluşmaz.
+    /// </summary>
+    IEnumerator UploadPending()
+    {
+        string current = Normalize(BalanceLog.CurrentPath);
+        foreach (var f in ListPending())
+        {
+            if (string.Equals(Normalize(f), current, System.StringComparison.OrdinalIgnoreCase))
+                continue;
+            yield return UploadFile(f, deleteOnSuccess: true);
+        }
+    }
+
+    /// <summary>
+    /// Klasördeki kayıtları eskiden yeniye listeler. Coroutine'den AYRI metot:
+    /// iterator gövdesinde catch'li try bloğu olamaz — <see cref="ReadAll"/>
+    /// da aynı kısıt yüzünden ayrı duruyor.
+    /// </summary>
+    static string[] ListPending()
+    {
+        try
+        {
+            string dir = Path.Combine(Application.persistentDataPath, "balance");
+            if (!Directory.Exists(dir)) return System.Array.Empty<string>();
+
+            var files = Directory.GetFiles(dir, "*.jsonl");
+            System.Array.Sort(files);   // ad zaman damgasıyla başlar: sıra kronolojik
+            return files;
+        }
+        catch (IOException)
+        {
+            return System.Array.Empty<string>();
+        }
+    }
+
+    /// <summary>Açık oturumun dosyasını ayırt edebilmek için yol normalleştirme.</summary>
+    static string Normalize(string path)
+        => string.IsNullOrEmpty(path) ? "" : Path.GetFullPath(path);
+
+    static void DeleteQuietly(string path)
+    {
+        try { File.Delete(path); }
+        catch (IOException e) { Debug.LogWarning($"[BalanceUploader] silinemedi: {e.Message}"); }
+    }
+
     /// <summary>
     /// Kaydı gönder. Level sonunda ve oyun kapanışında çağrılır — her olayda
     /// göndermek 4 dakikada yüzlerce istek demek olurdu.
@@ -68,15 +129,18 @@ public class BalanceUploader : MonoBehaviour
     public static void Flush()
     {
         if (_instance == null) return;
-        _instance.StartCoroutine(_instance.Upload());
+        _instance.StartCoroutine(_instance.UploadFile(BalanceLog.CurrentPath, deleteOnSuccess: false));
     }
 
-    IEnumerator Upload()
+    /// <summary>
+    /// Tek bir kaydı gönderir. <paramref name="deleteOnSuccess"/> yalnızca
+    /// KAPANMIŞ oturumlar için doğrudur; açık oturumun dosyasına hâlâ yazılıyor.
+    /// </summary>
+    IEnumerator UploadFile(string path, bool deleteOnSuccess)
     {
         var cfg = UploadConfig.Instance;
         if (!UploadConfig.Active) yield break;
 
-        string path = BalanceLog.CurrentPath;
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) yield break;
 
         // Okuma AYRI bir metotta: coroutine'in içinde catch'li bir try bloğu
@@ -97,10 +161,16 @@ public class BalanceUploader : MonoBehaviour
         yield return req.SendWebRequest();
 
         if (req.result != UnityWebRequest.Result.Success)
+        {
             Debug.LogWarning($"[BalanceUploader] gönderilemedi ({req.error}) — " +
                              "kayıt diskte kaldı, sonraki oturumda tekrar denenecek");
+        }
         else
-            Debug.Log($"[BalanceUploader] {body.Length / 1024} KB gönderildi");
+        {
+            Debug.Log($"[BalanceUploader] {Path.GetFileName(path)} — " +
+                      $"{body.Length / 1024} KB gönderildi");
+            if (deleteOnSuccess) DeleteQuietly(path);
+        }
     }
 
     /// <summary>

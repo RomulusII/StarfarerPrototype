@@ -93,3 +93,19 @@ StarfarerPrototype/.claude/worktrees/
 
 # Indirici yapilandirmasi - TOKEN icerir, repoya GIRMEMELI
 /StarfarerPrototype/Tools/Balance/pull.config.json
+
+# Performance testing paketinin build sirasinda yazdigi iskelet dosyalar.
+# Yollari pakette sabit kodlu (Utils.cs: "Assets/Resources/..."), tasinamaz --
+# Resources.Load yalnizca oradan okur. Basarili build sonunda Cleanup() siler;
+# yalnizca build cokerse geride kalirlar.
+/StarfarerPrototype/Assets/Resources/PerformanceTestRun*.json
+/StarfarerPrototype/Assets/Resources/PerformanceTestRun*.json.meta
+
+# Gradle/CMake ara ciktisi - Android build uretir
+/StarfarerPrototype/.utmp/
+
+# Log gonderim ayari - TOKEN icerir ve repo herkese acik: repoya GIRMEMELI.
+# Asset yoksa gonderim kendini kapatir (UploadConfig.Active), oyun calisir.
+# Yeni bir makinede: Create > Starfarer > Upload Config, Assets/Resources/ altina.
+/StarfarerPrototype/Assets/Resources/UploadConfig.asset
+/StarfarerPrototype/Assets/Resources/UploadConfig.asset.meta
