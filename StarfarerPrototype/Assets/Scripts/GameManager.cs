@@ -63,6 +63,12 @@ public class GameManager : MonoBehaviour
         BuildSpeedHUD();
         BuildEnemyInfoHUD();
 
+        // Simülasyon koşusunda menü YOK: koşunun bütün seçimleri komut
+        // satırından geldi (bkz. SimConfig) ve batchmode'da tıklayacak kimse
+        // yok. Menüyü kurup programatik tıklamak, ölçülen şeye menü akışını
+        // da katardı.
+        if (SimRuntime.Active) { StartCoroutine(BeginSimRun()); return; }
+
         // Oyun açılış menüsünden başlar; seçim yapılana kadar bölüm sistemi
         // kurulmaz, dolayısıyla arkada düşman spawn olmaz.
         StartMenuUI.Show(BeginGame);
@@ -138,6 +144,19 @@ public class GameManager : MonoBehaviour
         StartCoroutine(BeginCampaign(mode));
     }
 
+    /// <summary>
+    /// Simülasyon koşusu: kayıt yüklenmez (koşu temiz bir gemiyle başlamalı,
+    /// yoksa iki koşu farklı donanımla kıyaslanır) ve başlangıç leveli
+    /// menüden değil koşu yapılandırmasından gelir.
+    /// </summary>
+    System.Collections.IEnumerator BeginSimRun()
+    {
+        yield return null;   // ShipLoadout.Start() bu karede çalışır
+
+        GameProgress.CurrentLevel = SimRuntime.Config.startLevel;
+        BuildChapterSystem();
+    }
+
     System.Collections.IEnumerator BeginCampaign(StartMenuUI.GameMode mode)
     {
         yield return null;   // ShipLoadout.Start() bu karede çalışır
@@ -158,7 +177,10 @@ public class GameManager : MonoBehaviour
 
     void BuildChapterSystem()
     {
-        if (FindFirstObjectByType<ChapterTransitionUI>() == null)
+        // Bölüm geçiş ekranı simülasyonda KURULMAZ: mürettebat diyaloğu
+        // saniyelerce akan bir anlatım ve koşuya ölçülecek hiçbir şey katmaz.
+        // Kurulmadığında ChapterManager 1 saniyelik sade gecikmeye düşer.
+        if (!SimRuntime.Active && FindFirstObjectByType<ChapterTransitionUI>() == null)
         {
             var go = new GameObject("ChapterTransitionUI");
             go.AddComponent<ChapterTransitionUI>();

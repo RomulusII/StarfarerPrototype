@@ -59,6 +59,19 @@ public class LevelCurve : ScriptableObject
         }
     }
 
+    /// <summary>
+    /// Singleton'ı koşuya özgü bir KOPYAYA çevirir.
+    ///
+    /// Simülasyon parametre ezmesi (--set) uygularken asıl asset'e yazamaz:
+    /// editörde koşulduğunda Resources/LevelCurve.asset diske kirlenir ve bir
+    /// duyarlılık koşusunun ±%20'si projenin kalıcı dengesi hâline gelirdi.
+    /// Kopya yalnızca bellekte yaşar.
+    /// </summary>
+    public static void UseRuntimeCopy()
+    {
+        _instance = Instantiate(Instance);
+    }
+
     // ── Formüller ─────────────────────────────────────────────────────────────
 
     public float HpMultiplier(int n)     => Mathf.Pow(hpGrowth,     Mathf.Max(0, n - 1));

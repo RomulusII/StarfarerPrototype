@@ -41,6 +41,14 @@ public class ChapterManager : MonoBehaviour
     enum Phase { WaitClear, Transition, Done }
     Phase _phase = Phase.WaitClear;
 
+    /// <summary>
+    /// Kampanya tamamlandı mı? Simülasyon koşusu bitişi buradan anlar — kendi
+    /// başına "artık bitmiştir" diye tahmin etseydi yarım koşuyu tam sayardı.
+    /// Statik: koşuyu izleyen SimDirector sahnedeki yöneticiyi aramak zorunda
+    /// kalmasın (bölüm sistemi menü seçiminden SONRA kuruluyor).
+    /// </summary>
+    public static bool CampaignFinished { get; private set; }
+
     List<WaveData> _levelWaves = new();
     int            _waveIndex;
 
@@ -54,6 +62,7 @@ public class ChapterManager : MonoBehaviour
         foreach (var s in FindObjectsByType<EnemySpawner>(FindObjectsSortMode.None))
             s.DisableFreeSpawn();
 
+        CampaignFinished = false;   // sahne yeniden yüklenince (ölüm → restart) sıfırlanmalı
         BalanceLog.Begin("kampanya");
         BalanceUploader.EnsureExists();
 
@@ -380,6 +389,7 @@ public class ChapterManager : MonoBehaviour
         {
             _transitionUI?.ShowCredits();
             _phase = Phase.Done;
+            CampaignFinished = true;
             return;
         }
 

@@ -22,9 +22,22 @@ using UnityEngine.InputSystem;
 /// </summary>
 public static class PointerInput
 {
+    /// <summary>
+    /// Girdiyi donanım yerine üreten kaynak. Simülasyonun sahte pilotu bunu
+    /// doldurur; başka hiçbir yerde set edilmez.
+    ///
+    /// Neden pilot doğrudan <c>WeaponController</c>'a bağlanmıyor: sahte
+    /// oyuncunun ölçtüğü şey oyunun GERÇEK ateş yolu olmalı — nişan açısı,
+    /// namlu ucu, şarj süresi, UI yutması. Ayrı bir yol açsaydık simülasyon
+    /// kendi yazdığımız kestirmeyi ölçer, oyunu değil.
+    /// </summary>
+    public static IPointerSource Source;
+
     /// <summary>İşaretçinin ekran konumu. Hiçbir girdi yoksa false döner.</summary>
     public static bool TryPosition(out Vector2 screen)
     {
+        if (Source != null) return Source.TryPosition(out screen);
+
         var touch = Touchscreen.current;
         if (touch != null && touch.primaryTouch.press.isPressed)
         {
@@ -48,6 +61,8 @@ public static class PointerInput
     {
         get
         {
+            if (Source != null) return Source.FireHeld;
+
             var touch = Touchscreen.current;
             if (touch != null && touch.primaryTouch.press.isPressed)
                 return !OverUI(touch.primaryTouch.touchId.ReadValue());
@@ -62,6 +77,8 @@ public static class PointerInput
     {
         get
         {
+            if (Source != null) return Source.FireReleased;
+
             var touch = Touchscreen.current;
             if (touch != null && touch.primaryTouch.press.wasReleasedThisFrame)
                 return true;
@@ -73,4 +90,17 @@ public static class PointerInput
 
     static bool OverUI(int pointerId)
         => EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(pointerId);
+}
+
+/// <summary>
+/// Nişan ve ateşin donanım dışı kaynağı. Tek uygulayıcısı simülasyonun
+/// pilotudur (<c>SimInput</c>); arayüz olarak durması, sim kodunun oyunun
+/// çalışan derlemesine sızmaması içindir — <c>PointerInput</c> kimin
+/// bağlandığını bilmez.
+/// </summary>
+public interface IPointerSource
+{
+    bool TryPosition(out Vector2 screen);
+    bool FireHeld     { get; }
+    bool FireReleased { get; }
 }

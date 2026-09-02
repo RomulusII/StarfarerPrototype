@@ -73,6 +73,56 @@ public static class ComponentCatalog
 
     static int StatBase(int cost) => Mathf.RoundToInt(cost * StatBaseFactor);
 
+    // ── Stat izleri ve stat fiyatı ────────────────────────────────────────────
+
+    /// <summary>
+    /// Bir komponent tipinin yükseltilebilir izleri.
+    ///
+    /// Liste UpgradeUI'ın içindeydi; "yükseltmeyi satın alan tek yer upgrade
+    /// ekranıdır" doğru olduğu sürece orası da doğru yerdi. Artık simülasyonun
+    /// sahte oyuncusu da aynı listeyi okuyor (bkz. SimShopper): iki yerde
+    /// yazılsaydı biri diğerinden sapar ve simülasyon oyunda OLMAYAN bir izi
+    /// satın alırdı. Etiketler de burada, çünkü komponent adı ve açıklaması da
+    /// burada.
+    /// </summary>
+    public static (string key, string label)[] StatTracks(ComponentType type) => type switch
+    {
+        ComponentType.Generator  => new[] { (GeneratorComponent.ProductionKey, "Üretim"),
+                                            (GeneratorComponent.CapacitorKey,  "Kapasitör") },
+        ComponentType.Shield     => new[] { ("rechargeRate", "Şarj Hızı"),
+                                            ("maxShield",    "Max Kalkan") },
+        ComponentType.RepairUnit => new[] { ("repairRate",       "Tamir Hızı"),
+                                            ("energyEfficiency", "Enerji Verimi"),
+                                            (RepairUnitComponent.ArmorKey, "Zırh") },
+        ComponentType.Storage    => new[] { (StorageComponent.CapacityKey, "Kapasite") },
+        ComponentType.Turret     => new[] { ("damage",   "Hasar"),
+                                            ("fireRate", "Ateş Hızı") },
+        _                        => null,
+    };
+
+    /// <summary>
+    /// Bu silah tipinde satın alınmaya DEĞER statlar.
+    ///
+    /// Lazerde "Ateş Hızı" YOKTUR: <c>WeaponController.UpdateLaser</c> fireRate'i
+    /// hiç okumaz, yani listelenseydi oyuncu hiçbir şey yapmayan bir yükseltmeye
+    /// ödeme yapardı.
+    /// </summary>
+    public static (string key, string label)[] WeaponStatTracks(WeaponType type)
+        => type == WeaponType.Laser
+            ? new[] { ("damage", "Hasar") }
+            : new[] { ("damage", "Hasar"), ("fireRate", "Ateş Hızı") };
+
+    /// <summary>
+    /// Bir stat seviyesinin fiyatı. Taban komponentin kendi fiyatından türer;
+    /// anahtarın geçilmesi ŞART, çünkü zırh gibi ayrıcalıklı izler aynı
+    /// komponentin diğer statlarıyla aynı fiyata satılmaz.
+    /// </summary>
+    public static int StatUpgradeCost(ComponentDefinition def, int currentLevel, string key = null)
+    {
+        int baseCost = def.statCostBase > 0 ? def.statCostBase : def.cost;
+        return BalanceConfig.Instance.StatUpgradeCost(baseCost, currentLevel, key);
+    }
+
     // ── Kalkan ────────────────────────────────────────────────────────────────
     // Enerji sistemi olduğu için kristalle alınır.
 

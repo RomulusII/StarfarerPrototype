@@ -61,6 +61,13 @@ public static class BalanceLog
 
     /// <summary>Açık kaydın dosya yolu — yükleyici buradan okur.</summary>
     public static string CurrentPath => _path;
+
+    /// <summary>
+    /// Doluysa <see cref="Begin"/> tarih damgalı ad üretmek yerine BU dosyayı
+    /// açar. Yalnızca simülasyon doldurur (bkz. SimRuntime): paralel koşan
+    /// süreçler aynı saniyede başlar ve zaman damgalı ad çakışırdı.
+    /// </summary>
+    public static string PathOverride;
     static string       _mode = "-";
     static readonly StringBuilder _sb = new StringBuilder(256);
 
@@ -72,14 +79,38 @@ public static class BalanceLog
     public static void Begin(string mode)
     {
         if (!Enabled) return;
-        _mode = mode;
-        Close();
+
+        // Simülasyon koşusu kaydı kendi dosyasına ister; çağıranların (şu an
+        // ChapterManager ve GameManager) bunu bilmesi gerekmiyor.
+        if (!string.IsNullOrEmpty(PathOverride)) { BeginAt(PathOverride, mode); return; }
 
         var dir = Path.Combine(Application.persistentDataPath, "balance");
         Directory.CreateDirectory(dir);
         Prune(dir);
 
-        _path   = Path.Combine(dir, $"{System.DateTime.Now:yyyyMMdd-HHmmss}-{mode}.jsonl");
+        Open(Path.Combine(dir, $"{System.DateTime.Now:yyyyMMdd-HHmmss}-{mode}.jsonl"), mode);
+    }
+
+    /// <summary>
+    /// Kaydı BELİRTİLEN dosyaya açar. Simülasyon koşusu başına bir dosya gerekir
+    /// ve dosyayı koşucu adlandırır: paralel koşan onlarca süreç aynı saniyede
+    /// başlar, zaman damgalı ad ikisini birbirinin üstüne yazardı. Prune de
+    /// çalıştırılmaz — koşu çıktısı 30 dosyada kırpılamaz.
+    /// </summary>
+    public static void BeginAt(string path, string mode)
+    {
+        if (!Enabled) return;
+        var dir = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+        Open(path, mode);
+    }
+
+    static void Open(string path, string mode)
+    {
+        _mode = mode;
+        Close();
+
+        _path   = path;
         _writer = new StreamWriter(_path, append: false);
 
         // Satır satır diske yaz. Editörde Play durdurulduğunda OnDisable her

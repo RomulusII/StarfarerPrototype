@@ -1432,7 +1432,11 @@ bırakıldı.
 | ComponentCatalog.cs | Tüm komponent tanımlarının tek sahibi — ne var, kaça, hangi zincirle |
 | BalanceConfig.cs | Gelir ve zırh eğrilerinin tek sahibi (SO; asset yoksa varsayılan) |
 | LevelCurve.cs | Düşman ölçeklemesi: HP, hasar, zırh, kaçamak, manevra — levelden türer |
-| BalanceLog.cs | Denge ölçümü — ham olay kaydı (JSONL), editörde açık |
+| BalanceLog.cs | Denge ölçümü — ham olay kaydı (JSONL), her build'de açık |
+| SimRuntime.cs | Simülasyon koşusu — tohum, hızlandırma, `--set` ezmeleri, bitiş |
+| SimPilot.cs | Sahte oyuncunun nişan ve ateşi — isabet modeli burada |
+| SimShopper.cs | Sahte oyuncunun alışverişi — iki profil, çıkmaz kaçınma |
+| SimConfig.cs | Koşunun komut satırı yapılandırması |
 | GameProgress.cs | Kampanyadaki yer: 100 level, 10 bölüm, bölüm başına 1 boss |
 | SaveSystem.cs | Kampanya kaydı (PlayerPrefs), level sınırlarında yazılır |
 | StorageComponent.cs | Depo — kurulu olduğu sürece kaynak tavanını yükseltir |
@@ -1581,13 +1585,13 @@ başka bir şey loglayan metot çağrılmamalı.
 - **Analiz scripti** (`Tools/Balance/analyze.js`) — JSONL okur, metrik tablolarını
   basar. İlk gerçek log dosyası görülmeden yazılmayacak; formatı varsayıp
   yazmak, aynı hatayı bir kez daha yapmak olur.
-- **Headless simülasyon** — Unity `-batchmode`, sahte oyuncu politikası, binlerce
-  koşu. Ama önce gerçek oyundan **isabet oranı** ölçülmeli: simülasyona onu
-  koymadan kurmak, kendi varsayımını doğrulamak olur.
-  Ayrıntılı görev tanımı: "GÖREV — Headless denge simülasyonu".
-- **Seed'li rastgelelik** — A/B karşılaştırması için şart. Şu an yok.
-- **Duyarlılık analizi** — her parametreyi ±%20 oynatıp hedef metrikteki
-  değişimi ölç. En duyarlı üç parametre gerçek kollardır; gerisi gürültü.
+- **Headless simülasyon** — KURULDU ve koştu (2026-09-02). Ayrıntı:
+  "Headless Denge Simülasyonu". İsabet oranı önce insandan ölçüldü, sonra
+  simülasyona kondu; tersi kendi varsayımını doğrulamak olurdu.
+- **Seed'li rastgelelik** — var (`--seed`). Aynı tohum aynı koşuyu veriyor;
+  ölçülen tek kayma birkaç enkaz-toplama olayının kare düzeyinde oynaması.
+- **Duyarlılık analizi** — kolu hazır (`--set ad=değer`, yeniden derleme
+  gerektirmez), taramanın kendisi henüz KOŞULMADI.
 
 ### Hedef eğriler (ne "denge" sayılır)
 
@@ -2047,6 +2051,10 @@ kendi içinde tutarlı. Tek yerden değiştirilebilir: `BuildWarningText`.
 - [x] **Kapasitör izi** — jeneratörün ikinci statı, enerji tamponunu büyütür
 - [x] **Işın hasarı kare hızından bağımsızlaştı** — zırh artık atış başına bir kez ısırıyor
 - [x] **Lazer turreti hızlı hedefleri tercih ediyor** ve hasarı 12 → 26
+- [x] **Headless denge simülasyonu** — oyunun kendisi batchmode'da ~43× hızlı
+      koşuyor: sahte oyuncu (nişan + alışveriş), ÖLÇÜLMÜŞ isabet modeli,
+      seed'li koşu, `--set` ile parametre ezme, paralel koşucu.
+      Ayrıntı: "Headless Denge Simülasyonu — Tasarım Kararları"
 - [ ] **Denge testleri** — aşağıdaki listeye bak; sayıların hiçbiri oyunda denenmedi
 - [ ] Point defence turretleri — küçük/hızlı hedeflere odaklı otomatik turret
 - [ ] Mobil UI
@@ -2089,72 +2097,134 @@ Kristal çalışması sırasında çıkan, henüz kapatılmamış maddeler.
 
 ---
 
-## GÖREV — Headless denge simülasyonu
+## Headless Denge Simülasyonu — Tasarım Kararları
 
-**Bu görev başka bir makinede yapılacak.** Kurulduğu makine bu repoyu klonlayıp
-Unity'yi kurmuş olmalı; simülasyon binlerce koşu demek ve CPU'ya bağlıdır.
+**Kuruldu ve koşuyor** (2026-09-02). Denge parametrelerini elle deneyerek değil
+ÖLÇEREK ayarlamak için. Kullanım ve argümanlar: `Tools/Sim/README.md`.
 
-### Amaç
+**Simülasyon ayrı bir model DEĞİL, oyunun kendisidir.** Sahte oyuncu gerçek
+girdi yolundan nişan alıp ateş eder, gerçek mağazadan alışveriş yapar, gerçek
+dalgalarla dövüşür. Ayrı bir denge modeli yazılsaydı ölçtüğümüz şey oyunun
+dengesi değil MODELİN dengesi olurdu — bugüne kadarki bütün sayılar zaten öyle
+bir kâğıt modelinden geliyor ve düzeltilmek istenen tam olarak bu.
 
-Denge parametrelerini elle deneyerek değil, ölçerek ayarlamak. Bugün tehdit
-formülü, stat eğrisi ve gelir eğrisi kağıt üstünde tutarlı ama hiçbiri yeterli
-sayıda koşuyla doğrulanmadı.
+### Nasıl koşar
 
-### ÖN KOŞUL — atlanırsa görev anlamsızlaşır
+| Karar | Gerekçe |
+|---|---|
+| **Standalone player**, editör playmode değil | Koşu binlercedir ve 12 iş parçacığı var; exe aynı anda N süreç olarak koşar. Editör tek örnektir ve batchmode'da playmode'a girmesi kırılgandır |
+| **Süreç başına bir koşu** | Statik durum (BalanceLog, `CampaignFinished`, kalkan yetim havuzu) koşudan koşuya sızardı. Bu proje o hatayı bir kez yaşadı; süreç sınırı, sıfırlamayı unutmanın mümkün olmadığı tek sınırdır |
+| **`Time.captureDeltaTime`** | Kare süresi duvar saatinden koparılır: deltaTime her karede TAM sabittir. `timeScale` ile hızlandırmak kare sayısını makinenin hızına bağlar ve determinizmi bozardı |
+| **Parametreler komut satırından** (`--set ad=değer`) | Denge sayısı değiştikçe yeniden derlemek gerekseydi "her parametreyi ±%20 oynat" pratikte imkânsız olurdu. Ezme asıl asset'e yazılmaz (`BalanceConfig.UseRuntimeCopy`) — editörde koşan bir tarama projenin kalıcı dengesini kirletirdi |
+| **Çözünürlük sabit** (1920×1080) | Kadraj (`ViewBounds`) kameradan türer, doğum sınırları da oradan. Oran koşudan koşuya değişseydi düşmanlar farklı yerlerde doğar, iki koşu kıyaslanamazdı |
+| **Bitişi süreç bildirir** (`sim_end`) | Koşucu "artık bitmiştir" diye tahmin etseydi yarım koşuyu tam sayardı |
 
-Simülasyonun sahte oyuncusu gerçek bir **isabet oranı** ile beslenmeli. İlk
-gerçek ölçüm ana silahta %52, turretlerde %86 idi (4 level, 740 olay) — ama bu
-tek oturum ve yalnızca PC. Telefon oturumu henüz yok ve dokunmatikte oranın
-düşmesi bekleniyor.
+Ölçülen hız: tek süreçte **~43× gerçek zaman**; 8 koşu × 10 level, 11 paralel
+süreçle **36 saniyede** bitti.
 
-Bu sayı olmadan kurulan simülasyon, kendi varsayımını doğrular. Önce insan
-oynayışından veri toplanmalı; simülasyon o verinin YERİNE değil ÜSTÜNE kurulur.
+### Sahte oyuncu
 
-### Elde hazır olanlar
+Girdi oyunun GERÇEK yolundan verilir (`PointerInput.Source`): namlu döner,
+mermi namlu ucundan çıkar, plazma şarj olur, lazer enerji yakar. Doğrudan
+`WeaponController`'a bağlansaydık ölçtüğümüz şey oyunun ateş etmesi değil,
+kendi yazdığımız kestirme olurdu.
 
-| Ne | Nerede | Durum |
-|---|---|---|
-| Ham olay kaydı (JSONL) | `BalanceLog` | Çalışıyor; artık **her build'de açık**, editöre bağlı değil |
-| Kayıt yolu | `persistentDataPath/balance/<tarih>-<mod>.jsonl` | En fazla 30 oturum tutulur (`Prune`) |
-| Sunucuya gönderim | `BalanceUploader` + `Resources/UploadConfig.asset` | Çalışıyor; asset gitignore'da, token elle girilir |
-| Analiz | `Tools/Balance/analyze.js` | Metrik tablolarını basıyor |
-| Sunucu | `Tools/Balance/server/log.php` → akinayan.de | Ayakta (PHP 5.4.45) |
-| Batchmode build | `Tools/Build/build-android.cmd` | Çalışıyor |
+**Hedef seçimi turretlerin formülünü kullanır** (`TurretTargeting`). Bu bir
+tercih değil: elimizdeki tek YAZILI hedef seçme politikası o ve insan
+oyuncunun ne seçtiği ölçülmedi. Ayrı bir sezgisel yazmak, ölçülmemiş bir
+politikanın üstüne ikinci bir ölçülmemişi koymak olurdu.
 
-### Yazılacaklar
+**İki alışveriş profili şart** (`SimShopper`): tek politika kendi tercihini
+denge sanır. Bugüne kadarki bütün stat eğrisi "en ucuz statı al" varsayımıyla
+kalibre edildi ve hiç sınanmadı.
 
-1. **Sahte oyuncu politikası.** En az iki profil gerekir, çünkü tek bir politika
-   kendi tercihini denge sanır: "en ucuz statı al" (bugünkü simülasyon varsayımı)
-   ve "tek ize odaklan". Gerçek oyuncu ikisinin arasındadır.
-2. **İsabet modeli.** Ölçülen orana göre atışları ıskalat; hedefin hızı ve
-   çevikliğiyle ilişkilendir (ışınlar ıskalamaz, paydaya girmez).
-3. **Seed'li rastgelelik.** A/B karşılaştırması için şart, şu an yok.
-   Aynı seed aynı sonucu vermeli, yoksa iki koşu kıyaslanamaz.
-4. **Batchmode koşucu.** `-batchmode` + `-executeMethod`, koşu başına bir JSONL,
-   toplu çalıştırma scripti.
-5. **Duyarlılık analizi.** Her parametreyi ±%20 oynat, hedef metrikteki değişimi
-   ölç. En duyarlı üç parametre gerçek kollardır; gerisi gürültü.
+| Profil | Davranış |
+|---|---|
+| `ucuz` | her an alınabilecek EN UCUZ yükseltmeyi al — genişler, derinleşmez |
+| `odak` | tek izi sonuna kadar götür, o iz için PARA BİRİKTİR |
 
-### Kabul kriteri
+**Çıkmaz kaçınma her iki profilde ortaktır** ve politika değil oyunun
+kuralının sonucudur: istenen yükseltme kaynak TAVANININ üstündeyse depo,
+enerji kapısına takılıyorsa jeneratör alınır. Yoksa oyuncu sonsuza kadar
+alınamayacak bir şeyi bekler.
 
-Çıktı, "Hedef eğriler" tablosundaki metrikleri (level süresi, oyuncu/düşman güç
-oranı, kaynak yanması, tip başına hasar payı, tehdit tahmin hatası R²) koşu
-sayısıyla birlikte basmalı. Tek koşunun sayısı gürültüdür.
+### İsabet modeli — tahmin değil, ÖLÇÜM
 
-Asıl sınav tehdit formülünün doğrulanmasıdır:
+Nişan açısına Gauss gürültüsü biner: `sigma = aimError + aimErrorPerSpeed ×
+hedefHızı`. Hız bileşeni şart — tek bir sabit oran (%52) hangi TİPİN
+ıskalandığı bilgisini yok ederdi; Avcı ıskalamakla Kaleci ıskalamak aynı şey
+değil ve tehdit formülünün doğrulanması tam olarak bu farkı sorar.
 
-    gözlenen_tehdit ≈ α · (o gemiye harcanan oyuncu-saniyesi)
-                    + β · (o geminin oyuncuya verdiği hasar)
+**Işın ıskalamaz:** lazere gürültü uygulanmaz ve isabet paydasına girmez.
+Plazma bir ışın değil, uçan bir bolttur — o ıskalar.
 
-Artıklar hangi yetenek puanının yanlış olduğunu söyler.
+Kalibrasyon (level 1–5, 4–8 koşu, `aimErrorPerSpeed` 0.5):
 
-### Bu makineye özgü tuzaklar — BAŞKA MAKİNEDE GEÇERSİZ
+| nişan hatası | ana silah isabeti |
+|---|---|
+| 0.0° | **%58.8** ← yapısal tavan |
+| **0.4°** | **%50.3** ← seçildi; insandan ölçülen %52 |
+| 1.2° | %42.3 |
+| 3.0° | %37.4 |
 
-`Tools/Build/README.md` iki sorunu anlatır: Gradle'ın AF_UNIX/loopback hatası
-(`TEMP` düzeltmesi) ve Zscaler'in TLS'i açması (PKIX). **İkisi de yalnızca
-geliştirme makinesine özgüdür.** Yeni makinede bu belirtiler yoksa scriptlerdeki
-`TEMP` ayarı zararsızdır, dokunmaya gerek yok. Ayrıca simülasyon PC'de koşar,
-yani Android build'i hiç gerekmez.
+**Sıfır gürültüde bile %41 ıskalanıyor.** Mermi uçarken hedef ölüyor, kaçamak
+manevra yapıyor ya da öngörü hedefin dönüşünü kaçıramıyor. Yani insanın
+%52'si neredeyse tamamen YAPISAL; nişan hatası küçük bir düzeltmedir. Gürültü
+büyük seçilseydi bu görülemezdi — ve "oyuncu kötü nişan alıyor" diye yanlış
+bir sonuca varılırdı.
+
+### İlk ölçüm (8 koşu × 10 level, profil `ucuz`)
+
+| Metrik | Ölçülen | Hedef | Not |
+|---|---|---|---|
+| Level süresi | **0.84 dk** | 3–4 dk | insan oturumunda 2.0/1.1/0.7 dk idi; sapma doğrulandı |
+| Ölüm | **0/8** | — | 10 levelde bir kez bile ölünmedi |
+| Gövdeye geçen hasar | **%0** | — | kalkan hepsini yuttu (173 hasarın 173'ü) |
+| Yükseltme | **10 levelde 2 adet** | — | insan oturumundaki "3.8 dakikada sıfır yükseltme" doğrulandı |
+| Toplanamayan enkaz | **%55** | <%15 | insan oturumunda %23–27 idi |
+| İsabet, ana | %50.3 | — | kalibre edildi |
+| İsabet, turret | %61 | (insan %86) | fark açıklanmadı — düşman karışımı farklı olabilir |
+
+Yani ilk on level **hem çok kısa hem tehlikesiz**, ve ekonomi yükseltmeye
+yetmiyor. Üçü de daha önce insan oturumunda GÖRÜLMÜŞ ama tek oturumluk veriyle
+"belki böyle oynandı" denebilirdi; simülasyon bunları tekrarlanabilir hâle
+getirdi.
+
+**Hiçbiri bu oturumda DÜZELTİLMEDİ.** Ölçüm aracı ile denge değişikliği aynı
+oturumda yapılırsa, ölçümün kendisi doğrulanmadan ona göre karar verilmiş olur.
+
+### Ölçüm için açılan yollar
+
+Simülasyonun kurulması üç yeri ortak sahibe taşıdı — ikisi de zaten iki kere
+yazılmaya adaydı:
+
+- `ComponentCatalog.StatTracks` / `WeaponStatTracks` / `StatUpgradeCost` —
+  stat izleri ve fiyatı `UpgradeUI` içindeydi. "Yükseltmeyi satın alan tek yer
+  upgrade ekranıdır" doğru olduğu sürece orası da doğru yerdi; sahte oyuncu da
+  satın almaya başlayınca kataloğa taşındı. İki yerde yazılsaydı simülasyon
+  oyunda OLMAYAN bir izi satın alabilirdi.
+- `PointerInput.Source` — nişan ve ateşin donanım dışı kaynağı.
+- `WeaponController.KineticBulletSpeed` — öngörü hesabı için; sabit olarak
+  `SpawnBullet` çağrısının içindeydi.
+- **`kurulum` olayı** artık `ShipLoadout.InstallComponent` içinde loglanıyor:
+  kurulum temposu insan oturumlarında da görünmüyordu, yani "sıfır yükseltme"
+  ölçümü kurulumları hiç saymıyordu.
+
+### Kalan işler
+
+- **Duyarlılık analizi koşulmadı.** Kol hazır (`--set`), tarama yazılmadı.
+- **Tehdit formülünün doğrulanması** — asıl sınav bu:
+  `gözlenen_tehdit ≈ α·oyuncu-saniyesi + β·verilen hasar` regresyonu. Veri
+  artık üretilebiliyor (`dovus` alanı dahil), regresyon yazılmadı.
+- **Turret uzmanlaşması satın alınmıyor** (Point Defence, Gatling…).
+  Uzmanlaşma güç değil karakter seçimidir; profilini yazmak ölçülmemiş
+  sayılara dayanır.
+- **Boost kullanılmıyor** — sahte oyuncu kalkan/silah boost'una hiç basmıyor.
+- **Determinizm tam değil.** Aynı tohum aynı olayları aynı sırayla veriyor;
+  ölçülen tek kayma birkaç enkaz-toplama olayının 1–20 kare oynaması (fizik
+  iş parçacıklarının sıralaması). Miktarlar ve dövüş dizisi birebir aynı.
+- **Ölüm sonrası devam yok** — koşu ölümle biter, gerçek oyuncu son
+  tamamlanan levelden devam eder.
 
 ---
 
