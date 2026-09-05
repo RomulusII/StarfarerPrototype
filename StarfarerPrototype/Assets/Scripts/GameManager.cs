@@ -25,6 +25,15 @@ public class GameManager : MonoBehaviour
 
     void Awake()
     {
+        // Mobilde Unity kare hızını varsayılan olarak 30'a sabitler. Bu bir
+        // shmup: nişan almak ve kaçamak manevra kare hızına doğrudan bağlı,
+        // 30'da oyun ağır hissediyor. Değer AÇIKÇA yazılır — "varsayılan neyse
+        // o" hâli, ölçülen performans sayılarını (bkz. PerfSampler) hangi
+        // hedefe göre okuyacağımızı da belirsiz bırakıyordu.
+        //
+        // Masaüstünde vSync bunu zaten ezer; orada etkisi yoktur.
+        Application.targetFrameRate = 60;
+
         // Kadraj önbelleği statiktir; sahne yeniden yüklenince (ölüm → restart)
         // hayatta kalır ve eski en-boy oranıyla hesaplanmış kalırdı.
         ViewBounds.Invalidate();

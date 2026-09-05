@@ -78,7 +78,12 @@ public class UpgradeUI : MonoBehaviour
         if (GameManager.IsGameOver) return;   // game over → hiçbir şey yapma
         if (StartMenuUI.IsOpen)      return;   // açılış menüsü → oyun girdileri kilitli
 
-        if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
+        // Tab (masaüstü) ve GERİ TUŞU (Android) aynı yere bağlanır. Geri tuşu
+        // hiç ele alınmamıştı: Android'de varsayılan davranışı uygulamayı
+        // KAPATMAKTIR, yani oyuncu oyunun ortasında yanlışlıkla çıkabiliyordu.
+        // Girdi Sistemi geri tuşunu escape olarak sunar.
+        var kb = Keyboard.current;
+        if (kb != null && (kb.tabKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame))
             Toggle();
 
         if (_canvas != null && _canvas.enabled)
