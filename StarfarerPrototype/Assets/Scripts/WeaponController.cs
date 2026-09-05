@@ -49,7 +49,7 @@ public class WeaponController : MonoBehaviour
 
     void Update()
     {
-        if (UpgradeUI.IsPaused)
+        if (PointerInput.Locked)
         {
             CancelCharge();
             CancelLaserBeam();

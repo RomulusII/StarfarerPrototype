@@ -61,7 +61,9 @@ Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 1), Otomatik Turretler, İki
 ### Düşman Çeşitliliği — Tasarım Kararları
 
 **Uzak saldırganlar** (hareket ederken periyodik ateş, mermileri kalkan üzerinden hasar verir):
-- **Swarm:** HP 30, hız 3, lazer'e kırılgan (×1.5). Ateş hızı ~4sn.
+- **Swarm:** HP 30, hız **2.4**, lazer'e kırılgan (×1.5). Ateş hızı ~4sn.
+  Hız 3 → 2.4: Swarm oyuncunun gördüğü İLK gemidir ve nişan almayı onun
+  üstünde öğrenir; 3 birim/sn'de kadrajı yedi saniyede geçiyordu.
 - **Armored:** HP 80, hız 1.5, kinetike dirençli (×0.3), plazmaya zayıf (×1.8). Ateş hızı ~6sn, hasar 15.
   **Tehdit 9** (eskiden 4): eski değer ham HP'ye bakıyor, geminin bütün kimliğini
   — kinetik direncini — yok sayıyordu. Oyunun VARSAYILAN silahı bedava gelen raylı
@@ -747,6 +749,11 @@ sistemleri için.
 toplar → hangara döner → `ResourceInventory`'ye boşaltır.
 
 **Enkaz (`Debris`) kuralları:**
+- **Görsel ölçek %50 büyük** (`DebrisScale` = 1.5). Toplama tamamen mesafeye
+  bakar — enkazın collider'ı yok — yani bu sayı oynanışı değil yalnızca
+  OKUNABİLİRLİĞİ değiştirir. `localScale`'e uygulanır çünkü iki çizim yolu var
+  (skin sprite'ı ve `PxW/PxH`'den üretilen prosedürel sprite); ölçek ikisini de
+  aynı oranda büyütür, `PxW/PxH`'yi büyütmek yalnızca ikincisini etkilerdi.
 - Hız iki bileşenli: **saçılma** (patlama itmesi, ~1 sn'de söner) + **sabit sola
   kayma** (0.3 birim/sn, kalıcı). Enkaz asla durmaz; vaktinde toplanmazsa soldan
   çıkıp kaybolur. Tamamen dursaydı ekranın sağında kalan enkaz toplayıcının
@@ -1109,6 +1116,38 @@ yani PD turreti bölüm 4'e kadar tek el bile ateş etmiyordu. Ölçü artık
 GÖVDE KÜTLESİ (`EnemyTypeData.IsLightHull`, eşik 2.5) ve bu eşik savaşçı
 kovalamayla AYNI: "küçük gemi" oyunda tek bir kavram olmalı.
 
+### Mermi Hızı — Turretler Ana Silahla Aynı Hızda Atar
+
+Kinetik ve enerji turretlerin mermisi **6 birim/sn** uçar; ana silahın hızının
+AYNISI (`WeaponController.UpdateKinetic`). Eskiden 9 ve 14'tü, yani oyuncunun
+kendi atışı sahnedeki en yavaş mermiydi: nişan alırken öğrendiği "önde tutma"
+hissi turretlerinkiyle çelişiyordu.
+
+Füzeler kasten DAHA YAVAŞ (7 → **5**, güdümlü roket 4.5 → **3.5**): ağır ve
+gecikmeli silahlar.
+
+| | eski hız | yeni hız | eski ömür | yeni ömür | menzil |
+|---|---|---|---|---|---|
+| Raylı Turret | 9 | **6** | 3.0 | **4.5** | 27 (sabit) |
+| Enerji Turret | 14 | **6** | 4.0 | **9.33** | 56 (sabit) |
+| Füze Turret | 7 | **5** | 5.0 | **7.0** | 35 (sabit) |
+| Gatling | 9 | **6** | 3.0 | **4.5** | 27 (sabit) |
+| Güdümlü Roket | 4.5 | **3.5** | 6.0 | **7.71** | 27 (sabit) |
+
+**ÖMÜRLER HIZLA BİRLİKTE AYARLANIR — bu bir seçim değil, zorunluluk.** Menzil
+`bulletLifeTime × bulletSpeed`'tir (`TurretController.EffectiveRange`); yalnızca
+hızı düşürmek turretlerin menzilini sessizce kırpardı (enerji turretinde
+56'dan 24'e). Yukarıdaki her ömür, menzil ESKİSİ GİBİ KALSIN diye yeniden
+hesaplandı. Değişen tek şey **uçuş süresi**.
+
+Bunun ölçülmesi gereken bedeli var: uzun menzilde mermi daha uzun uçtuğu için
+öndeleme (`TurretController` ikinci derece denklemi) kaçamak hedeflerde daha çok
+ıskalayacak. `shot_fired` / `shot_hit` çifti tam da bunu ölçüyor.
+
+**İSTİSNALAR:** Point Defence (20'de kalır — bombayı kalkana varmadan
+karşılamak zorunda), Lazer (ışın, mermi hızı kavramı yok), Plazma (zaten 5,
+yani ana silahtan yavaş; yükseltmek "düşsün" isteğine ters olurdu).
+
 **Dar rolün karşılığı yüksek DPS.** Menzil 5.5 → 4.0 → 5.2 → **10.4** (kalkan küresi 2.5;
 turretler gövdede ±1.3 yayılı, yani en uzak slottan bile kabuğun 1.4 birim
 dışına ulaşır ve bombayı kalkana değmeden karşılar). Mermi ömrü menzille
@@ -1181,7 +1220,12 @@ dolayısıyla arkada düşman spawn olmaz.
 | **ZORLUK** | `DifficultyManager.Current` — Kolay / Normal / Zor |
 
 Zorluk seçimi buraya taşındı; daha önce yalnızca Game Over panelindeydi ve oyuncu
-zorluğu ancak öldükten sonra değiştirebiliyordu. Game Over'daki butonlar duruyor.
+zorluğu ancak öldükten sonra değiştirebiliyordu.
+
+**Game Over ekranında zorluk seçimi YOK — yalnızca RESTART var.** İki ekranda
+da sorulunca aynı karar iki kez alınıyordu: Game Over'da seçilen zorluk,
+RESTART'ın döndüğü açılış menüsünde hemen tekrar değiştirilebiliyordu. Zorluğun
+tek sahibi `StartMenuUI`.
 
 **Serbest modun zorluğu SAATTEN DEĞİL, YOK EDİLEN DÜŞMANDAN gelir.**
 
@@ -1199,14 +1243,72 @@ Yalnızca gerçek ölüm sayılır — ekrandan çıkarak kaybolan gemi oyuncunu
 kazanımı değildir. Sonuç kendini dengeler: takılan oyuncuda zorluk durur, hızlı
 temizleyende hızlı yükselir.
 
-Zaman yalnızca **spawn aralığını** ölçer. "Ne sıklıkta gelsin" bir tempo
-sorusudur; "ne kadar güçlü gelsin" ise bir kazanım sorusu.
+### Serbest mod DALGA gönderir, tek tek gemi değil
+
+Eskisi sabit bir aralıkta bir gemi doğuruyordu: sahne ne doluyor ne boşalıyordu
+— ne bir dalganın gerilimi ne de aralardaki nefes vardı, yalnızca düz bir
+sızıntı. Artık kampanyayla aynı dalga ritmi geçerli; ayrıldığı tek nokta
+**bekleme kuralı**:
+
+| | Sonraki dalga ne zaman gelir |
+|---|---|
+| **Kampanya** | Öncekinin TEMİZLENMESİ beklenir |
+| **Serbest** | `waveInterval` (20 sn) dolunca — ya da saha erken temizlenirse HEMEN |
+
+"Bitmeden başlamaz" kuralı kampanyada anlamlı (level bir bütündür), serbest
+modda değildi: oyuncu son bir gemiyi kovalarken oyun duruyordu. Erken bitirmek
+artık cezalandırılmıyor, ÖDÜLLENDİRİLİYOR — sonraki dalga beklemeden gelir.
+
+**İKİ AYRI KADRAN VAR ve karıştırılmamalıdır:**
+
+| Kadran | Neyi belirler | Nereden gelir |
+|---|---|---|
+| **Dalga bütçesi** | KAÇ TANE gemi | Her dalgada ×1.10 (bileşik) |
+| **Rampa seviyesi** | NE KADAR SERT | Oyuncunun temizlediği tehdit |
+
+İkisini aynı anda artırmak, log'da hangisinin fazla geldiğini okumayı imkânsız
+kılardı. Aynı gerekçeyle **`waveInterval` SABİTTİR**: sıklık ve büyüklük aynı
+anda açılırsa ölçüm iki bilinmeyenli olur. Önce tek kadranla ölçüp sonra karar
+vereceğiz.
+
+%10 BİLEŞİKTİR ve hızlıdır — 20 saniyelik bir tempoda:
+
+| dalga | dk | bütçe | temizlenen | rampa | denk kampanya leveli | tehdit tavanı |
+|---|---|---|---|---|---|---|
+| 1 | 0 | 2 | 0 | 0.0 | 1 | 1.0 |
+| 10 | 3 | 5 | 27 | 1.4 | 3 | 2.0 |
+| 20 | 7 | 12 | 102 | 5.1 | 9 | 4.6 |
+| 30 | 10 | 32 | 297 | 14.9 | 23 | 11.4 |
+| 40 | 13 | 82 | 803 | 40.1 | 61 | 29.1 |
+
+Bu oran bir BAŞLANGIÇ TAHMİNİDİR; doğrusu `wave` olaylarının log'undan
+bulunacak.
+
+**BOSS serbest modda da gelir.** Bütçe `bossMinBudget`i (40, ~32. dalga) aşınca
+dalgaya boss girebilir (`bossChance` 0.35, en fazla `maxBossesPerWave` 2). Boss
+BÜTÇEDEN ÖDENİR (tehdit değeri kadar), yani boss gelen dalgada refakat kadrosu
+kendiliğinden küçülür — boss dalganın üstüne eklenen bir bonus değil, içindeki
+en pahalı kalemdir. Bütçenin tamamını da yiyemez (1.5× pay şartı): yalnız gelen
+bir boss hedef bölme sınavı olmaktan çıkıp tek hedefli bir bekleyişe döner.
+
+**Boss sahnedeyken yeni dalga GELMEZ** — tek istisna budur. Boss dövüşü zaten
+sahnenin tamamını istiyor; üstüne dalga bindirmek onu bir dövüş değil bir
+kalabalık yapardı. Boss'un bölümü rampanın denk geldiği kampanya levelinden
+türetilir (`BossShipData.CreateForChapter`).
+
+Dalga kadrosu formasyon düzeninde doğar; formasyon seçimi ve sıralama kampanyayla
+AYNI koddan gelir (`ChapterManager.PickFormation` / `SortByFormation`), doğurma
+işi de öyle (`EnemySpawner.SpawnFormation`) — iki mod arasında ikinci bir kopya
+kalmadı.
+
+Sahne taraması kare başına değil `ScanInterval` (0.25 sn) aralıklarla yapılır:
+`FindObjectsByType` bütün sahneyi gezer ve "saha temizlendi mi" sorusunun
+saniyede 60 kez sorulmasının karşılığı yok.
 
 | | Formül | 0 puan | 90 | 150 | 250 | 350 |
 |---|---|---|---|---|---|---|
 | Açık tipler | `threatScore ≤ 1 + seviye × 0.7` | Swarm | +Avcı | +Bomber | +Bariyer, Shield, Sülük, Hayalet, Bölünen, **Armored** | +Obüs, Karıştırıcı, Onarıcı, BombRunner |
-| Aynı anda sahada | `2 + seviye × 0.5` (tavan 8) | **2** | 4 | 5 | 8 | 8 |
-| Spawn aralığı | 3.5 → 1.5 sn (seviye 20'de) | 3.5 | 3.0 | 2.8 | 2.3 | 1.8 |
+| Aynı anda sahada (ZAMANLI dalga için tavan) | `4 + seviye × 0.7` (tavan 20) | **4** | 7 | 9 | 12 | 16 |
 | Denk kampanya leveli | `1 + seviye × 1.5` | 1 | 8 | 12 | 20 | 27 |
 | HP / zırh | o levelin `LevelCurve` değerleri | 1.00 / 0.0 | 1.17 / 0.4 | 1.29 / 0.7 | 1.55 / 1.5 | 1.82 / 2.5 |
 
@@ -1218,7 +1320,7 @@ atıyordu. Kilit tehdit puanı cinsinden ölçüldüğü için tablo değişince
 **SAYI ile TİP ayrı kollardır.** Rampa iki kez toptan yavaşlatıldı ve ikisinde de
 oyunun başı sıkıcı hâle geldi: sahada tek bir Swarm, altı saniyede bir yenisi.
 Oysa bir Swarm daha eklemek TEMPO'yu artırır, yeni bir TİP açmak DUVAR örer.
-Şimdi sayı hızlı büyüyor (taban 2, aralık 3.5 sn), tipler yavaş açılıyor.
+Şimdi sayı hızlı büyüyor (dalga bütçesi ×1.10), tipler yavaş açılıyor.
 
 **Rampa kendi ölçekleme formülünü YAZMIYOR**, yalnızca bir kampanya leveli
 seçiyor (`EquivalentLevel`) ve çarpanları `LevelCurve`'den okuyor. Ayrı
@@ -1245,7 +1347,7 @@ yalnız gelmez ve aynı anda en fazla `maxBarriersAlive` (1) tane bulunur.
 Birincisi kampanyada zaten vardı (`FillByBudget`), serbest modda HİÇ YOKTU —
 oysa gerekçe modun değil, gemi tipinin kendisine ait. İkincisi yeni ve serbest
 moda özgü bir boşluğu kapatıyor: kampanyada dalga bittiğinde siperlere çekilme
-emri verilir (`Withdraw`), serbest modda dalga diye bir şey yok. Siper hiç hasar
+emri verilir (`Withdraw`), serbest modda böyle bir an yoktu. Siper hiç hasar
 vermez, ölmez (kalkanı boşalınca çekilip şarj olur) ve sayılmaz — yani hiçbir
 şey onu sahneden çıkarmıyordu. Üç siper bir DUVAR eder: oyuncunun ateş hattı
 tamamen kapanır ve yapabileceği bir şey kalmaz.
@@ -1498,6 +1600,44 @@ Turret menzilleri BİLEREK dokunulmadı: onlar `bulletLifeTime × bulletSpeed`
 ile tanımlı birer DENGE değeri, kadraj sınırı değil.
 
 ## Kamera Sistemi
+
+### Mobilde Kadraj Ekranın FİZİKSEL Boyutuna Göre Daralır
+
+Telefonda her şey PC'dekiyle aynı dünya ölçeğinde çizilirse fiziksel olarak çok
+küçük kalır: 5 birimlik yarı yükseklik 27 inçlik bir monitörde rahat okunur,
+6 inçlik bir telefonda değil. Çözüm çizim boyutlarını tek tek büyütmek DEĞİL,
+**kadrajı daraltmak** — tek bir sayı bütün sahneyi (gemi, düşman, mermi, enkaz)
+aynı oranda büyütür. `minZoomSize`, `maxZoomSize` ve `upgradeZoomSize` aynı
+çarpanı yer.
+
+**Ölçek SÜREKLİDİR, "tablet mi telefon mu" ikilisi değil:**
+
+| köşegen | çarpan | `minZoomSize` |
+|---|---|---|
+| ≤ 5.5" | 0.70 | 3.50 |
+| 6.2" (varsayılan telefon) | 0.73 | 3.67 |
+| 8" | 0.82 | 4.12 |
+| ≥ 10.5" | 0.95 | 4.75 |
+| PC | 1.00 | 5.00 |
+
+Sert bir eşik ("8 inçin altı telefondur") iki sorun üretirdi: eşiğin iki
+yanındaki cihazlar çok farklı görünür, ve — asıl sorun — **`Screen.dpi`
+güvenilmezdir**. Android'de üreticinin bildirdiği `DisplayMetrics.xdpi`'den
+gelir; bazı cihazlarda 0, bazılarında tamamen uydurma bir sayıdır. Sürekli bir
+eğride yanlış okunan bir dpi küçük bir hata üretir, SINIF DEĞİŞTİRMEZ.
+
+Makul aralığın (100–800 dpi) dışındaki değer hiç kullanılmaz — yanlış bir dpi,
+dpi'siz kalmaktan kötüdür, çünkü sessizce yanlış bir kadraj üretir. O durumda
+6.2 inç varsayılır: bilinmeyen bir Android cihazın telefon olma olasılığı çok
+daha yüksek ve hata yönü de daha ucuz — biraz fazla zoom rahatsız etmez, az
+zoom okunmaz.
+
+Çarpan `Awake`'te uygulanır ve ardından `ViewBounds.Invalidate()` çağrılır:
+doğum ve silinme sınırları `maxZoomSize`'dan türer, önbellek düşmezse düşmanlar
+eski (geniş) kadrajın kenarında, yani görünür alanın çok dışında doğardı.
+
+Editörde denemek için `CameraController.forceDeviceZoom`. Gerçek cihazda
+gereksiz — `Application.isMobilePlatform` zaten ayırıyor.
 
 **Upgrade kadrajı ayrı hesaplanır.** `ZoomToShip` kamerayı gemiye ORTALIYORDU,
 yani gemi ekranın tam ortasına geliyordu — ama ekranın ortası boş değil: üstte
@@ -2271,11 +2411,24 @@ Yukarıdakilerin çoğu KAPANDI; kalanlar aşağıda.
   kapanışta coroutine bitirilmez, yani `OnApplicationQuit` gönderimi pratikte
   hiç tamamlanmaz. Artık kapanışta yarışmıyoruz, açılışta topluyoruz.
 
-- **`UploadConfig.asset` oluşturuldu ama `token` alanı BOŞ.** Endpoint dolu.
-  Token girilene kadar sunucuya gönderim reddedilir; kayıtlar diskte birikir ve
-  token girildikten sonraki ilk açılışta toplanır, yani veri kaybolmaz.
-  Asset `.gitignore`'da — repo herkese açık, token repoya girmemeli
-  (`pull.config.json` ile aynı gerekçe).
+- **Kapandı — 403 Forbidden.** `UploadConfig.asset`'in `token` alanı BOŞTU.
+  `log.php` ilk iş olarak `hash_equals(TOKEN, $_GET['t'])` yapar ve
+  eşleşmezse 403 döner; kod tarafında hiçbir hata yoktu. Token dolduruldu
+  (gerçek değer `Tools/Balance/pull.config.json` içinde; asset `.gitignore`'da,
+  repo herkese açık). Sunucu `?ping=1` ile doğrulandı: PHP 5.4.45, `logs/`
+  yazılabilir.
+
+  Buna bağlı İKİ GERÇEK HATA daha kapandı:
+
+  - **`UploadConfig.Active` token'a bakmıyordu.** Yalnızca endpoint kontrol
+    ediliyordu, yani anahtarı olmayan bir istemci yine de çalıyordu. Artık
+    token boşsa gönderim hiç başlamaz.
+  - **4xx geçici hata sayılıyordu.** 403, ağ kopması ile aynı kefeye konup
+    "sonraki oturumda tekrar denenecek" deniyordu — oysa yanlış yapılandırma
+    asla kendiliğinden düzelmez. Yanlış token'la dağıtılan bir build her
+    açılışta bütün birikmiş dosyaları tek tek gönderip 403 yiyor, hiçbirini
+    silmiyordu. Artık 4xx'te gönderim o oturum için kapanır ve `LogError` ile
+    sebebi (token/endpoint) açıkça yazılır.
 - **Release build'de kaydın yazıldığı DOĞRULANMADI.** APK kuruldu, açıldı,
   Unity oyun döngüsü başladı, exception yok — ama `BalanceLog.Begin` ancak oyun
   başlayınca çalışır ve telefonda henüz oynanmadı. `balance/` klasörü yok.

@@ -231,19 +231,33 @@ public static class ComponentCatalog
     // 3 temel tip — uzmanlaşma upgrade ekranından yapılır.
     // Hedef: TEMEL_DPS = 6 (damage/fireRate)
 
+    // MERMİ HIZI KURALI: kinetik ve enerji turretlerin mermisi ana silahla AYNI
+    // hızda uçar (6 birim/sn, bkz. WeaponController.UpdateKinetic). Turret
+    // mermisi ana silahtan hızlı olunca oyuncunun kendi atışı sahnedeki en yavaş
+    // mermi oluyor ve nişan alırken öğrendiği önde tutma hissi turretlerinkiyle
+    // çelişiyordu. Füzeler kasten DAHA YAVAŞ: ağır ve gecikmeli silahlar.
+    //
+    // ÖMÜRLER HIZLA BİRLİKTE AYARLANIR. Menzil bulletLifeTime × bulletSpeed'tir
+    // (EffectiveRange); yalnızca hızı düşürmek turretlerin menzilini sessizce
+    // kırpardı — enerji turretinde 56'dan 24'e. Buradaki her ömür, menzil ESKİSİ
+    // GİBİ KALSIN diye yeniden hesaplandı. Değişen tek şey uçuş SÜRESİ.
+    // İstisnalar: Point Defence (bombayı kalkana varmadan karşılamak zorunda,
+    // 20'de kalır), Lazer (ışın, mermi hızı kavramı yok), Plazma (zaten 5,
+    // yani ana silahtan yavaş — yükseltmek "düşsün" isteğine ters olurdu).
+
     static ComponentDefinition _tKinetic, _tEnergy, _tMissile;
 
     public static ComponentDefinition TurretKinetic => _tKinetic ??= TurretBase(
         "Raylı Turret", TurretBaseType.Kinetic, cost: 22,
-        fireRate: 2f, damage: 12f, speed: 9f, life: 3f, energy: 0.5f);
+        fireRate: 2f, damage: 12f, speed: 6f, life: 4.5f, energy: 0.5f);   // menzil 27 sabit
 
     public static ComponentDefinition TurretEnergy => _tEnergy ??= TurretBase(
         "Enerji Turret", TurretBaseType.Energy, cost: 22,
-        fireRate: 3f, damage: 18f, speed: 14f, life: 4f, energy: 3f);
+        fireRate: 3f, damage: 18f, speed: 6f, life: 9.33f, energy: 3f);    // menzil 56 sabit
 
     public static ComponentDefinition TurretMissile => _tMissile ??= TurretBase(
         "Füze Turret", TurretBaseType.Missile, cost: 28,
-        fireRate: 10f, damage: 60f, speed: 7f, life: 5f, energy: 0.5f);
+        fireRate: 10f, damage: 60f, speed: 5f, life: 7f, energy: 0.5f);    // menzil 35 sabit
 
     static ComponentDefinition TurretBase(string name, TurretBaseType bt, int cost,
         float fireRate, float damage, float speed, float life, float energy,
@@ -277,7 +291,7 @@ public static class ComponentCatalog
         return spec switch
         {
             TurretSpecType.Gatling      => Spec(baseDef, spec, specCost: 20,
-                fireRate: 1f,  damage: 8f,  speed: 9f,   life: 3f,   energy: 0.5f, mag: 10, reload: 3f),
+                fireRate: 1f,  damage: 8f,  speed: 6f,   life: 4.5f, energy: 0.5f, mag: 10, reload: 3f),   // menzil 27 sabit
             // Menzil dar (10.4u) ve hedef listesi dar; karşılığı yüksek ham DPS:
             // 8 hasar / 0.28 sn = 28.6 DPS, diğer turretlerin ~5 katı.
             //
@@ -302,7 +316,7 @@ public static class ComponentCatalog
             TurretSpecType.Plasma       => Spec(baseDef, spec, specCost: 40,
                 fireRate: 6f,  damage: 36f, speed: 5f,   life: 4f,   energy: 4f),
             TurretSpecType.HomingRocket => Spec(baseDef, spec, specCost: 35,
-                fireRate: 15f, damage: 60f, speed: 4.5f, life: 6f,   energy: 0.5f),
+                fireRate: 15f, damage: 60f, speed: 3.5f, life: 7.71f, energy: 0.5f),   // menzil 27 sabit
             _ => baseDef,
         };
     }

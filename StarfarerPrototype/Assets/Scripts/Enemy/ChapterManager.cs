@@ -271,42 +271,8 @@ public class ChapterManager : MonoBehaviour
     /// gemiler öndekilerin tam üstüne doğuyordu.
     /// </summary>
     void SpawnFormation(List<EnemyTypeData> types, FormationTemplate formation, SpawnSide side)
-    {
-        Vector3 basePos = SpawnPosition(side);
-        var     group   = FormationGroup.Create(basePos, FormationTarget());
-
-        int slotCount = formation != null && formation.slots != null && formation.slots.Length > 0
-            ? formation.slots.Length : 1;
-
-        for (int i = 0; i < types.Count; i++)
-        {
-            Vector2 offset = Vector2.zero;
-            if (formation != null && slotCount > 1)
-            {
-                offset = formation.slots[i % slotCount].offset;
-                // Taşan her sıra formasyonun bir boy gerisine düşer
-                offset.x -= (i / slotCount) * RankSpacing;
-            }
-
-            Vector3 pos = basePos + new Vector3(offset.x * FormationGroup.SpreadX,
-                                                offset.y * FormationGroup.SpreadY, 0f);
-
-            var bot = EnemySpawner.Spawn(types[i], pos);
-            if (bot != null) group.Add(bot, offset);
-        }
-
-        group.Seal();
-    }
-
-    /// <summary>Formasyonun ilerlediği nokta — ana gemi.</summary>
-    static Vector2 FormationTarget()
-    {
-        var ship = FindFirstObjectByType<PlayerShip>();
-        return ship != null ? (Vector2)ship.transform.position : Vector2.zero;
-    }
-
-    /// <summary>Taşan sıralar arası mesafe (normalize ofset biriminde).</summary>
-    const float RankSpacing = 0.55f;
+        => EnemySpawner.SpawnFormation(types, formation, SpawnPosition(side),
+                                       EnemyScaling.ForLevel(GameProgress.CurrentLevel));
 
     /// <summary>
     /// Boss'u sahneye koyar. 9. bölümde İKİ tane gelir — tek hedefe kilitlenen
@@ -478,7 +444,7 @@ public class ChapterManager : MonoBehaviour
         }
     }
 
-    static FormationTemplate PickFormation(List<EnemyTypeData> enemies,
+    public static FormationTemplate PickFormation(List<EnemyTypeData> enemies,
                                            FormationTemplate[] formations)
     {
         var roles = new HashSet<EnemyRole>();
@@ -498,7 +464,7 @@ public class ChapterManager : MonoBehaviour
         return best;
     }
 
-    static void SortByFormation(List<EnemyTypeData> list, FormationTemplate formation)
+    public static void SortByFormation(List<EnemyTypeData> list, FormationTemplate formation)
     {
         var slotRoles = new List<EnemyRole>();
         foreach (var s in formation.slots) slotRoles.Add(s.role);

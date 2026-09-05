@@ -57,6 +57,13 @@ public class CameraController : MonoBehaviour
              "alanı buradan türer, o yüzden sabit değil ALAN olmalı.")]
     public float maxZoomSize = 7f;
 
+    [Header("Cihaz Ölçeği")]
+    [Tooltip("Mobilde kadrajı ekranın FİZİKSEL boyutuna göre daralt. PC'de etkisiz.")]
+    public bool scaleZoomByScreenSize = true;
+
+    [Tooltip("Editörde mobil ölçeğini denemek için. Gerçek cihazda gereksiz.")]
+    public bool forceDeviceZoom = false;
+
     PlayerShip _ship;
 
     private Camera _cam;
@@ -74,6 +81,83 @@ public class CameraController : MonoBehaviour
     void Awake()
     {
         _cam = GetComponent<Camera>();
+        ApplyDeviceZoom();
+    }
+
+    // ── Cihaz ölçeği ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Telefonda her şey PC'dekiyle aynı dünya ölçeğinde çizilirse fiziksel
+    /// olarak çok küçük kalır: 5 birimlik yarı yükseklik 27 inçlik bir monitörde
+    /// rahat okunur, 6 inçlik bir telefonda değil. Çözüm çizim boyutlarını tek
+    /// tek büyütmek değil, KADRAJI DARALTMAK — tek bir sayı bütün sahneyi
+    /// (gemi, düşman, mermi, enkaz, HUD dışı her şey) aynı oranda büyütür.
+    ///
+    /// Ölçek SÜREKLİDİR, "tablet mi telefon mu" ikilisi değil. Sert bir eşik
+    /// ("8 inçin altı telefondur") eşiğin iki yanındaki cihazları çok farklı
+    /// gösterir ve — asıl sorun — <see cref="Screen.dpi"/> güvenilmez olduğu
+    /// için cihazı YANLIŞ tarafa atabilir. Sürekli bir eğride yanlış okunan bir
+    /// dpi küçük bir hata üretir, sınıf değiştirmez.
+    /// </summary>
+    void ApplyDeviceZoom()
+    {
+        if (!scaleZoomByScreenSize) return;
+        if (!Application.isMobilePlatform && !forceDeviceZoom) return;
+
+        float k = DeviceZoomFactor();
+        minZoomSize     *= k;
+        maxZoomSize     *= k;
+        upgradeZoomSize *= k;
+
+        // Doğum ve silinme sınırları maxZoomSize'dan türer; önbellek düşmezse
+        // düşmanlar eski (geniş) kadrajın kenarında, yani görünür alanın çok
+        // dışında doğardı.
+        ViewBounds.Invalidate();
+
+        Debug.Log($"[CameraController] cihaz ölçeği k={k:0.00} " +
+                  $"(köşegen {ScreenDiagonalInches():0.0}\" dpi {Screen.dpi:0}) " +
+                  $"min={minZoomSize:0.00} max={maxZoomSize:0.00}");
+    }
+
+    /// <summary>Küçük ekranda kadraj bu kadar daralır (1 = PC ile aynı).</summary>
+    const float PhoneZoom  = 0.70f;
+    const float TabletZoom = 0.95f;
+
+    /// <summary>Eğrinin uçları — bu köşegenlerin dışında ölçek sabitlenir.</summary>
+    const float PhoneInches  = 5.5f;
+    const float TabletInches = 10.5f;
+
+    /// <summary>
+    /// dpi okunamadığında varsayılan köşegen. TELEFON tarafına düşer: bilinmeyen
+    /// bir Android cihazın telefon olma olasılığı çok daha yüksek ve hata
+    /// yönü de daha ucuz — biraz fazla zoom rahatsız etmez, az zoom okunmaz.
+    /// </summary>
+    const float UnknownInches = 6.2f;
+
+    static float DeviceZoomFactor()
+    {
+        float inches = ScreenDiagonalInches();
+        if (inches <= 0f) inches = UnknownInches;
+        return Mathf.Lerp(PhoneZoom, TabletZoom,
+                          Mathf.InverseLerp(PhoneInches, TabletInches, inches));
+    }
+
+    /// <summary>
+    /// Ekranın fiziksel köşegeni (inç). Okunamıyorsa 0.
+    ///
+    /// <see cref="Screen.dpi"/> Android'de üreticinin bildirdiği
+    /// <c>DisplayMetrics.xdpi</c>'den gelir ve bazı cihazlarda 0, bazılarında
+    /// tamamen uydurma bir sayıdır. Makul aralığın dışındaki değer KULLANILMAZ:
+    /// yanlış bir dpi, dpi'siz kalmaktan daha kötüdür — sessizce yanlış bir
+    /// kadraj üretir.
+    /// </summary>
+    static float ScreenDiagonalInches()
+    {
+        float dpi = Screen.dpi;
+        if (dpi < 100f || dpi > 800f) return 0f;
+
+        float w = Screen.width, h = Screen.height;
+        return Mathf.Sqrt(w * w + h * h) / dpi;
     }
 
     void Update()

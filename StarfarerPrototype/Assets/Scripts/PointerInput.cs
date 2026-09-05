@@ -23,6 +23,22 @@ using UnityEngine.InputSystem;
 public static class PointerInput
 {
     /// <summary>
+    /// Oyun girdisi kilitli mi. Tam ekran bir menü açıkken silah NE DÖNER NE
+    /// ATEŞ EDER.
+    ///
+    /// Tek bir yerde toplandı çünkü kilit iki ayrı davranışı kapsıyor ve ikisi
+    /// ayrı dosyalarda: <see cref="WeaponMount"/> nişan alır,
+    /// <see cref="WeaponController"/> ateş eder. İkisi de yalnızca
+    /// <c>UpgradeUI.IsPaused</c>'a bakıyordu; açılış menüsü eklendiğinde
+    /// namlu menünün ARKASINDA farenin peşinde dönmeye devam etti — oyuncu
+    /// daha oyuna başlamamışken gemi nişan alıyordu.
+    ///
+    /// Game Over da dahil: gemi yok edilmişken namlunun dönmesinin anlamı yok.
+    /// </summary>
+    public static bool Locked
+        => UpgradeUI.IsPaused || StartMenuUI.IsOpen || GameManager.IsGameOver;
+
+    /// <summary>
     /// Girdiyi donanım yerine üreten kaynak. Simülasyonun sahte pilotu bunu
     /// doldurur; başka hiçbir yerde set edilmez.
     ///
@@ -30,6 +46,10 @@ public static class PointerInput
     /// oyuncunun ölçtüğü şey oyunun GERÇEK ateş yolu olmalı — nişan açısı,
     /// namlu ucu, şarj süresi, UI yutması. Ayrı bir yol açsaydık simülasyon
     /// kendi yazdığımız kestirmeyi ölçer, oyunu değil.
+    ///
+    /// <see cref="Locked"/> kaynağın ÜSTÜNDEDİR: kilit çağıranlarda sorulur
+    /// (WeaponMount / WeaponController), yani sahte pilot da menü açıkken
+    /// ateş edemez. Simülasyonda menü zaten açılmıyor.
     /// </summary>
     public static IPointerSource Source;
 
