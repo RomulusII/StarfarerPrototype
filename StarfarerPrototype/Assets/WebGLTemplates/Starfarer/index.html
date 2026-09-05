@@ -73,9 +73,13 @@
          Ayrıca oyun koduna platform kontrolü girmiyor — bu düğme yalnızca
          tarayıcı sürümünde VAR OLUYOR.
 
-         Yol göreceli: oyun /starfarer/game/ altında, paket /starfarer/ altında.
+         Paket oyunla AYNI klasörde durur. Bir üstte tutulup oraya ayrı bir
+         web.config konması denendi ve çalışmadı: IIS yapılandırması bulunduğu
+         klasör ve altı için geçerli, üste doğru işlemiyor. Aynı klasör, build
+         ile birlikte giden tek bir MIME eşlemesiyle çözüyor.
+
          Dosya yoksa link hiç görünmez (aşağıdaki HEAD yoklaması). -->
-    <a id="apk" href="../Starfarer.apk" download>&#8681; APK</a>
+    <a id="apk" href="Starfarer.apk" download>&#8681; APK</a>
 
     <button id="fs" title="Tam ekran">&#9974;</button>
 
