@@ -1,10 +1,11 @@
 using System.Text;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 /// <summary>
-/// Fareyi bir düşmanın üzerine getirince sol üstte açılan bilgi kutusu.
+/// İşaretçiyi bir düşmanın üzerine getirince sol üstte açılan bilgi kutusu.
+/// Masaüstünde fare üzerine gelmek, dokunmada parmağı düşmanın üstünde tutmak
+/// açar — girdi <see cref="PointerInput"/>'tan gelir.
 ///
 /// Neden var: düşman tipleri artık birbirinden davranışla ayrılıyor (zırh,
 /// direnç, faz, aura, karıştırma) ama oyuncu ekranda yalnızca bir siluet ve
@@ -54,7 +55,9 @@ public class EnemyInfoHUD : MonoBehaviour
 
     void Update()
     {
-        if (GameManager.IsGameOver || UpgradeUI.IsPaused || StartMenuUI.IsOpen)
+        // Aynı üç koşul PointerInput.Locked'ta zaten toplanmış; burada ayrıca
+        // yazılsaydı biri eklendiğinde diğeri unutulurdu.
+        if (PointerInput.Locked)
         {
             _canvas.enabled = false;
             return;
@@ -76,17 +79,21 @@ public class EnemyInfoHUD : MonoBehaviour
     // =========================================================================
 
     /// <summary>
-    /// İmlecin altındaki düşman. Boss gövdesi ve hardpoint'leri de sayılır —
-    /// hardpoint'e denk gelen imleç boss'un kartını açar, çünkü oyuncunun
+    /// İşaretçinin altındaki düşman. Boss gövdesi ve hardpoint'leri de sayılır —
+    /// hardpoint'e denk gelen işaretçi boss'un kartını açar, çünkü oyuncunun
     /// merak ettiği geminin bütünüdür.
+    ///
+    /// Konum <see cref="PointerInput"/>'tan alınır. Doğrudan <c>Mouse.current</c>
+    /// okunuyordu ve telefonda o NULL'dır: kart Android'de hiç açılmıyordu.
+    /// Dokunmada konum yalnızca parmak basılıyken vardır, yani kart parmağın
+    /// düşman üstünde durduğu sürece görünür.
     /// </summary>
     Component PickUnderCursor()
     {
         var cam = Camera.main;
-        if (cam == null || Mouse.current == null) return null;
+        if (cam == null || !PointerInput.TryPosition(out var screen)) return null;
 
-        Vector2 screen = Mouse.current.position.ReadValue();
-        Vector3 world  = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -cam.transform.position.z));
+        Vector3 world = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -cam.transform.position.z));
 
         var hits = Physics2D.OverlapCircleAll(world, PickRadius);
         if (hits == null || hits.Length == 0) return null;
