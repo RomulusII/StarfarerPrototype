@@ -55,6 +55,18 @@ public class BalanceUploader : MonoBehaviour
 
     static BalanceUploader _instance;
 
+    /// <summary>
+    /// Sunucu isteği KURAL GEREĞİ reddetti (4xx) — yanlış token, kapatılmış uç.
+    /// Bu oturumda bir daha denenmez.
+    ///
+    /// Ağ kopması ile yanlış yapılandırmayı ayırmak şart: ilki tekrar denemeyi
+    /// hak eder, ikincisi asla düzelmez. İkisi aynı sayılınca yanlış token'la
+    /// dağıtılan bir build her açılışta bütün birikmiş dosyaları tek tek
+    /// gönderip 403 yiyor, hiçbir şey silinmiyor ve log'da yalnızca "sonraki
+    /// oturumda tekrar denenecek" yazıyordu.
+    /// </summary>
+    static bool _rejected;
+
     void Awake()
     {
         _instance = this;
@@ -139,7 +151,7 @@ public class BalanceUploader : MonoBehaviour
     IEnumerator UploadFile(string path, bool deleteOnSuccess)
     {
         var cfg = UploadConfig.Instance;
-        if (!UploadConfig.Active) yield break;
+        if (!UploadConfig.Active || _rejected) yield break;
 
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) yield break;
 
@@ -160,7 +172,16 @@ public class BalanceUploader : MonoBehaviour
 
         yield return req.SendWebRequest();
 
-        if (req.result != UnityWebRequest.Result.Success)
+        if (req.responseCode >= 400 && req.responseCode < 500)
+        {
+            // Yapılandırma hatası. 403 = token yanlış (sunucudaki TOKEN ile
+            // UploadConfig.token aynı olmalı), 404 = uç yolu yanlış.
+            _rejected = true;
+            Debug.LogError($"[BalanceUploader] sunucu REDDETTİ (HTTP {req.responseCode}) — " +
+                           "gönderim bu oturumda kapatıldı. Token/endpoint yanlış: " +
+                           $"{cfg.endpoint} · teşhis için ?ping=1 aç.");
+        }
+        else if (req.result != UnityWebRequest.Result.Success)
         {
             Debug.LogWarning($"[BalanceUploader] gönderilemedi ({req.error}) — " +
                              "kayıt diskte kaldı, sonraki oturumda tekrar denenecek");

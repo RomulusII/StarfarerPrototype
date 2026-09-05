@@ -36,7 +36,7 @@ public class WeaponMount : MonoBehaviour
 
     void Update()
     {
-        if (UpgradeUI.IsPaused) return;
+        if (PointerInput.Locked) return;
 
         // Fare YOKSA (Android) namlu son yönünde kalır — eskiden Mouse.current
         // kontrolsüz okunuyordu ve telefonda ilk karede patlıyordu.

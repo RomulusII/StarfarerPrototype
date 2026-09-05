@@ -22,6 +22,22 @@ using UnityEngine.InputSystem;
 /// </summary>
 public static class PointerInput
 {
+    /// <summary>
+    /// Oyun girdisi kilitli mi. Tam ekran bir menü açıkken silah NE DÖNER NE
+    /// ATEŞ EDER.
+    ///
+    /// Tek bir yerde toplandı çünkü kilit iki ayrı davranışı kapsıyor ve ikisi
+    /// ayrı dosyalarda: <see cref="WeaponMount"/> nişan alır,
+    /// <see cref="WeaponController"/> ateş eder. İkisi de yalnızca
+    /// <c>UpgradeUI.IsPaused</c>'a bakıyordu; açılış menüsü eklendiğinde
+    /// namlu menünün ARKASINDA farenin peşinde dönmeye devam etti — oyuncu
+    /// daha oyuna başlamamışken gemi nişan alıyordu.
+    ///
+    /// Game Over da dahil: gemi yok edilmişken namlunun dönmesinin anlamı yok.
+    /// </summary>
+    public static bool Locked
+        => UpgradeUI.IsPaused || StartMenuUI.IsOpen || GameManager.IsGameOver;
+
     /// <summary>İşaretçinin ekran konumu. Hiçbir girdi yoksa false döner.</summary>
     public static bool TryPosition(out Vector2 screen)
     {

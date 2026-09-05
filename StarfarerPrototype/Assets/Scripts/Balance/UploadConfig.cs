@@ -44,12 +44,23 @@ public class UploadConfig : ScriptableObject
         }
     }
 
+    /// <summary>
+    /// Gönderim gerçekten yapılabilir mi.
+    ///
+    /// TOKEN de aranır. Eskiden yalnızca endpoint'e bakılıyordu; token boş
+    /// kalınca sunucu her isteğe 403 döner, istemci ise bunu geçici bir hata
+    /// sayıp "sonraki oturumda tekrar denenecek" derdi. Yani yanlış kurulmuş
+    /// bir build, hiç veri göndermeden sessizce dosya biriktiriyordu.
+    /// Anahtarı olmayan istemci hiç çalmamalı.
+    /// </summary>
     public static bool Active
     {
         get
         {
             var c = Instance;
-            return c != null && c.enabled && !string.IsNullOrEmpty(c.endpoint);
+            return c != null && c.enabled
+                && !string.IsNullOrEmpty(c.endpoint)
+                && !string.IsNullOrEmpty(c.token);
         }
     }
 }

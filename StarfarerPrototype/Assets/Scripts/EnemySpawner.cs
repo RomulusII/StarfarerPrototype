@@ -33,19 +33,41 @@ public class EnemySpawner : MonoBehaviour
              "Zorluk saatten değil, oyuncunun temizlediği düşmandan ilerler.")]
     public float threatPerRampLevel = 20f;
 
-    [Tooltip("Spawn aralığı: başlangıç → seviye rampFullLevel'e ulaşınca varılan değer.")]
-    public float startInterval = 3.5f;
-    public float minInterval   = 1.5f;
+    [Header("Serbest Mod — Dalgalar")]
+    [Tooltip("İki dalga arasındaki süre (sn). SABİTTİR: zorluk dalga BÜYÜKLÜĞÜNDEN " +
+             "gelsin diye. İki kadranı (sıklık ve büyüklük) aynı anda açmak, " +
+             "log'dan hangisinin fazla geldiğini okumayı imkânsız kılardı — önce " +
+             "tek kadranla ölçüp sonra karar vereceğiz.")]
+    public float waveInterval = 20f;
 
+    [Tooltip("İlk dalganın tehdit bütçesi. 2 = iki Swarm.")]
+    public float startWaveBudget = 2f;
+
+    [Tooltip("Her dalga bir öncekinden bu kadar büyük. %10 BİLEŞİKTİR: 10. dalga " +
+             "2.4×, 20. dalga 6.1×, 30. dalga 15.9× bütçe taşır — yani 10 " +
+             "dakikalık bir koşu kampanyanın ucuna kadar tırmanır. Doğru oran " +
+             "ölçümle bulunacak; bu bir başlangıç tahmini.")]
+    public float waveBudgetGrowth = 1.10f;
+
+    [Tooltip("Bütçe bunu aşınca dalgaya boss girebilir.")]
+    public float bossMinBudget = 40f;
+
+    [Tooltip("Boss eşiğini aşan her dilim için boss gelme olasılığı.")]
+    [Range(0f, 1f)] public float bossChance = 0.35f;
+
+    [Tooltip("Tek dalgada en fazla kaç boss.")]
+    public int maxBossesPerWave = 2;
+
+    [Header("Serbest Mod Zorluk Rampası (düşman GÜCÜ)")]
     [Tooltip("Rampanın tamamlandığı seviye — bundan sonrası tam zorluktur.")]
     public float rampFullLevel = 20f;
 
-    [Tooltip("Aynı anda sahada olabilecek düşman: taban ve seviye başına artış. " +
-             "SAYI hızlı büyür, TİP yavaş açılır — ikisi ayrı kollardır: bir " +
-             "Swarm daha eklemek tempoyu artırır, yeni bir tip açmak duvar örer.")]
-    public int   baseMaxAlive    = 2;
-    public float maxAlivePerLevel = 0.5f;
-    public int   maxAliveCap      = 8;
+    [Tooltip("Sahada bu kadar düşman varken ZAMANLI dalga gönderilmez — oyuncu " +
+             "boğulmasın. Saha tamamen temizlendiğinde sınır aranmaz: yeni dalga " +
+             "zaten hemen gelir.")]
+    public int   baseMaxAlive    = 4;
+    public float maxAlivePerLevel = 0.7f;
+    public int   maxAliveCap      = 20;
 
     [Tooltip("Tip kilidi: seviye başına açılan tehdit puanı. threatScore'u bu " +
              "eşiğin üstünde olan tipler henüz gelmez.")]
@@ -72,7 +94,16 @@ public class EnemySpawner : MonoBehaviour
     float[]         _defaultWeights;
     float           _timer;
 
-    bool _freeRunning;
+    bool  _freeRunning;
+    int   _waveIndex;
+    float _waveBudget;
+    float _scanTimer;
+
+    /// <summary>Sahne taramaları arası süre (sn) — bkz. Update.</summary>
+    const float ScanInterval = 0.25f;
+
+    /// <summary>Sonraki dalganın bütçesi — HUD/log için okunur.</summary>
+    public float NextWaveBudget => _waveBudget;
 
     // ── Serbest modun ilerlemesi: YOK EDİLEN TEHDİT ──────────────────────────
     //
@@ -198,6 +229,25 @@ public class EnemySpawner : MonoBehaviour
         };
     }
 
+    /// <summary>
+    /// Serbest mod artık DALGA gönderir, tek tek gemi değil.
+    ///
+    /// Eskisi sabit bir aralıkta bir gemi doğuruyordu: sahne ne doluyor ne
+    /// boşalıyordu — ne bir dalganın gerilimi ne de aralardaki nefes vardı,
+    /// yalnızca düz bir sızıntı. Kampanyanın dalga ritmi zaten doğru olan
+    /// taraftı; serbest mod ondan yalnızca BEKLEME KURALINDA ayrılır:
+    ///
+    ///   Kampanya  — dalga TEMİZLENMEDEN sonraki başlamaz.
+    ///   Serbest   — dalga bir SAATE göre gelir; saha erken temizlenirse
+    ///               sonraki dalga beklemeden gelir.
+    ///
+    /// "Bitmeden başlamaz" kuralı kampanyada anlamlı (level bir bütündür),
+    /// burada değildi: oyuncu son bir gemiyi kovalarken oyun duruyordu.
+    ///
+    /// TEK İSTİSNA BOSS'tur. Boss sahnedeyken yeni dalga gelmez — boss dövüşü
+    /// zaten sahnenin tamamını istiyor, üstüne dalga bindirmek onu bir dövüş
+    /// değil bir kalabalık yapardı.
+    /// </summary>
     void Update()
     {
         if (!debugFreeSpawn) { _freeRunning = false; return; }
@@ -207,29 +257,209 @@ public class EnemySpawner : MonoBehaviour
         // Duraklatma rampayı sıfırlamamalı — yalnızca ilerlemeyi durdurur
         if (UpgradeUI.IsPaused) return;
 
-        // Seviye TEMİZLENEN TEHDİTTEN gelir; burada yalnızca okunur. Zaman
-        // yalnızca spawn ARALIĞINI ölçer — "ne sıklıkta" bir tempo sorusudur,
-        // "ne kadar güçlü" ise bir kazanım sorusu.
-        float level = RampLevel;
-
         _timer += Time.deltaTime;
-        if (_timer < IntervalAt(level)) return;
-        _timer = 0f;
+
+        // Sahne taraması KARE BAŞINA yapılmaz. FindObjectsByType bütün sahneyi
+        // gezer; "saha temizlendi mi" sorusunun saniyede 60 kez sorulmasının
+        // hiçbir karşılığı yok — 0.25 sn'lik gecikme fark edilmez, maliyeti ise
+        // dörtte bire iner.
+        _scanTimer -= Time.deltaTime;
+        if (_scanTimer > 0f) return;
+        _scanTimer = ScanInterval;
+
+        // Boss dövüşü sahnenin tamamını ister: saat işlemez, dalga gelmez.
+        if (FindFirstObjectByType<BossShip>() != null) { _timer = 0f; return; }
 
         var alive = FindObjectsByType<EnemyBot>(FindObjectsSortMode.None);
+        int live  = CountBlocking(alive);
 
-        // Sahada yeterince düşman varsa yenisini gönderme — oyuncu boğulmasın
-        if (alive.Length >= MaxAliveAt(level)) return;
+        // Saha temizlendiyse saati bekleme. "Son gemiyi kovala" ölü zamanı
+        // buradan çıkar; oyuncu erken bitirdiği için ÖDÜLLENDİRİLİR.
+        bool clear = live == 0;
+        bool due   = _timer >= waveInterval;
+        if (!clear && !due) return;
 
-        var type = RollUnlockedType(level, alive);
-        if (type == null) return;
+        // Zamanlı dalga sahayı boğmasın; temizlenmiş sahada sınır aranmaz.
+        float level = RampLevel;
+        if (!clear && live >= MaxAliveAt(level)) return;
 
+        _timer = 0f;
+        SendWave(level, alive);
+    }
+
+    /// <summary>
+    /// Dalgayı kurar ve sahneye koyar. Bütçe her dalgada
+    /// <see cref="waveBudgetGrowth"/> kadar büyür; düşmanların GÜCÜ ise ayrı bir
+    /// koldan, oyuncunun temizlediği tehditten gelir (bkz. <see cref="RampLevel"/>).
+    /// İkisi ayrı tutulur: bütçe "kaç tane", rampa "ne kadar sert" sorusudur —
+    /// aynı anda ikisini birden artırmak, log'da hangisinin fazla geldiğini
+    /// okumayı imkânsız kılardı.
+    /// </summary>
+    void SendWave(float level, EnemyBot[] alive)
+    {
         var scaling = debugLevel > 0
             ? EnemyScaling.ForLevel(debugLevel)
             : CurrentRamp(level);
 
-        Spawn(type, new Vector3(ViewBounds.SpawnX, Random.Range(-4.5f, 4.5f), 0f), scaling);
+        int   budget = Mathf.Max(1, Mathf.RoundToInt(_waveBudget));
+        float left   = budget;
+
+        int bosses = RollBosses(budget, ref left);
+        var types  = BuildWaveTypes(level, left, alive);
+
+        int kadroTehdit = 0;
+        foreach (var t in types) if (t != null) kadroTehdit += t.threatScore;
+
+        BalanceLog.Event("wave")
+                  .Num("index",  _waveIndex)
+                  .Num("butce",  budget)
+                  .Num("kadro",  types.Count)
+                  .Num("tehdit", kadroTehdit)
+                  .Num("boss",   bosses)
+                  .Num("rampa",  level)
+                  .End();
+
+        if (types.Count > 0)
+        {
+            var formation = ChapterManager.PickFormation(types, _formations);
+            ChapterManager.SortByFormation(types, formation);
+            SpawnFormation(types, formation,
+                           new Vector3(ViewBounds.SpawnX, 0f, 0f), scaling);
+        }
+
+        for (int i = 0; i < bosses; i++) SpawnFreeBoss(level, i, bosses);
+
+        _waveIndex++;
+        _waveBudget *= Mathf.Max(1f, waveBudgetGrowth);
     }
+
+    /// <summary>
+    /// Dalgaya kaç boss girecek. Boss bütçeden ÖDENİR (tehdit değeri kadar),
+    /// yani boss gelen dalgada refakat kadrosu kendiliğinden küçülür: boss
+    /// dalganın üstüne eklenen bir bonus değil, içindeki en pahalı kalemdir.
+    ///
+    /// Boss bütçenin tamamını yiyemez (1.5× pay şartı) — yalnız gelen bir boss
+    /// hedef bölme sınavı olmaktan çıkıp tek hedefli bir bekleyişe döner.
+    /// </summary>
+    int RollBosses(int budget, ref float left)
+    {
+        if (budget < bossMinBudget || maxBossesPerWave <= 0) return 0;
+
+        float bossThreat = Mathf.Max(1f, BalanceConfig.Instance.bossThreatValue);
+        int   slots      = Mathf.Min(maxBossesPerWave,
+                                     Mathf.FloorToInt(budget / Mathf.Max(1f, bossMinBudget)));
+        int   count      = 0;
+
+        for (int i = 0; i < slots; i++)
+        {
+            if (left < bossThreat * 1.5f) break;
+            if (Random.value >= bossChance) continue;
+            left -= bossThreat;
+            count++;
+        }
+        return count;
+    }
+
+    /// <summary>Serbest modun boss'u: rampanın karşılık geldiği bölümün boss'u.</summary>
+    void SpawnFreeBoss(float level, int index, int total)
+    {
+        int chapter = Mathf.Clamp(GameProgress.ChapterOf(EquivalentLevel(level)), 1, 10);
+        var data    = BossShipData.CreateForChapter(chapter);
+        if (data == null) return;
+
+        var go = new GameObject($"Boss_{data.displayName}");
+        go.transform.position = new Vector3(ViewBounds.SpawnX + index * 2f,
+                                            total == 1 ? 0f : (index == 0 ? 2f : -2f), 0f);
+        go.AddComponent<BossShip>().data = data;
+    }
+
+    /// <summary>
+    /// Bütçeyi tiplere çevirir. Aynı iş kampanyada
+    /// <c>ChapterManager.FillByBudget</c> ile yapılıyor ama oradaki havuz
+    /// bölümün sabit listesidir; buradaki havuz SEVİYEYE GÖRE açılır ve siper /
+    /// ağır tip kuralları sahnenin o anki durumuna bakar. İki kural kümesi
+    /// birleştirilemedi, o yüzden dolum burada kendi yolundan gider.
+    /// </summary>
+    List<EnemyTypeData> BuildWaveTypes(float level, float budget, EnemyBot[] alive)
+    {
+        SnapshotAlive(alive);
+
+        var   list   = new List<EnemyTypeData>();
+        float left   = budget;
+        int   safety = 200;
+
+        while (left >= 1f && safety-- > 0)
+        {
+            var t = RollUnlockedType(level, left);
+            if (t == null) break;
+            list.Add(t);
+            NoteChosen(t);
+            left -= Mathf.Max(1, t.threatScore);
+        }
+
+        // BOŞ DALGA OLMAZ. Bütçe küçükken tek uygun tip bile pahalı kalabilir;
+        // dalganın hiç gelmemesi, bütçeyi bir tip kadar aşmaktan kötüdür —
+        // kampanyadaki taşma kuralıyla aynı gerekçe.
+        if (list.Count == 0)
+        {
+            var t = RollUnlockedType(level, float.MaxValue);
+            if (t != null) { list.Add(t); NoteChosen(t); }
+        }
+        return list;
+    }
+
+    /// <summary>Dalganın gemilerini formasyon düzeninde doğurur.</summary>
+    public static void SpawnFormation(List<EnemyTypeData> types, FormationTemplate formation,
+                                      Vector3 basePos, EnemyScaling scaling)
+    {
+        var group = FormationGroup.Create(basePos, FormationTarget());
+
+        int slotCount = formation != null && formation.slots != null && formation.slots.Length > 0
+            ? formation.slots.Length : 1;
+
+        for (int i = 0; i < types.Count; i++)
+        {
+            Vector2 offset = Vector2.zero;
+            if (formation != null && slotCount > 1)
+            {
+                offset = formation.slots[i % slotCount].offset;
+                offset.x -= (i / slotCount) * RankSpacing;
+            }
+
+            Vector3 pos = basePos + new Vector3(offset.x * FormationGroup.SpreadX,
+                                                offset.y * FormationGroup.SpreadY, 0f);
+
+            var bot = Spawn(types[i], pos, scaling);
+            if (bot != null) group.Add(bot, offset);
+        }
+
+        group.Seal();
+    }
+
+    /// <summary>Taşan sıralar arası mesafe (normalize ofset biriminde).</summary>
+    public const float RankSpacing = 0.55f;
+
+    static Vector2 FormationTarget()
+    {
+        var ship = FindFirstObjectByType<PlayerShip>();
+        return ship != null ? (Vector2)ship.transform.position : Vector2.zero;
+    }
+
+    /// <summary>
+    /// Sahayı "temizlendi" saymak için ölmesi gereken düşman sayısı. Silahsız
+    /// siper gemileri sayılmaz — onları beklemek sahneyi hiçbir şeyin olmadığı
+    /// bir bekleyişte kilitler (kampanyadaki UpdateWaitClear ile aynı kural).
+    /// </summary>
+    static int CountBlocking(EnemyBot[] alive)
+    {
+        if (alive == null) return 0;
+        int n = 0;
+        foreach (var b in alive)
+            if (b != null && b.data != null && b.data.BlocksWaveClear) n++;
+        return n;
+    }
+
+    FormationTemplate[] _formations;
 
     /// <summary>
     /// Serbest mod açıldığında sayaçları sıfırlar, asteroit alanını kurar.
@@ -241,6 +471,18 @@ public class EnemySpawner : MonoBehaviour
     {
         s_clearedThreat = 0f;
         _timer          = 0f;
+        _waveIndex      = 0;
+        _waveBudget     = Mathf.Max(1f, startWaveBudget);
+
+        _formations = new[]
+        {
+            FormationTemplate.CreateArrow(),
+            FormationTemplate.CreateColumn(),
+            FormationTemplate.CreateBroadFront(),
+            FormationTemplate.CreateEscort(),
+            FormationTemplate.CreateShieldWall(),
+            FormationTemplate.CreateScattered(),
+        };
 
         // Asteroit yoksa serbest modda hiç kaynak akmaz — küçük bir alan kur
         if (FindFirstObjectByType<AsteroidSpawner>() == null)
@@ -248,9 +490,6 @@ public class EnemySpawner : MonoBehaviour
     }
 
     // ── Zorluk rampası ────────────────────────────────────────────────────────
-
-    float IntervalAt(float level)
-        => Mathf.Lerp(startInterval, minInterval, Mathf.Clamp01(level / rampFullLevel));
 
     int MaxAliveAt(float level)
         => Mathf.Min(maxAliveCap, baseMaxAlive + Mathf.FloorToInt(level * maxAlivePerLevel));
@@ -305,32 +544,18 @@ public class EnemySpawner : MonoBehaviour
     /// çifter gelmesi, oyuncunun eline yeni bir cevap geçmeden önce iki katı
     /// duvar demekti.
     /// </summary>
-    EnemyTypeData RollUnlockedType(float level, EnemyBot[] alive)
+    /// <param name="budgetLeft">
+    /// Dalganın kalan tehdit bütçesi. Bundan pahalı tip seçilemez — dolum
+    /// döngüsü bu sayı tükenince durur.
+    /// </param>
+    EnemyTypeData RollUnlockedType(float level, float budgetLeft)
     {
         bool custom  = typePool != null && typePool.Length > 0
                     && typeWeights != null && typeWeights.Length == typePool.Length;
         var  pool    = custom ? typePool    : _defaultPool;
         var  weights = custom ? typeWeights : _defaultWeights;
 
-        // Sahnenin durumu: refakat edecek biri var mı, kaç siper duruyor,
-        // hangi tipten kaç tane var? Tip kimliği ADdır — ApplyScaling runtime
-        // kopyasında adı korur (skin anahtarı da oradan türer).
-        bool hasEscorted = false;
-        int  barriers    = 0;
-        _aliveByType.Clear();
-
-        if (alive != null)
-            foreach (var b in alive)
-            {
-                if (b == null || b.data == null) continue;
-                if (b.data.RequiresEscort) barriers++;
-                else                       hasEscorted = true;
-
-                _aliveByType.TryGetValue(b.data.name, out int c);
-                _aliveByType[b.data.name] = c + 1;
-            }
-
-        bool  barriersAllowed = hasEscorted && barriers < Mathf.Max(0, maxBarriersAlive);
+        bool  barriersAllowed = _hasEscorted && _barriers < Mathf.Max(0, maxBarriersAlive);
         float cap             = ThreatCapAt(level);
 
         // Taban 2: tehdit 1 olan tip (Swarm) hiçbir zaman "ağır" sayılmamalı,
@@ -339,7 +564,7 @@ public class EnemySpawner : MonoBehaviour
 
         float total = 0f;
         for (int i = 0; i < pool.Length; i++)
-            if (Allowed(pool[i], cap, heavyAt, barriersAllowed)) total += weights[i];
+            if (Allowed(pool[i], cap, heavyAt, barriersAllowed, budgetLeft)) total += weights[i];
 
         // Hiçbir tip gönderilemiyorsa (ör. yalnızca siper açık ve sahada refakat
         // yok) bu turu ATLA. Eskiden pool[0]'a düşülüyordu — kilit boşa çıkardı.
@@ -349,18 +574,58 @@ public class EnemySpawner : MonoBehaviour
         float acc = 0f;
         for (int i = 0; i < pool.Length; i++)
         {
-            if (!Allowed(pool[i], cap, heavyAt, barriersAllowed)) continue;
+            if (!Allowed(pool[i], cap, heavyAt, barriersAllowed, budgetLeft)) continue;
             acc += weights[i];
             if (r < acc) return pool[i];
         }
         return null;
     }
 
-    readonly Dictionary<string, int> _aliveByType = new();
+    // ── Saha durumu anlık görüntüsü ───────────────────────────────────────────
+    //
+    // Siper ve "ağır tip yalnız gelir" kuralları sahnedeki duruma bakar. Dalga
+    // TEK SEFERDE kurulduğu için bu durum dolum sırasında da güncellenmeli:
+    // yoksa aynı dalgaya iki Kaleci birden girerdi — kural yalnızca ZATEN
+    // sahnede olanlara bakıyor, aynı turda seçilenlere değil.
 
-    bool Allowed(EnemyTypeData t, float threatCap, float heavyAt, bool barriersAllowed)
+    readonly Dictionary<string, int> _aliveByType = new();
+    bool _hasEscorted;
+    int  _barriers;
+
+    /// <summary>Dalga kurulmaya başlarken sahnenin durumunu okur.</summary>
+    void SnapshotAlive(EnemyBot[] alive)
+    {
+        _aliveByType.Clear();
+        _hasEscorted = false;
+        _barriers    = 0;
+
+        if (alive == null) return;
+        foreach (var b in alive)
+        {
+            if (b == null || b.data == null) continue;
+            NoteChosen(b.data);
+        }
+    }
+
+    /// <summary>
+    /// Bir tipi "sahada var" sayar. Tip kimliği ADdır — ApplyScaling runtime
+    /// kopyasında adı korur (skin anahtarı da oradan türer).
+    /// </summary>
+    void NoteChosen(EnemyTypeData t)
+    {
+        if (t == null) return;
+        if (t.RequiresEscort) _barriers++;
+        else                  _hasEscorted = true;
+
+        _aliveByType.TryGetValue(t.name, out int c);
+        _aliveByType[t.name] = c + 1;
+    }
+
+    bool Allowed(EnemyTypeData t, float threatCap, float heavyAt, bool barriersAllowed,
+                 float budgetLeft)
     {
         if (t == null || t.threatScore > threatCap) return false;
+        if (t.threatScore > budgetLeft)             return false;
         if (t.RequiresEscort && !barriersAllowed)   return false;
 
         if (t.threatScore >= heavyAt)

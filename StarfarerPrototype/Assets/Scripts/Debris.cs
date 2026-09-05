@@ -53,6 +53,17 @@ public class Debris : MonoBehaviour
     /// </summary>
     const float CrystalScale = 1.35f;
 
+    /// <summary>
+    /// Enkazın GÖRSEL büyütmesi — %50. Toplama tamamen mesafeye bakar (enkazın
+    /// collider'ı yok), yani bu sayı oynanışı değil yalnızca okunabilirliği
+    /// değiştirir.
+    ///
+    /// localScale'e uygulanır çünkü iki çizim yolu var: skin sprite'ı ve
+    /// PxW/PxH'den üretilen prosedürel sprite. Ölçek ikisini de aynı oranda
+    /// büyütür; PxW/PxH'yi büyütmek yalnızca ikincisini etkilerdi.
+    /// </summary>
+    const float DebrisScale = 1.5f;
+
     static readonly Color MetalColor   = new Color(0.55f, 0.45f, 0.30f);
 
     // Kristal PARLAK camgöbeği, mavimsi gri değil. Eski ton (0.52, 0.70, 0.85)
@@ -192,7 +203,7 @@ public class Debris : MonoBehaviour
 
         bool crystalSkin = SkinLibrary.Has(key) &&
                            resourceType == ResourceType.EnergyCrystal;
-        transform.localScale = Vector3.one * (crystalSkin ? CrystalScale : 1f);
+        transform.localScale = Vector3.one * DebrisScale * (crystalSkin ? CrystalScale : 1f);
 
         ApplyTint(1f);
     }
