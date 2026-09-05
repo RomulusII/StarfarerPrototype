@@ -672,23 +672,10 @@ public class UpgradeUI : MonoBehaviour
     /// komponentin diğer statlarıyla aynı fiyata satılmamalı.
     /// </summary>
     static int StatUpgradeCost(ComponentDefinition def, int currentLevel, string key = null)
-    {
-        int baseCost = def.statCostBase > 0 ? def.statCostBase : def.cost;
-        return BalanceConfig.Instance.StatUpgradeCost(baseCost, currentLevel, key);
-    }
+        => ComponentCatalog.StatUpgradeCost(def, currentLevel, key);
 
     static (string key, string label)[] GetStatsForType(ComponentType type)
-    {
-        switch (type)
-        {
-            case ComponentType.Generator:  return new[] { (GeneratorComponent.ProductionKey, "Üretim"), (GeneratorComponent.CapacitorKey, "Kapasitör") };
-            case ComponentType.Shield:     return new[] { ("rechargeRate", "Şarj Hızı"), ("maxShield", "Max Kalkan") };
-            case ComponentType.RepairUnit: return new[] { ("repairRate", "Tamir Hızı"), ("energyEfficiency", "Enerji Verimi"), (RepairUnitComponent.ArmorKey, "Zırh") };
-            case ComponentType.Storage:    return new[] { (StorageComponent.CapacityKey, "Kapasite") };
-            case ComponentType.Turret:     return new[] { ("damage", "Hasar"), ("fireRate", "Ateş Hızı") };
-            default:                       return null;
-        }
-    }
+        => ComponentCatalog.StatTracks(type);
 
     void StatUpgradeAndRefresh(int slotIndex, string key, ComponentDefinition def, int cost)
     {
@@ -733,9 +720,7 @@ public class UpgradeUI : MonoBehaviour
     /// yapıyordu. Artık listelenmiyor.
     /// </summary>
     static (string key, string label)[] WeaponStatsFor(WeaponType type)
-        => type == WeaponType.Laser
-            ? new[] { ("damage", "Hasar") }
-            : new[] { ("damage", "Hasar"), ("fireRate", "Ateş Hızı") };
+        => ComponentCatalog.WeaponStatTracks(type);
 
     void BuildWeaponSwitchRows()
     {

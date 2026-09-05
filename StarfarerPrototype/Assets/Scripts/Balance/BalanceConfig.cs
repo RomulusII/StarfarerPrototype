@@ -186,6 +186,19 @@ public class BalanceConfig : ScriptableObject
         }
     }
 
+    /// <summary>
+    /// Singleton'ı koşuya özgü bir KOPYAYA çevirir.
+    ///
+    /// Simülasyon parametre ezmesi (--set) uygularken asıl asset'e yazamaz:
+    /// editörde koşulduğunda Resources/BalanceConfig.asset diske kirlenir ve bir
+    /// duyarlılık koşusunun ±%20'si projenin kalıcı dengesi hâline gelirdi.
+    /// Kopya yalnızca bellekte yaşar.
+    /// </summary>
+    public static void UseRuntimeCopy()
+    {
+        _instance = Instantiate(Instance);
+    }
+
     // ── Hesaplar ──────────────────────────────────────────────────────────────
 
     public float ThreatBudget(int gameLevel)

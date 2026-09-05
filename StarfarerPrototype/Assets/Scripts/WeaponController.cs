@@ -10,6 +10,13 @@ using UnityEngine.InputSystem;
 /// </summary>
 public class WeaponController : MonoBehaviour
 {
+    /// <summary>
+    /// Kinetik merminin hızı. SpawnBullet çağrısının içinde sabit duruyordu;
+    /// simülasyonun pilotu öngörü (lead) hesabı için okumak zorunda ve iki
+    /// yerde ayrı yazılsaydı sahte oyuncu var olmayan bir mermiye nişan alırdı.
+    /// </summary>
+    public const float KineticBulletSpeed = 6f;
+
     public WeaponType weaponType   = WeaponType.Kinetic;
     public float damage            = 10f;
     public float fireRate          = 1.00f;   // Kinetik: atışlar arası, Plazma: atış sonrası bekleme
@@ -66,7 +73,7 @@ public class WeaponController : MonoBehaviour
         if (PointerInput.FireHeld && Time.time >= _nextFireTime)
         {
             _nextFireTime = Time.time + fireRate;
-            SpawnBullet(_kineticSprite, WeaponType.Kinetic, speed: 6f);
+            SpawnBullet(_kineticSprite, WeaponType.Kinetic, speed: KineticBulletSpeed);
         }
     }
 

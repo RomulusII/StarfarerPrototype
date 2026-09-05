@@ -116,6 +116,17 @@ public class ShipLoadout : MonoBehaviour
         {
             if (ResourceInventory.Instance == null) return false;
             if (!ResourceInventory.Instance.TrySpend(def.costResource, def.cost)) return false;
+
+            // Kurulum temposu, stat yükseltmesi kadar önemli bir denge sayısı:
+            // "3.8 dakikada sıfır yükseltme" ölçümü kurulumları HİÇ görmüyordu.
+            // Kayıt burada, çağıranda değil — hem upgrade ekranı hem sahte
+            // oyuncu buradan geçiyor, iki yerde yazılsaydı biri unutulurdu.
+            BalanceLog.Event("kurulum")
+                      .Str("komponent", def.componentName)
+                      .Num("slot",      slotIndex)
+                      .Num("maliyet",   def.cost)
+                      .Str("kaynak",    def.costResource.ToString())
+                      .End();
         }
 
         GameObject go = new GameObject(def.componentName);
