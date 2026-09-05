@@ -145,6 +145,14 @@ public class ChapterManager : MonoBehaviour
         if (inChapter == 1 && chapter.introducedType != null)
             pool = new[] { chapter.introducedType };
 
+        // OYUNUN İLK LEVELİ ELLE YAZILIR. Havuz zaten tek tip (Swarm) olduğu
+        // için guaranteedType da gereksiz; bütçe formülü hiç çalışmaz.
+        if (level == 1)
+        {
+            foreach (int b in OpeningWaveBudgets) waves.Add(Wave(b, pool));
+            return waves;
+        }
+
         if (GameProgress.IsBossLevel)
         {
             // Escort dalgası, sonra boss + küçük refakat
@@ -175,6 +183,39 @@ public class ChapterManager : MonoBehaviour
 
         return waves;
     }
+
+    /// <summary>
+    /// Oyunun İLK levelinin dalgaları — tehdit puanı cinsinden, elle yazılmış.
+    ///
+    /// Level 1 bir denge eğrisi değil bir TANIŞMADIR: oyuncu ilk dalgada tek
+    /// gemiyi tanır, ikincisinde kalabalığın geldiğini anlar, üçüncüsünde
+    /// levelin zirvesini görür.
+    ///
+    /// Neden formülden gelmiyor: geometrik bölüşümde ikinci dalganın birinciye
+    /// ORANI, büyüme katsayısının kendisidir. Level 1 bütçesi 7 iken yuvarlama
+    /// ikinci dalgayı 2'ye çakılı tutuyor — büyümeyi 1.6'dan 2.5'e çıkarmak bile
+    /// 1/2/4 veriyor. "1 sonra 3" için taban bütçeyi 7'den 10'a çıkarmak
+    /// gerekirdi ve o değişiklik level 1'i değil YÜZ LEVELİN HEPSİNİ %43
+    /// kaydırırdı (üstelik geliri sabit tutmak için `dropPerThreat`i de
+    /// düşürmek gerekirdi).
+    ///
+    /// Onboarding zaten özel bir andır. Bedeli üç elle yazılmış sayıdır,
+    /// kampanyanın tamamı değil.
+    ///
+    /// TOPLAM TAM 7 — levelin bütçesinin AYNISI. Bu bir tesadüf değil, kısıt:
+    /// 1/3/5 denendi ve level 1'i 9'a çıkarıyordu, oysa level 2 formülden
+    /// 2/2/3 = 7 geliyor. Yani oyuncu level 1'i beş gemilik bir dalgayla
+    /// bitirip level 2'ye iki gemiyle başlıyordu — bir TESTERE DİŞİ. Açılışın
+    /// levelden taşmaması, sonraki levelin daha hafif hissettirmemesi demek.
+    ///
+    /// Son iki dalganın eşit olması (3 ve 3) "level tırmanır" kuralından bir
+    /// ödün, ama karşılığında iki level ARASINDAKİ akış korunuyor: bir levelin
+    /// içindeki tırmanış, levellerin arasındaki düşüşten daha az önemli.
+    ///
+    /// Serbest moddaki karşılığı: `EnemySpawner.startWaveBudget` /
+    /// `secondWaveBudget`. Aynı gerekçe, aynı çözüm.
+    /// </summary>
+    static readonly int[] OpeningWaveBudgets = { 1, 3, 3 };
 
     /// <summary>
     /// Bir levelde kaç dalga var. Bütçe büyüdükçe dalga sayısı da bir artar;

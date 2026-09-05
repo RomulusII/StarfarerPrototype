@@ -1253,7 +1253,7 @@ sızıntı. Artık kampanyayla aynı dalga ritmi geçerli; ayrıldığı tek nok
 | | Sonraki dalga ne zaman gelir |
 |---|---|
 | **Kampanya** | Öncekinin TEMİZLENMESİ beklenir |
-| **Serbest** | `waveInterval` (20 sn) dolunca — ya da saha erken temizlenirse HEMEN |
+| **Serbest** | `waveInterval` (20 sn; ilk iki dalga arası 10) dolunca — ya da saha erken temizlenirse HEMEN |
 
 "Bitmeden başlamaz" kuralı kampanyada anlamlı (level bir bütündür), serbest
 modda değildi: oyuncu son bir gemiyi kovalarken oyun duruyordu. Erken bitirmek
@@ -1273,16 +1273,50 @@ vereceğiz.
 
 %10 BİLEŞİKTİR ve hızlıdır — 20 saniyelik bir tempoda:
 
-| dalga | dk | bütçe | temizlenen | rampa | denk kampanya leveli | tehdit tavanı |
-|---|---|---|---|---|---|---|
-| 1 | 0 | 2 | 0 | 0.0 | 1 | 1.0 |
-| 10 | 3 | 5 | 27 | 1.4 | 3 | 2.0 |
-| 20 | 7 | 12 | 102 | 5.1 | 9 | 4.6 |
-| 30 | 10 | 32 | 297 | 14.9 | 23 | 11.4 |
-| 40 | 13 | 82 | 803 | 40.1 | 61 | 29.1 |
+| dalga | dk | bütçe | rampa | denk kampanya leveli |
+|---|---|---|---|---|
+| 0 | 0.0 | **1** | 0.0 | 1 |
+| 1 | 0.2 | **3** | 0.1 | 1 |
+| 10 | 3 | 7 | 2.1 | 4 |
+| 20 | 6 | 18 | 7.7 | 13 |
+| 30 | 10 | 48 | 22.4 | 35 |
 
 Bu oran bir BAŞLANGIÇ TAHMİNİDİR; doğrusu `wave` olaylarının log'undan
 bulunacak.
+
+### Açılış elle konur, formül üçüncü dalgadan devralır
+
+İlk dalga **1 tehdit** (tek Swarm), ikincisi **3** ve arası yalnızca 10 saniye.
+Bu iki sayı formülden GELMEZ, `startWaveBudget` / `secondWaveBudget` /
+`openingInterval` olarak elle konur — %10 büyüme 1'i 1.1 yapar, yani ikinci
+dalga birincinin aynısı olurdu. Açılış bir eğri değil, iki adımdır: oyuncu
+ilkinde tek gemiyi tanır, ikincisinde kalabalığın geldiğini anlar.
+
+Bileşik büyüme 3'ten devam ettiği için eğrinin tamamı eski hâline göre ~1.5×
+yukarı kaydı — bunun yan etkisi boss'un ARTIK ULAŞILABİLİR olması: eşik (40)
+29. dalgada, yani ~10 dakikada aşılıyor. Ölçülen ilk oturumda bütçe 35'te
+kalmış ve boss hiç gelmemişti.
+
+### Valf TEHDİTLE ölçülür ve süresizce bekletemez
+
+Saha doluyken zamanlı dalga ertelenir. Bu valfin iki kuralı da ÖLÇÜMLE düzeldi.
+
+**Birincisi: ölçü gemi sayısı değil TEHDİT PUANI.** "4 gemi" derken 4 Swarm
+(tehdit 4) ile 4 Kaleci (tehdit 108) aynı sayılıyordu; valf erken oyunda
+boğuyor, geç oyunda hiçbir şey ifade etmiyordu. Tehdit puanı zaten dalga
+bütçesiyle aynı para birimi: "sahada ne kadar iş var" ile "dalgada ne kadar iş
+gönderiyorum" aynı soru.
+
+**İkincisi: gecikmenin bir sınırı var** (`maxWaveDelay`, 15 sn). Ölçülen ilk
+oturumda 3. dalga 40.5, 4. dalga 61.6 saniye gecikmişti ve sebebi şaşırtıcıydı:
+ekran BOŞ DEĞİLDİ, dört Swarm dolaşıyordu. Oyuncu ilk 150 saniyede ana silahla
+asteroitlere 56, Swarm'lara 21 isabet almış; Swarm'ların ortalama yaşam süresi
+44.5 saniye ama ateş altında geçirdikleri süre yalnızca 10 saniye. Yani oyuncu
+kazıyordu ve valf onun adına oyunu duraklatıyordu.
+
+Farm etmek için bir süre olmalı — ama sınırsız olmamalı. Süre dolunca dalga
+sahada ne olursa olsun gelir, yani bir dalga en fazla `aralık + 15` saniye
+gecikebilir.
 
 **BOSS serbest modda da gelir.** Bütçe `bossMinBudget`i (40, ~32. dalga) aşınca
 dalgaya boss girebilir (`bossChance` 0.35, en fazla `maxBossesPerWave` 2). Boss
@@ -1308,7 +1342,7 @@ saniyede 60 kez sorulmasının karşılığı yok.
 | | Formül | 0 puan | 90 | 150 | 250 | 350 |
 |---|---|---|---|---|---|---|
 | Açık tipler | `threatScore ≤ 1 + seviye × 0.7` | Swarm | +Avcı | +Bomber | +Bariyer, Shield, Sülük, Hayalet, Bölünen, **Armored** | +Obüs, Karıştırıcı, Onarıcı, BombRunner |
-| Aynı anda sahada (ZAMANLI dalga için tavan) | `4 + seviye × 0.7` (tavan 20) | **4** | 7 | 9 | 12 | 16 |
+| Sahadaki tehdit tavanı (valf) | `6 + seviye × 2` (tavan 60) | **6** | 15 | 21 | 33 | 45 |
 | Denk kampanya leveli | `1 + seviye × 1.5` | 1 | 8 | 12 | 20 | 27 |
 | HP / zırh | o levelin `LevelCurve` değerleri | 1.00 / 0.0 | 1.17 / 0.4 | 1.29 / 0.7 | 1.55 / 1.5 | 1.82 / 2.5 |
 
@@ -1449,6 +1483,30 @@ böler (level < 50 → 3 dalga, sonrası 4).
 (`BalanceConfig.waveBudgetGrowth`). Eskiden eşit bölüşüm + son dalgaya sabit bir
 zam vardı; level düz gidip sonunda tek sıçrama yapıyordu. Artık baştan sona
 tırmanıyor: Lv75'te dalgalar 9 / 11 / 14 / 17.
+
+**OYUNUN İLK LEVELİ İSTİSNADIR ve elle yazılır:** `1 / 3 / 3`
+(`ChapterManager.OpeningWaveBudgets`). Level 1 bir denge eğrisi değil bir
+TANIŞMADIR — oyuncu ilk dalgada tek gemiyi tanır, ikincisinde kalabalığın
+geldiğini anlar.
+
+Formül bunu üretemiyor: geometrik bölüşümde ikinci dalganın birinciye ORANI,
+büyüme katsayısının kendisidir. Level 1 bütçesi 7 iken yuvarlama ikinci dalgayı
+2'ye çakılı tutuyor — büyümeyi 1.25'ten 2.5'e çıkarmak bile 1/2/4 veriyor.
+"1 sonra 3" için taban bütçeyi 10'a çıkarmak gerekirdi ve o değişiklik level 1'i
+değil YÜZ LEVELİN HEPSİNİ %43 kaydırırdı (üstelik geliri sabit tutmak için
+`dropPerThreat`i de düşürmek gerekirdi). Onboarding zaten özel bir andır;
+bedeli üç sayıdır, kampanyanın tamamı değil.
+
+**Toplam tam 7** — levelin bütçesinin aynısı, ve bu bir kısıt. 1/3/5 denendi:
+level 1'i 9'a çıkarıyordu, oysa level 2 formülden 2/2/3 = 7 geliyor. Oyuncu
+level 1'i beş gemilik dalgayla bitirip level 2'ye iki gemiyle başlıyordu — bir
+TESTERE DİŞİ. Son iki dalganın eşit olması "level tırmanır" kuralından bir ödün
+ama levellerin ARASINDAKİ akış, bir levelin İÇİNDEKİ tırmanıştan önemli.
+
+Bir ara `waveBudgetGrowth` 1.25 → 1.6 yapılmıştı, aynı amaçla (7 bütçeyi
+1/2/3'e bölmek için). İşe yarıyordu ama bedeli yüz levelin tamamında daha sivri
+son dalgalardı: Lv100'ün son dalgası 33'ten 43'e çıkıyordu. Açılış elle
+yazılınca o gerekçe kalktı ve katsayı 1.25'e geri alındı.
 
 **BİR DALGANIN TÜM GEMİLERİ AYNI ANDA DOĞAR VE FORMASYONLA GELİR.**
 Ayrıntı: "Formasyon Sistemi" bölümü.

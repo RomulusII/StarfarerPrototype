@@ -40,8 +40,19 @@ public class EnemySpawner : MonoBehaviour
              "tek kadranla ölçüp sonra karar vereceğiz.")]
     public float waveInterval = 20f;
 
-    [Tooltip("İlk dalganın tehdit bütçesi. 2 = iki Swarm.")]
-    public float startWaveBudget = 2f;
+    [Tooltip("İlk dalganın tehdit bütçesi. 1 = tek Swarm — oyuncu ısınsın.")]
+    public float startWaveBudget = 1f;
+
+    [Tooltip("İKİNCİ dalganın bütçesi. Formülden DEĞİL, elle konur: %10 büyüme " +
+             "1'i 1.1 yapar ve ikinci dalga birincinin aynısı olurdu. Açılış bir " +
+             "eğri değil, iki elle konmuş adımdır — oyuncu ilkinde tek gemiyi " +
+             "tanır, ikincisinde kalabalığın geldiğini anlar. Üçüncü dalgadan " +
+             "itibaren normal büyüme devralır.")]
+    public float secondWaveBudget = 3f;
+
+    [Tooltip("İlk iki dalga arasındaki süre. Normalden kısa: açılışta tanıma " +
+             "anı kısa olmalı, bekleme anı değil.")]
+    public float openingInterval = 10f;
 
     [Tooltip("Her dalga bir öncekinden bu kadar büyük. %10 BİLEŞİKTİR: 10. dalga " +
              "2.4×, 20. dalga 6.1×, 30. dalga 15.9× bütçe taşır — yani 10 " +
@@ -62,12 +73,23 @@ public class EnemySpawner : MonoBehaviour
     [Tooltip("Rampanın tamamlandığı seviye — bundan sonrası tam zorluktur.")]
     public float rampFullLevel = 20f;
 
-    [Tooltip("Sahada bu kadar düşman varken ZAMANLI dalga gönderilmez — oyuncu " +
-             "boğulmasın. Saha tamamen temizlendiğinde sınır aranmaz: yeni dalga " +
-             "zaten hemen gelir.")]
-    public int   baseMaxAlive    = 4;
-    public float maxAlivePerLevel = 0.7f;
-    public int   maxAliveCap      = 20;
+    [Tooltip("Sahada aynı anda bulunabilecek TEHDİT PUANI. Aşılmışsa zamanlı " +
+             "dalga ertelenir — oyuncu boğulmasın. Saha temizlendiğinde sınır " +
+             "aranmaz: yeni dalga zaten hemen gelir.\n\n" +
+             "Ölçü GEMİ SAYISI DEĞİL TEHDİT: 4 Swarm (tehdit 4) ile 4 Kaleci " +
+             "(tehdit 108) aynı sayılamaz. Sayıyla ölçülürken valf erken oyunda " +
+             "boğuyor, geç oyunda hiçbir şey ifade etmiyordu.")]
+    public float baseMaxThreat     = 6f;
+    public float maxThreatPerLevel = 2f;
+    public float maxThreatCap      = 60f;
+
+    [Tooltip("Valf bir dalgayı EN FAZLA bu kadar geciktirebilir (sn). Süre " +
+             "dolunca dalga sahada ne olursa olsun gelir.\n\n" +
+             "Farm etmenin bir süresi olmalı ama sınırsız olmamalı: valf tek " +
+             "başınayken oyuncu asteroit kazarken sahadaki gemileri görmezden " +
+             "geliyor, valf de onun adına oyunu duraklatıyordu. Ölçülen ilk " +
+             "oturumda bu 40 ve 61 saniyelik iki boşluk üretti.")]
+    public float maxWaveDelay = 15f;
 
     [Tooltip("Tip kilidi: seviye başına açılan tehdit puanı. threatScore'u bu " +
              "eşiğin üstünde olan tipler henüz gelmez.")]
@@ -270,18 +292,23 @@ public class EnemySpawner : MonoBehaviour
         // Boss dövüşü sahnenin tamamını ister: saat işlemez, dalga gelmez.
         if (FindFirstObjectByType<BossShip>() != null) { _timer = 0f; return; }
 
-        var alive = FindObjectsByType<EnemyBot>(FindObjectsSortMode.None);
-        int live  = CountBlocking(alive);
+        var   alive  = FindObjectsByType<EnemyBot>(FindObjectsSortMode.None);
+        float onField = BlockingThreat(alive);
 
         // Saha temizlendiyse saati bekleme. "Son gemiyi kovala" ölü zamanı
         // buradan çıkar; oyuncu erken bitirdiği için ÖDÜLLENDİRİLİR.
-        bool clear = live == 0;
-        bool due   = _timer >= waveInterval;
+        bool clear = onField <= 0f;
+        bool due   = _timer >= CurrentInterval;
         if (!clear && !due) return;
 
-        // Zamanlı dalga sahayı boğmasın; temizlenmiş sahada sınır aranmaz.
+        // Valf: saha doluysa dalga ERTELENİR — ama süresiz değil. Gecikme payı
+        // dolunca dalga her hâlükârda gelir; yoksa oyuncu sahadaki gemileri
+        // görmezden gelerek oyunu süresiz duraklatabiliyordu.
         float level = RampLevel;
-        if (!clear && live >= MaxAliveAt(level)) return;
+        if (!clear
+            && onField >= MaxThreatAt(level)
+            && _timer < CurrentInterval + Mathf.Max(0f, maxWaveDelay))
+            return;
 
         _timer = 0f;
         SendWave(level, alive);
@@ -330,7 +357,11 @@ public class EnemySpawner : MonoBehaviour
         for (int i = 0; i < bosses; i++) SpawnFreeBoss(level, i, bosses);
 
         _waveIndex++;
-        _waveBudget *= Mathf.Max(1f, waveBudgetGrowth);
+
+        // Açılış elle konur, formül üçüncü dalgadan itibaren devralır.
+        _waveBudget = _waveIndex == 1
+            ? Mathf.Max(startWaveBudget, secondWaveBudget)
+            : _waveBudget * Mathf.Max(1f, waveBudgetGrowth);
     }
 
     /// <summary>
@@ -446,17 +477,22 @@ public class EnemySpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// Sahayı "temizlendi" saymak için ölmesi gereken düşman sayısı. Silahsız
-    /// siper gemileri sayılmaz — onları beklemek sahneyi hiçbir şeyin olmadığı
-    /// bir bekleyişte kilitler (kampanyadaki UpdateWaitClear ile aynı kural).
+    /// Sahadaki TEHDİT PUANI toplamı. Silahsız siper gemileri sayılmaz — onları
+    /// beklemek sahneyi hiçbir şeyin olmadığı bir bekleyişte kilitler
+    /// (kampanyadaki UpdateWaitClear ile aynı kural).
+    ///
+    /// Tehdit puanı, dalga bütçesiyle AYNI para birimidir. Valfin de onunla
+    /// ölçülmesi tesadüf değil: "sahada ne kadar iş var" ile "dalgada ne kadar
+    /// iş gönderiyorum" aynı soru.
     /// </summary>
-    static int CountBlocking(EnemyBot[] alive)
+    static float BlockingThreat(EnemyBot[] alive)
     {
-        if (alive == null) return 0;
-        int n = 0;
+        if (alive == null) return 0f;
+        float t = 0f;
         foreach (var b in alive)
-            if (b != null && b.data != null && b.data.BlocksWaveClear) n++;
-        return n;
+            if (b != null && b.data != null && b.data.BlocksWaveClear)
+                t += Mathf.Max(1, b.data.threatScore);
+        return t;
     }
 
     FormationTemplate[] _formations;
@@ -491,8 +527,15 @@ public class EnemySpawner : MonoBehaviour
 
     // ── Zorluk rampası ────────────────────────────────────────────────────────
 
-    int MaxAliveAt(float level)
-        => Mathf.Min(maxAliveCap, baseMaxAlive + Mathf.FloorToInt(level * maxAlivePerLevel));
+    /// <summary>Sahada aynı anda taşınabilecek tehdit puanı — valfin eşiği.</summary>
+    float MaxThreatAt(float level)
+        => Mathf.Min(maxThreatCap, baseMaxThreat + level * maxThreatPerLevel);
+
+    /// <summary>
+    /// Bu dalganın beklenme süresi. İlk iki dalga arası kısadır: açılışta
+    /// oyuncu tek gemiyi tanır, hemen ardından kalabalığın geldiğini görür.
+    /// </summary>
+    float CurrentInterval => _waveIndex <= 1 ? openingInterval : waveInterval;
 
     /// <summary>Bu seviyede açık olan max tehdit puanı — tipler buna göre kilitlenir.</summary>
     float ThreatCapAt(float level) => 1f + level * threatPerLevel;

@@ -61,16 +61,14 @@ public class BalanceConfig : ScriptableObject
     [Tooltip("Bir level içinde her dalganın bir öncekine göre büyüme oranı. " +
              "Level kendi zirvesiyle bitsin diye: ilk dalga ısınma, son dalga " +
              "levelin en ağır anı. " +
-             "1.25 -> 1.6: OYUNUN İLK DALGASI iki Swarm'la başlıyordu. Levelin " +
-             "toplam bütçesi 7 ve dalga ağırlıkları 1 : 1.25 : 1.5625 olunca " +
-             "bölüşüm 2/2/3 çıkıyor, yani ilk iki dalga birbirinin aynı ve " +
-             "oyuncunun tek bir gemiyi izleyip öğrenebileceği hiçbir an yok. " +
-             "1.6 ile ağırlıklar 1 : 1.6 : 2.56 olur ve level 1 sırasıyla " +
-             "1 / 2 / 3 Swarm üretir. " +
-             "LEVELİN TOPLAM BÜTÇESİ DEĞİŞMEZ — yalnızca level İÇİNDEKİ dağılım " +
-             "dikleşir. Kaynak geliri bütçenin toplamından türediği için " +
-             "yükseltme fiyatları bu değişiklikten etkilenmez.")]
-    public float waveBudgetGrowth = 1.6f;
+             "BİR ARA 1.6 YAPILIP GERİ ALINDI. Amaç oyunun ilk dalgasını tek " +
+             "Swarm'a indirmekti (7 bütçe / 1.25 büyüme bölüşümü 2/2/3 veriyor). " +
+             "İşe yarıyordu ama bedeli yüz levelin tamamında daha sivri son " +
+             "dalgalardı — level 100'ün son dalgası 33'ten 43'e çıkıyordu. Açılış " +
+             "artık ChapterManager.OpeningWaveBudgets ile ELLE yazıldığı için bu " +
+             "katsayının o gerekçesi kalmadı; ölçülmemiş bir kaydırmayı taşımak " +
+             "için sebep yok.")]
+    public float waveBudgetGrowth = 1.25f;
 
     [Header("Boss")]
     [Tooltip("Bölümü kapatan boss'un tehdit değeri ve kapanış primi çarpanı.")]
