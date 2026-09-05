@@ -58,6 +58,23 @@ const h   = t => console.log("\n\x1b[1m── " + t + " " + "─".repeat(Math.ma
 console.log(`\x1b[1m${path.basename(file)}\x1b[0m — ${R.length} olay` +
             (dropped ? `, ${dropped} bozuk satır atlandı` : ""));
 
+// ── Oturum künyesi ──────────────────────────────────────────────────────────
+//
+// Dağıtılan build'lerden veri gelmeye başlayınca "bu kayıt nereden geldi"
+// sorusu ilk soru oldu: aynı sayı telefonda ve PC'de aynı şeyi anlatmıyor.
+
+const oturum = by("session")[0];
+if (oturum) {
+  const ekran = oturum.ekran_en && oturum.ekran_boy
+    ? `${oturum.ekran_en}×${oturum.ekran_boy}` + (oturum.dpi ? ` @${Math.round(oturum.dpi)}dpi` : "")
+    : "?";
+  console.log(`  ${oturum.platform || "?"}  ${oturum.cihaz || "?"}  ${ekran}  ` +
+              `${oturum.ram_mb ? oturum.ram_mb + "MB" : "?"}  ` +
+              `${oturum.cekirdek ? oturum.cekirdek + " çekirdek" : ""}`);
+  console.log(`  ${oturum.isletim || "?"}  ·  ${oturum.gpu || "?"}`);
+  console.log(`  sürüm ${oturum.surum || "?"} (Unity ${oturum.unity || "?"})  ·  dil ${oturum.dil || "?"}`);
+}
+
 // ── İsabet oranı ────────────────────────────────────────────────────────────
 //
 // Ölçülmemiş tek kritik bilinmeyen buydu: oyunun bütün TTK ve tehdit hesabı
@@ -208,6 +225,56 @@ if (!boosts.length) {
   const acik = Object.entries(sureler).filter(([m]) => m !== "None")
                      .reduce((s, [, a]) => s + a.sure, 0);
   if (oyun) console.log(`  oyun süresinin %${(100 * acik / oyun).toFixed(0)}'inde bir boost açıktı`);
+}
+
+// ── Performans ──────────────────────────────────────────────────────────────
+//
+// Ortalama FPS tek başına yanıltıcıdır: saniyede bir gelen 200 ms'lik takılma
+// ortalamayı 60'tan ancak 55'e indirir, oyuncunun şikâyet ettiği şey ise odur.
+// Bu yüzden asıl bakılan sayı p95 — kötü kareler burada görünür.
+//
+// Yük sütunu (sahadaki gemi sayısı) olmadan sayılar karşılaştırılamaz: aynı
+// cihazda 5 ve 40 gemiyle ölçülen kare süresi aynı şeyi anlatmaz.
+
+h("PERFORMANS");
+const perf = by("perf");
+if (!perf.length) {
+  console.log("  \x1b[33mperf örneği yok\x1b[0m — PerfSampler kurulmamış ya da oturum çok kısa");
+} else {
+  const kare  = sum(perf, "kare");
+  const agir  = perf.filter(p => (p.ms_p95 || 0) > 33.3);   // p95 30 fps'in altında
+  const enKot = perf.reduce((a, b) => ((b.ms_max || 0) > (a.ms_max || 0) ? b : a));
+
+  console.log(`  ${perf.length} pencere, ${kare} kare  ·  ` +
+              `ortalama \x1b[1m${avg(perf, "fps_ort").toFixed(1)} fps\x1b[0m ` +
+              `(${avg(perf, "ms_ort").toFixed(1)} ms)`);
+  console.log(`  p50 ${avg(perf, "ms_p50").toFixed(1)} ms  ·  ` +
+              `p95 \x1b[1m${avg(perf, "ms_p95").toFixed(1)} ms\x1b[0m  ·  ` +
+              `en kötü kare ${(enKot.ms_max || 0).toFixed(0)} ms (${enKot.dusman || 0} gemi varken)`);
+
+  if (agir.length)
+    console.log(`  \x1b[33m${agir.length}/${perf.length} pencerede p95 > 33 ms\x1b[0m ` +
+                `(30 fps altı) — ortalama ${avg(agir, "dusman").toFixed(0)} gemi sahadayken`);
+
+  // Yüke göre kırılım: hangi gemi sayısından sonra bozuluyor?
+  const kova = { "0-9": [], "10-19": [], "20-39": [], "40+": [] };
+  for (const p of perf) {
+    const d = p.dusman || 0;
+    kova[d < 10 ? "0-9" : d < 20 ? "10-19" : d < 40 ? "20-39" : "40+"].push(p);
+  }
+  for (const [ad, a] of Object.entries(kova)) {
+    if (!a.length) continue;
+    console.log(`    ${ad.padEnd(6)} ${pad(a.length, 3)} pencere  ` +
+                `ort ${pad(avg(a, "fps_ort").toFixed(0), 3)} fps  ` +
+                `p95 ${pad(avg(a, "ms_p95").toFixed(1), 5)} ms`);
+  }
+
+  const gc = perf.filter(p => p.gc_mb);
+  if (gc.length) {
+    const ilk = gc[0].gc_mb, son = gc[gc.length - 1].gc_mb;
+    console.log(`  yönetilen yığın ${ilk.toFixed(1)} → ${son.toFixed(1)} MB` +
+                (son > ilk * 1.5 ? "  \x1b[33m(sürekli büyüyor — sızıntı olabilir)\x1b[0m" : ""));
+  }
 }
 
 // ── Yükseltme temposu ───────────────────────────────────────────────────────

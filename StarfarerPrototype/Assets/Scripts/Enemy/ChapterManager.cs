@@ -65,6 +65,7 @@ public class ChapterManager : MonoBehaviour
         CampaignFinished = false;   // sahne yeniden yüklenince (ölüm → restart) sıfırlanmalı
         BalanceLog.Begin("kampanya");
         BalanceUploader.EnsureExists();
+        PerfSampler.EnsureExists();
 
         _asteroids    = gameObject.AddComponent<AsteroidSpawner>();
         _transitionUI = FindFirstObjectByType<ChapterTransitionUI>();

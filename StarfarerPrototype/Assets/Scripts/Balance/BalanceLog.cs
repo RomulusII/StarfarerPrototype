@@ -119,8 +119,30 @@ public static class BalanceLog
         // maliyeti yok, veri kaybının maliyeti ise bütün oturum.
         _writer.AutoFlush = true;
 
+        // Oturum satırı kaydın KİMLİĞİDİR. Eskiden yalnızca Unity sürümü ve
+        // başlangıç leveli vardı; dağıtılan build'lerden veri gelmeye
+        // başlayınca bu yetmez oldu:
+        //   · Platform alanı olmadan Android ve PC kayıtları sunucuda
+        //     birbirinden ayrılamıyordu.
+        //   · Cihaz/RAM/GPU olmadan "takılıyor" verisi hangi donanımda
+        //     ölçüldüğünü söylemiyordu (bkz. PerfSampler).
+        //   · Sürüm alanı olmadan bir düzeltmenin işe yarayıp yaramadığı
+        //     build'ler arasında karşılaştırılamıyordu.
+        // Satır oturum başına bir kez yazılır; alan sayısının maliyeti yok.
         Event("session")
-            .Str("unity", Application.unityVersion)
+            .Str("unity",      Application.unityVersion)
+            .Str("surum",      Application.version)
+            .Str("platform",   Application.platform.ToString())
+            .Str("cihaz",      SystemInfo.deviceModel)
+            .Str("isletim",    SystemInfo.operatingSystem)
+            .Str("islemci",    SystemInfo.processorType)
+            .Num("cekirdek",   SystemInfo.processorCount)
+            .Num("ram_mb",     SystemInfo.systemMemorySize)
+            .Str("gpu",        SystemInfo.graphicsDeviceName)
+            .Num("ekran_en",   Screen.width)
+            .Num("ekran_boy",  Screen.height)
+            .Num("dpi",        Screen.dpi)
+            .Str("dil",        Loc.Language.ToString())
             .Num("startLevel", GameProgress.CurrentLevel)
             .End();
 
