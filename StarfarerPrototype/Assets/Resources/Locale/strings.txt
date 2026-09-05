@@ -1,0 +1,292 @@
+# Starfarer metin tablosu — sekme (TAB) ayraçlı, UTF-8.
+#
+# Sütunlar:  key <TAB> tr <TAB> en <TAB> de
+#
+# Kurallar:
+#   · Ayraç sekmedir. Metnin içinde sekme KULLANMA.
+#   · Satır sonu gerekiyorsa \n yaz (gerçek satır sonu değil) — her metin tek satırdır.
+#   · Yer tutucular {0}, {1} … — sırası çeviride değişebilir, sayısı değişemez.
+#   · Boş bırakılan hücre eksik çeviri demektir: oyun sırayla en, sonra tr karşılığını kullanır.
+#   · # ile başlayan satırlar yorumdur.
+#   · Dosya uzantısı .txt çünkü Unity yalnızca tanıdığı uzantıları TextAsset olarak alır (.tsv almıyor).
+#
+# Excel/Sheets: "Metinden sütunlara / Sekme" ile açılır, sekmeli metin olarak geri kaydedilir.
+
+key	tr	en	de
+
+# ── Açılış menüsü ────────────────────────────────────────────────────────────
+menu.subtitle	Oort bulutu — Dünya'ya 1 ışık yılı	Oort cloud — 1 light year from Earth	Oortsche Wolke — 1 Lichtjahr von der Erde
+menu.difficulty	ZORLUK	DIFFICULTY	SCHWIERIGKEIT
+menu.difficulty.easy	KOLAY	EASY	LEICHT
+menu.difficulty.normal	NORMAL	NORMAL	NORMAL
+menu.difficulty.hard	ZOR	HARD	SCHWER
+menu.startLevel	BAŞLANGIÇ LEVELİ	STARTING LEVEL	STARTLEVEL
+menu.levelValue	Level {0}  ·  Bölüm {1}	Level {0}  ·  Chapter {1}	Level {0}  ·  Kapitel {1}
+menu.start	BAŞLA	START	STARTEN
+menu.continue	DEVAM ET  (Level {0})	CONTINUE  (Level {0})	FORTSETZEN  (Level {0})
+menu.freeplay	SERBEST MOD	FREE PLAY	FREIES SPIEL
+menu.freeplay.hint	Serbest mod: bölüm sistemi olmadan sürekli düşman akışı — test içindir	Free play: a continuous enemy stream without the chapter system — for testing	Freies Spiel: durchgehender Gegnerstrom ohne Kapitelsystem — nur zum Testen
+
+# ── Oyun içi HUD ─────────────────────────────────────────────────────────────
+hud.boost.shield	KALKAN\nBOOST	SHIELD\nBOOST	SCHILD\nBOOST
+hud.boost.weapon	SİLAH\nBOOST	WEAPON\nBOOST	WAFFEN\nBOOST
+hud.upgrade	YÜKSELT	UPGRADE	AUSBAU
+hud.energy	ENERJİ	ENERGY	ENERGIE
+hud.metal	METAL	METAL	METALL
+hud.crystal	KRİSTAL	CRYSTAL	KRISTALL
+hud.warn.noEnergy	ENERJİ YOK	NO ENERGY	KEINE ENERGIE
+hud.warn.lowEnergy	ENERJİ AZ	LOW ENERGY	WENIG ENERGIE
+hud.warn.metalFull	METAL DOLU	METAL FULL	METALL VOLL
+hud.warn.metalNear	METAL DOLMAK ÜZERE	METAL NEARLY FULL	METALL FAST VOLL
+hud.warn.crystalFull	KRİSTAL DOLU	CRYSTAL FULL	KRISTALL VOLL
+hud.warn.crystalNear	KRİSTAL DOLMAK ÜZERE	CRYSTAL NEARLY FULL	KRISTALL FAST VOLL
+
+# ── Level bandı ──────────────────────────────────────────────────────────────
+banner.level	LEVEL {0}	LEVEL {0}	LEVEL {0}
+banner.levelBoss	LEVEL {0}  —  BOSS	LEVEL {0}  —  BOSS	LEVEL {0}  —  BOSS
+banner.chapter	BÖLÜM {0}	CHAPTER {0}	KAPITEL {0}
+banner.chapterSector	BÖLÜM {0}  ·  {1}	CHAPTER {0}  ·  {1}	KAPITEL {0}  ·  {1}
+
+# ── Oyun sonu ────────────────────────────────────────────────────────────────
+gameover.title	OYUN BİTTİ	GAME OVER	SPIEL VORBEI
+gameover.restart	YENİDEN BAŞLA	RESTART	NEU STARTEN
+
+# ── Bölüm geçişi ─────────────────────────────────────────────────────────────
+crew.captain	Kaptan	Captain	Kapitän
+crew.engineer	Mühendis	Engineer	Ingenieur
+crew.pilot	Pilot	Pilot	Pilot
+credits.title	Tebrikler!	Congratulations!	Glückwunsch!
+credits.body	Tüm sektörler temizlendi.	All sectors cleared.	Alle Sektoren gesäubert.
+
+# ── Düşman bilgi kartı ───────────────────────────────────────────────────────
+enemyinfo.subtitle	{0}  ·  Tehdit {1}	{0}  ·  Threat {1}	{0}  ·  Bedrohung {1}
+enemyinfo.boss.subtitle	Bölüm Patronu  ·  Tehdit {0}	Chapter Boss  ·  Threat {0}	Kapitelboss  ·  Bedrohung {0}
+enemyinfo.boss.fallbackName	Boss	Boss	Boss
+enemyinfo.boss.hardpoints	Hardpoint: {0}	Hardpoints: {0}	Hardpoints: {0}
+enemyinfo.bar.hp	HP	HP	HP
+enemyinfo.bar.shield	KALKAN	SHIELD	SCHILD
+enemyinfo.bar.armor	ZIRH	ARMOR	PANZERUNG
+enemyinfo.weapon	Silah: {0}   {1:0.#} hasar / {2:0.#}s	Weapon: {0}   {1:0.#} damage / {2:0.#}s	Waffe: {0}   {1:0.#} Schaden / {2:0.#}s
+enemyinfo.range	Menzil: {0:0.#}   ·   Kaçamak: {1:0.#}°	Range: {0:0.#}   ·   Evasion: {1:0.#}°	Reichweite: {0:0.#}   ·   Ausweichen: {1:0.#}°
+enemyinfo.movement	Hareket: {0}	Movement: {0}	Bewegung: {0}
+enemyinfo.layer.hull	Gövde	Hull	Rumpf
+enemyinfo.layer.shield	Kalkan	Shield	Schild
+enemyinfo.vsFighters.pursue	Savaşçıları kovalar	Chases fighters	Verfolgt Jäger
+enemyinfo.vsFighters.engage	Savaşçıya ateş eder, kovalamaz	Fires at fighters but will not chase	Feuert auf Jäger, verfolgt sie aber nicht
+enemyinfo.vsFighters.ignore	Savaşçıları tamamen yok sayar	Ignores fighters entirely	Ignoriert Jäger vollständig
+enemyinfo.directionalShield	⚠ YÖNLÜ kalkan: yalnızca öndeki {0:0}° yayı korur — kenarından dolan	⚠ DIRECTIONAL shield: covers only the {0:0}° arc in front — go around it	⚠ GERICHTETER Schild: deckt nur den {0:0}°-Bogen vorn — umgehe ihn seitlich
+enemyinfo.shieldRecharge	Kalkan şarjı: {0:0.#}/s ({1:0.#}s gecikme)	Shield recharge: {0:0.#}/s ({1:0.#}s delay)	Schildaufladung: {0:0.#}/s ({1:0.#}s Verzögerung)
+enemyinfo.energyDrain	⚠ Enerji karıştırıcı: üretimi %{0:0} kısar ({1:0.#} menzil)	⚠ Energy disruptor: cuts output by {0:0}% ({1:0.#} range)	⚠ Energiestörer: senkt die Produktion um {0:0}% ({1:0.#} Reichweite)
+enemyinfo.phase	⚠ Faz: {0:0.#}s'de bir {1:0.#}s vurulamaz	⚠ Phase: untargetable for {1:0.#}s every {0:0.#}s	⚠ Phase: alle {0:0.#}s für {1:0.#}s unverwundbar
+enemyinfo.repairAura	⚠ Onarım aurası: {0:0.#} HP/s ({1:0.#} menzil)	⚠ Repair aura: {0:0.#} HP/s ({1:0.#} range)	⚠ Reparaturaura: {0:0.#} HP/s ({1:0.#} Reichweite)
+enemyinfo.split	⚠ Ölünce ikiye bölünür (%{0:0} HP)	⚠ Splits in two on death ({0:0}% HP)	⚠ Teilt sich beim Tod in zwei ({0:0}% HP)
+enemyinfo.phased	⚠ ŞU AN VURULAMAZ	⚠ CURRENTLY UNTARGETABLE	⚠ AKTUELL UNVERWUNDBAR
+
+# ── Düşman rolleri / silahları / hareketleri ─────────────────────────────────
+enemy.role.vanguard	Öncü	Vanguard	Vorhut
+enemy.role.flank	Kanat	Flank	Flanke
+enemy.role.center	Merkez	Center	Zentrum
+enemy.role.rear	Arka	Rear	Nachhut
+enemy.role.support	Destek	Support	Unterstützung
+enemy.role.barrier	Bariyer	Barrier	Barriere
+enemy.role.artillery	Topçu	Artillery	Artillerie
+enemy.weapon.none	Silahsız	Unarmed	Unbewaffnet
+enemy.weapon.laser	Lazer	Laser	Laser
+enemy.weapon.kinetic	Kinetik	Kinetic	Kinetisch
+enemy.weapon.cannon	Ağır top	Heavy cannon	Schwere Kanone
+enemy.weapon.rocket	Roket	Rocket	Rakete
+enemy.weapon.componentBurst	Komponent burst	Component burst	Komponenten-Burst
+enemy.move.charge	Yörünge	Orbit	Orbit
+enemy.move.hoverFire	Uzaktan döver	Pounds from range	Beschießt aus der Ferne
+enemy.move.approach	Yaklaşır, burst atar	Closes in, fires bursts	Nähert sich, feuert Salven
+enemy.move.strafe	Dalar geçer	Strafing runs	Sturzangriffe
+enemy.move.stationary	Sabit	Stationary	Stationär
+enemy.move.bombRun	Bomba koşusu	Bombing run	Bombenangriff
+enemy.move.attackRun	Saldırı sortisi	Attack run	Angriffsflug
+weapon.kinetic	Kinetik	Kinetic	Kinetisch
+weapon.laser	Lazer	Laser	Laser
+weapon.plasma	Plazma	Plasma	Plasma
+
+# ── Kaynaklar ────────────────────────────────────────────────────────────────
+resource.crystal	Kristal	Crystal	Kristall
+resource.rawMaterial	Ham Madde	Raw Material	Rohstoff
+
+# ── Komponent adları ─────────────────────────────────────────────────────────
+component.shield	Kalkan Jeneratörü	Shield Generator	Schildgenerator
+component.generator	Enerji Jeneratörü	Energy Generator	Energiegenerator
+component.repairUnit	Onarım Birimi	Repair Unit	Reparatureinheit
+component.storage	Depo	Storage	Lager
+component.hangar	Hangar	Hangar	Hangar
+component.turret.kinetic	Raylı Turret	Railgun Turret	Schienengeschütz
+component.turret.energy	Enerji Turret	Energy Turret	Energiegeschütz
+component.turret.missile	Füze Turret	Missile Turret	Raketengeschütz
+component.turret.fallback	Turret	Turret	Geschütz
+component.weapon.kinetic	Raylı Top	Railgun	Schienenkanone
+component.weapon.laser	Lazer Topu	Laser Cannon	Laserkanone
+component.weapon.plasma	Plazma Topu	Plasma Cannon	Plasmakanone
+
+# ── Komponent tipleri ────────────────────────────────────────────────────────
+componentType.shield	Kalkan	Shield	Schild
+componentType.repairUnit	Onarım Birimi	Repair Unit	Reparatureinheit
+componentType.generator	Enerji Jeneratörü	Energy Generator	Energiegenerator
+componentType.weapon	Silah	Weapon	Waffe
+componentType.turret	Turret	Turret	Geschütz
+componentType.hangar	Hangar	Hangar	Hangar
+componentType.storage	Depo	Storage	Lager
+
+# ── Stat izleri ──────────────────────────────────────────────────────────────
+stat.production	Üretim	Output	Erzeugung
+stat.capacitor	Kapasitör	Capacitor	Kondensator
+stat.rechargeRate	Şarj Hızı	Recharge Rate	Aufladerate
+stat.maxShield	Max Kalkan	Max Shield	Max. Schild
+stat.repairRate	Tamir Hızı	Repair Rate	Reparaturrate
+stat.energyEfficiency	Enerji Verimi	Energy Efficiency	Energieeffizienz
+stat.armor	Zırh	Armor	Panzerung
+stat.capacity	Kapasite	Capacity	Kapazität
+stat.damage	Hasar	Damage	Schaden
+stat.fireRate	Ateş Hızı	Rate of Fire	Feuerrate
+stat.hangar.productionSpeed	Üretim Hızı	Production Speed	Produktionstempo
+stat.hangar.maxHP	Gemi Max HP	Craft Max HP	Max. HP der Schiffe
+stat.hangar.fireRate	Savaşçı Ateş	Fighter Fire Rate	Jäger-Feuerrate
+stat.hangar.salvageRate	Toplama Hızı	Salvage Speed	Bergetempo
+stat.hangar.speed	Gemi Hızı	Craft Speed	Schiffstempo
+
+# ── Upgrade ekranı ───────────────────────────────────────────────────────────
+upgrade.close	KAPAT	CLOSE	SCHLIESSEN
+upgrade.panel.general	GENEL BİLGİLER	GENERAL	ÜBERSICHT
+upgrade.panel.slot	SLOT BİLGİSİ	SLOT INFO	SLOT-INFO
+upgrade.panel.option	OPSİYON DETAYI	OPTION DETAIL	OPTIONSDETAIL
+upgrade.box.hp	HP	HP	HP
+upgrade.box.shield	KALKAN	SHIELD	SCHILD
+upgrade.box.energy	ENERJİ	ENERGY	ENERGIE
+upgrade.box.none	yok	none	keiner
+upgrade.slotTitle.filled	Slot {0} — {1}	Slot {0} — {1}	Slot {0} — {1}
+upgrade.slotTitle.empty	Slot {0} — Boş	Slot {0} — Empty	Slot {0} — Leer
+upgrade.slotTitle.mainWeapon	Slot {0} — Ana Silah	Slot {0} — Main Weapon	Slot {0} — Hauptwaffe
+upgrade.install	Kur	Install	Einbauen
+upgrade.sell	Sat ({0})	Sell ({0})	Verkaufen ({0})
+upgrade.select	Seç	Select	Wählen
+upgrade.buy	Satın Al	Buy	Kaufen
+upgrade.buy.cost	Satın Al\n{0}	Buy\n{0}	Kaufen\n{0}
+upgrade.section.spec	── UZMANLAŞMA ──	── SPECIALIZATION ──	── SPEZIALISIERUNG ──
+upgrade.section.stat	── STAT UPGRADE ──	── STAT UPGRADE ──	── WERT-UPGRADE ──
+upgrade.section.hangar	── HANGAR ──	── HANGAR ──	── HANGAR ──
+upgrade.section.mainWeapon	ANA SİLAH	MAIN WEAPON	HAUPTWAFFE
+upgrade.spec.base	← Temel Tip (+{0})	← Base Type (+{0})	← Grundtyp (+{0})
+upgrade.spec.option	{0} ({1})	{0} ({1})	{0} ({1})
+upgrade.spec.optionFree	{0} (ücretsiz)	{0} (free)	{0} (kostenlos)
+upgrade.stat.maxed	{0} Lv {1}/{2} MAX	{0} Lv {1}/{2} MAX	{0} Lv {1}/{2} MAX
+upgrade.stat.level	{0} Lv {1}/{2}  ({3})	{0} Lv {1}/{2}  ({3})	{0} Lv {1}/{2}  ({3})
+upgrade.count.maxed	{0}: {1} MAX	{0}: {1} MAX	{0}: {1} MAX
+upgrade.count.level	{0}: {1}  (+1 → {2})	{0}: {1}  (+1 → {2})	{0}: {1}  (+1 → {2})
+upgrade.hangar.maxCollectors	Max Toplayıcı	Max Collectors	Max. Sammler
+upgrade.hangar.maxFighters	Max Savaşçı	Max Fighters	Max. Jäger
+upgrade.weapon.laser	Lazer	Laser	Laser
+upgrade.weapon.kinetic	Raylı Top	Railgun	Schienenkanone
+upgrade.weapon.plasma	Plazma	Plasma	Plasma
+upgrade.baseEnergy	⚡ {0:0.#}/s (Sv0)	⚡ {0:0.#}/s (Lv0)	⚡ {0:0.#}/s (St0)
+upgrade.energyShort	⚡ Enerji yetersiz — {0:0.#} eksik. Jeneratörü yükselt veya bir komponent sat.	⚡ Not enough energy — {0:0.#} short. Upgrade the generator or sell a component.	⚡ Zu wenig Energie — {0:0.#} fehlen. Rüste den Generator auf oder verkaufe eine Komponente.
+
+# ── Komponent detayı ─────────────────────────────────────────────────────────
+detail.beamDamage	Işın hasarı	Beam damage	Strahlenschaden
+detail.burn	Yanma: {0:0.##}s / {1:0.#}s	Burn: {0:0.##}s / {1:0.#}s	Brand: {0:0.##}s / {1:0.#}s
+detail.effectiveDps	Etkin DPS: {0:0.##}	Effective DPS: {0:0.##}	Effektiver DPS: {0:0.##}
+detail.energyPerShot	Enerji/atış: {0:0.##}	Energy/shot: {0:0.##}	Energie/Schuss: {0:0.##}
+detail.damage	Hasar	Damage	Schaden
+detail.shotsPerSec	Ateş/sn	Shots/s	Schuss/s
+detail.magazine	Şarjör: {0}	Magazine: {0}	Magazin: {0}
+detail.reload	Yeniden şarj: {0:0.#}s	Reload: {0:0.#}s	Nachladen: {0:0.#}s
+detail.repairPerSec	Tamir/sn	Repair/s	Reparatur/s
+detail.energyPerSec	Enerji/sn	Energy/s	Energie/s
+detail.armorBonus	Zırh (+HP)	Armor (+HP)	Panzerung (+HP)
+detail.shipHp	Gemi HP: {0:0}/{1:0}	Ship HP: {0:0}/{1:0}	Schiff-HP: {0:0}/{1:0}
+detail.productionPerSec	Üretim/sn	Output/s	Erzeugung/s
+detail.bufferBonus	Tampon +	Buffer +	Puffer +
+detail.maxEnergy	Max enerji: {0:0}	Max energy: {0:0}	Max. Energie: {0:0}
+detail.maxShield	Max kalkan	Max shield	Max. Schild
+detail.rechargePerSec	Şarj/sn	Recharge/s	Aufladung/s
+detail.metalCapacity	Metal kap.	Metal cap.	Metall-Kap.
+detail.crystalCapacity	Kristal kap.	Crystal cap.	Kristall-Kap.
+detail.maxCollectors	Max toplayıcı: {0}	Max collectors: {0}	Max. Sammler: {0}
+detail.maxFighters	Max savaşçı: {0}	Max fighters: {0}	Max. Jäger: {0}
+detail.productionTime	Üretim süresi: {0:0.#}s	Production time: {0:0.#}s	Produktionszeit: {0:0.#}s
+detail.shipSpeed	Gemi hızı: {0:0.#}	Ship speed: {0:0.#}	Schiffstempo: {0:0.#}
+detail.weaponDamage	Hasar: {0:0.#}	Damage: {0:0.#}	Schaden: {0:0.#}
+detail.fireInterval	Ateş aralığı: {0:0.##}s	Fire interval: {0:0.##}s	Feuerintervall: {0:0.##}s
+detail.weapon.energyPerShot	Enerji/atış: {0:0.#}	Energy/shot: {0:0.#}	Energie/Schuss: {0:0.#}
+
+# ── Stat açıklamaları ────────────────────────────────────────────────────────
+# {0} = "her seviye ×N" cümlesi, {1} = azaltıcı hâli, {2} = enerji uyarısı,
+# {3} = kapasitör yüzdesi. Kullanılmayan yer tutucu sorun değildir.
+statdesc.up	Her seviye ×{0:0.##} çarpanı ekler.	Each level adds a ×{0:0.##} multiplier.	Jede Stufe fügt einen ×{0:0.##} Multiplikator hinzu.
+statdesc.down	Her seviye ÷{0:0.##} azalma sağlar.	Each level divides the value by {0:0.##}.	Jede Stufe teilt den Wert durch {0:0.##}.
+statdesc.energy	\n\nEnerji tüketimi de ×{0:0.##} büyür — jeneratör yetişmezse yükseltme yapılamaz.	\n\nEnergy draw also grows ×{0:0.##} — if the generator cannot keep up, the upgrade is blocked.	\n\nAuch der Energieverbrauch wächst ×{0:0.##} — hält der Generator nicht mit, ist das Upgrade gesperrt.
+statdesc.damage	Turretin verdiği hasarı artırır.\n{0}\n\nZırhlı düşmanlarda atış başına hasar belirleyicidir: zırh her atıştan sabit miktar düşer.{2}	Increases the damage the turret deals.\n{0}\n\nAgainst armored enemies, damage per shot decides the fight: armor subtracts a flat amount from every shot.{2}	Erhöht den Schaden des Geschützes.\n{0}\n\nGegen gepanzerte Gegner entscheidet der Schaden pro Schuss: Panzerung zieht von jedem Schuss einen festen Betrag ab.{2}
+statdesc.fireRate	Ateş hızını artırır.\n{0}\n\nZırha karşı hasar kadar iyi değildir — daha çok atış, her biri zırhtan aynı cezayı yer.{2}	Increases rate of fire.\n{0}\n\nAgainst armor it is worse than damage — more shots, each paying the same armor penalty.{2}	Erhöht die Feuerrate.\n{0}\n\nGegen Panzerung schlechter als Schaden — mehr Schüsse, jeder zahlt denselben Panzerungsabzug.{2}
+statdesc.armor	Ana geminin maksimum gövde HP'sini artırır.\n{0}\n\nKalkanın arkasındaki son katman: kalkanı delen her şey (komponent mermileri, kalkan çökünce gelen her atış) buradan yer. Bu izi taşıyan her onarım birimi bonusunu EKLER, çarpmaz.\n\nDiğer izlerden pahalıdır — doğrudan hayatta kalma satın alır.{2}	Increases the main ship's maximum hull HP.\n{0}\n\nThe last layer behind the shield: everything that gets through (component rounds, every shot once the shield collapses) lands here. Each repair unit carrying this track ADDS its bonus, it does not multiply.\n\nCostlier than the other tracks — it buys survival directly.{2}	Erhöht die maximalen Rumpf-HP des Hauptschiffs.\n{0}\n\nDie letzte Schicht hinter dem Schild: alles, was ihn durchdringt (Komponentengeschosse, jeder Schuss nach dem Schildzusammenbruch), landet hier. Jede Reparatureinheit mit dieser Spur ADDIERT ihren Bonus, sie multipliziert nicht.\n\nTeurer als die anderen Spuren — sie kauft direkt Überleben.{2}
+statdesc.capacity	Deponun kaynak kapasitesini artırır.\n{0}\n\nGeç seviyelerde tek bir yükseltme binlerce kaynak tutar; tavan yetmezse o parayı biriktirmek mümkün değildir.{2}	Increases the storage capacity for resources.\n{0}\n\nLate on a single upgrade costs thousands; if the ceiling is too low you simply cannot save that much up.{2}	Erhöht die Ressourcenkapazität des Lagers.\n{0}\n\nSpäter kostet ein einzelnes Upgrade Tausende; ist die Obergrenze zu niedrig, lässt sich so viel gar nicht ansparen.{2}
+statdesc.repairRate	Saniyede tamir edilen HP miktarını artırır.\n{0}{2}	Increases HP repaired per second.\n{0}{2}	Erhöht die pro Sekunde reparierten HP.\n{0}{2}
+statdesc.energyEfficiency	Tamir için harcanan enerji miktarını azaltır.\n{1}	Reduces the energy spent on repairs.\n{1}	Senkt den Energieverbrauch für Reparaturen.\n{1}
+statdesc.production	Saniyede üretilen enerji miktarını artırır.\n{0}\n\nDiğer tüm yükseltmelerin kapısıdır: üretim yetmezse hiçbir komponent seviye alamaz.	Increases energy produced per second.\n{0}\n\nIt is the gate to every other upgrade: if production falls short, no component can gain a level.	Erhöht die pro Sekunde erzeugte Energie.\n{0}\n\nSie ist das Tor zu allen anderen Upgrades: reicht die Erzeugung nicht, kann keine Komponente aufsteigen.
+statdesc.capacitor	Enerji tamponunu (max enerji) büyütür.\nHer seviye tamponu %{3:0} büyütür — diğer statlardan farklı, çünkü tampon bir AKIŞ değil STOK.\n\nÜretim AKIŞI, kapasitör STOKU belirler. Turretlerin aynı anda ateşlemesi, plazma şarjı ve kalkan boost'u anlık olarak üretimin çok üstünde enerji ister — tampon boşsa o atışlar hiç yapılamaz.\n\nÜretimi yükseltmek bunu da çözer ama çok daha pahalıya; tampon ucuz ve dar bir cevaptır.{2}	Grows the energy buffer (max energy).\nEach level grows the buffer by {3:0}% — unlike the other stats, because the buffer is a STOCK, not a FLOW.\n\nProduction sets the FLOW, the capacitor sets the STOCK. Turrets firing at once, a plasma charge and a shield boost demand far more energy in an instant than production supplies — with an empty buffer those shots never happen at all.\n\nRaising production solves this too, but far more expensively; the buffer is the cheap, narrow answer.{2}	Vergrößert den Energiepuffer (max. Energie).\nJede Stufe vergrößert den Puffer um {3:0}% — anders als die übrigen Werte, denn der Puffer ist ein BESTAND, kein FLUSS.\n\nDie Erzeugung bestimmt den FLUSS, der Kondensator den BESTAND. Gleichzeitig feuernde Geschütze, eine Plasmaladung und ein Schildboost verlangen kurzzeitig weit mehr Energie als erzeugt wird — bei leerem Puffer finden diese Schüsse gar nicht statt.\n\nMehr Erzeugung löst das auch, aber viel teurer; der Puffer ist die billige, enge Antwort.{2}
+statdesc.rechargeRate	Kalkan şarj hızını artırır.\n{0}{2}	Increases shield recharge rate.\n{0}{2}	Erhöht die Schildaufladerate.\n{0}{2}
+statdesc.maxShield	Maksimum kalkan kapasitesini artırır.\n{0}{2}	Increases maximum shield capacity.\n{0}{2}	Erhöht die maximale Schildkapazität.\n{0}{2}
+statdesc.productionSpeed	Toplayıcı/savaşçı üretim hızını artırır.\n{0}{2}	Increases collector/fighter production speed.\n{0}{2}	Erhöht das Produktionstempo von Sammlern/Jägern.\n{0}{2}
+statdesc.maxHP	Gemi bileşenlerinin dayanaklılığını artırır.\n{0}{2}	Increases the durability of the ship's craft.\n{0}{2}	Erhöht die Widerstandsfähigkeit der Schiffe.\n{0}{2}
+statdesc.salvageRate	Enkaz toplama hızını artırır.\n{0}{2}	Increases wreck salvage speed.\n{0}{2}	Erhöht das Bergetempo von Wracks.\n{0}{2}
+statdesc.speed	Toplayıcı/savaşçı gemi hızını artırır.\n{0}{2}	Increases collector/fighter ship speed.\n{0}{2}	Erhöht das Tempo von Sammler-/Jägerschiffen.\n{0}{2}
+statdesc.maxCollectors	Hangarın maksimum toplayıcı sayısını artırır.\nHer seviye +1 toplayıcı ekler.{2}	Increases the hangar's maximum collector count.\nEach level adds +1 collector.{2}	Erhöht die maximale Sammlerzahl des Hangars.\nJede Stufe fügt +1 Sammler hinzu.{2}
+statdesc.maxFighters	Hangarın maksimum savaşçı sayısını artırır.\nHer seviye +1 savaşçı ekler.{2}	Increases the hangar's maximum fighter count.\nEach level adds +1 fighter.{2}	Erhöht die maximale Jägerzahl des Hangars.\nJede Stufe fügt +1 Jäger hinzu.{2}
+
+# ── Düşman tipi adları ───────────────────────────────────────────────────────
+# Swarm/Armored/Shield/Bomber/Bomb Runner Türkçe sütunda da İngilizceydi;
+# olduğu gibi bırakıldı, çevirmek istersen tek satır değiştirmek yeterli.
+enemy.type.swarm	Swarm	Swarm	Schwarm
+enemy.type.armored	Armored	Armored	Gepanzert
+enemy.type.shield	Shield	Shield	Schild
+enemy.type.bomber	Bomber	Bomber	Bomber
+enemy.type.bombRunner	Bomb Runner	Bomb Runner	Bombenläufer
+enemy.type.interceptor	Avcı	Interceptor	Abfangjäger
+enemy.type.artillery	Obüs	Howitzer	Haubitze
+enemy.type.jammer	Karıştırıcı	Jammer	Störsender
+enemy.type.phantom	Hayalet	Phantom	Phantom
+enemy.type.regenerator	Onarıcı	Regenerator	Regenerator
+enemy.type.leech	Sülük	Leech	Blutegel
+enemy.type.barrier	Bariyer	Barrier	Barriere
+enemy.type.splitter	Bölünen	Splitter	Teiler
+enemy.type.juggernaut	Kaleci	Juggernaut	Juggernaut
+
+# ── Boss adları ──────────────────────────────────────────────────────────────
+boss.type.sentinel	Nöbetçi	Sentinel	Wächter
+boss.type.patrolLeader	Devriye Lideri	Patrol Leader	Patrouillenführer
+boss.type.shieldMatrix	Kalkan Matriksi	Shield Matrix	Schildmatrix
+boss.type.bombPlatform	Bombardıman Platformu	Bombardment Platform	Bombardierungsplattform
+boss.type.armoredKeep	Zırhlı Kale	Armored Keep	Gepanzerte Festung
+boss.type.howitzerLine	Obüs Hattı	Howitzer Line	Haubitzenlinie
+boss.type.disruptor	Karıştırıcı	Disruptor	Störsender
+boss.type.hiveMother	Kovan Anası	Hive Mother	Schwarmmutter
+boss.type.dreadnought	Dreadnought	Dreadnought	Dreadnought
+boss.type.hiveMind	Kovan Zihni	Hive Mind	Schwarmbewusstsein
+boss.type.carrierCommand	Komuta Taşıyıcısı	Command Carrier	Kommandoträger
+
+# ── Bölümler ─────────────────────────────────────────────────────────────────
+chapter.1.title	Sektör 1: İlk Temas	Sector 1: First Contact	Sektor 1: Erster Kontakt
+chapter.1.story	Araştırma gemimiz sistemleri yeni aktive etti. İlk botlar yaklaşıyor.	Our survey ship has only just powered up its systems. The first bots are closing in.	Unser Forschungsschiff hat die Systeme gerade erst hochgefahren. Die ersten Bots nähern sich.
+chapter.2.title	Sektör 2: Devriye Hattı	Sector 2: The Patrol Line	Sektor 2: Die Patrouillenlinie
+chapter.2.story	Zırhlı birimler tespit edildi. Raylı toplar bu gövdeleri delmiyor.	Armored units detected. Railguns do not punch through these hulls.	Gepanzerte Einheiten entdeckt. Schienenkanonen durchschlagen diese Rümpfe nicht.
+chapter.3.title	Sektör 3: Kalkan Duvarı	Sector 3: The Shield Wall	Sektor 3: Die Schildwand
+chapter.3.story	Enerji kalkanıyla donatılmış yeni bir varyant. Lazer kalkanda eriyor.	A new variant fitted with an energy shield. The laser fizzles out against it.	Eine neue Variante mit Energieschild. Der Laser verpufft daran.
+chapter.4.title	Sektör 4: Bomba Yağmuru	Sector 4: Bomb Rain	Sektor 4: Bombenregen
+chapter.4.story	Yakın mesafe bombardımanı. Komponentleriniz doğrudan hedef alınıyor — Point Defence artık lüks değil.	Close-range bombardment. Your components are being targeted directly — Point Defence is no longer a luxury.	Bombardement aus nächster Nähe. Eure Komponenten werden direkt angegriffen — Point Defence ist kein Luxus mehr.
+chapter.5.title	Sektör 5: Avcı Sürüsü	Sector 5: Interceptor Swarm	Sektor 5: Abfangjäger-Schwarm
+chapter.5.story	Küçük, hızlı, kaçamak. Turretleriniz nişan alamıyor.	Small, fast, evasive. Your turrets cannot get a bead on them.	Klein, schnell, ausweichend. Eure Geschütze bekommen sie nicht ins Visier.
+chapter.6.title	Sektör 6: Uzun Menzil	Sector 6: Long Range	Sektor 6: Weite Reichweite
+chapter.6.story	Menzil dışından dövülüyoruz. Beklemek ölüm, ilerlemek şart.	We are being pounded from outside our range. Waiting is death, advancing is mandatory.	Wir werden von außerhalb unserer Reichweite beschossen. Warten heißt sterben, Vorrücken ist Pflicht.
+chapter.7.title	Sektör 7: Karartma	Sector 7: Blackout	Sektor 7: Blackout
+chapter.7.story	Sinyal karışıyor, reaktör düşüyor. Bazı gemiler hiç vurulmuyor.	The signal is jammed, the reactor is dropping. Some ships cannot be hit at all.	Das Signal wird gestört, der Reaktor fällt ab. Manche Schiffe lassen sich gar nicht treffen.
+chapter.8.title	Sektör 8: Onarım Kovanı	Sector 8: The Repair Hive	Sektor 8: Der Reparaturschwarm
+chapter.8.story	Vurduğunuz her şey geri geliyor. Yetersiz hasar, hiç hasar demek.	Everything you hit comes back. Insufficient damage means no damage.	Alles, was ihr trefft, kommt zurück. Zu wenig Schaden heißt gar kein Schaden.
+chapter.9.title	Sektör 9: Bölünen Sürü	Sector 9: The Splitting Swarm	Sektor 9: Der sich teilende Schwarm
+chapter.9.story	Öldürdükçe çoğalıyorlar. Tek hedefe odaklanmak artık işe yaramıyor.	They multiply as you kill them. Focusing a single target no longer works.	Sie vermehren sich, während ihr sie tötet. Ein einzelnes Ziel zu fokussieren funktioniert nicht mehr.
+chapter.10.title	Sektör 10: Kovan Zihni	Sector 10: The Hive Mind	Sektor 10: Das Schwarmbewusstsein
+chapter.10.story	Sinyalin kaynağı. Bütün bu tasarımlar tek bir yerden çıkıyordu.	The source of the signal. Every one of these designs came from a single place.	Die Quelle des Signals. All diese Konstruktionen stammen von einem einzigen Ort.

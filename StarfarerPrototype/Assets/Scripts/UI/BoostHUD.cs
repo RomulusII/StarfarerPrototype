@@ -12,6 +12,10 @@ public class BoostHUD : MonoBehaviour
     private Button _shieldBtn;
     private Button _weaponBtn;
 
+    // Etiketler kurulumda bir kez yazılır; dil menüden değişince tazelenmeleri
+    // gerekir (GameManager bu HUD'u menüden önce kurar).
+    private Text _shieldLbl, _weaponLbl, _upgradeLbl;
+
     static readonly Color ColNormal  = new Color(0.18f, 0.18f, 0.22f, 0.92f);
     static readonly Color ColShield  = new Color(0.10f, 0.35f, 0.80f, 1f);
     static readonly Color ColWeapon  = new Color(0.75f, 0.25f, 0.10f, 1f);
@@ -29,21 +33,33 @@ public class BoostHUD : MonoBehaviour
 
         gameObject.AddComponent<GraphicRaycaster>();
 
-        _shieldBtn = BuildButton("ShieldBoostBtn", "KALKAN\nBOOST",
+        _shieldBtn = BuildButton("ShieldBoostBtn",
             new Vector2(0.38f, 0.02f), new Vector2(0.49f, 0.10f),
-            () => OnToggle(BoostMode.Shield));
+            () => OnToggle(BoostMode.Shield), out _shieldLbl);
 
-        _weaponBtn = BuildButton("WeaponBoostBtn", "SİLAH\nBOOST",
+        _weaponBtn = BuildButton("WeaponBoostBtn",
             new Vector2(0.51f, 0.02f), new Vector2(0.62f, 0.10f),
-            () => OnToggle(BoostMode.Weapon));
+            () => OnToggle(BoostMode.Weapon), out _weaponLbl);
 
         // Upgrade ekranının tek girişi Tab tuşuydu; Android'de klavye yok, yani
         // telefonda ekran hiç açılamıyordu. Düğme boost şeridinin yanına konur —
         // ikisi de "oyun içi eylem" bandı. Kapatma düğmesi upgrade ekranının
         // KENDİ içindedir, çünkü bu şerit o ekran açıkken gizleniyor.
-        BuildButton("UpgradeBtn", "YÜKSELT",
+        BuildButton("UpgradeBtn",
             new Vector2(0.64f, 0.02f), new Vector2(0.74f, 0.10f),
-            () => FindFirstObjectByType<UpgradeUI>()?.Toggle());
+            () => FindFirstObjectByType<UpgradeUI>()?.Toggle(), out _upgradeLbl);
+
+        ApplyTexts();
+    }
+
+    void OnEnable()  => Loc.OnLanguageChanged += ApplyTexts;
+    void OnDisable() => Loc.OnLanguageChanged -= ApplyTexts;
+
+    void ApplyTexts()
+    {
+        if (_shieldLbl  != null) _shieldLbl.text  = Loc.T("hud.boost.shield");
+        if (_weaponLbl  != null) _weaponLbl.text  = Loc.T("hud.boost.weapon");
+        if (_upgradeLbl != null) _upgradeLbl.text = Loc.T("hud.upgrade");
     }
 
     void Update()
@@ -63,9 +79,9 @@ public class BoostHUD : MonoBehaviour
         BoostController.Toggle(mode);
     }
 
-    Button BuildButton(string goName, string label,
+    Button BuildButton(string goName,
         Vector2 anchorMin, Vector2 anchorMax,
-        UnityEngine.Events.UnityAction onClick)
+        UnityEngine.Events.UnityAction onClick, out Text label)
     {
         var go = new GameObject(goName, typeof(RectTransform));
         go.transform.SetParent(transform, false);
@@ -87,7 +103,6 @@ public class BoostHUD : MonoBehaviour
         txtGo.transform.SetParent(go.transform, false);
 
         var t = txtGo.AddComponent<Text>();
-        t.text      = label;
         t.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         t.fontSize  = 16;
         t.fontStyle = FontStyle.Bold;
@@ -99,6 +114,7 @@ public class BoostHUD : MonoBehaviour
         tRect.anchorMax = Vector2.one;
         tRect.sizeDelta = Vector2.zero;
 
+        label = t;
         return btn;
     }
 }

@@ -128,12 +128,14 @@ public class LevelBannerUI : MonoBehaviour
 
     void Play(int level, int chapter, string sectorTitle, bool bossLevel)
     {
-        _levelText.text = bossLevel ? $"LEVEL {level}  —  BOSS" : $"LEVEL {level}";
+        _levelText.text  = Loc.T(bossLevel ? "banner.levelBoss" : "banner.level", level);
         _levelText.color = bossLevel ? new Color(1f, 0.72f, 0.35f) : Color.white;
 
+        // Büyük harf dile göre yapılır: ToUpperInvariant Türkçe'de "Devriye
+        // Hattı"nı "DEVRIYE HATTI" yazıyordu.
         _sectorText.text = string.IsNullOrEmpty(sectorTitle)
-                         ? $"BÖLÜM {chapter}"
-                         : $"BÖLÜM {chapter}  ·  {sectorTitle.ToUpperInvariant()}";
+                         ? Loc.T("banner.chapter", chapter)
+                         : Loc.T("banner.chapterSector", chapter, Loc.ToUpper(sectorTitle));
 
         // Hızlı ilerleyen bir oyuncu bir önceki bandı görmeden yenisine geçebilir;
         // iki coroutine üst üste binerse alfa titrer.

@@ -19,6 +19,10 @@ public class GameManager : MonoBehaviour
     bool _gameOver = false;
     GameObject _gameOverPanel;
 
+    // Panel açılış menüsünden ÖNCE kurulur, yani metinleri dil seçilmeden
+    // yazılır; gösterildiği anda tazelenirler (bkz. TriggerGameOver).
+    Text _gameOverLabel, _restartLabel;
+
     void Awake()
     {
         // Kadraj önbelleği statiktir; sahne yeniden yüklenince (ölüm → restart)
@@ -249,6 +253,10 @@ public class GameManager : MonoBehaviour
         SpeedController.Instance?.Pause();
         if (_weaponController != null) _weaponController.enabled = false;
         if (_weaponMount      != null) _weaponMount.enabled      = false;
+
+        if (_gameOverLabel != null) _gameOverLabel.text = Loc.T("gameover.title");
+        if (_restartLabel  != null) _restartLabel.text  = Loc.T("gameover.restart");
+
         _gameOverPanel.SetActive(true);
     }
 
@@ -312,9 +320,9 @@ public class GameManager : MonoBehaviour
         panelRect.sizeDelta = new Vector2(600f, 280f);
         panelRect.anchoredPosition = Vector2.zero;
 
-        // GAME OVER yazısı
-        MakeText(_gameOverPanel.transform, "GameOverLabel",
-            "GAME OVER",
+        // GAME OVER yazısı — metni gösterim anında yazılır
+        _gameOverLabel = MakeText(_gameOverPanel.transform, "GameOverLabel",
+            "",
             fontSize: 80,
             color: new Color(0.92f, 0.12f, 0.12f),
             anchorMin: new Vector2(0f, 0.52f),
@@ -331,7 +339,7 @@ public class GameManager : MonoBehaviour
         _gameOverPanel.SetActive(false);
     }
 
-    void MakeText(Transform parent, string objName, string content,
+    Text MakeText(Transform parent, string objName, string content,
                   int fontSize, Color color,
                   Vector2 anchorMin, Vector2 anchorMax)
     {
@@ -351,6 +359,7 @@ public class GameManager : MonoBehaviour
         r.anchorMax = anchorMax;
         r.offsetMin = Vector2.zero;
         r.offsetMax = Vector2.zero;
+        return txt;
     }
 
     void MakeRestartButton(Transform parent)
@@ -379,9 +388,9 @@ public class GameManager : MonoBehaviour
         btnRect.offsetMin = Vector2.zero;
         btnRect.offsetMax = Vector2.zero;
 
-        // Buton yazısı
-        MakeText(btnGO.transform, "Label",
-            "RESTART",
+        // Buton yazısı — metni gösterim anında yazılır
+        _restartLabel = MakeText(btnGO.transform, "Label",
+            "",
             fontSize: 44,
             color: Color.white,
             anchorMin: Vector2.zero,

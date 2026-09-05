@@ -133,23 +133,23 @@ public class EnemyInfoHUD : MonoBehaviour
         var d = bot.Data;
         if (d == null) return;
 
-        _title.text    = string.IsNullOrEmpty(d.displayName) ? d.name : d.displayName;
-        _subtitle.text = $"{RoleLabel(d.role)}  ·  Tehdit {d.threatScore}";
+        _title.text    = string.IsNullOrEmpty(d.displayName) ? d.name : Loc.T(d.displayName);
+        _subtitle.text = Loc.T("enemyinfo.subtitle", RoleLabel(d.role), d.threatScore);
 
         SetBar(_hpFill, _hpText, bot.CurrentHP, bot.MaxHP,
-               new Color(0.25f, 0.82f, 0.30f));
+               new Color(0.25f, 0.82f, 0.30f), Loc.T("enemyinfo.bar.hp"));
 
         bool hasShield = bot.MaxShield > 0f;
         _shieldRow.SetActive(hasShield);
         if (hasShield)
             SetBar(_shieldFill, _shieldText, bot.CurrentShield, bot.MaxShield,
-                   new Color(0.30f, 0.55f, 1f));
+                   new Color(0.30f, 0.55f, 1f), Loc.T("enemyinfo.bar.shield"));
 
         // Zırh mutlak bir sayıdır; bar dolgusu kampanyanın zırh tavanına göre
         // ölçeklenir, böylece "bu gemi ne kadar zırhlı" göz kararı okunabilir.
         float armorMax = Mathf.Max(1f, LevelCurve.Instance.maxArmor);
         SetBar(_armorFill, _armorText, bot.ArmorValue, armorMax,
-               new Color(0.85f, 0.72f, 0.25f), showMax: false);
+               new Color(0.85f, 0.72f, 0.25f), Loc.T("enemyinfo.bar.armor"), showMax: false);
 
         _body.text = BuildEnemyBody(d, bot);
     }
@@ -157,26 +157,28 @@ public class EnemyInfoHUD : MonoBehaviour
     void ShowBoss(BossShip boss)
     {
         var d = boss.Data;
-        _title.text    = d != null && !string.IsNullOrEmpty(d.displayName) ? d.displayName : "Boss";
-        _subtitle.text = $"Bölüm Patronu  ·  Tehdit {(d != null ? d.threatScore : 0)}";
+        _title.text    = d != null && !string.IsNullOrEmpty(d.displayName)
+                       ? Loc.T(d.displayName) : Loc.T("enemyinfo.boss.fallbackName");
+        _subtitle.text = Loc.T("enemyinfo.boss.subtitle", d != null ? d.threatScore : 0);
 
         SetBar(_hpFill, _hpText, boss.CurrentHP, boss.MaxHP,
-               new Color(0.25f, 0.82f, 0.30f));
+               new Color(0.25f, 0.82f, 0.30f), Loc.T("enemyinfo.bar.hp"));
 
         bool hasShield = boss.MaxShield > 0f;
         _shieldRow.SetActive(hasShield);
         if (hasShield)
             SetBar(_shieldFill, _shieldText, boss.CurrentShield, boss.MaxShield,
-                   new Color(0.30f, 0.55f, 1f));
+                   new Color(0.30f, 0.55f, 1f), Loc.T("enemyinfo.bar.shield"));
 
         float armorMax = Mathf.Max(1f, LevelCurve.Instance.maxArmor);
         SetBar(_armorFill, _armorText, boss.ArmorValue, armorMax,
-               new Color(0.85f, 0.72f, 0.25f), showMax: false);
+               new Color(0.85f, 0.72f, 0.25f), Loc.T("enemyinfo.bar.armor"), showMax: false);
 
         var sb = new StringBuilder();
         if (d != null)
         {
-            sb.AppendLine($"Hardpoint: {(d.hardpoints != null ? d.hardpoints.Length : 0)}");
+            sb.AppendLine(Loc.T("enemyinfo.boss.hardpoints",
+                                d.hardpoints != null ? d.hardpoints.Length : 0));
         }
         _body.text = sb.ToString().TrimEnd();
     }
@@ -185,32 +187,29 @@ public class EnemyInfoHUD : MonoBehaviour
     {
         var sb = new StringBuilder();
 
-        sb.AppendLine($"Silah: {WeaponLabel(d.weaponKind)}   {d.fireDamage:0.#} hasar / {d.fireRate:0.#}s");
-        sb.AppendLine($"Menzil: {d.fireRange:0.#}   ·   Kaçamak: {d.evasionAngle:0.#}°");
-        sb.AppendLine($"Hareket: {MovementLabel(d.movementKind)}");
+        sb.AppendLine(Loc.T("enemyinfo.weapon", WeaponLabel(d.weaponKind), d.fireDamage, d.fireRate));
+        sb.AppendLine(Loc.T("enemyinfo.range", d.fireRange, d.evasionAngle));
+        sb.AppendLine(Loc.T("enemyinfo.movement", MovementLabel(d.movementKind)));
 
         // Oyuncunun silah seçimini doğrudan etkileyen tek bilgi budur
-        AppendResistances(sb, "Gövde", d.hullResistances);
-        if (d.maxShield > 0f) AppendResistances(sb, "Kalkan", d.shieldResistances);
+        AppendResistances(sb, Loc.T("enemyinfo.layer.hull"), d.hullResistances);
+        if (d.maxShield > 0f) AppendResistances(sb, Loc.T("enemyinfo.layer.shield"), d.shieldResistances);
 
         // Savaşçılara karşı tutum — oyuncunun hangar yatırımını okuyabilmesi için
-        string vsFighters = d.PursuesFighters
-            ? "Savaşçıları kovalar"
-            : (d.CanEngageFighters ? "Savaşçıya ateş eder, kovalamaz"
-                                   : "Savaşçıları tamamen yok sayar");
-        sb.AppendLine(vsFighters);
+        sb.AppendLine(Loc.T(d.PursuesFighters    ? "enemyinfo.vsFighters.pursue"
+                          : d.CanEngageFighters  ? "enemyinfo.vsFighters.engage"
+                                                 : "enemyinfo.vsFighters.ignore"));
 
         if (d.HasDirectionalShield)
-            sb.AppendLine($"⚠ YÖNLÜ kalkan: yalnızca öndeki {d.shieldArcDegrees:0}° yayı korur — " +
-                          "kenarından dolan");
+            sb.AppendLine(Loc.T("enemyinfo.directionalShield", d.shieldArcDegrees));
         if (d.maxShield > 0f)
-            sb.AppendLine($"Kalkan şarjı: {d.shieldRechargeRate:0.#}/s ({d.shieldRechargeDelay:0.#}s gecikme)");
+            sb.AppendLine(Loc.T("enemyinfo.shieldRecharge", d.shieldRechargeRate, d.shieldRechargeDelay));
 
-        if (d.energyDrain   > 0f) sb.AppendLine($"⚠ Enerji karıştırıcı: üretimi %{d.energyDrain * 100f:0} kısar ({d.energyDrainRange:0.#} menzil)");
-        if (d.phaseInterval > 0f) sb.AppendLine($"⚠ Faz: {d.phaseInterval:0.#}s'de bir {d.phaseDuration:0.#}s vurulamaz");
-        if (d.repairAura    > 0f) sb.AppendLine($"⚠ Onarım aurası: {d.repairAura:0.#} HP/s ({d.repairAuraRange:0.#} menzil)");
-        if (d.splitInto  != null) sb.AppendLine($"⚠ Ölünce ikiye bölünür (%{d.splitHpRatio * 100f:0} HP)");
-        if (bot.IsPhased)         sb.AppendLine("⚠ ŞU AN VURULAMAZ");
+        if (d.energyDrain   > 0f) sb.AppendLine(Loc.T("enemyinfo.energyDrain", d.energyDrain * 100f, d.energyDrainRange));
+        if (d.phaseInterval > 0f) sb.AppendLine(Loc.T("enemyinfo.phase", d.phaseInterval, d.phaseDuration));
+        if (d.repairAura    > 0f) sb.AppendLine(Loc.T("enemyinfo.repairAura", d.repairAura, d.repairAuraRange));
+        if (d.splitInto  != null) sb.AppendLine(Loc.T("enemyinfo.split", d.splitHpRatio * 100f));
+        if (bot.IsPhased)         sb.AppendLine(Loc.T("enemyinfo.phased"));
 
         return sb.ToString().TrimEnd();
     }
@@ -222,7 +221,9 @@ public class EnemyInfoHUD : MonoBehaviour
         for (int i = 0; i < mods.Length; i++)
         {
             if (i > 0) sb.Append("  ");
-            sb.Append($"{WeaponTypeLabel(mods[i].weaponType)} ×{mods[i].multiplier:0.##}");
+            sb.Append(WeaponTypeLabel(mods[i].weaponType))
+              .Append(" ×")
+              .Append(mods[i].multiplier.ToString("0.##", Loc.Culture));
         }
         sb.AppendLine();
     }
@@ -233,44 +234,44 @@ public class EnemyInfoHUD : MonoBehaviour
 
     static string RoleLabel(EnemyRole r) => r switch
     {
-        EnemyRole.Vanguard  => "Öncü",
-        EnemyRole.Flank     => "Kanat",
-        EnemyRole.Center    => "Merkez",
-        EnemyRole.Rear      => "Arka",
-        EnemyRole.Support   => "Destek",
-        EnemyRole.Barrier   => "Bariyer",
-        EnemyRole.Artillery => "Topçu",
+        EnemyRole.Vanguard  => Loc.T("enemy.role.vanguard"),
+        EnemyRole.Flank     => Loc.T("enemy.role.flank"),
+        EnemyRole.Center    => Loc.T("enemy.role.center"),
+        EnemyRole.Rear      => Loc.T("enemy.role.rear"),
+        EnemyRole.Support   => Loc.T("enemy.role.support"),
+        EnemyRole.Barrier   => Loc.T("enemy.role.barrier"),
+        EnemyRole.Artillery => Loc.T("enemy.role.artillery"),
         _                   => r.ToString(),
     };
 
     static string WeaponLabel(EnemyWeaponKind w) => w switch
     {
-        EnemyWeaponKind.None           => "Silahsız",
-        EnemyWeaponKind.Laser          => "Lazer",
-        EnemyWeaponKind.Kinetic        => "Kinetik",
-        EnemyWeaponKind.Cannon         => "Ağır top",
-        EnemyWeaponKind.Rocket         => "Roket",
-        EnemyWeaponKind.ComponentBurst => "Komponent burst",
+        EnemyWeaponKind.None           => Loc.T("enemy.weapon.none"),
+        EnemyWeaponKind.Laser          => Loc.T("enemy.weapon.laser"),
+        EnemyWeaponKind.Kinetic        => Loc.T("enemy.weapon.kinetic"),
+        EnemyWeaponKind.Cannon         => Loc.T("enemy.weapon.cannon"),
+        EnemyWeaponKind.Rocket         => Loc.T("enemy.weapon.rocket"),
+        EnemyWeaponKind.ComponentBurst => Loc.T("enemy.weapon.componentBurst"),
         _                              => w.ToString(),
     };
 
     static string MovementLabel(EnemyMovementKind m) => m switch
     {
-        EnemyMovementKind.Charge     => "Yörünge",
-        EnemyMovementKind.HoverFire  => "Uzaktan döver",
-        EnemyMovementKind.Approach   => "Yaklaşır, burst atar",
-        EnemyMovementKind.Strafe     => "Dalar geçer",
-        EnemyMovementKind.Stationary => "Sabit",
-        EnemyMovementKind.BombRun    => "Bomba koşusu",
-        EnemyMovementKind.AttackRun  => "Saldırı sortisi",
+        EnemyMovementKind.Charge     => Loc.T("enemy.move.charge"),
+        EnemyMovementKind.HoverFire  => Loc.T("enemy.move.hoverFire"),
+        EnemyMovementKind.Approach   => Loc.T("enemy.move.approach"),
+        EnemyMovementKind.Strafe     => Loc.T("enemy.move.strafe"),
+        EnemyMovementKind.Stationary => Loc.T("enemy.move.stationary"),
+        EnemyMovementKind.BombRun    => Loc.T("enemy.move.bombRun"),
+        EnemyMovementKind.AttackRun  => Loc.T("enemy.move.attackRun"),
         _                            => m.ToString(),
     };
 
     static string WeaponTypeLabel(WeaponType w) => w switch
     {
-        WeaponType.Kinetic => "Kinetik",
-        WeaponType.Laser   => "Lazer",
-        WeaponType.Plasma  => "Plazma",
+        WeaponType.Kinetic => Loc.T("weapon.kinetic"),
+        WeaponType.Laser   => Loc.T("weapon.laser"),
+        WeaponType.Plasma  => Loc.T("weapon.plasma"),
         _                  => w.ToString(),
     };
 
@@ -307,9 +308,10 @@ public class EnemyInfoHUD : MonoBehaviour
         _subtitle           = MakeText(_panel.transform, 20, FontStyle.Normal);
         _subtitle.color     = new Color(0.62f, 0.72f, 0.85f);
 
+        // Nesne adları çeviriye bağlı değil; başlık artık SetBar'a geçilir.
         (_hpFill,     _hpText,     _)          = MakeBar(_panel.transform, "HP");
-        (_shieldFill, _shieldText, _shieldRow) = MakeBar(_panel.transform, "KALKAN");
-        (_armorFill,  _armorText,  _)          = MakeBar(_panel.transform, "ZIRH");
+        (_shieldFill, _shieldText, _shieldRow) = MakeBar(_panel.transform, "Shield");
+        (_armorFill,  _armorText,  _)          = MakeBar(_panel.transform, "Armor");
 
         _body                    = MakeText(_panel.transform, 19, FontStyle.Normal);
         _body.color              = new Color(0.82f, 0.86f, 0.92f);
@@ -334,10 +336,13 @@ public class EnemyInfoHUD : MonoBehaviour
         return t;
     }
 
-    /// <summary>Zeminli, soldan dolan bar + üstüne binen sayısal etiket.</summary>
-    static (RectTransform fill, Text label, GameObject row) MakeBar(Transform parent, string caption)
+    /// <summary>
+    /// Zeminli, soldan dolan bar + üstüne binen sayısal etiket. <paramref name="id"/>
+    /// yalnızca nesne adıdır; ekranda görünen başlık SetBar'dan gelir.
+    /// </summary>
+    static (RectTransform fill, Text label, GameObject row) MakeBar(Transform parent, string id)
     {
-        var row = new GameObject(caption + "Bar", typeof(RectTransform));
+        var row = new GameObject(id + "Bar", typeof(RectTransform));
         row.transform.SetParent(parent, false);
         row.AddComponent<Image>().color = new Color(0.13f, 0.14f, 0.18f, 0.95f);
 
@@ -373,16 +378,17 @@ public class EnemyInfoHUD : MonoBehaviour
     }
 
     static void SetBar(RectTransform fill, Text label, float cur, float max,
-                       Color color, bool showMax = true)
+                       Color color, string caption, bool showMax = true)
     {
         float ratio = max > 0f ? Mathf.Clamp01(cur / max) : 0f;
         fill.anchorMax = new Vector2(ratio, 1f);
         fill.sizeDelta = Vector2.zero;
         fill.GetComponent<Image>().color = color;
 
-        string caption = fill.parent.name.Replace("Bar", "");
+        // Başlık eskiden nesne adından türetiliyordu; çeviri gelince nesne adı
+        // dile bağlı olurdu, o yüzden dışarıdan geçiliyor.
         label.text = showMax
-            ? $"{caption}  {cur:0} / {max:0}"
-            : $"{caption}  {cur:0.#}";
+            ? $"{caption}  {cur.ToString("0", Loc.Culture)} / {max.ToString("0", Loc.Culture)}"
+            : $"{caption}  {cur.ToString("0.#", Loc.Culture)}";
     }
 }

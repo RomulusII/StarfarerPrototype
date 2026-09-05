@@ -14,6 +14,9 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "ComponentDef", menuName = "Starfarer/ComponentDefinition")]
 public class ComponentDefinition : ScriptableObject
 {
+    [Tooltip("Metin tablosu anahtarı (component.*), ekrana yazılacak ad değil. " +
+             "Görünen ad ComponentCatalog.DisplayName'den gelir; telemetri ve " +
+             "nesne adları anahtarı kullanarak dilden bağımsız kalır.")]
     public string componentName;
     public ComponentType componentType;
     public ResourceType costResource;

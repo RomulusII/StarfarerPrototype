@@ -17,6 +17,9 @@ public struct DamageModifier
 public class EnemyTypeData : ScriptableObject
 {
     [Header("Kimlik")]
+    [Tooltip("Metin tablosu anahtarı (enemy.type.*), ekrana yazılacak ad değil. " +
+             "Tipler statik olarak bir kez kurulur; çevrilmiş ad yazılsaydı dil " +
+             "değişince eski dilde donardı. Ekrana yazan yer Loc.T ile çözer.")]
     public string      displayName;
     public EnemyRole   role;
     public int         threatScore = 1;
@@ -228,7 +231,7 @@ public class EnemyTypeData : ScriptableObject
     {
         var d = CreateInstance<EnemyTypeData>();
         d.name          = "Swarm";
-        d.displayName   = "Swarm";
+        d.displayName   = "enemy.type.swarm";
         d.role          = EnemyRole.Vanguard;
         d.threatScore   = 1;
         d.maxHP         = 20f;
@@ -258,7 +261,7 @@ public class EnemyTypeData : ScriptableObject
     {
         var d = CreateInstance<EnemyTypeData>();
         d.name          = "Armored";
-        d.displayName   = "Armored";
+        d.displayName   = "enemy.type.armored";
         d.role          = EnemyRole.Rear;
         // Tehdit 4 → 9 (bkz. CLAUDE.md "Tehdit Puanı — Formül"). Eski değer HAM
         // HP'ye bakılarak konmuştu (80 = 4× Swarm) ve geminin bütün kimliğini,
@@ -291,7 +294,7 @@ public class EnemyTypeData : ScriptableObject
     {
         var d = CreateInstance<EnemyTypeData>();
         d.name          = "Shield";
-        d.displayName   = "Shield";
+        d.displayName   = "enemy.type.shield";
         d.role          = EnemyRole.Center;
         d.threatScore   = 7;
         d.maxHP         = 50f;  d.maxShield     = 40f;
@@ -319,7 +322,7 @@ public class EnemyTypeData : ScriptableObject
     {
         var d = CreateInstance<EnemyTypeData>();
         d.name          = "Bomber";
-        d.displayName   = "Bomber";
+        d.displayName   = "enemy.type.bomber";
         d.role          = EnemyRole.Flank;
         d.threatScore   = 6;
         d.maxHP         = 10f;
@@ -345,7 +348,7 @@ public class EnemyTypeData : ScriptableObject
     {
         var d = CreateInstance<EnemyTypeData>();
         d.name          = "Interceptor";
-        d.displayName   = "Avcı";
+        d.displayName   = "enemy.type.interceptor";
         d.role          = EnemyRole.Vanguard;
         d.threatScore   = 4;
         d.maxHP         = 25f;
@@ -370,7 +373,7 @@ public class EnemyTypeData : ScriptableObject
     {
         var d = CreateInstance<EnemyTypeData>();
         d.name          = "Artillery";
-        d.displayName   = "Obüs";
+        d.displayName   = "enemy.type.artillery";
         d.role          = EnemyRole.Rear;
         d.threatScore   = 10;
         d.maxHP         = 60f;
@@ -396,7 +399,7 @@ public class EnemyTypeData : ScriptableObject
     {
         var d = CreateInstance<EnemyTypeData>();
         d.name          = "Jammer";
-        d.displayName   = "Karıştırıcı";
+        d.displayName   = "enemy.type.jammer";
         d.role          = EnemyRole.Center;
         d.threatScore   = 10;
         d.maxHP         = 55f;  d.maxShield     = 30f;
@@ -427,7 +430,7 @@ public class EnemyTypeData : ScriptableObject
     {
         var d = CreateInstance<EnemyTypeData>();
         d.name          = "Phantom";
-        d.displayName   = "Hayalet";
+        d.displayName   = "enemy.type.phantom";
         d.role          = EnemyRole.Flank;
         d.threatScore   = 8;
         d.maxHP         = 45f;
@@ -452,7 +455,7 @@ public class EnemyTypeData : ScriptableObject
     {
         var d = CreateInstance<EnemyTypeData>();
         d.name          = "Regenerator";
-        d.displayName   = "Onarıcı";
+        d.displayName   = "enemy.type.regenerator";
         d.role          = EnemyRole.Rear;
         d.threatScore   = 11;
         d.maxHP         = 90f;
@@ -480,7 +483,7 @@ public class EnemyTypeData : ScriptableObject
     {
         var d = CreateInstance<EnemyTypeData>();
         d.name          = "Leech";
-        d.displayName   = "Sülük";
+        d.displayName   = "enemy.type.leech";
         d.role          = EnemyRole.Flank;
         d.threatScore   = 7;
         d.maxHP         = 30f;
@@ -516,7 +519,7 @@ public class EnemyTypeData : ScriptableObject
     {
         var d = CreateInstance<EnemyTypeData>();
         d.name          = "Barrier";
-        d.displayName   = "Bariyer";
+        d.displayName   = "enemy.type.barrier";
         d.role          = EnemyRole.Barrier;
         // Tehdit 8'di ve bir DALGANIN bütçesi 8'e ulaşana kadar hiç seçilemiyordu:
         // gerçek ilk çıkışı ~level 40'tı. 3'e indi — refakat kuralı yüzünden
@@ -563,7 +566,7 @@ public class EnemyTypeData : ScriptableObject
     {
         var d = CreateInstance<EnemyTypeData>();
         d.name          = "Splitter";
-        d.displayName   = "Bölünen";
+        d.displayName   = "enemy.type.splitter";
         d.role          = EnemyRole.Center;
         d.threatScore   = 8;
         d.maxHP         = 70f;
@@ -589,7 +592,7 @@ public class EnemyTypeData : ScriptableObject
     {
         var d = CreateInstance<EnemyTypeData>();
         d.name          = "Juggernaut";
-        d.displayName   = "Kaleci";
+        d.displayName   = "enemy.type.juggernaut";
         d.role          = EnemyRole.Center;
         d.threatScore   = 27;
         d.maxHP         = 200f;
@@ -619,7 +622,7 @@ public class EnemyTypeData : ScriptableObject
     {
         var d = CreateInstance<EnemyTypeData>();
         d.name          = "BombRunner";
-        d.displayName   = "Bomb Runner";
+        d.displayName   = "enemy.type.bombRunner";
         d.role          = EnemyRole.Flank;
         d.threatScore   = 13;
         d.maxHP         = 35f;

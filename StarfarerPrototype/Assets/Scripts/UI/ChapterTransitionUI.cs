@@ -145,7 +145,7 @@ public class ChapterTransitionUI : MonoBehaviour
     public void ShowCredits()
     {
         // Placeholder — tüm bölümler bitti
-        StartCoroutine(RunSimpleText("Tebrikler!", "Tüm sektörler temizlendi.", null));
+        StartCoroutine(RunSimpleText(Loc.T("credits.title"), Loc.T("credits.body"), null));
     }
 
     // ── Coroutine akışı ───────────────────────────────────────────────────────
@@ -160,7 +160,8 @@ public class ChapterTransitionUI : MonoBehaviour
         }
 
         // 2. Başlık + hikaye
-        yield return StartCoroutine(RunSimpleText(chapter.chapterTitle, chapter.storyText, null));
+        yield return StartCoroutine(RunSimpleText(Loc.T(chapter.chapterTitle),
+                                                  Loc.T(chapter.storyText), null));
 
         // 3. Callback
         _onComplete?.Invoke();
@@ -247,9 +248,9 @@ public class ChapterTransitionUI : MonoBehaviour
 
     static string SpeakerName(CrewMember m) => m switch
     {
-        CrewMember.Captain  => "Kaptan",
-        CrewMember.Engineer => "Mühendis",
-        CrewMember.Pilot    => "Pilot",
+        CrewMember.Captain  => Loc.T("crew.captain"),
+        CrewMember.Engineer => Loc.T("crew.engineer"),
+        CrewMember.Pilot    => Loc.T("crew.pilot"),
         _                   => "?",
     };
 

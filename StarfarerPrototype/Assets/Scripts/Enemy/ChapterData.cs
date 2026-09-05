@@ -16,7 +16,9 @@ public class ChapterData : ScriptableObject
 {
     [Header("Kimlik")]
     public int    chapterNumber;
+    [Tooltip("Metin tablosu anahtarı (chapter.N.title), ekrana yazılacak başlık değil.")]
     public string chapterTitle;
+    [Tooltip("Metin tablosu anahtarı (chapter.N.story).")]
     [TextArea(2, 5)]
     public string storyText;
 
@@ -64,63 +66,52 @@ public class ChapterData : ScriptableObject
 
         return new[]
         {
-            Make(1, "Sektör 1: İlk Temas",
-                "Araştırma gemimiz sistemleri yeni aktive etti. İlk botlar yaklaşıyor.",
+            Make(1,
                 introduced: swarm,
                 pool: new[] { swarm },
                 asteroids: 2),
 
-            Make(2, "Sektör 2: Devriye Hattı",
-                "Zırhlı birimler tespit edildi. Raylı toplar bu gövdeleri delmiyor.",
+            Make(2,
                 introduced: armored,
                 pool: new[] { swarm, armored, barrier },
                 asteroids: 2),
 
-            Make(3, "Sektör 3: Kalkan Duvarı",
-                "Enerji kalkanıyla donatılmış yeni bir varyant. Lazer kalkanda eriyor.",
+            Make(3,
                 introduced: shield,
                 pool: new[] { swarm, armored, shield, barrier },
                 asteroids: 3),
 
-            Make(4, "Sektör 4: Bomba Yağmuru",
-                "Yakın mesafe bombardımanı. Komponentleriniz doğrudan hedef alınıyor — " +
-                "Point Defence artık lüks değil.",
+            Make(4,
                 introduced: bomber,
                 pool: new[] { swarm, armored, shield, barrier, bomber, bombRunner },
                 asteroids: 3),
 
-            Make(5, "Sektör 5: Avcı Sürüsü",
-                "Küçük, hızlı, kaçamak. Turretleriniz nişan alamıyor.",
+            Make(5,
                 introduced: interceptor,
                 pool: new[] { swarm, armored, shield, barrier, bomber, interceptor },
                 asteroids: 3),
 
-            Make(6, "Sektör 6: Uzun Menzil",
-                "Menzil dışından dövülüyoruz. Beklemek ölüm, ilerlemek şart.",
+            Make(6,
                 introduced: artillery,
                 pool: new[] { swarm, armored, shield, barrier, interceptor, artillery },
                 asteroids: 4),
 
-            Make(7, "Sektör 7: Karartma",
-                "Sinyal karışıyor, reaktör düşüyor. Bazı gemiler hiç vurulmuyor.",
+            Make(7,
                 introduced: jammer,
                 pool: new[] { swarm, armored, interceptor, artillery, jammer, phantom },
                 asteroids: 4),
 
-            Make(8, "Sektör 8: Onarım Kovanı",
-                "Vurduğunuz her şey geri geliyor. Yetersiz hasar, hiç hasar demek.",
+            Make(8,
                 introduced: regenerator,
                 pool: new[] { swarm, armored, shield, barrier, interceptor, jammer, regenerator, leech },
                 asteroids: 4),
 
-            Make(9, "Sektör 9: Bölünen Sürü",
-                "Öldürdükçe çoğalıyorlar. Tek hedefe odaklanmak artık işe yaramıyor.",
+            Make(9,
                 introduced: splitter,
                 pool: new[] { swarm, armored, interceptor, artillery, phantom, regenerator, splitter },
                 asteroids: 4),
 
-            Make(10, "Sektör 10: Kovan Zihni",
-                "Sinyalin kaynağı. Bütün bu tasarımlar tek bir yerden çıkıyordu.",
+            Make(10,
                 introduced: juggernaut,
                 pool: new[] { armored, shield, barrier, interceptor, artillery, jammer,
                               phantom, regenerator, splitter, juggernaut },
@@ -128,13 +119,19 @@ public class ChapterData : ScriptableObject
         };
     }
 
-    static ChapterData Make(int number, string title, string story,
+    /// <summary>
+    /// Başlık ve hikaye metni bölüm numarasından türeyen tablo anahtarlarıdır
+    /// (<c>chapter.N.title</c> / <c>chapter.N.story</c>); metinler
+    /// Resources/Locale/strings.txt'te durur. Burada tutulsalardı bölümler
+    /// statik olarak bir kez kurulduğu için dil değişimini göremezlerdi.
+    /// </summary>
+    static ChapterData Make(int number,
         EnemyTypeData introduced, EnemyTypeData[] pool, int asteroids)
     {
         var c = CreateInstance<ChapterData>();
         c.chapterNumber        = number;
-        c.chapterTitle         = title;
-        c.storyText            = story;
+        c.chapterTitle         = $"chapter.{number}.title";
+        c.storyText            = $"chapter.{number}.story";
         c.introducedType       = introduced;
         c.enemyPool            = pool;
         c.boss                 = BossShipData.CreateForChapter(number);

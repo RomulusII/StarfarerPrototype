@@ -42,12 +42,16 @@ public static class TurretSpecHelper
         _                             => TurretBaseType.Kinetic,
     };
 
+    /// <summary>
+    /// Anahtarlar ComponentCatalog'daki turret tanımlarıyla AYNIDIR; iki yer
+    /// aynı metni göstermeli.
+    /// </summary>
     public static string GetBaseTypeName(TurretBaseType bt) => bt switch
     {
-        TurretBaseType.Kinetic => "Raylı Turret",
-        TurretBaseType.Energy  => "Enerji Turret",
-        TurretBaseType.Missile => "Füze Turret",
-        _                      => "Turret",
+        TurretBaseType.Kinetic => Loc.T("component.turret.kinetic"),
+        TurretBaseType.Energy  => Loc.T("component.turret.energy"),
+        TurretBaseType.Missile => Loc.T("component.turret.missile"),
+        _                      => Loc.T("component.turret.fallback"),
     };
 
     public static string GetSpecName(TurretSpecType spec) => spec switch

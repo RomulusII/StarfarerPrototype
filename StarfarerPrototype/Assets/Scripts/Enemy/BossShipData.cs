@@ -57,6 +57,8 @@ public struct BossPhase
 public class BossShipData : ScriptableObject
 {
     [Header("Kimlik")]
+    [Tooltip("Metin tablosu anahtarı (boss.type.*), ekrana yazılacak ad değil — " +
+             "bkz. EnemyTypeData.displayName.")]
     public string displayName;
     public int    threatScore = 20;
 
@@ -125,13 +127,13 @@ public class BossShipData : ScriptableObject
         switch (chapter)
         {
             case 1:
-                b.name = "Sentinel";       b.displayName = "Nöbetçi";
+                b.name = "Sentinel";       b.displayName = "boss.type.sentinel";
                 b.bodyColor = new Color(0.30f, 0.32f, 0.36f);
                 b.hardpoints = Cannons(hpN, hpHP, dmg: 18f, rate: 5f, speed: 2.5f);
                 break;
 
             case 2:
-                b.name = "PatrolLeader";   b.displayName = "Devriye Lideri";
+                b.name = "PatrolLeader";   b.displayName = "boss.type.patrolLeader";
                 b.bodyColor = new Color(0.42f, 0.45f, 0.50f);
                 b.hardpoints = Combine(
                     Cannons(hpN - 1, hpHP, 20f, 5f, 2.5f),
@@ -139,7 +141,7 @@ public class BossShipData : ScriptableObject
                 break;
 
             case 3:
-                b.name = "ShieldMatrix";   b.displayName = "Kalkan Matriksi";
+                b.name = "ShieldMatrix";   b.displayName = "boss.type.shieldMatrix";
                 b.bodyColor = new Color(0.25f, 0.35f, 0.85f);
                 // Kalkan jeneratörü yaşadığı sürece gövde vurulamaz
                 b.hardpoints = Combine(
@@ -148,7 +150,7 @@ public class BossShipData : ScriptableObject
                 break;
 
             case 4:
-                b.name = "BombPlatform";   b.displayName = "Bombardıman Platformu";
+                b.name = "BombPlatform";   b.displayName = "boss.type.bombPlatform";
                 b.bodyColor = new Color(0.85f, 0.45f, 0.05f);
                 b.hardpoints = Combine(
                     Cannons(hpN - 1, hpHP, 24f, 4f, 2.2f),
@@ -156,14 +158,14 @@ public class BossShipData : ScriptableObject
                 break;
 
             case 5:
-                b.name = "ArmoredKeep";    b.displayName = "Zırhlı Kale";
+                b.name = "ArmoredKeep";    b.displayName = "boss.type.armoredKeep";
                 b.bodyColor = new Color(0.34f, 0.30f, 0.26f);
                 b.armor     = 12f;   // ilk gerçek zırh duvarı
                 b.hardpoints = Cannons(hpN, hpHP, 26f, 4.5f, 2.4f);
                 break;
 
             case 6:
-                b.name = "HowitzerLine";   b.displayName = "Obüs Hattı";
+                b.name = "HowitzerLine";   b.displayName = "boss.type.howitzerLine";
                 b.bodyColor = new Color(0.35f, 0.42f, 0.30f);
                 b.armor     = 6f;
                 b.preferredX = 11f;  // menzil dışından döver, oyuncu yaklaşmalı
@@ -171,7 +173,7 @@ public class BossShipData : ScriptableObject
                 break;
 
             case 7:
-                b.name = "Disruptor";      b.displayName = "Karıştırıcı";
+                b.name = "Disruptor";      b.displayName = "boss.type.disruptor";
                 b.bodyColor = new Color(0.55f, 0.25f, 0.75f);
                 b.armor     = 8f;
                 // Jammer droneları enerji üretimini kısar — bütçe sınavı
@@ -181,7 +183,7 @@ public class BossShipData : ScriptableObject
                 break;
 
             case 8:
-                b.name = "HiveMother";     b.displayName = "Kovan Anası";
+                b.name = "HiveMother";     b.displayName = "boss.type.hiveMother";
                 b.bodyColor = new Color(0.25f, 0.70f, 0.40f);
                 b.armor     = 10f;
                 // Onarım yatağı hardpoint'leri geri getirir — DPS eşiği sınavı
@@ -192,7 +194,7 @@ public class BossShipData : ScriptableObject
                 break;
 
             case 9:
-                b.name = "Dreadnought";    b.displayName = "Dreadnought";
+                b.name = "Dreadnought";    b.displayName = "boss.type.dreadnought";
                 b.bodyColor = new Color(0.28f, 0.24f, 0.32f);
                 b.armor     = 14f;
                 // ChapterManager bu bölümde İKİ tane spawn eder — hedef bölme sınavı
@@ -202,7 +204,7 @@ public class BossShipData : ScriptableObject
                 break;
 
             default:
-                b.name = "HiveMind";       b.displayName = "Kovan Zihni";
+                b.name = "HiveMind";       b.displayName = "boss.type.hiveMind";
                 b.bodyColor = new Color(0.55f, 0.10f, 0.18f);
                 b.armor     = curve.maxArmor;   // 20 — her mekanik burada toplanır
                 b.hardpoints = Combine(
@@ -327,7 +329,7 @@ public class BossShipData : ScriptableObject
 
         var b = CreateInstance<BossShipData>();
         b.name        = "CarrierCommand";
-        b.displayName = "Komuta Taşıyıcısı";
+        b.displayName = "boss.type.carrierCommand";
         b.threatScore = 20;
         b.maxHP       = 800f;
         b.mass        = 20f; b.enginePower = 8f;

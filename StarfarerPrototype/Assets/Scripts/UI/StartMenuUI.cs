@@ -29,6 +29,7 @@ public class StartMenuUI : MonoBehaviour
     public static bool IsOpen { get; private set; }
 
     Action<GameMode> _onStart;
+    GameObject       _canvasGO;
     GameObject       _panel;
     Button           _easyBtn, _normalBtn, _hardBtn;
     Text             _levelText;
@@ -44,6 +45,13 @@ public class StartMenuUI : MonoBehaviour
         var menu = go.AddComponent<StartMenuUI>();
         menu._onStart = onStart;
         menu.Build();
+
+        // Menü açıkken oyun ilerlemesin. Projedeki pause protokolü SpeedController'da;
+        // timeScale'i doğrudan ezmek hız sistemiyle çakışır.
+        IsOpen = true;
+        if (SpeedController.Instance != null) SpeedController.Instance.Pause();
+        else                                  Time.timeScale = 0f;
+
         return menu;
     }
 
@@ -51,21 +59,21 @@ public class StartMenuUI : MonoBehaviour
 
     void Build()
     {
-        var canvasGO = new GameObject("StartMenuCanvas");
-        canvasGO.transform.SetParent(transform, false);
+        _canvasGO = new GameObject("StartMenuCanvas");
+        _canvasGO.transform.SetParent(transform, false);
 
-        var canvas       = canvasGO.AddComponent<Canvas>();
+        var canvas       = _canvasGO.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 200;   // her şeyin üstünde
 
-        var scaler = canvasGO.AddComponent<CanvasScaler>();
+        var scaler = _canvasGO.AddComponent<CanvasScaler>();
         scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
 
-        canvasGO.AddComponent<GraphicRaycaster>();
+        _canvasGO.AddComponent<GraphicRaycaster>();
 
         _panel = new GameObject("Panel");
-        _panel.transform.SetParent(canvasGO.transform, false);
+        _panel.transform.SetParent(_canvasGO.transform, false);
 
         var bg = _panel.AddComponent<Image>();
         bg.color = new Color(0.02f, 0.03f, 0.06f, 0.96f);
@@ -76,16 +84,19 @@ public class StartMenuUI : MonoBehaviour
         pr.offsetMin = Vector2.zero;
         pr.offsetMax = Vector2.zero;
 
+        BuildLanguageButtons();
+
+        // Oyunun adı çevrilmez.
         MakeText(_panel.transform, "Title", "STARFARER", 96,
                  new Color(0.85f, 0.92f, 1f),
                  new Vector2(0f, 0.74f), new Vector2(1f, 0.90f));
 
         MakeText(_panel.transform, "Subtitle",
-                 "Oort bulutu — Dünya'ya 1 ışık yılı", 24,
+                 Loc.T("menu.subtitle"), 24,
                  new Color(0.45f, 0.50f, 0.60f),
                  new Vector2(0f, 0.67f), new Vector2(1f, 0.73f));
 
-        MakeText(_panel.transform, "DifficultyLabel", "ZORLUK", 22,
+        MakeText(_panel.transform, "DifficultyLabel", Loc.T("menu.difficulty"), 22,
                  new Color(0.55f, 0.55f, 0.60f),
                  new Vector2(0f, 0.58f), new Vector2(1f, 0.63f));
 
@@ -93,7 +104,7 @@ public class StartMenuUI : MonoBehaviour
 
         BuildLevelSelect();
 
-        MakeButton("StartButton", "BAŞLA", 32,
+        MakeButton("StartButton", Loc.T("menu.start"), 32,
                    new Color(0.13f, 0.42f, 0.22f),
                    new Vector2(0.34f, 0.25f), new Vector2(0.66f, 0.33f),
                    () => Choose(GameMode.Campaign));
@@ -101,38 +112,52 @@ public class StartMenuUI : MonoBehaviour
         // Kayıt varsa devam etmek asıl akıştır; yeni başlamak kaydı siler
         if (SaveSystem.HasSave)
         {
-            MakeButton("ContinueButton", $"DEVAM ET  (Level {SaveSystem.SavedLevel})", 24,
+            MakeButton("ContinueButton", Loc.T("menu.continue", SaveSystem.SavedLevel), 24,
                        new Color(0.15f, 0.28f, 0.45f),
                        new Vector2(0.34f, 0.17f), new Vector2(0.66f, 0.24f),
                        () => Choose(GameMode.Continue));
         }
 
-        MakeButton("FreePlayButton", "SERBEST MOD", 22,
+        MakeButton("FreePlayButton", Loc.T("menu.freeplay"), 22,
                    new Color(0.28f, 0.24f, 0.12f),
                    new Vector2(0.38f, 0.09f), new Vector2(0.62f, 0.15f),
                    () => Choose(GameMode.FreePlay));
 
         MakeText(_panel.transform, "FreePlayHint",
-                 "Serbest mod: bölüm sistemi olmadan sürekli düşman akışı — test içindir",
+                 Loc.T("menu.freeplay.hint"),
                  17, new Color(0.40f, 0.42f, 0.48f),
                  new Vector2(0f, 0.04f), new Vector2(1f, 0.08f));
 
         RefreshDifficultyButtons();
+    }
 
-        // Menü açıkken oyun ilerlemesin. Projedeki pause protokolü SpeedController'da;
-        // timeScale'i doğrudan ezmek hız sistemiyle çakışır.
-        IsOpen = true;
-        if (SpeedController.Instance != null) SpeedController.Instance.Pause();
-        else                                  Time.timeScale = 0f;
+    /// <summary>
+    /// Dil seçimi sağ üst köşede durur — dikey yığının dışında olduğu için
+    /// "Devam Et" ve level seçimi gibi koşullu satırlar geldiğinde kaymaz.
+    /// Düğmeler dil adlarını kendi dillerinde yazar, o yüzden çevrilmezler.
+    /// </summary>
+    void BuildLanguageButtons()
+    {
+        float[] xMin = { 0.700f, 0.795f, 0.890f };
+        float[] xMax = { 0.790f, 0.885f, 0.980f };
+
+        for (int i = 0; i < Loc.All.Length && i < xMin.Length; i++)
+        {
+            var lang = Loc.All[i];
+            MakeButton($"Lang_{lang}", Loc.NameOf(lang), 18,
+                       lang == Loc.Language ? Selected : Unselected,
+                       new Vector2(xMin[i], 0.92f), new Vector2(xMax[i], 0.97f),
+                       () => SelectLanguage(lang));
+        }
     }
 
     void BuildDifficultyButtons()
     {
         var defs = new[]
         {
-            (label: "KOLAY",  diff: Difficulty.Easy),
-            (label: "NORMAL", diff: Difficulty.Normal),
-            (label: "ZOR",    diff: Difficulty.Hard),
+            (name: "Easy",   label: Loc.T("menu.difficulty.easy"),   diff: Difficulty.Easy),
+            (name: "Normal", label: Loc.T("menu.difficulty.normal"), diff: Difficulty.Normal),
+            (name: "Hard",   label: Loc.T("menu.difficulty.hard"),   diff: Difficulty.Hard),
         };
 
         float[] xMin = { 0.34f, 0.44f, 0.54f };
@@ -141,7 +166,8 @@ public class StartMenuUI : MonoBehaviour
         for (int i = 0; i < defs.Length; i++)
         {
             var d   = defs[i];
-            var btn = MakeButton($"Diff_{d.label}", d.label, 22, Unselected,
+            // Nesne adı çeviriye bağlı olmamalı; hiyerarşi dilden dile değişmez.
+            var btn = MakeButton($"Diff_{d.name}", d.label, 22, Unselected,
                                  new Vector2(xMin[i], 0.49f), new Vector2(xMax[i], 0.56f),
                                  () => SelectDifficulty(d.diff));
 
@@ -162,7 +188,7 @@ public class StartMenuUI : MonoBehaviour
         int maxLevel = SaveSystem.MaxReachedLevel;
         if (maxLevel <= 1) return;   // henüz seçilecek bir şey yok
 
-        MakeText(_panel.transform, "LevelLabel", "BAŞLANGIÇ LEVELİ", 20,
+        MakeText(_panel.transform, "LevelLabel", Loc.T("menu.startLevel"), 20,
                  new Color(0.55f, 0.55f, 0.60f),
                  new Vector2(0f, 0.42f), new Vector2(1f, 0.47f));
 
@@ -193,10 +219,37 @@ public class StartMenuUI : MonoBehaviour
     {
         if (_levelText == null) return;
         int chapter = GameProgress.ChapterOf(_startLevel);
-        _levelText.text = $"Level {_startLevel}  ·  Bölüm {chapter}";
+        _levelText.text = Loc.T("menu.levelValue", _startLevel, chapter);
     }
 
     // ── Etkileşim ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Dil değişince menü baştan kurulur. Metinleri tek tek güncellemek yerine
+    /// bu tercih edildi: menü zaten koddan kuruluyor ve oyun henüz başlamadı,
+    /// yani yeniden kurmanın görünür bir maliyeti yok.
+    ///
+    /// Menü dışındaki UI'lar bu yolu izleyemez: GameManager onları menüden ÖNCE
+    /// kurar (BuildBoostHUD, BuildUpgradeUI …), yani dil değiştiğinde çoktan
+    /// ekranda dururlar. Onlar <see cref="Loc.OnLanguageChanged"/>'a abone olup
+    /// kendi metinlerini tazeler.
+    /// </summary>
+    void SelectLanguage(Lang lang)
+    {
+        if (Loc.Language == lang) return;
+
+        Loc.Language = lang;
+
+        // Destroy kare sonunda işler; eski canvas bir kare boyunca yenisiyle
+        // üst üste çizilip tıklama yakalamasın diye önce kapatılır.
+        if (_canvasGO != null)
+        {
+            _canvasGO.SetActive(false);
+            Destroy(_canvasGO);
+        }
+
+        Build();
+    }
 
     void SelectDifficulty(Difficulty d)
     {

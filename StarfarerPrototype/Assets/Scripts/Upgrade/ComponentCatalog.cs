@@ -87,16 +87,16 @@ public static class ComponentCatalog
     /// </summary>
     public static (string key, string label)[] StatTracks(ComponentType type) => type switch
     {
-        ComponentType.Generator  => new[] { (GeneratorComponent.ProductionKey, "Üretim"),
-                                            (GeneratorComponent.CapacitorKey,  "Kapasitör") },
-        ComponentType.Shield     => new[] { ("rechargeRate", "Şarj Hızı"),
-                                            ("maxShield",    "Max Kalkan") },
-        ComponentType.RepairUnit => new[] { ("repairRate",       "Tamir Hızı"),
-                                            ("energyEfficiency", "Enerji Verimi"),
-                                            (RepairUnitComponent.ArmorKey, "Zırh") },
-        ComponentType.Storage    => new[] { (StorageComponent.CapacityKey, "Kapasite") },
-        ComponentType.Turret     => new[] { ("damage",   "Hasar"),
-                                            ("fireRate", "Ateş Hızı") },
+        ComponentType.Generator  => new[] { (GeneratorComponent.ProductionKey, Loc.T("stat.production")),
+                                            (GeneratorComponent.CapacitorKey,  Loc.T("stat.capacitor")) },
+        ComponentType.Shield     => new[] { ("rechargeRate", Loc.T("stat.rechargeRate")),
+                                            ("maxShield",    Loc.T("stat.maxShield")) },
+        ComponentType.RepairUnit => new[] { ("repairRate",       Loc.T("stat.repairRate")),
+                                            ("energyEfficiency", Loc.T("stat.energyEfficiency")),
+                                            (RepairUnitComponent.ArmorKey, Loc.T("stat.armor")) },
+        ComponentType.Storage    => new[] { (StorageComponent.CapacityKey, Loc.T("stat.capacity")) },
+        ComponentType.Turret     => new[] { ("damage",   Loc.T("stat.damage")),
+                                            ("fireRate", Loc.T("stat.fireRate")) },
         _                        => null,
     };
 
@@ -109,8 +109,8 @@ public static class ComponentCatalog
     /// </summary>
     public static (string key, string label)[] WeaponStatTracks(WeaponType type)
         => type == WeaponType.Laser
-            ? new[] { ("damage", "Hasar") }
-            : new[] { ("damage", "Hasar"), ("fireRate", "Ateş Hızı") };
+            ? new[] { ("damage", Loc.T("stat.damage")) }
+            : new[] { ("damage", Loc.T("stat.damage")), ("fireRate", Loc.T("stat.fireRate")) };
 
     /// <summary>
     /// Bir stat seviyesinin fiyatı. Taban komponentin kendi fiyatından türer;
@@ -133,7 +133,7 @@ public static class ComponentCatalog
         get
         {
             if (_shield != null) return _shield;
-            _shield = New("Kalkan Jeneratörü", ComponentType.Shield,
+            _shield = New("component.shield", ComponentType.Shield,
                           ResourceType.EnergyCrystal, cost: 45, sell: 18);
             _shield.maxShield      = 100f;
             _shield.rechargeRate   = 1.8f;
@@ -151,7 +151,7 @@ public static class ComponentCatalog
         get
         {
             if (_generator != null) return _generator;
-            _generator = New("Enerji Jeneratörü", ComponentType.Generator,
+            _generator = New("component.generator", ComponentType.Generator,
                              ResourceType.RawMaterial, cost: 65, sell: 28);
             _generator.productionAmount = 18f;
             _generator.baseEnergyCost   = 0f;   // üreticidir, tüketmez
@@ -168,7 +168,7 @@ public static class ComponentCatalog
         get
         {
             if (_repair != null) return _repair;
-            _repair = New("Onarım Birimi", ComponentType.RepairUnit,
+            _repair = New("component.repairUnit", ComponentType.RepairUnit,
                           ResourceType.RawMaterial, cost: 55, sell: 22);
             _repair.repairRate     = 4f;
             _repair.baseEnergyCost = 2.5f;
@@ -202,7 +202,7 @@ public static class ComponentCatalog
         get
         {
             if (_storage != null) return _storage;
-            _storage = New("Depo", ComponentType.Storage,
+            _storage = New("component.storage", ComponentType.Storage,
                            ResourceType.RawMaterial, cost: 50, sell: 20);
             _storage.storageMetal   = 900f;
             _storage.storageCrystal = 350f;
@@ -220,7 +220,7 @@ public static class ComponentCatalog
         get
         {
             if (_hangar != null) return _hangar;
-            _hangar = New("Hangar", ComponentType.Hangar, ResourceType.RawMaterial,
+            _hangar = New("component.hangar", ComponentType.Hangar, ResourceType.RawMaterial,
                           cost: 20, sell: 8);
             _hangar.baseEnergyCost = 1.5f;
             return _hangar;
@@ -248,15 +248,15 @@ public static class ComponentCatalog
     static ComponentDefinition _tKinetic, _tEnergy, _tMissile;
 
     public static ComponentDefinition TurretKinetic => _tKinetic ??= TurretBase(
-        "Raylı Turret", TurretBaseType.Kinetic, cost: 22,
+        "component.turret.kinetic", TurretBaseType.Kinetic, cost: 22,
         fireRate: 2f, damage: 12f, speed: 6f, life: 4.5f, energy: 0.5f);   // menzil 27 sabit
 
     public static ComponentDefinition TurretEnergy => _tEnergy ??= TurretBase(
-        "Enerji Turret", TurretBaseType.Energy, cost: 22,
+        "component.turret.energy", TurretBaseType.Energy, cost: 22,
         fireRate: 3f, damage: 18f, speed: 6f, life: 9.33f, energy: 3f);    // menzil 56 sabit
 
     public static ComponentDefinition TurretMissile => _tMissile ??= TurretBase(
-        "Füze Turret", TurretBaseType.Missile, cost: 28,
+        "component.turret.missile", TurretBaseType.Missile, cost: 28,
         fireRate: 10f, damage: 60f, speed: 5f, life: 7f, energy: 0.5f);    // menzil 35 sabit
 
     static ComponentDefinition TurretBase(string name, TurretBaseType bt, int cost,
@@ -325,7 +325,9 @@ public static class ComponentCatalog
         float fireRate, float damage, float speed, float life, float energy,
         int mag = 0, float reload = 0f, float burnDuration = 0f)
     {
-        var d = New($"{TurretSpecHelper.GetBaseTypeName(baseDef.turretBaseType)} — {TurretSpecHelper.GetSpecName(spec)}",
+        // Ad taban tipin anahtarından gelir; uzmanlaşma eki DisplayName'de
+        // turretSpecType'tan üretilir, yani burada birleşik bir metin doğmaz.
+        var d = New(baseDef.componentName,
                     ComponentType.Turret, baseDef.costResource, baseDef.cost, baseDef.sellValue);
         d.statCostBase         = baseDef.statCostBase;
         d.baseEnergyCost       = baseDef.baseEnergyCost;
@@ -378,17 +380,17 @@ public static class ComponentCatalog
         // Kinetik başlangıç silahı: bedava geldiği için kasten en zayıf taban.
         // dmg=10 @ 1.0s → 10 DPS. Hem hasar hem ateş hızı statı DPS'e çarpımsal
         // girdiği için stat yatırımını en çok ödüllendiren silah da budur.
-        _kinetic = MakeWeapon("Raylı Top", WeaponType.Kinetic, ResourceType.RawMaterial,
+        _kinetic = MakeWeapon("component.weapon.kinetic", WeaponType.Kinetic, ResourceType.RawMaterial,
                               cost: 12, sell: 5, dmg: 10f, rate: 1.00f);
 
         // Lazer — sürekli ışın: damage = DPS, fireRate KULLANILMAZ,
         // energy = enerji/saniye.
-        _laser = MakeWeapon("Lazer Topu", WeaponType.Laser, ResourceType.EnergyCrystal,
+        _laser = MakeWeapon("component.weapon.laser", WeaponType.Laser, ResourceType.EnergyCrystal,
                             cost: 35, sell: 15, dmg: 46f, rate: 0f, energy: 20f);
 
         // Plazma — şarj + bırak: fireRate = atış sonrası bekleme,
         // charge = tam şarj süresi.
-        _plasma = MakeWeapon("Plazma Topu", WeaponType.Plasma, ResourceType.RawMaterial,
+        _plasma = MakeWeapon("component.weapon.plasma", WeaponType.Plasma, ResourceType.RawMaterial,
                              cost: 38, sell: 15, dmg: 36f, rate: 1.2f, charge: 1.7f, burst: 0);
     }
 
@@ -450,13 +452,38 @@ public static class ComponentCatalog
         return null;
     }
 
+    // ── Ad ────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Bir tanımın ekranda görünen adı. <c>componentName</c> metin tablosu
+    /// anahtarıdır (bkz. <see cref="New"/>); uzmanlaşmış turretlerde adın
+    /// arkasına uzmanlaşma adı eklenir. Uzmanlaşma adları (Gatling, Railgun …)
+    /// her dilde aynı kalır — özel adlar.
+    /// </summary>
+    public static string DisplayName(ComponentDefinition def)
+    {
+        if (def == null) return "";
+
+        string baseName = Loc.T(def.componentName);
+        return def.turretSpecType != TurretSpecType.None
+             ? $"{baseName} — {TurretSpecHelper.GetSpecName(def.turretSpecType)}"
+             : baseName;
+    }
+
     // ── Ortak kurucu ──────────────────────────────────────────────────────────
 
-    static ComponentDefinition New(string name, ComponentType type,
+    /// <summary>
+    /// <paramref name="nameKey"/> ekranda görünen ad DEĞİL, metin tablosundaki
+    /// anahtardır. Katalog statiktir ve bir kez kurulur; içine çevrilmiş metin
+    /// yazılsaydı dil değiştiğinde eski dilde donup kalırdı. Ekrana yazan yer
+    /// <see cref="DisplayName"/>'i çağırır; telemetri ve nesne adları ise
+    /// anahtarı kullanarak dilden bağımsız kalır.
+    /// </summary>
+    static ComponentDefinition New(string nameKey, ComponentType type,
                                    ResourceType res, int cost, int sell)
     {
         var d = ScriptableObject.CreateInstance<ComponentDefinition>();
-        d.componentName = name;
+        d.componentName = nameKey;
         d.componentType = type;
         d.costResource  = res;
         d.cost          = cost;

@@ -112,7 +112,7 @@ public class ChapterManager : MonoBehaviour
         // level geçişi tamamen sessizdi ve 100 levellik kampanyada oyuncu
         // kaçıncı levelde olduğunu hiçbir yerden okuyamıyordu.
         LevelBannerUI.Show(level, GameProgress.CurrentChapter,
-                           chapter != null ? chapter.chapterTitle : null,
+                           chapter != null ? Loc.T(chapter.chapterTitle) : null,
                            GameProgress.IsBossLevel);
 
         _asteroids?.Configure(chapter.asteroidCount, chapter.asteroidInterval);

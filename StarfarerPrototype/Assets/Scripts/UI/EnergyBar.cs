@@ -17,6 +17,10 @@ public class EnergyBar : MonoBehaviour
     Text          _crystalText;
     Text          _warningText;
 
+    // Bar başlıkları her karede yazılıyor; sözlük araması kare başına üç kez
+    // olmasın diye önbelleklenir (bu dosyadaki uyarı maskesiyle aynı gerekçe).
+    string _energyLabel, _metalLabel, _crystalLabel;
+
     void Awake()
     {
         var canvas = gameObject.AddComponent<Canvas>();
@@ -45,6 +49,22 @@ public class EnergyBar : MonoBehaviour
             new Color(0.28f, 0.58f, 0.80f, 1.00f));
 
         _warningText = MakeWarningLine();
+
+        ApplyTexts();
+    }
+
+    void OnEnable()  => Loc.OnLanguageChanged += ApplyTexts;
+    void OnDisable() => Loc.OnLanguageChanged -= ApplyTexts;
+
+    void ApplyTexts()
+    {
+        _energyLabel  = Loc.T("hud.energy");
+        _metalLabel   = Loc.T("hud.metal");
+        _crystalLabel = Loc.T("hud.crystal");
+
+        // Uyarı metni maske değişmedikçe yeniden kurulmuyor; dil değiştiğinde
+        // maske aynı kalacağı için önbelleği elle geçersiz kılmak gerekir.
+        _warnMask = -1;
     }
 
     /// <summary>
@@ -131,12 +151,12 @@ public class EnergyBar : MonoBehaviour
             eCur = EnergyBus.Instance.currentEnergy;
             eMax = EnergyBus.Instance.maxEnergy;
         }
-        SetBar(_energyFill, _energyText, eCur, eMax, "ENERJİ");
+        SetBar(_energyFill, _energyText, eCur, eMax, _energyLabel);
 
         if (ResourceInventory.Instance != null)
         {
-            SetBar(_metalFill,   _metalText,   ResourceInventory.Instance.metal,   ResourceInventory.Instance.maxMetal,   "METAL");
-            SetBar(_crystalFill, _crystalText, ResourceInventory.Instance.crystal, ResourceInventory.Instance.maxCrystal, "KRİSTAL");
+            SetBar(_metalFill,   _metalText,   ResourceInventory.Instance.metal,   ResourceInventory.Instance.maxMetal,   _metalLabel);
+            SetBar(_crystalFill, _crystalText, ResourceInventory.Instance.crystal, ResourceInventory.Instance.maxCrystal, _crystalLabel);
         }
 
         UpdateWarnings(eCur, eMax);
@@ -217,12 +237,12 @@ public class EnergyBar : MonoBehaviour
         var sb = new System.Text.StringBuilder();
         void Add(string s) { if (sb.Length > 0) sb.Append("    "); sb.Append(s); }
 
-        if ((mask & WNoEnergy)    != 0) Add("NO ENERGY");
-        if ((mask & WLowEnergy)   != 0) Add("LOW ENERGY");
-        if ((mask & WMetalFull)   != 0) Add("METAL FULL");
-        if ((mask & WMetalNear)   != 0) Add("METAL NEARLY FULL");
-        if ((mask & WCrystalFull) != 0) Add("CRYSTAL FULL");
-        if ((mask & WCrystalNear) != 0) Add("CRYSTAL NEARLY FULL");
+        if ((mask & WNoEnergy)    != 0) Add(Loc.T("hud.warn.noEnergy"));
+        if ((mask & WLowEnergy)   != 0) Add(Loc.T("hud.warn.lowEnergy"));
+        if ((mask & WMetalFull)   != 0) Add(Loc.T("hud.warn.metalFull"));
+        if ((mask & WMetalNear)   != 0) Add(Loc.T("hud.warn.metalNear"));
+        if ((mask & WCrystalFull) != 0) Add(Loc.T("hud.warn.crystalFull"));
+        if ((mask & WCrystalNear) != 0) Add(Loc.T("hud.warn.crystalNear"));
 
         return sb.ToString();
     }
@@ -234,6 +254,6 @@ public class EnergyBar : MonoBehaviour
         aMax.x     = ratio;
         fill.anchorMax = aMax;
         fill.sizeDelta = Vector2.zero;
-        lbl.text = $"{name}   {cur:0} / {max:0}";
+        lbl.text = $"{name}   {cur.ToString("0", Loc.Culture)} / {max.ToString("0", Loc.Culture)}";
     }
 }
