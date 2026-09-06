@@ -109,3 +109,10 @@ StarfarerPrototype/.claude/worktrees/
 # Yeni bir makinede: Create > Starfarer > Upload Config, Assets/Resources/ altina.
 /StarfarerPrototype/Assets/Resources/UploadConfig.asset
 /StarfarerPrototype/Assets/Resources/UploadConfig.asset.meta
+
+# Dagitim yapilandirmasi - FTP PAROLASI icerir, repoya GIRMEMELI.
+# Ayni desen pull.config.json ile ayni: yapilandirma diskte, repo temiz.
+/StarfarerPrototype/Tools/Deploy/deploy.config.json
+
+# Dagitim build numarasi - makine durumu, uretilebilir
+/StarfarerPrototype/Tools/Deploy/build-number.txt
