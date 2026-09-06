@@ -54,11 +54,24 @@ public class EnemySpawner : MonoBehaviour
              "anı kısa olmalı, bekleme anı değil.")]
     public float openingInterval = 10f;
 
-    [Tooltip("Her dalga bir öncekinden bu kadar büyük. %10 BİLEŞİKTİR: 10. dalga " +
-             "2.4×, 20. dalga 6.1×, 30. dalga 15.9× bütçe taşır — yani 10 " +
-             "dakikalık bir koşu kampanyanın ucuna kadar tırmanır. Doğru oran " +
-             "ölçümle bulunacak; bu bir başlangıç tahmini.")]
-    public float waveBudgetGrowth = 1.10f;
+    [Tooltip("Kaç kaynak bir GÜÇ SEVİYESİ eder. Dalga bütçesi buradan " +
+             "türer: zorluk oyuncunun eline geçen kaynakla büyür.")]
+    public float resourcePerPower = 75f;
+
+    [Tooltip("Bütçe katsayısı — güç seviyesi başına dalga büyüklüğü.")]
+    public float budgetScale = 5f;
+
+    [Tooltip("Bütçe üssü. 1'İN ALTINDA OLMASI KASITLIDIR: oyuncunun geliri " +
+             "doğrusal artarken zorluk kök gibi artar, yani ilerledikçe pay " +
+             "AÇILIR. Zırh eşiği geride kalanı zaten ayrıca cezalandırıyor; " +
+             "marj oradaki cezanın karşılığıdır.")]
+    public float budgetExponent = 0.58f;
+
+    [Tooltip("Hiç kaynak toplamayan oyuncu için dakika başına zemin güç. " +
+             "SÜRÜCÜ DEĞİL ZEMİN: kaynak yolu bunu her zaman geçer. Sırf " +
+             "toplamayarak zorluğu dondurup sonsuza dek güvenli farm " +
+             "yapmayı engeller, o kadar.")]
+    public float idlePowerPerMinute = 0.2f;
 
     [Tooltip("Bütçe bunu aşınca dalgaya boss girebilir.")]
     public float bossMinBudget = 40f;
@@ -116,6 +129,9 @@ public class EnemySpawner : MonoBehaviour
     float[]         _defaultWeights;
     float           _timer;
 
+    /// <summary>Koşunun başından beri geçen süre — yalnızca zemin güç için.</summary>
+    float _runTime;
+
     bool  _freeRunning;
     int   _waveIndex;
     float _waveBudget;
@@ -153,6 +169,53 @@ public class EnemySpawner : MonoBehaviour
     /// <summary>Serbest modun anlık zorluk seviyesi — temizlenen tehditten türer.</summary>
     public float RampLevel =>
         threatPerRampLevel > 0.01f ? s_clearedThreat / threatPerRampLevel : 0f;
+
+    // ── Dalga BÜYÜKLÜĞÜ: TOPLANAN KAYNAK ─────────────────────────────────────
+    //
+    // Bütçe eskiden her dalgada %10 BİLEŞİK büyüyordu ve dalgalar sabit bir
+    // saatte geliyordu (waveInterval). Yani dakikada 3 dalga, 10 dakikada
+    // 1.10^30 ≈ 17× bütçe — oyuncu ne yaparsa yapsın. (Ölçülen 11×: aradaki
+    // farkı valfin geciktirdiği dalgalar kapatıyor.) Rampadan (düşman GÜCÜ)
+    // sökülen saat, bütçede (düşman SAYISI) duruyordu.
+    //
+    // Ölçüldü: dört serbest oturumda oyuncunun dakikada verdiği hasarın
+    // sahaya gelen HP'ye oranı 3.4'ten 0.77'ye düşüyor. 1.0'ın altı, geleni
+    // öldürmenin matematiksel olarak imkânsız olduğu yerdir — tarayıcıda 7.,
+    // PC'de 11. dakikada geliyordu.
+    //
+    // Ölçü neden ÖLDÜRÜLEN DÜŞMAN değil TOPLANAN KAYNAK: öldürme pozitif geri
+    // besleme yapar (büyük dalga → çok öldürme → daha büyük dalga) ve oyuncunun
+    // tercihi değildir, geleni öldürmek zorundadır. Kaynak ise oyuncunun güce
+    // çevirebildiği tek şeydir; zorluğu ona bağlamak zorluğu oyuncunun GÜÇ
+    // EĞRİSİNE bağlamaktır. Rampa (düşman gücü) bilerek temizlenen tehditte
+    // bırakıldı: iki kadranı aynı anda oynatmak, log'dan hangisinin işe
+    // yaradığını okumayı imkânsız kılardı.
+    static float s_collected;
+
+    /// <summary>Depoya GİREN kaynak (bkz. ResourceInventory.Add).</summary>
+    /// <remarks>
+    /// Tavana çarpıp yanan kısım sayılmaz: oyuncunun eline geçmeyen kaynak
+    /// güce dönüşmez, dolayısıyla zorluğu da ilerletmemeli.
+    /// </remarks>
+    public static void ReportCollected(float miktar)
+    {
+        if (miktar > 0f) s_collected += miktar;
+    }
+
+    /// <summary>Serbest modun güç seviyesi — toplanan kaynaktan türer.</summary>
+    public float PowerLevel
+    {
+        get
+        {
+            float kaynak = resourcePerPower > 0.01f ? s_collected / resourcePerPower : 0f;
+            float zemin  = idlePowerPerMinute * _runTime / 60f;
+            return Mathf.Max(kaynak, zemin);
+        }
+    }
+
+    /// <summary>Güç seviyesinin karşılığı olan dalga bütçesi.</summary>
+    public float BudgetFor(float power)
+        => 1f + budgetScale * Mathf.Pow(Mathf.Max(0f, power), budgetExponent);
 
     // ── Tek inşa yolu ─────────────────────────────────────────────────────────
 
@@ -280,6 +343,7 @@ public class EnemySpawner : MonoBehaviour
         if (UpgradeUI.IsPaused) return;
 
         _timer += Time.deltaTime;
+        _runTime += Time.deltaTime;
 
         // Sahne taraması KARE BAŞINA yapılmaz. FindObjectsByType bütün sahneyi
         // gezer; "saha temizlendi mi" sorusunun saniyede 60 kez sorulmasının
@@ -315,12 +379,14 @@ public class EnemySpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// Dalgayı kurar ve sahneye koyar. Bütçe her dalgada
-    /// <see cref="waveBudgetGrowth"/> kadar büyür; düşmanların GÜCÜ ise ayrı bir
-    /// koldan, oyuncunun temizlediği tehditten gelir (bkz. <see cref="RampLevel"/>).
-    /// İkisi ayrı tutulur: bütçe "kaç tane", rampa "ne kadar sert" sorusudur —
-    /// aynı anda ikisini birden artırmak, log'da hangisinin fazla geldiğini
-    /// okumayı imkânsız kılardı.
+    /// Dalgayı kurar ve sahneye koyar. Bütçe (KAÇ TANE) oyuncunun topladığı
+    /// kaynaktan gelir (bkz. <see cref="PowerLevel"/>); düşmanların GÜCÜ (NE
+    /// KADAR SERT) ise ayrı bir koldan, temizlenen tehditten
+    /// (bkz. <see cref="RampLevel"/>).
+    ///
+    /// İkisi ayrı tutulur ki log'dan hangisinin fazla geldiği okunabilsin.
+    /// İkisi de artık bir SAATE bağlı değil: bütçenin dalga başına bileşik
+    /// büyümesi, oyuncu ne yaparsa yapsın 10 dakikada 17× bütçe üretiyordu.
     /// </summary>
     void SendWave(float level, EnemyBot[] alive)
     {
@@ -344,6 +410,7 @@ public class EnemySpawner : MonoBehaviour
                   .Num("tehdit", kadroTehdit)
                   .Num("boss",   bosses)
                   .Num("rampa",  level)
+                  .Num("guc",    PowerLevel)
                   .End();
 
         if (types.Count > 0)
@@ -356,12 +423,14 @@ public class EnemySpawner : MonoBehaviour
 
         for (int i = 0; i < bosses; i++) SpawnFreeBoss(level, i, bosses);
 
+        // Açılış elle konur, formül üçüncü dalgadan itibaren devralır. Formül
+        // bir ÖNCEKİ bütçeye değil, güç seviyesine bakar: bileşik büyüme yok,
+        // yani geç kalan bir oyuncu bir daha asla yakalayamayacağı bir eğrinin
+        // altında kalmaz.
         _waveIndex++;
-
-        // Açılış elle konur, formül üçüncü dalgadan itibaren devralır.
         _waveBudget = _waveIndex == 1
             ? Mathf.Max(startWaveBudget, secondWaveBudget)
-            : _waveBudget * Mathf.Max(1f, waveBudgetGrowth);
+            : Mathf.Max(secondWaveBudget, BudgetFor(PowerLevel));
     }
 
     /// <summary>
@@ -506,6 +575,8 @@ public class EnemySpawner : MonoBehaviour
     void BeginFreeRun()
     {
         s_clearedThreat = 0f;
+        s_collected     = 0f;
+        _runTime        = 0f;
         _timer          = 0f;
         _waveIndex      = 0;
         _waveBudget     = Mathf.Max(1f, startWaveBudget);

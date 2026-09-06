@@ -61,9 +61,13 @@ Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 1), Otomatik Turretler, İki
 ### Düşman Çeşitliliği — Tasarım Kararları
 
 **Uzak saldırganlar** (hareket ederken periyodik ateş, mermileri kalkan üzerinden hasar verir):
-- **Swarm:** HP 30, hız **2.4**, lazer'e kırılgan (×1.5). Ateş hızı ~4sn.
-  Hız 3 → 2.4: Swarm oyuncunun gördüğü İLK gemidir ve nişan almayı onun
-  üstünde öğrenir; 3 birim/sn'de kadrajı yedi saniyede geçiyordu.
+- **Swarm:** HP 20, hız **2.76**, lazer'e kırılgan (×1.5). Ateş hızı ~4sn.
+  Hız 3 → 2.4 → 2.76: Swarm oyuncunun gördüğü İLK gemidir ve nişan almayı
+  onun üstünde öğrenir; 3 birim/sn'de kadrajı yedi saniyede geçiyordu. Ama
+  %20'lik kesinti fazla kaçtı — 2.4'te kadrajı geçmek 8.75 saniye sürüyor ve
+  gemi bir tehditten çok bir engel gibi duruyordu. Kalan %8 nişan almayı
+  öğrenmeye yetiyor; fazlası kalabalıkta okunmuyor, çünkü Swarm sahaya HER
+  ZAMAN sürü hâlinde gelir.
 - **Armored:** HP 80, hız 1.5, kinetike dirençli (×0.3), plazmaya zayıf (×1.8). Ateş hızı ~6sn, hasar 15.
   **Tehdit 9** (eskiden 4): eski değer ham HP'ye bakıyor, geminin bütün kimliğini
   — kinetik direncini — yok sayıyordu. Oyunun VARSAYILAN silahı bedava gelen raylı
@@ -1009,9 +1013,14 @@ iniyor, ama gemi hâlâ 3 birim/sn giden ve **135°/sn** dönen bir Swarm'dı. Y
 | Denk level | 1 | 5 | 9 | 13 | 25+ |
 |---|---|---|---|---|---|
 | Manevra çarpanı (`startMobility` 0.7 → 1) | 0.70 | 0.75 | 0.80 | 0.85 | 1.00 |
-| Swarm hızı | 2.10 | 2.25 | 2.40 | 2.55 | 3.00 |
-| Swarm dönüş hızı | **66°/sn** | 76 | 86 | 98 | **135°/sn** |
+| Swarm hızı | 1.93 | 2.07 | 2.21 | 2.35 | 2.76 |
+| Swarm dönüş hızı | **61°/sn** | 70 | 80 | 90 | **124°/sn** |
 | Swarm min kavis yarıçapı | 2.80 | 2.61 | 2.45 | 2.30 | 1.96 |
+
+Yarıçap satırı taban hızdan BAĞIMSIZDIR ve hız değişimlerinde güncellenmez:
+hem hız hem dönüş hızı tabanla doğrusal ölçeklendiği için oran sadeleşir.
+Üstteki iki satır ise tabana bağlıdır — 2.4 dönemi boyunca bu tablo eski
+3.0 tabanıyla kalmıştı.
 
 Kavis yarıçapı `orbitRadius`'un (Swarm: 3.5) altında kaldığı için `ShipBrain`'in
 yörünge davranışı değişmez — gemi aynı deseni uçar, yalnızca daha yayvan ve
@@ -1263,13 +1272,63 @@ artık cezalandırılmıyor, ÖDÜLLENDİRİLİYOR — sonraki dalga beklemeden 
 
 | Kadran | Neyi belirler | Nereden gelir |
 |---|---|---|
-| **Dalga bütçesi** | KAÇ TANE gemi | Her dalgada ×1.10 (bileşik) |
+| **Dalga bütçesi** | KAÇ TANE gemi | Oyuncunun TOPLADIĞI kaynak |
 | **Rampa seviyesi** | NE KADAR SERT | Oyuncunun temizlediği tehdit |
 
 İkisini aynı anda artırmak, log'da hangisinin fazla geldiğini okumayı imkânsız
 kılardı. Aynı gerekçeyle **`waveInterval` SABİTTİR**: sıklık ve büyüklük aynı
 anda açılırsa ölçüm iki bilinmeyenli olur. Önce tek kadranla ölçüp sonra karar
 vereceğiz.
+
+### Dalga bütçesi saatten kaynağa taşındı (denge r1)
+
+Bütçe eskiden her dalgada **×1.10 bileşik** büyüyordu ve dalgalar sabit bir
+saatte geldiği için bu, oyuncu ne yaparsa yapsın 10 dakikada ~17× bütçe
+demekti (ölçülen 11×; farkı valfin geciktirdiği dalgalar kapatıyor). Yani
+rampadan sökülen saat bütçede duruyordu — üstelik daha sert biçimde, çünkü
+rampa doğrusal, bileşik büyüme üsteldi.
+
+**Ölçüm.** Dört serbest oturumda dakika başına *oyuncunun verdiği hasar ÷
+sahaya gelen HP* oranı:
+
+| dakika | tarayıcı (195311) | PC (025043) |
+|---|---|---|
+| 0 | 3.45 | 2.75 |
+| 5 | 1.43 | 1.30 |
+| 7 | **1.03** | 1.43 |
+| 11 | — | **0.77** |
+
+1.0'ın altı, geleni öldürmenin matematiksel olarak imkânsız olduğu yerdir.
+Aynı aralıkta oyuncunun ateş gücü 2–3×, gelen HP 6.6–14.8× arttı.
+
+**Para birimi neden TOPLANAN KAYNAK.** Öldürülen düşman pozitif geri besleme
+yapar: büyük dalga → çok öldürme → daha büyük dalga. Üstelik oyuncunun tercihi
+değildir, geleni öldürmek zorundadır. Kaynak ise oyuncunun güce çevirebildiği
+tek şeydir; zorluğu ona bağlamak zorluğu oyuncunun GÜÇ EĞRİSİNE bağlamaktır.
+Sayılan miktar depoya GİREN kaynaktır — tavana çarpıp yanan kısım oyuncunun
+eline geçmez, güce dönüşmez, zorluğu da ilerletmemeli.
+
+```
+güç   = max(toplanan / resourcePerPower,  idlePowerPerMinute × dakika)
+bütçe = 1 + budgetScale × güç ^ budgetExponent
+```
+
+| alan | değer | neden |
+|---|---|---|
+| `resourcePerPower` | 75 | 75 kaynak = 1 güç seviyesi |
+| `budgetScale` | 5.0 | ölçülen oturumlara oturtuldu |
+| `budgetExponent` | 0.58 | **1'in altı kasıtlı**: gelir doğrusal artarken zorluk kök gibi artar, yani ilerledikçe pay AÇILIR — zırh eşiğinin geride kalana verdiği ayrı cezanın karşılığı |
+| `idlePowerPerMinute` | 0.2 | zemin, sürücü değil: kaynak yolu bunu her zaman geçer. Sırf toplamayarak zorluğu dondurup sonsuza dek güvenli farm yapmayı engeller |
+
+Bileşik büyüme kalktığı için bütçe artık bir ÖNCEKİ bütçeye bakmıyor: geç
+kalan oyuncu, bir daha asla yakalayamayacağı bir eğrinin altında kalmıyor.
+Aynı oturumlara uygulandığında oran ortalama 2.16'da kalıyor, en düşük nokta
+1.30 ve düşüş eğilimi kayboluyor. 20. dakikada bütçe ~17, eski formülde 830.
+
+**Rampaya (düşman gücü) DOKUNULMADI** — hâlâ temizlenen tehditten geliyor.
+Bütçe küçülünce öldürülen tehdit de kendiliğinden yavaşlar, yani rampa da
+yumuşar. İki kadranı aynı anda oynatmak, hangisinin işe yaradığını okumayı
+imkânsız kılardı; bu ölçüm sırasının kuralı.
 
 %10 BİLEŞİKTİR ve hızlıdır — 20 saniyelik bir tempoda:
 
@@ -1761,6 +1820,35 @@ diskine yazmasının anlamı yok.
 | `upgrade` | Yükseltme temposu — oyuncu güç eğrisinin gerçeği |
 | `wave` | Kağıttaki bütçe ile sahneye çıkan KADRO farkı |
 | `level_start` / `level_end` | **Level süresi**, biterken HP ve envanter |
+
+### Oturum künyesi ve DENGE REVİZYONU
+
+Kaydın ilk satırı (`session`) onun kimliğidir: platform, cihaz, işletim,
+GPU, ekran, dil, Unity sürümü. Dağıtılan build'lerden veri gelmeye
+başlayınca "bu kayıt nereden geldi" ilk soru oldu — Android ile PC
+kayıtları sunucuda başka türlü ayrılamıyordu.
+
+Sürüm İKİ ayrı sayıdır (`GameVersion`) ve karıştırılmamalıdır:
+
+| alan | log | ne zaman değişir |
+|---|---|---|
+| `GameVersion.Surum` | `surum` | Oyuncunun gördüğü sürüm — mağazaya giden numara |
+| `GameVersion.Denge` | `denge` | **Her denge değişikliğinde**: bir formül, bir sabit, bir düşman değeri |
+
+Ayrımın sebebi: aynı `1.0.0` altında onlarca ayar denemesi yapılır. Mağaza
+sürümü değişmeden formül değişir ve o iki dönemin kayıtları aynı havuzda
+toplanırsa ortalama iki ayarın ortasını gösterir — hiçbirini anlatmaz, üstelik
+kaybı fark etmek de mümkün olmaz. `analyze.js` künyede revizyonu basar;
+alanın HİÇ OLMAMASI da bir cevaptır: 2026-09-05 öncesi, bütçenin saatte
+büyüdüğü build.
+
+**KURAL: dengeyi etkileyen her değişiklikte `GameVersion.Denge` artırılır.**
+
+`surum` `Application.version`'dan DEĞİL `GameVersion`'dan okunur: ilki
+ProjectSettings'te unutulmuş bir "1.0" idi ve editörde koşarken build'in
+numarasını hiç vermez. Ters yön build script'lerinde kapatıldı — üç build
+script'i de `PlayerSettings.bundleVersion`'a `GameVersion.Surum` yazar, yani
+paketin sürümü ile log'daki sürüm ayrılamaz.
 
 Ölçmek istediğimiz asıl şey tehdit puanının doğrulanmasıdır:
 

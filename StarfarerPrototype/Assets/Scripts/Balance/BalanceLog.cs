@@ -128,10 +128,15 @@ public static class BalanceLog
         //     ölçüldüğünü söylemiyordu (bkz. PerfSampler).
         //   · Sürüm alanı olmadan bir düzeltmenin işe yarayıp yaramadığı
         //     build'ler arasında karşılaştırılamıyordu.
+        // Sürüm Application.version'dan DEĞİL, GameVersion'dan okunur: ilki
+        // ProjectSettings'te unutulmuş bir "1.0" idi ve editörde koşarken
+        // build'in numarasını hiç vermez. Denge revizyonu da AYRI bir alan:
+        // mağaza sürümü değişmeden ayar değişir (bkz. GameVersion).
         // Satır oturum başına bir kez yazılır; alan sayısının maliyeti yok.
         Event("session")
             .Str("unity",      Application.unityVersion)
-            .Str("surum",      Application.version)
+            .Str("surum",      GameVersion.Surum)
+            .Num("denge",      GameVersion.Denge)
             .Str("platform",   Application.platform.ToString())
             .Str("cihaz",      SystemInfo.deviceModel)
             .Str("isletim",    SystemInfo.operatingSystem)

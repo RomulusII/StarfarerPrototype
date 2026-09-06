@@ -62,6 +62,12 @@ console.log(`\x1b[1m${path.basename(file)}\x1b[0m — ${R.length} olay` +
 //
 // Dağıtılan build'lerden veri gelmeye başlayınca "bu kayıt nereden geldi"
 // sorusu ilk soru oldu: aynı sayı telefonda ve PC'de aynı şeyi anlatmıyor.
+//
+// DENGE REVİZYONU ayrı basılır çünkü karşılaştırmayı asıl o böler: mağaza
+// sürümü aynı kalırken formül değişir. Farklı revizyonların kayıtları aynı
+// havuzda toplanırsa ortalama iki ayarın ortasını gösterir ve hiçbirini
+// anlatmaz. Alanın hiç olmaması da bir cevaptır: bütçenin saatte büyüdüğü
+// eski build.
 
 const oturum = by("session")[0];
 if (oturum) {
@@ -72,7 +78,9 @@ if (oturum) {
               `${oturum.ram_mb ? oturum.ram_mb + "MB" : "?"}  ` +
               `${oturum.cekirdek ? oturum.cekirdek + " çekirdek" : ""}`);
   console.log(`  ${oturum.isletim || "?"}  ·  ${oturum.gpu || "?"}`);
-  console.log(`  sürüm ${oturum.surum || "?"} (Unity ${oturum.unity || "?"})  ·  dil ${oturum.dil || "?"}`);
+  const denge = oturum.denge != null ? `denge r${oturum.denge}` : "denge YOK (2026-09-05 öncesi)";
+  console.log(`  sürüm ${oturum.surum || "?"} · ${denge} (Unity ${oturum.unity || "?"})` +
+              `  ·  dil ${oturum.dil || "?"}`);
 }
 
 // ── İsabet oranı ────────────────────────────────────────────────────────────

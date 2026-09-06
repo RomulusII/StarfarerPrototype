@@ -235,10 +235,13 @@ public class EnemyTypeData : ScriptableObject
         d.role          = EnemyRole.Vanguard;
         d.threatScore   = 1;
         d.maxHP         = 20f;
-        // Hız 3 -> 2.4 (%20). Swarm oyuncunun gördüğü İLK gemidir ve nişan
-        // almayı onun üstünde öğreniyor; 3 birim/sn'de kadrajı 7 saniyede
-        // geçiyordu. mass 1 olduğu için enginePower doğrudan hızdır.
-        d.mass          = 1f;   d.enginePower   = 2.4f;
+        // Hız 3 -> 2.4 (%20) -> 2.76 (%15 geri). %20 fazla kaçmış: 3
+        // birim/sn'de kadrajı 7 saniyede geçen Swarm 2.4'te 8.75 saniye
+        // sürüyordu ve bir tehditten çok bir engel gibi duruyordu. Kalan %8
+        // kesinti nişan almayı öğrenmeye yetiyor; fazlası kalabalıkta
+        // okunmuyor, çünkü Swarm sahaya HER ZAMAN sürü hâlinde gelir.
+        // mass 1 olduğu için enginePower doğrudan hızdır.
+        d.mass          = 1f;   d.enginePower   = 2.76f;
         d.bodyWidth     = 60;   d.bodyHeight    = 20;   d.sizeOrder = 8;
         d.bodyColor     = new Color(0.9f, 0.20f, 0.20f);
         d.barrelColor   = new Color(0.7f, 0.15f, 0.15f);

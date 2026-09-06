@@ -92,6 +92,10 @@ public class ResourceInventory : MonoBehaviour
         }
 
         float gained = AmountOf(type) - before;
+
+        // Serbest modun zorluğu buradan ilerler: gelen değil, DEPOYA GİREN
+        // kaynak. Yanan kısım oyuncunun eline geçmez, güce de dönüşmez.
+        EnemySpawner.ReportCollected(gained);
         BalanceLog.Event("resource")
                   .Str("tip",    type.ToString())
                   .Str("olay",   "toplandi")
