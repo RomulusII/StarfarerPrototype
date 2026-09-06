@@ -65,6 +65,13 @@ public static class WebBuild
 
     static void ApplySettings()
     {
+        // Sürüm + build numarası. Tarayıcıda bu değerin her pakette değişmesi
+        // ŞART: Unity'nin veri önbelleği (aşağıdaki dataCaching) IndexedDB
+        // anahtarını productVersion'dan üretir, dosya adları ise sabittir.
+        // Sabit sürümle yeni paket yüklemek, testçinin eski paketi oynamaya
+        // devam etmesi demek. Bkz. BuildStamp.
+        BuildStamp.Apply();
+
         // Brotli, gzip'ten belirgin biçimde küçük. İlk açılışta indirilen şey
         // oyunun tamamı olduğu için buradaki fark doğrudan bekleme süresidir.
         PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli;

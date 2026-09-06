@@ -137,6 +137,12 @@ public static class BalanceLog
             .Str("unity",      Application.unityVersion)
             .Str("surum",      GameVersion.Surum)
             .Num("denge",      GameVersion.Denge)
+            // Paketin kimliği: build script'i -sfBuild ile "1.0.0+b17" yazar
+            // (bkz. BuildStamp). `surum` "hangi sürüm", bu alan "HANGİ PAKET"
+            // sorusunun cevabı — tarayıcı sürümünde testçinin eski bir paketi
+            // önbellekten oynayıp oynamadığı ancak buradan görülür. Editörde
+            // ProjectSettings'te ne yazıyorsa o gelir, yani bir şey söylemez.
+            .Str("build",      Application.version)
             .Str("platform",   Application.platform.ToString())
             .Str("cihaz",      SystemInfo.deviceModel)
             .Str("isletim",    SystemInfo.operatingSystem)

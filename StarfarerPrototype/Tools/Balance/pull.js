@@ -3,7 +3,12 @@
 //   node Tools/Balance/pull.js
 //
 // Yapılandırma: Tools/Balance/pull.config.json (git'e girmez, token içerir)
-//   { "endpoint": "https://akinayan.de/starfarer/log.php", "token": "..." }
+//   { "endpoint": "https://akinayan.de/starfarer/log/log.php", "readToken": "..." }
+//
+// readToken, log.php'deki READ_TOKEN'dır ve YALNIZCA burada yaşar — hiçbir
+// build'in içine girmez. Build'lerdeki yazma token'larıyla liste ve indirme
+// uçlarına erişilemez; sebebi log.php'nin başında yazılı. Eski tek-token
+// düzeninden gelen "token" alanı hâlâ okunur ama uyarı basar.
 //
 // Neden ayrı bir indirici var: Claude'un çalıştığı ortamda dışarı HTTP kapalı
 // (DNS çözülüyor ama bağlantı kurulmuyor). Kayıtlar diskte olursa okunabiliyor,
@@ -23,10 +28,23 @@ const outDir  = path.join(here, "logs");
 
 if (!fs.existsSync(cfgPath)) {
   console.error(`Yapılandırma yok: ${cfgPath}`);
-  console.error(`Örnek:\n{\n  "endpoint": "https://akinayan.de/starfarer/log/log.php",\n  "token": "..."\n}`);
+  console.error(`Örnek:\n{\n  "endpoint": "https://akinayan.de/starfarer/log/log.php",\n  "readToken": "..."\n}`);
   process.exit(1);
 }
 const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+
+// Okuma token'ı ayrıldıktan sonra eski yapılandırmalar sessizce 403 alırdı;
+// "nope" dönen bir sunucu ile yanlış alan adı taşıyan bir dosyayı ayırt etmek
+// zordur, o yüzden burada söyleniyor.
+const readToken = cfg.readToken || cfg.token;
+if (!readToken) {
+  console.error(`Yapılandırmada readToken yok: ${cfgPath}`);
+  process.exit(1);
+}
+if (!cfg.readToken) {
+  console.warn("uyarı: pull.config.json'daki 'token' alanı 'readToken' olarak yeniden adlandırılmalı " +
+               "— değeri de log.php'deki READ_TOKEN olmalı, yazma token'ı buraya girmez.");
+}
 fs.mkdirSync(outDir, { recursive: true });
 
 function get(url) {
@@ -44,7 +62,7 @@ function get(url) {
   });
 }
 
-const base = `${cfg.endpoint}?t=${encodeURIComponent(cfg.token)}`;
+const base = `${cfg.endpoint}?t=${encodeURIComponent(readToken)}`;
 
 (async () => {
   const list = JSON.parse((await get(`${base}&list=1`)).toString());

@@ -50,6 +50,10 @@ public static class SimBuild
             options          = BuildOptions.None,
         };
 
+        // Sürüm koddan yazılır: simülasyon kayıtları da hangi denge
+        // revizyonundan geldiğini söylemeli (bkz. GameVersion, BuildStamp).
+        BuildStamp.Apply();
+
         var summary = BuildPipeline.BuildPlayer(opts).summary;
         Debug.Log($"[SimBuild] sonuc={summary.result} boyut={summary.totalSize} " +
                   $"sure={summary.totalTime} yol={outPath}");

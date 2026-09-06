@@ -64,6 +64,12 @@ public static class AndroidBuild
 
         ApplyVersionCodeOverride();
 
+        // Mağaza sürümü koddaki tek doğruluk kaynağından yazılır; -sfBuild
+        // geçilmişse paket numarası da eklenir. Elle iki yerde tutulduğu
+        // sürece biri unutulur; log'daki sürüm ile paketin sürümü ayrıldığı
+        // anda kaydın kimliği yalan söyler. Bkz. BuildStamp.
+        BuildStamp.Apply();
+
         var opts = new BuildPlayerOptions
         {
             scenes            = scenes,
@@ -96,19 +102,16 @@ public static class AndroidBuild
     /// </summary>
     static void ApplyVersionCodeOverride()
     {
-        var args = System.Environment.GetCommandLineArgs();
-        for (int i = 0; i < args.Length - 1; i++)
+        var raw = BuildStamp.Arg("-sfVersionCode");
+        if (raw == null) return;
+
+        if (!int.TryParse(raw, out int code) || code <= 0)
         {
-            if (args[i] != "-sfVersionCode") continue;
-            if (!int.TryParse(args[i + 1], out int code) || code <= 0)
-            {
-                Debug.LogWarning($"[AndroidBuild] -sfVersionCode okunamadi: '{args[i + 1]}', "
-                               + "proje ayari kullaniliyor.");
-                return;
-            }
-            PlayerSettings.Android.bundleVersionCode = code;
+            Debug.LogWarning($"[AndroidBuild] -sfVersionCode okunamadi: '{raw}', "
+                           + "proje ayari kullaniliyor.");
             return;
         }
+        PlayerSettings.Android.bundleVersionCode = code;
     }
 
     static void Fail(string message)

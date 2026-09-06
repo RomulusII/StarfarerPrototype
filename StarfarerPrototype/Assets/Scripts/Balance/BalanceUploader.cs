@@ -56,8 +56,8 @@ public class BalanceUploader : MonoBehaviour
     static BalanceUploader _instance;
 
     /// <summary>
-    /// Sunucu isteği KURAL GEREĞİ reddetti (4xx) — yanlış token, kapatılmış uç.
-    /// Bu oturumda bir daha denenmez.
+    /// Sunucu isteği KURAL GEREĞİ reddetti — yanlış token, kapatılmış uç (4xx)
+    /// ya da dolu kota (507). Bu oturumda bir daha denenmez.
     ///
     /// Ağ kopması ile yanlış yapılandırmayı ayırmak şart: ilki tekrar denemeyi
     /// hak eder, ikincisi asla düzelmez. İkisi aynı sayılınca yanlış token'la
@@ -160,7 +160,9 @@ public class BalanceUploader : MonoBehaviour
         byte[] body = ReadAll(path);
         if (body == null) yield break;
 
-        string url = $"{cfg.endpoint}?t={UnityWebRequest.EscapeURL(cfg.token)}" +
+        // Token platforma göre seçilir (bkz. UploadConfig.Token): tarayıcı
+        // build'i kendi yazma token'ını taşır, native build başkasını.
+        string url = $"{cfg.endpoint}?t={UnityWebRequest.EscapeURL(UploadConfig.Token)}" +
                      $"&d={UnityWebRequest.EscapeURL(DeviceId)}" +
                      $"&f={UnityWebRequest.EscapeURL(Path.GetFileName(path))}";
 
@@ -172,7 +174,28 @@ public class BalanceUploader : MonoBehaviour
 
         yield return req.SendWebRequest();
 
-        if (req.responseCode >= 400 && req.responseCode < 500)
+        if (req.responseCode == 409)
+        {
+            // Sunucu bu dosyayı reddetti: gönderilen gövde sunucudakinden
+            // KÜÇÜK (log.php'deki küçülme kuralı). Meşru bir istemcide olmaz —
+            // kayıt yalnızca büyür — ama yarıda kalmış bir dosya bu duruma
+            // düşebilir. Yapılandırma hatası DEĞİL: diğer dosyalar denenmeye
+            // devam etmeli, yoksa tek bozuk kayıt bütün oturumun gönderimini
+            // susturur.
+            Debug.LogWarning($"[BalanceUploader] {Path.GetFileName(path)} reddedildi (409) — " +
+                             "sunucudaki kayıt daha büyük, bu dosya atlandı");
+        }
+        else if (req.responseCode == 507)
+        {
+            // Sunucu kotası dolu. Geçici sayılır ve dosya diskte kalır, ama bu
+            // oturumda ısrar etmenin anlamı yok: kota kendi kendine boşalmaz,
+            // sunucudaki kayıtların indirilip temizlenmesi gerekir.
+            _rejected = true;
+            Debug.LogError("[BalanceUploader] sunucu kotası DOLU (507) — gönderim bu oturumda " +
+                           "kapatıldı. Kayıtlar diskte kaldı; sunucuda yer açılınca gidecekler " +
+                           "(node Tools/Balance/pull.js ile indirip sunucudan sil).");
+        }
+        else if (req.responseCode >= 400 && req.responseCode < 500)
         {
             // Yapılandırma hatası. 403 = token yanlış (sunucudaki TOKEN ile
             // UploadConfig.token aynı olmalı), 404 = uç yolu yanlış.
