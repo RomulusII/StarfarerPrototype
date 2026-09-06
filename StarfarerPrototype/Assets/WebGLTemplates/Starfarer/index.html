@@ -36,6 +36,11 @@
       }
       #bar { width: min(320px, 60vw); height: 3px; background: #17202e; }
       #fill { width: 0; height: 100%; background: #4f7fb8; transition: width .15s linear; }
+      #ver {
+        font: 600 11px/1 system-ui, -apple-system, Segoe UI, sans-serif;
+        letter-spacing: .12em;
+        color: #3a4655;
+      }
       #fs, #apk {
         position: fixed; bottom: 12px;
         height: 34px;
@@ -59,9 +64,20 @@
     <!-- Yükleme göstergesi kasten METİNSİZ: bu sayfa oyunun dil katmanının
          (Loc) dışında kalır, yazı koyulsaydı üç dilde ayrıca tutulması
          gerekirdi. Çubuk her dilde aynı şeyi anlatıyor. -->
+    <!-- Sürüm numarası yükleme ekranında da durur: oyun HİÇ açılmazsa menüye
+         (StartMenuUI) ulaşılamaz ve testçi hangi paketi denediğini söyleyemez —
+         oysa "açılmıyor" bildiriminin en kritik alanı tam olarak budur.
+
+         Yükleyicinin metinsiz olma kuralını bozmuyor: bu sayfa Loc katmanının
+         dışında ve buradaki şey sayı, üç dilde de aynı okunuyor.
+
+         Denge revizyonu burada YOK — şablon makroları yalnızca Unity'nin paket
+         sürümünü verir, GameVersion'a erişemez. Menüdeki satır ikisini birden
+         gösteriyor. -->
     <div id="loader">
       <div>{{{ PRODUCT_NAME }}}</div>
       <div id="bar"><div id="fill"></div></div>
+      <div id="ver">{{{ PRODUCT_VERSION }}}</div>
     </div>
 
     <!-- Android paketi. Etiket kasten dilden bağımsız ("APK" üç dilde de aynı):
@@ -88,6 +104,7 @@
       var canvas = document.querySelector("#unity-canvas");
       var loader = document.querySelector("#loader");
       var fill   = document.querySelector("#fill");
+      var bar    = document.querySelector("#bar");
       var fs     = document.querySelector("#fs");
       var apk    = document.querySelector("#apk");
 
@@ -128,8 +145,12 @@
         fs.onclick = function () { unityInstance.SetFullscreen(1); };
         if (apkVar) apk.style.display = "block";
       }).catch(function (message) {
-        loader.innerHTML = "<div style='color:#c46a6a;max-width:80vw;text-align:center'>" +
-                           String(message) + "</div>";
+        // Hata metni çubuğun YERİNE geçer ama sürüm satırı KALIR: "oyun
+        // açılmıyor" bildiriminin işe yaraması için hangi paketin açılmadığını
+        // bilmek gerekiyor. innerHTML'i topluca ezmek tam da o bilgiyi
+        // siliyordu.
+        bar.outerHTML = "<div style='color:#c46a6a;max-width:80vw;text-align:center'>" +
+                        String(message) + "</div>";
       });
     </script>
   </body>

@@ -128,7 +128,48 @@ public class StartMenuUI : MonoBehaviour
                  17, new Color(0.40f, 0.42f, 0.48f),
                  new Vector2(0f, 0.04f), new Vector2(1f, 0.08f));
 
+        BuildVersionLabel();
+
         RefreshDifficultyButtons();
+    }
+
+    /// <summary>
+    /// Sürüm bilgisi sağ alt köşede. Testçi "hangi paketi oynuyorum" sorusuna
+    /// ekrandan cevap verebilsin diye var: hata bildirimi sürümsüz geldiğinde
+    /// hangi ayarın ölçüldüğü belirsizleşiyor.
+    ///
+    /// <c>Application.version</c> okunur, <see cref="GameVersion.Surum"/> DEĞİL:
+    /// paket numarasını (1.0.0+b17) build sırasında <c>BuildStamp</c> oraya
+    /// yazar ve bu, kayıttaki <c>build</c> alanıyla birebir aynı değerdir.
+    /// Surum yalnızca "1.0.0" der, yani iki farklı paketi ayırt ettirmez.
+    ///
+    /// Denge revizyonu AYRI bir sayı olarak yanında: aynı sürüm altında
+    /// onlarca ayar denemesi yapılıyor ve testçinin gördüğü tek numara
+    /// bunları ayırmaya yetmez.
+    ///
+    /// Çevrilmez. "rev" üç dilde de aynı kısaltma (revizyon / revision /
+    /// Revision), geri kalanı zaten sayı — oyunun adı gibi, Loc katmanına
+    /// girmesi gereksiz bir bakım yükü olurdu.
+    ///
+    /// BAŞLIĞIN YANINDA, köşede DEĞİL. İki denemede de köşe yanlış çıktı:
+    /// sağ alt köşede tarayıcının APK ve tam ekran düğmeleri (HTML katmanı
+    /// canvas'ın her zaman üstünde) yazının üstünü örtüyordu; küçük punto ise
+    /// telefonda hiç okunmuyordu. Sebep CanvasScaler'ın genişliğe göre
+    /// ölçeklemesi: 1920 referansta 16 punto, 375 piksellik bir telefonda
+    /// 3 piksele iner. Punto artık başlıkla aynı bantta ve ona oranlı, yani
+    /// ekran küçüldükçe başlıkla birlikte küçülüyor — kaybolmuyor.
+    ///
+    /// Sola hizalı: kutu sabit, yazı uzunluğu ise sürüm numarasıyla değişiyor
+    /// (1.0.0+b9 ile 1.0.0+b123 aynı değil). Ortalanmış olsaydı her dağıtımda
+    /// birkaç piksel kayardı.
+    /// </summary>
+    void BuildVersionLabel()
+    {
+        var txt = MakeText(_panel.transform, "Version",
+                           $"{Application.version} · rev {GameVersion.Denge}", 40,
+                           new Color(0.45f, 0.52f, 0.66f),
+                           new Vector2(0.66f, 0.745f), new Vector2(0.99f, 0.845f));
+        txt.alignment = TextAnchor.MiddleLeft;
     }
 
     /// <summary>
