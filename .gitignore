@@ -114,5 +114,3 @@ StarfarerPrototype/.claude/worktrees/
 # Ayni desen pull.config.json ile ayni: yapilandirma diskte, repo temiz.
 /StarfarerPrototype/Tools/Deploy/deploy.config.json
 
-# Dagitim build numarasi - makine durumu, uretilebilir
-/StarfarerPrototype/Tools/Deploy/build-number.txt

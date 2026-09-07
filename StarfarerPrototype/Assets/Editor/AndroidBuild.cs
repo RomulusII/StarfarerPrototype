@@ -80,6 +80,11 @@ public static class AndroidBuild
         };
 
         var summary = BuildPipeline.BuildPlayer(opts).summary;
+
+        // Damga geri alinir: paket numarayi aldi, ProjectSettings.asset ise
+        // temiz kalsin (bkz. BuildStamp.Restore). Basarisiz build de dahil —
+        // yarim kalan bir denemenin ardindan repoda numara kalmasin.
+        BuildStamp.Restore();
         Debug.Log($"[AndroidBuild] sonuc={summary.result} paket={(bundle ? "aab" : "apk")} " +
                   $"development={development} versionCode={PlayerSettings.Android.bundleVersionCode} " +
                   $"targetSdk={PlayerSettings.Android.targetSdkVersion} " +

@@ -50,6 +50,11 @@ public static class WebBuild
         };
 
         var summary = BuildPipeline.BuildPlayer(opts).summary;
+
+        // Damga geri alinir: paket numarayi aldi, ProjectSettings.asset ise
+        // temiz kalsin (bkz. BuildStamp.Restore). Basarisiz build de dahil —
+        // yarim kalan bir denemenin ardindan repoda numara kalmasin.
+        BuildStamp.Restore();
         Debug.Log($"[WebBuild] sonuc={summary.result} development={development} " +
                   $"sikistirma={PlayerSettings.WebGL.compressionFormat} " +
                   $"boyut={summary.totalSize} sure={summary.totalTime} yol={outPath}");

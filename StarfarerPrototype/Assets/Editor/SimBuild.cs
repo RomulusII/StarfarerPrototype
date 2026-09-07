@@ -55,6 +55,11 @@ public static class SimBuild
         BuildStamp.Apply();
 
         var summary = BuildPipeline.BuildPlayer(opts).summary;
+
+        // Damga geri alinir: paket numarayi aldi, ProjectSettings.asset ise
+        // temiz kalsin (bkz. BuildStamp.Restore). Basarisiz build de dahil —
+        // yarim kalan bir denemenin ardindan repoda numara kalmasin.
+        BuildStamp.Restore();
         Debug.Log($"[SimBuild] sonuc={summary.result} boyut={summary.totalSize} " +
                   $"sure={summary.totalTime} yol={outPath}");
 

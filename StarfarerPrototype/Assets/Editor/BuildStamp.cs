@@ -47,6 +47,35 @@ public static class BuildStamp
     }
 
     /// <summary>
+    /// Damgayı geri alır: <c>bundleVersion</c> yeniden <see cref="GameVersion.Surum"/>
+    /// olur. Build BİTTİKTEN sonra çağrılır, paket numarayı çoktan almış olur.
+    ///
+    /// NEDEN GEREKLİ: numara <c>ProjectSettings.asset</c>'e yazılıyor ve o dosya
+    /// git'te izleniyor. Geri alınmazsa her dağıtımdan sonra çalışma ağacında
+    /// bir değişiklik kalır; birkaç dağıtım sonra <c>git status</c> sinyal
+    /// olmaktan çıkar ve içine gerçek bir ayar değişikliği karışırsa fark
+    /// edilmez. (Nitekim bir kez karıştı: UnityConnectSettings'teki gerçek bir
+    /// ayar, "build artığı" sanılıp aylarca commit'lenmeden bekleyebilirdi.)
+    ///
+    /// Numaranın TEK doğruluk kaynağı <c>Tools/Deploy/build-number.txt</c>.
+    /// Aynı sayıyı iki yerde tutmak, er geç ikisinin ayrışması demek.
+    ///
+    /// Yan faydası: numarasız bir sürüm (<c>1.0.0</c>) gören, o paketin ELLE
+    /// alındığını anlar — pipeline her zaman numara geçiyor.
+    /// </summary>
+    public static void Restore()
+    {
+        PlayerSettings.bundleVersion = GameVersion.Surum;
+
+        // Batchmode kapanışında ayarların diske yazılacağına güvenmiyoruz:
+        // yazılmazsa dosya numaralı hâliyle kalır ve bu metodun varlık sebebi
+        // ortadan kalkar.
+        AssetDatabase.SaveAssets();
+
+        Debug.Log($"[BuildStamp] surum geri alindi: {GameVersion.Surum}");
+    }
+
+    /// <summary>
     /// Komut satırından <paramref name="name"/> argümanının değerini okur;
     /// yoksa null. Batchmode'da Unity kendi bayraklarıyla birlikte bizimkileri
     /// de taşır, ayrıştırmak bize kalır.
