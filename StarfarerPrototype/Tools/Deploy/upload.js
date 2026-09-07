@@ -79,6 +79,32 @@ function istek(url, body) {
   });
 }
 
+const uyu = ms => new Promise(r => setTimeout(r, ms));
+
+/**
+ * İsteği yeniden dener. Kurumsal ağ dalgalı: aynı dosya bir gün 20 saniyede
+ * giderken ertesi gün 1 MB'lık bir parça 60 saniyede tamamlanmayıp bağlantıyı
+ * kopardı (ölçüldü: küçük bir ping 6 sn). Tek bir aksaklıkta 49 MB'lık
+ * dağıtımı baştan almak gereksiz.
+ *
+ * YALNIZCA AĞ hataları tekrarlanır. Sunucunun kural gereği verdiği cevaplar
+ * (403 token, 400 yol, 409 ofset) tekrarlansaydı yanlış bir isteği ısrarla
+ * yollardık; onlar ilk seferde yukarı fırlatılır.
+ */
+async function istekTekrarli(url, body, etiket) {
+  const bekle = [2000, 5000, 12000];
+  for (let i = 0; ; i++) {
+    try {
+      return await istek(url, body);
+    } catch (e) {
+      const agHatasi = /zaman aşımı|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|socket hang up/i.test(e.message);
+      if (!agHatasi || i >= bekle.length) throw e;
+      console.log(`    ↻ ${etiket}: ${e.message} — ${bekle[i] / 1000} sn sonra tekrar (${i + 1}/${bekle.length})`);
+      await uyu(bekle[i]);
+    }
+  }
+}
+
 /** "8M", "128K", "-1" → bayt. Sınırsızsa Infinity. */
 function boyut(s) {
   if (!s) return Infinity;
@@ -110,10 +136,10 @@ async function main() {
     process.exit(1);
   }
 
-  const durum = JSON.parse(await istek(`${base}&ping=1`));
+  const durum = JSON.parse(await istekTekrarli(`${base}&ping=1`, undefined, "ping"));
   // Parça boyutu sunucunun sınırına göre seçilir. post_max_size'ı bilmeden
   // yüklemek, "boş gövde" diye görünen sessiz bir kesilme üretiyordu.
-  const parcaBoyu = Math.max(65536, Math.min(
+  let parcaBoyu = Math.max(65536, Math.min(
     durum.max_chunk,
     Math.floor(boyut(durum.post_max_size) * 0.8)
   ));
@@ -124,7 +150,7 @@ async function main() {
   console.log(`yuklenecek: ${liste.length} dosya, ${(toplam / 1048576).toFixed(1)} MB, ` +
               `parca ${(parcaBoyu / 1048576).toFixed(1)} MB`);
 
-  await istek(`${base}&reset=1`, Buffer.alloc(0));
+  await istekTekrarli(`${base}&reset=1`, Buffer.alloc(0), "reset");
 
   const basladi = Date.now();
   for (const rel of liste) {
@@ -137,7 +163,17 @@ async function main() {
         const uzunluk = Math.min(parcaBoyu, boy - ofset);
         const tampon  = Buffer.alloc(uzunluk);
         fs.readSync(fd, tampon, 0, uzunluk, ofset);
-        await istek(`${base}&p=${encodeURIComponent(rel)}&o=${ofset}`, tampon);
+        try {
+          await istekTekrarli(`${base}&p=${encodeURIComponent(rel)}&o=${ofset}`, tampon, rel);
+        } catch (e) {
+          // Tekrarlar da tükendiyse parçayı KÜÇÜLT ve devam et. Yavaş bir
+          // hatta 6 MB'lık bir parça zaman aşımına uğrarken 1 MB geçebiliyor;
+          // dağıtımı tamamen bırakmadan önce denenecek şey bu.
+          if (parcaBoyu <= 262144) throw e;
+          parcaBoyu = Math.max(262144, Math.floor(parcaBoyu / 4));
+          console.log(`    ↓ parça küçültüldü: ${(parcaBoyu / 1024).toFixed(0)} KB — kaldığı yerden devam`);
+          continue;   // aynı ofsetten, daha küçük parçayla
+        }
         ofset += uzunluk;
       } while (ofset < boy);   // boş dosya da bir kez gönderilsin
     } finally {
@@ -154,14 +190,14 @@ async function main() {
     return;
   }
 
-  const sonuc = (await istek(`${base}&swap=1`, Buffer.alloc(0))).trim();
+  const sonuc = (await istekTekrarli(`${base}&swap=1`, Buffer.alloc(0), "swap")).trim();
   console.log(`\n${liste.length} dosya, ${(toplam / 1048576).toFixed(1)} MB, ${saniye} sn — ${sonuc}`);
   if (cfg.publicUrl) console.log(`yayinda: ${cfg.publicUrl}`);
 }
 
 // Yalnızca takas: --no-swap ile yüklenmiş bir build'i sonradan yayına alır.
 async function sadeceTakas() {
-  const sonuc = (await istek(`${base}&swap=1`, Buffer.alloc(0))).trim();
+  const sonuc = (await istekTekrarli(`${base}&swap=1`, Buffer.alloc(0), "swap")).trim();
   console.log(sonuc);
   if (cfg.publicUrl) console.log(`yayinda: ${cfg.publicUrl}`);
 }
