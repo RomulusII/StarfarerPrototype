@@ -19,6 +19,14 @@ public class Bullet : MonoBehaviour
     /// </summary>
     public BoostMode boostAtFire = BoostMode.None;
 
+    /// <summary>
+    /// Ateşlendiği andaki kadraj genişliği (0 = dinlenme, 1 = tam zoom-out).
+    /// <see cref="boostAtFire"/> ile aynı gerekçeyle mermiyle TAŞINIR: isabet
+    /// anındaki zoom başka bir şeydir, oysa nişan ateş anındaki kadrajda
+    /// alındı. İsabet oranını zoom'a göre ayırmanın tek doğru anahtarı bu.
+    /// </summary>
+    public float zoomAtFire;
+
     void Awake()
     {
         BoxCollider2D col = gameObject.AddComponent<BoxCollider2D>();
@@ -63,6 +71,7 @@ public class Bullet : MonoBehaviour
                       .Str("yuzey",  surface.ToString())
                       .Str("hedef",  DamageUtil.TypeNameOf(other))
                       .Num("hasar",  damage)
+                      .Num("zoom",   zoomAtFire)
                       .Bool("oldurdu", lethal)
                       .End();
 

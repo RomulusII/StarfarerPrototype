@@ -175,11 +175,35 @@ if (isset($_GET['ping']) && !isset($_GET['t'])) {
 // Token'lar değiştirilmemişse HİÇBİR ŞEY kabul edilmez. Kurulmuş ama
 // yapılandırılmamış bir kopya, herkesin bildiği bir parolayla açık duran bir
 // yazma ucudur; sessizce çalışmasındansa gürültüyle durması yeğdir.
-if (WRITE_TOKEN_NATIVE === 'BUNU_DEGISTIR_NATIVE'
- || WRITE_TOKEN_WEB    === 'BUNU_DEGISTIR_WEB'
- || READ_TOKEN         === 'BUNU_DEGISTIR_OKUMA') {
+//
+// Yer tutucunun TAMAMIYLA karşılaştırmak yerine ÖNEKİ aranıyor: tam
+// karşılaştırma aynı metni iki yerde tutardı ve dosyayı otomatik dolduran bir
+// araç ikisini birden değiştirip kontrolü sessizce her zaman doğru hâle
+// getirirdi — koruma, koruduğu şeyle birlikte kaybolurdu. Dört harflik önek
+// ise değiştirilen metnin parçası değil, o yüzden yerinde kalıyor.
+//
+// Uzunluk tabanlı bir kural (deploy.php'deki gibi ≥24) burada KULLANILMADI:
+// hâlihazırda dağıtılmış APK'ların içindeki token 19 karakter ve o kurala
+// takılırdı. Token'ı değiştirmek, testçilerin elindeki paketin sessizce veri
+// göndermeyi bırakması demek olurdu — ölçümün sürekliliği, bu eşiğin
+// getireceğinden değerli. Alt sınır yine de var ki boş/kısa bir değer
+// geçmesin.
+function token_gecerli($t) {
+    return strlen($t) >= 16 && strpos($t, 'BUNU') !== 0;
+}
+// HANGİ token'ın geçersiz olduğu yazılır, "biri bozuk" değil. Değer
+// basılmaz — yalnızca adı ve uzunluğu. Bu ayrıntı bir teşhis turunu
+// tamamen ortadan kaldırıyor: eksik yapıştırılmış tek bir satırı
+// aramak için dosyanın tamamını gözle taramak gerekmiyor.
+$bozuk = array();
+if (!token_gecerli(WRITE_TOKEN_NATIVE)) $bozuk[] = 'WRITE_TOKEN_NATIVE (' . strlen(WRITE_TOKEN_NATIVE) . ' karakter)';
+if (!token_gecerli(WRITE_TOKEN_WEB))    $bozuk[] = 'WRITE_TOKEN_WEB ('    . strlen(WRITE_TOKEN_WEB)    . ' karakter)';
+if (!token_gecerli(READ_TOKEN))         $bozuk[] = 'READ_TOKEN ('         . strlen(READ_TOKEN)         . ' karakter)';
+
+if (count($bozuk) > 0) {
     http_response_code(500);
-    exit("kurulmadi: log.php icindeki uc token da degistirilmeli\n");
+    exit("kurulmadi, gecersiz token: " . implode(', ', $bozuk)
+       . "\nkural: en az 16 karakter ve 'BUNU' ile baslamamali\n");
 }
 
 $given = isset($_GET['t']) ? $_GET['t'] : '';

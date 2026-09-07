@@ -10,15 +10,24 @@
          ViewBounds); tarayıcıda yapılacak doğru şey pencerenin TAMAMINI ona
          vermek. Unity'nin Default şablonu sabit boyutlu bir kutu çizer ve
          telefonda oyun ekranın ortasında küçük bir kare olarak kalır. */
+      /* YÜKSEKLİK: dvh, vh DEĞİL.
+         Mobil tarayıcıda `height: 100%` (ve 100vh) adres çubuğunun kapladığı
+         yeri SAYMAYAN düzen yüksekliğine göre çözülür. Sonuç: tuval görünen
+         alandan uzun olur, sayfa kayar ve sağ alttaki tam ekran düğmesi
+         ekranın dışında kalır — yani tam ekrana geçerek kurtulmak da mümkün
+         olmaz. `dvh` görünen alanı takip eder ve çubuk gizlenip göründükçe
+         güncellenir. Destek yoksa üstteki 100% devrede kalır. */
       html, body {
         margin: 0; padding: 0; border: 0;
         width: 100%; height: 100%;
+        height: 100dvh;
         overflow: hidden;
         background: #05070c;
       }
       #unity-canvas {
         display: block;
         width: 100%; height: 100%;
+        height: 100dvh;
         position: fixed; inset: 0;
         /* Dokunma sürüklemesi sayfayı kaydırmasın: parmak oyunun nişan
            girdisidir (bkz. PointerInput), tarayıcının scroll'u değil. */
@@ -56,6 +65,28 @@
         letter-spacing: .08em; text-decoration: none;
       }
       #fs:hover, #apk:hover { background: rgba(32, 44, 62, .9); }
+
+      /* Dokunmatikte düğmeler büyür. 34 piksel fare için yeterli, parmak için
+         değil — ve bunlardan biri tam ekran, yani dar ekranda oyunun kaçış
+         yolu. Ulaşılamayan bir kaçış yolu, olmayanla aynı şey. */
+      @media (pointer: coarse) {
+        #fs, #apk { height: 46px; bottom: 14px; }
+        #fs  { width: 46px; font-size: 22px; line-height: 46px; }
+        #apk { right: 70px; line-height: 46px; font-size: 13px; }
+      }
+
+      /* PORTREYİ ENGELLEYEN KAPLAMA KALDIRILDI — ve neden, kalıcı bir ders:
+         oyun landscape diye portrede ekranı kapatan bir uyarı koyduk. Sonuç,
+         çözmeye çalıştığından kötü oldu. Yatayda tuval görünen alandan uzun
+         olduğu için tam ekran düğmesi ekran dışında kalıyordu; oyuncu düğmeye
+         ulaşmak için telefonu dikey çevirdiğinde ise karşısına oyunu tamamen
+         kapatan uyarı çıkıyordu. Yani her iki yönelimde de sıkışıyordu.
+
+         Bir uyarının kabul edilebilir olması için oyuncunun ondan ÇIKIŞ YOLU
+         olmalı; burada çıkış yolunun kendisi uyarının arkasında kalıyordu.
+         Yatay kilit artık yalnızca tam ekranda, gerçek Screen Orientation API
+         ile deneniyor — orada kilit gerçek ve çıkışı da tarayıcının kendi
+         jesti. Portrede oyun oynanır, sadece dar olur. */
     </style>
   </head>
   <body>
@@ -98,6 +129,7 @@
     <a id="apk" href="Starfarer.apk" download>&#8681; APK</a>
 
     <button id="fs" title="Tam ekran">&#9974;</button>
+
 
     <script src="Build/{{{ LOADER_FILENAME }}}"></script>
     <script>
@@ -142,7 +174,17 @@
       }).then(function (unityInstance) {
         loader.style.display = "none";
         fs.style.display = "block";
-        fs.onclick = function () { unityInstance.SetFullscreen(1); };
+        fs.onclick = function () {
+          unityInstance.SetFullscreen(1);
+          // Yönelim kilidi YALNIZCA tam ekranda çalışır (tarayıcı kuralı) ve
+          // masaüstünde hiç desteklenmez. Başarısızlığı yutuyoruz: kilit bir
+          // iyileştirme, ön koşul değil — tutmazsa portredeki kaplama devrede.
+          // Tam ekran geçişi bir kare sürebildiği için küçük bir gecikme var.
+          setTimeout(function () {
+            var o = screen.orientation;
+            if (o && o.lock) { try { o.lock("landscape").catch(function () {}); } catch (e) {} }
+          }, 250);
+        };
         if (apkVar) apk.style.display = "block";
       }).catch(function (message) {
         // Hata metni çubuğun YERİNE geçer ama sürüm satırı KALIR: "oyun

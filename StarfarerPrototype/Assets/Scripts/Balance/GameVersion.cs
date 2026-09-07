@@ -29,6 +29,11 @@ public static class GameVersion
     /// Denge revizyonu.
     ///   1 — serbest mod dalga bütçesi saatten KAYNAĞA taşındı,
     ///       Swarm hızı 2.4 -> 2.76.
+    ///   2 — nişan çizgisi eklendi (bkz. AimLine). Mekanik değişmedi ama
+    ///       oyuncunun gördüğü BİLGİ değişti: namlunun gerçek yönü artık
+    ///       görünüyor. İsabet oranının bundan etkilenmesi bekleniyor, yani
+    ///       1 numaralı revizyonun %52'siyle bu revizyonun sayısı aynı
+    ///       havuzda toplanamaz.
     /// </summary>
-    public const int Denge = 1;
+    public const int Denge = 2;
 }

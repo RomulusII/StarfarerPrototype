@@ -19,6 +19,14 @@ public class TurretBullet : MonoBehaviour
     [Tooltip("0 = vurulabilir değil. Roketler için ayarlanır.")]
     public float      hp         = 0f;
 
+    /// <summary>
+    /// Ateşlendiği andaki kadraj genişliği. Turret kendi nişan alıyor, yani
+    /// zoom onun isabetini ETKİLEMEMELİ — alan tam da bunu sınamak için var:
+    /// ana silahın isabeti zoom'la düşerken turret'ınki düşmüyorsa, sebep
+    /// kadraj değil nişan mekaniğidir. Kontrol grubu.
+    /// </summary>
+    public float      zoomAtFire;
+
     Vector2 _dir;
 
     /// <summary>Collider yarıçapı — süpürme mesafesi buna göre uzatılır.</summary>
@@ -174,6 +182,7 @@ public class TurretBullet : MonoBehaviour
                       .Str("yuzey",  surface.ToString())
                       .Str("hedef",  DamageUtil.TypeNameOf(other))
                       .Num("hasar",  damage)
+                      .Num("zoom",   zoomAtFire)
                       .Bool("oldurdu", lethal)
                       .End();
 

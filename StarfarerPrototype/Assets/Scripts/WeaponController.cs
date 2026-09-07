@@ -33,6 +33,12 @@ public class WeaponController : MonoBehaviour
 
     void Start()
     {
+        // Nişan çizgisi silahın KENDİ nesnesine kurulur: namlu yönü bu
+        // transform'un +y'si, çizgi de merminin çıktığı yerden aynı ekseni
+        // kullanıyor (bkz. AimLine). Ayrı bir nesneye kurulsaydı iki dönüş
+        // birbirini kovalardı.
+        gameObject.AddComponent<AimLine>();
+
         _kineticSprite = SkinLibrary.Get(SkinId.PlayerBulletKinetic, 10, 30, Color.white);
 
         // Plazma küresi yumuşak kenarlıdır; skin yoksa prosedürel daire kullanılır
@@ -249,6 +255,10 @@ public class WeaponController : MonoBehaviour
         b.damage      = damage * damageMulti;
         b.weaponType  = type;
         b.boostAtFire = BoostController.Mode;
+        // Kadraj ATEŞ ANINDA ne kadar genişti. İsabet anındaki değil: soru
+        // "hangi kadrajda nişan alındı" — mermi uçarken imleç çoktan yer
+        // değiştirmiş olur. boostAtFire ile aynı gerekçe.
+        b.zoomAtFire  = CameraController.ZoomOrani;
 
         // İsabet oranının PAYDASI. Işınlar buraya girmez (ıskalamazlar), yani
         // oran yalnızca mermili silahlar için anlamlıdır.
@@ -264,6 +274,7 @@ public class WeaponController : MonoBehaviour
                   .Num("hasar",  b.damage)
                   .Num("boyut",  scaleMulti)
                   .Num("hiz",    speed)
+                  .Num("zoom",   b.zoomAtFire)
                   .End();
     }
 

@@ -153,6 +153,18 @@ public static class BalanceLog
             .Num("ekran_en",   Screen.width)
             .Num("ekran_boy",  Screen.height)
             .Num("dpi",        Screen.dpi)
+            // Kadrajın cihaza göre ne kadar daraltıldığı ve bunun dayandığı
+            // köşegen. Ekran ölçüleri tek başına yetmiyordu: "her şey çok
+            // küçük" şikâyetinin sebebi ekranın kendisi değil, ekrandan
+            // TÜRETİLEN sınıflandırmanın yanlış olmasıydı — tarayıcıda
+            // Screen.dpi fiziksel yoğunluk değil (bkz. CameraController).
+            // Hesabın çıktısı kayda girmezse böyle bir hata yine görünmez.
+            .Num("cihaz_k",    CameraController.CihazOlcegi)
+            .Num("kosegen",    CameraController.CihazKosegen)
+            // Yatay mı portre mi. Landscape bir oyunda portre, ekranın yarısını
+            // çöpe atar; kaç oturumun öyle oynandığı kilidin gerekli olup
+            // olmadığını söyler.
+            .Str("yonelim",    Screen.width >= Screen.height ? "yatay" : "portre")
             .Str("dil",        Loc.Language.ToString())
             .Num("startLevel", GameProgress.CurrentLevel)
             .End();

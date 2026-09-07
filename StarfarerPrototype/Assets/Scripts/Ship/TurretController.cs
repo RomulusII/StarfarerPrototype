@@ -264,6 +264,7 @@ public class TurretController : ShipComponentBase
         if (isRocket) { tb.turnRate = 150f; tb.hp = 3f; }
 
         tb.SetDirection(transform.right);
+        tb.zoomAtFire = CameraController.ZoomOrani;
 
         BalanceLog.Event("shot_fired")
                   .Str("kaynak", "turret")
@@ -271,6 +272,7 @@ public class TurretController : ShipComponentBase
                   .Str("silah",  tb.weaponType.ToString())
                   .Num("hasar",  tb.damage)
                   .Num("hiz",    bulletSpeed)
+                  .Num("zoom",   tb.zoomAtFire)
                   .End();
 
         BuildBulletVisual(go, specType);

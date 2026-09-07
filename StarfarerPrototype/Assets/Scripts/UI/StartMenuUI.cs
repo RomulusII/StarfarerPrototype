@@ -69,6 +69,12 @@ public class StartMenuUI : MonoBehaviour
         var scaler = _canvasGO.AddComponent<CanvasScaler>();
         scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
+        // Projedeki diğer sekiz canvas 0.5 kullanıyor; burada ayarlanmamıştı,
+        // yani varsayılan 0'da (yalnızca GENİŞLİĞE göre) kalıyordu. Dar bir
+        // ekranda menü, oyunun geri kalanındaki HUD'lardan daha çok küçülüyor
+        // ve yazılar okunmuyordu — telefonda en çok şikâyet edilen ekran da
+        // ilk açılan bu.
+        scaler.matchWidthOrHeight  = 0.5f;
 
         _canvasGO.AddComponent<GraphicRaycaster>();
 

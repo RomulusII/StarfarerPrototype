@@ -64,6 +64,17 @@ public class CameraController : MonoBehaviour
     [Tooltip("Editörde mobil ölçeğini denemek için. Gerçek cihazda gereksiz.")]
     public bool forceDeviceZoom = false;
 
+    /// <summary>
+    /// Kadrajın o anki genişliği: 0 = dinlenme, 1 = tam zoom-out.
+    ///
+    /// Neden var: zoom şu an bir kontrol değil, NİŞANIN YAN ETKİSİ — imleç
+    /// kenara gittikçe dünya küçülüyor, yani hedef tam da nişan alırken
+    /// ufalıyor. Bunun isabete zarar verip vermediği tartışmayla değil ölçümle
+    /// bilinir: atış olaylarına bu alan yazılıyor ve isabet oranı zoom
+    /// durumuna göre ayrılabiliyor.
+    /// </summary>
+    public static float ZoomOrani { get; private set; }
+
     PlayerShip _ship;
 
     private Camera _cam;
@@ -134,12 +145,23 @@ public class CameraController : MonoBehaviour
     /// </summary>
     const float UnknownInches = 6.2f;
 
+    /// <summary>
+    /// Son hesaplanan cihaz ölçeği ve köşegen. Denge kaydına yazılır: sahadaki
+    /// cihazlarda sınıflandırmanın doğru çalıştığı ancak böyle görülür.
+    /// Tarayıcıdaki hata da tam olarak burada gizlenmişti — kimse bakmadığı
+    /// için aylarca telefonlar tablet sayıldı.
+    /// </summary>
+    public static float CihazOlcegi  { get; private set; } = 1f;
+    public static float CihazKosegen { get; private set; }
+
     static float DeviceZoomFactor()
     {
         float inches = ScreenDiagonalInches();
         if (inches <= 0f) inches = UnknownInches;
-        return Mathf.Lerp(PhoneZoom, TabletZoom,
-                          Mathf.InverseLerp(PhoneInches, TabletInches, inches));
+        CihazKosegen = inches;
+        CihazOlcegi  = Mathf.Lerp(PhoneZoom, TabletZoom,
+                                  Mathf.InverseLerp(PhoneInches, TabletInches, inches));
+        return CihazOlcegi;
     }
 
     /// <summary>
@@ -153,11 +175,48 @@ public class CameraController : MonoBehaviour
     /// </summary>
     static float ScreenDiagonalInches()
     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return TarayiciKosegen();
+#else
         float dpi = Screen.dpi;
         if (dpi < 100f || dpi > 800f) return 0f;
 
         float w = Screen.width, h = Screen.height;
         return Mathf.Sqrt(w * w + h * h) / dpi;
+#endif
+    }
+
+    /// <summary>Tarayıcı sınıflandırmasının uçları, CSS pikseli cinsinden.</summary>
+    const float CssPhoneWidth  = 500f;
+    const float CssTabletWidth = 1100f;
+
+    /// <summary>
+    /// Tarayıcıda ekran sınıfını CSS piksel genişliğinden kestirir ve yukarıdaki
+    /// eğrinin beklediği "inç" karşılığını döndürür.
+    ///
+    /// NEDEN dpi KULLANILMIYOR: tarayıcıda <c>Screen.dpi</c> fiziksel yoğunluk
+    /// DEĞİL, <c>96 × devicePixelRatio</c>. Ölçüldü: bir Pixel 8'de 192 çıkıyor,
+    /// cihazın gerçek yoğunluğu ~430. Köşegen bu yüzden iki katı hesaplanıyor,
+    /// telefon 9,3 inçlik bir tablet sanılıyor ve telefon için ayrılmış daraltma
+    /// (0.70) hiç uygulanmıyordu — 0.89 uygulanıyordu. "Küçük ekranda her şey
+    /// çok küçük" şikâyetinin ölçülmüş kaynağı buydu.
+    ///
+    /// CSS genişliği ise doğrudan "bu ekran ne kadar geniş görünüyor" sorusunun
+    /// cevabı: telefon ~375-430, tablet ~768-1024, masaüstü 1200+. Fiziksel inç
+    /// değil — ama sınıflandırmada aradığımız sinyal zaten fiziksel boy değil,
+    /// ekrana kaç şeyin sığdığı.
+    ///
+    /// Masaüstü tarayıcı buraya HİÇ GİRMEZ: ApplyDeviceZoom yalnızca
+    /// isMobilePlatform doğruyken çalışıyor ve tarayıcıda bu bayrak kullanıcı
+    /// ajanından geliyor (ölçüldü, mobil tarayıcıda true).
+    /// </summary>
+    static float TarayiciKosegen()
+    {
+        float dpr      = Screen.dpi > 1f ? Screen.dpi / 96f : 1f;
+        float cssWidth = Screen.width / Mathf.Max(dpr, 0.5f);
+
+        return Mathf.Lerp(PhoneInches, TabletInches,
+                          Mathf.InverseLerp(CssPhoneWidth, CssTabletWidth, cssWidth));
     }
 
     void Update()
@@ -190,6 +249,11 @@ public class CameraController : MonoBehaviour
         float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
         float targetSize = Mathf.Lerp(minZoomSize, maxZoomSize, zoomT);
         _cam.orthographicSize = Mathf.Lerp(_cam.orthographicSize, targetSize, Time.deltaTime * 3f);
+
+        // Kaydın okuyacağı hâl: 0 = dinlenme kadrajı, 1 = tam zoom-out.
+        // Ham ortographic size değil ORAN yazılıyor; cihaz ölçeği min/max'ı
+        // zaten kaydırıyor, yani 5.2 sayısı iki cihazda aynı şeyi anlatmaz.
+        ZoomOrani = Mathf.InverseLerp(minZoomSize, maxZoomSize, _cam.orthographicSize);
     }
 
     /// <summary>
