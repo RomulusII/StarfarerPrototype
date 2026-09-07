@@ -13,7 +13,9 @@
  * UÇLAR
  *   GET  ...?ping=1                          → "pong" (token gerekmez, teşhis için)
  *   GET  ...?t=OKUMA&ping=1                  → ayrıntılı durum (PHP sürümü, kota)
- *   POST ...?t=YAZMA&d=CIHAZ&f=DOSYA         gövde = JSONL
+ *   GET  ...?t=YAZMA&d=CIHAZ&f=DOSYA&size=1  → dosyanın sunucudaki boyutu
+ *   POST ...?t=YAZMA&d=CIHAZ&f=DOSYA&o=OFS   gövde = kaydın devamı (EKLEME)
+ *   POST ...?t=YAZMA&d=CIHAZ&f=DOSYA         gövde = kaydın tamamı (eski yol)
  *   GET  ...?t=OKUMA&list=1                  → JSON dosya listesi
  *   GET  ...?t=OKUMA&get=DOSYA               → dosyanın kendisi
  *
@@ -33,9 +35,14 @@
  * TOKEN GİZLİLİK İÇİN DEĞİL: içerik oyun olayları. Yazma ucunu token'la
  * kapatmanın tek sebebi, açık bir POST ucunun birkaç gün içinde tarayıcı
  * botlarınca bulunup diski doldurmasıdır. Botu durdurur, paketi açan birini
- * durdurmaz — bu yüzden asıl savunma aşağıdaki KOTA ve KÜÇÜLME kurallarıdır,
- * ve son sözü analiz tarafındaki tutarlılık kontrolleri söyler. İstemci
- * tarafında tutulamayan bir sırla veri bütünlüğü garanti edilemez.
+ * durdurmaz — bu yüzden asıl savunma aşağıdaki KOTA ve OFSET kurallarıdır, ve
+ * son sözü analiz tarafındaki tutarlılık kontrolleri söyler. İstemci tarafında
+ * tutulamayan bir sırla veri bütünlüğü garanti edilemez.
+ *
+ * EKLEME UCU güvenliği ZAYIFLATMAZ, güçlendirir. Üzerine yazan bir uçta token'ı
+ * olan biri bir kaydı baştan sona değiştirebiliyordu; ofset denetimli eklemede
+ * bayt yok edilemiyor, yalnızca ekleniyor. Eski üzerine-yazma yolu yalnızca
+ * dağıtılmış paketlerle uyum için duruyor.
  *
  * SÜRÜM NOTU: bu dosya PHP 5.3 ile de çalışır. İlk sürümde `fn() =>` (7.4+) ve
  * `str_ends_with` (8.0+) kullanılmıştı; eski bir PHP'de dosya PARSE EDİLEMİYOR,
@@ -302,6 +309,39 @@ if (isset($_GET['get'])) {
 
 if (!$yazabilir) { http_response_code(403); exit("nope\n"); }
 
+/**
+ * Hedef dosya yolu. İstemciden gelen ad temizlenir: süzgeç dizin ayıracını da
+ * eler ('/' ve '\' listede yok), yani ".." ile klasörün dışına çıkmak mümkün
+ * değil; uzantı .jsonl'a zorlandığı için çalıştırılabilir bir dosya yazdırmak
+ * da mümkün değil. Cihaz kimliği önek olur, böylece iki telefonun aynı saniyede
+ * başlattığı oturum birbirini ezmez.
+ */
+function hedef_yol() {
+    $device = preg_replace('/[^A-Za-z0-9_-]/', '', isset($_GET['d']) ? $_GET['d'] : 'anon');
+    $name   = preg_replace('/[^A-Za-z0-9._-]/', '', isset($_GET['f']) ? $_GET['f'] : 'session.jsonl');
+
+    // str_ends_with DEĞİL: PHP 8.0 öncesinde tanımsız fonksiyon = ölümcül hata.
+    if ($name === '' || substr($name, -6) !== '.jsonl') $name = 'session.jsonl';
+    if ($device === '') $device = 'anon';
+
+    return LOG_DIR . '/' . substr($device, 0, 16) . '-' . $name;
+}
+
+// ── Boyut sorgusu ────────────────────────────────────────────────────────────
+//
+// İstemci nereden devam edeceğini buradan öğrenir. Ofseti YERELDE tutmak daha
+// ucuz olurdu ama tam da kaybolduğundan şüphelendiğimiz depolamaya yazmak
+// demekti (tarayıcıda IndexedDB); sunucuya sormak durumsuzdur ve istemcinin
+// deposu silinse bile doğru cevabı verir.
+//
+// Yazma token'ı yeter: istemci zaten kendi dosyasına yazıyor, boyutunu
+// öğrenmesi yeni bir yetki değil.
+if (isset($_GET['size'])) {
+    $p = hedef_yol();
+    header('Content-Type: text/plain');
+    exit(is_file($p) ? (string)filesize($p) . "\n" : "0\n");
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     exit("POST bekleniyor\n");
@@ -317,38 +357,50 @@ if (strlen($body) > MAX_BYTES) {
     exit("cok buyuk\n");
 }
 
-// İlk satır JSON olmalı — yanlışlıkla gelen HTML/çöp diske yazılmasın
-$nl    = strpos($body, "\n");
-$first = ($nl === false) ? $body : substr($body, 0, $nl);
-if (json_decode($first) === null) {
-    http_response_code(400);
-    exit("JSONL degil\n");
+$path   = hedef_yol();
+$vardi  = is_file($path);
+$mevcut = $vardi ? filesize($path) : 0;
+
+// EKLEME Mİ, ÜZERİNE YAZMA MI: `o` parametresinin VARLIĞI belirler.
+//
+// `o` VARSA — ekleme. Gelen ofset dosyanın mevcut boyutuna eşit olmalı, değilse
+// reddedilir. Bu kural sayesinde bayt YOK EDİLEMEZ, yalnızca eklenir: bir kaydı
+// kısaltmak ya da sahtesiyle değiştirmek yapısal olarak imkânsız hâle gelir.
+// Eskiden bu işi "küçülme yasağı" görüyordu, ama o yalnızca üzerine yazmanın
+// açtığı deliği yamalayan bir kuraldı; ofset denetimi deliği kapatıyor.
+//
+// `o` YOKSA — eski davranış: dosyanın tamamı gelir, üzerine yazılır.
+// KALDIRILAMAZ, çünkü testçilerin elindeki dağıtılmış APK'lar tam olarak böyle
+// gönderiyor. Kaldırsaydık o paketler ilk gönderimden sonra 409 alırdı ve
+// istemci 4xx'i yapılandırma hatası sayıp gönderimi o oturum için tamamen
+// kapatırdı — sahadaki veri sessizce kesilirdi. Bu yolda küçülme yasağı duruyor.
+$ekleme = isset($_GET['o']);
+$ofset  = $ekleme ? (int)$_GET['o'] : 0;
+
+if ($ekleme) {
+    if ($ofset < 0 || $ofset !== $mevcut) {
+        http_response_code(409);
+        exit("ofset uyusmuyor: dosyada " . $mevcut . ", gelen " . $ofset . "\n");
+    }
+    if ($ofset + strlen($body) > MAX_BYTES) {
+        http_response_code(413);
+        exit("dosya siniri asildi\n");
+    }
+} else if ($vardi && strlen($body) < $mevcut) {
+    http_response_code(409);
+    exit("kucuk govde: mevcut kayit " . $mevcut . " bayt\n");
 }
 
-// Dosya adı İSTEMCİDEN gelir ama temizlenir: cihaz kimliği önek olarak eklenir,
-// böylece iki telefonun aynı saniyede başlattığı oturum birbirini ezmez.
-//
-// Süzgeç dizin ayıracını da eler ('/' ve '\' listede yok), yani ".." ile
-// klasörün dışına çıkmak mümkün değil; uzantı .jsonl'a zorlandığı için
-// çalıştırılabilir bir dosya (.php) yazdırmak da mümkün değil.
-$device = preg_replace('/[^A-Za-z0-9_-]/', '', isset($_GET['d']) ? $_GET['d'] : 'anon');
-$name   = preg_replace('/[^A-Za-z0-9._-]/', '', isset($_GET['f']) ? $_GET['f'] : 'session.jsonl');
-
-// str_ends_with DEĞİL: PHP 8.0 öncesinde tanımsız fonksiyon = ölümcül hata.
-if ($name === '' || substr($name, -6) !== '.jsonl') $name = 'session.jsonl';
-if ($device === '') $device = 'anon';
-
-$path = LOG_DIR . '/' . substr($device, 0, 16) . '-' . $name;
-$vardi = is_file($path);
-
-// KÜÇÜLME YASAK. İstemci her seferinde dosyanın TAMAMINI gönderir, yani meşru
-// bir gönderimde dosya oturum boyunca yalnızca büyür. Küçülen bir gövde iki
-// şeyden biridir: yarım okunmuş bir dosya ya da `list=1` ile ad öğrenip
-// gerçek kaydı sahtesiyle değiştirmeye çalışan biri. Gerçek istemciyi hiç
-// etkilemez, kaydı silinmekten korur.
-if ($vardi && strlen($body) < filesize($path)) {
-    http_response_code(409);
-    exit("kucuk govde: mevcut kayit " . filesize($path) . " bayt\n");
+// İlk satır JSON olmalı — yanlışlıkla gelen HTML/çöp diske yazılmasın.
+// Yalnızca dosyanın BAŞINDA anlamlı: ekleme parçaları kaydın ortasından devam
+// eder ve bir satırın tam başına denk gelmek zorunda değildir.
+if ($ofset === 0) {
+    $nl    = strpos($body, "\n");
+    $first = ($nl === false) ? $body : substr($body, 0, $nl);
+    if (json_decode($first) === null) {
+        http_response_code(400);
+        exit("JSONL degil\n");
+    }
 }
 
 // Kota YALNIZCA yeni dosyada işler: süren bir oturumun büyümesini kesmek,
@@ -369,12 +421,17 @@ if (!$vardi) {
     }
 }
 
-// Üzerine yaz, ekleme YAPMA: istemci her seferinde dosyanın tamamını gönderiyor.
-// Ekleme yapsaydık her gönderimde kayıt katlanarak büyürdü.
-if (file_put_contents($path, $body, LOCK_EX) === false) {
+// Ekleme yolunda FILE_APPEND, eski yolda üzerine yazma. Ofset denetimi
+// yukarıda yapıldı, yani buraya gelen bir ekleme dosyanın tam sonuna denk
+// geliyor demektir.
+$bayrak = $ekleme ? (FILE_APPEND | LOCK_EX) : LOCK_EX;
+if (file_put_contents($path, $body, $bayrak) === false) {
     http_response_code(500);
     exit("yazilamadi\n");
 }
 
+// Yeni boyut döndürülür: istemci bir sonraki parçayı nereden göndereceğini
+// ayrı bir istek atmadan öğrenir. Ofsetin tek doğruluk kaynağı sunucudur.
+clearstatcache(false, $path);
 http_response_code(200);
-echo "ok " . strlen($body) . "\n";
+echo "ok " . filesize($path) . "\n";

@@ -73,7 +73,69 @@ public class BalanceUploader : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
-    void Start() => StartCoroutine(UploadPending());
+    void Start()
+    {
+        StartCoroutine(UploadPending());
+        StartCoroutine(PeriyodikGonderim());
+    }
+
+    /// <summary>Kaç saniyede bir açık oturumun yeni satırları gönderilir.</summary>
+    const float GonderimAraligi = 30f;
+
+    /// <summary>
+    /// Her dosya için sunucudaki BAYT SAYISI. Bir sonraki gönderim buradan
+    /// devam eder; sunucu her yazımdan sonra yeni boyutu döndürüyor, yani bu
+    /// sözlük sunucunun söylediğinin önbelleği. Ofsetin tek doğruluk kaynağı
+    /// sunucu: diskte tutmak, tam da kaybolduğundan şüphelendiğimiz depoya
+    /// (tarayıcıda IndexedDB) yazmak olurdu.
+    /// </summary>
+    readonly System.Collections.Generic.Dictionary<string, long> _gonderilen =
+        new System.Collections.Generic.Dictionary<string, long>();
+
+    bool _mesgul;
+
+    /// <summary>
+    /// Açık oturumu düzenli aralıkla gönderir.
+    ///
+    /// NEDEN GEREKLİ: gönderim eskiden yalnızca level sonunda ve kapanışta
+    /// yapılıyordu, yani oyunun verisi kaydın DOSYADA HAYATTA KALMASINA
+    /// bağlıydı. Tarayıcıda bu varsayım tutmadı: üç oturum boyunca kayıtlar
+    /// IndexedDB'ye yazıldı ama sayfa yenilenince hiçbiri sunucuya ulaşmadı
+    /// (yalnızca önceki günlerden kalan dosyalar gitti). Otuz saniyede bir
+    /// gönderince verinin sağ kalması artık depolamanın kaprisine bağlı değil.
+    ///
+    /// Yalnızca DOSYA BÜYÜDÜYSE istek atılır; duran bir oyunda ağ trafiği
+    /// olmaz. Ekleme yolu sayesinde her turda yalnızca yeni baytlar gidiyor,
+    /// dosyanın tamamı değil.
+    ///
+    /// Gerçek zaman kullanılır: menü ve upgrade ekranı timeScale'i sıfırlıyor,
+    /// WaitForSeconds ise orada durur ve gönderim sessizce ölürdü.
+    /// </summary>
+    IEnumerator PeriyodikGonderim()
+    {
+        while (true)
+        {
+            yield return new WaitForSecondsRealtime(GonderimAraligi);
+
+            if (_rejected) yield break;   // yapılandırma bozuk, ısrar etmenin anlamı yok
+
+            string path = BalanceLog.CurrentPath;
+            if (string.IsNullOrEmpty(path)) continue;
+
+            long diskte = BoyutOku(path);
+            long gonderilmis = _gonderilen.TryGetValue(Normalize(path), out long g) ? g : -1;
+            if (diskte <= 0 || diskte == gonderilmis) continue;
+
+            yield return UploadFile(path, deleteOnSuccess: false);
+        }
+    }
+
+    /// <summary>Dosya boyutu; okunamıyorsa -1. Coroutine'de try/catch olamaz.</summary>
+    static long BoyutOku(string path)
+    {
+        try { return File.Exists(path) ? new FileInfo(path).Length : -1; }
+        catch (IOException) { return -1; }
+    }
 
     /// <summary>
     /// ÖNCEKİ oturumlardan kalan kayıtları gönderir ve gidenleri siler.
@@ -104,8 +166,8 @@ public class BalanceUploader : MonoBehaviour
 
     /// <summary>
     /// Klasördeki kayıtları eskiden yeniye listeler. Coroutine'den AYRI metot:
-    /// iterator gövdesinde catch'li try bloğu olamaz — <see cref="ReadAll"/>
-    /// da aynı kısıt yüzünden ayrı duruyor.
+    /// iterator gövdesinde catch'li try bloğu olamaz — <see cref="ReadFrom"/>
+    /// ve <see cref="BoyutOku"/> da aynı kısıt yüzünden ayrı duruyor.
     /// </summary>
     static string[] ListPending()
     {
@@ -155,16 +217,57 @@ public class BalanceUploader : MonoBehaviour
 
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) yield break;
 
-        // Okuma AYRI bir metotta: coroutine'in içinde catch'li bir try bloğu
-        // olamaz (C# iterator kısıtı), yoksa `yield break` derlenmez.
-        byte[] body = ReadAll(path);
-        if (body == null) yield break;
+        // Aynı anda tek gönderim. Periyodik tur ile level sonu flush'ı üst üste
+        // binerse ikisi de aynı ofsetten gönderir, ikincisi 409 yer ve boşuna
+        // bir teşhis gürültüsü üretirdi.
+        if (_mesgul) yield break;
+        _mesgul = true;
 
         // Token platforma göre seçilir (bkz. UploadConfig.Token): tarayıcı
         // build'i kendi yazma token'ını taşır, native build başkasını.
-        string url = $"{cfg.endpoint}?t={UnityWebRequest.EscapeURL(UploadConfig.Token)}" +
-                     $"&d={UnityWebRequest.EscapeURL(DeviceId)}" +
-                     $"&f={UnityWebRequest.EscapeURL(Path.GetFileName(path))}";
+        string taban = $"{cfg.endpoint}?t={UnityWebRequest.EscapeURL(UploadConfig.Token)}" +
+                       $"&d={UnityWebRequest.EscapeURL(DeviceId)}" +
+                       $"&f={UnityWebRequest.EscapeURL(Path.GetFileName(path))}";
+
+        string anahtar = Normalize(path);
+
+        // Ofseti bilmiyorsak SUNUCUYA sor. Yerel bir sayaç tutmak bir istek
+        // kazandırırdı ama tam da kaybolduğundan şüphelendiğimiz depoya
+        // yazmak olurdu; üstelik önceki oturumdan kalan bir dosyanın ne
+        // kadarının gittiğini yalnızca sunucu bilir.
+        if (!_gonderilen.ContainsKey(anahtar))
+        {
+            using var boyutReq = UnityWebRequest.Get(taban + "&size=1");
+            boyutReq.timeout = 15;
+            yield return boyutReq.SendWebRequest();
+
+            if (boyutReq.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogWarning($"[BalanceUploader] boyut sorulamadı ({boyutReq.error}) — " +
+                                 "sonraki turda tekrar denenecek");
+                _mesgul = false;
+                yield break;
+            }
+            if (!long.TryParse(boyutReq.downloadHandler.text.Trim(), out long uzak)) uzak = 0;
+            _gonderilen[anahtar] = uzak;
+        }
+
+        long ofset = _gonderilen[anahtar];
+
+        // Okuma AYRI bir metotta: coroutine'in içinde catch'li bir try bloğu
+        // olamaz (C# iterator kısıtı), yoksa `yield break` derlenmez.
+        byte[] body = ReadFrom(path, ofset);
+        if (body == null) { _mesgul = false; yield break; }
+        if (body.Length == 0)
+        {
+            // Sunucu dosyanın tamamına sahip. Kapanmış bir oturumsa yereldeki
+            // kopyanın işi bitti.
+            if (deleteOnSuccess) DeleteQuietly(path);
+            _mesgul = false;
+            yield break;
+        }
+
+        string url = taban + $"&o={ofset}";
 
         using var req = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST);
         req.uploadHandler   = new UploadHandlerRaw(body);
@@ -174,16 +277,18 @@ public class BalanceUploader : MonoBehaviour
 
         yield return req.SendWebRequest();
 
+        _mesgul = false;
+
         if (req.responseCode == 409)
         {
-            // Sunucu bu dosyayı reddetti: gönderilen gövde sunucudakinden
-            // KÜÇÜK (log.php'deki küçülme kuralı). Meşru bir istemcide olmaz —
-            // kayıt yalnızca büyür — ama yarıda kalmış bir dosya bu duruma
-            // düşebilir. Yapılandırma hatası DEĞİL: diğer dosyalar denenmeye
-            // devam etmeli, yoksa tek bozuk kayıt bütün oturumun gönderimini
-            // susturur.
-            Debug.LogWarning($"[BalanceUploader] {Path.GetFileName(path)} reddedildi (409) — " +
-                             "sunucudaki kayıt daha büyük, bu dosya atlandı");
+            // Ofset tutmadı: sunucudaki dosya beklediğimizden farklı boyutta.
+            // Önbelleklenen ofseti atıyoruz, sonraki tur sunucuya yeniden
+            // sorup doğru yerden devam edecek. Yapılandırma hatası DEĞİL —
+            // 4xx sayıp gönderimi kapatmak, tek bir senkron kaymasında bütün
+            // oturumun verisini çöpe atardı.
+            _gonderilen.Remove(Normalize(path));
+            Debug.LogWarning($"[BalanceUploader] {Path.GetFileName(path)} ofset uyuşmadı (409) — " +
+                             $"sunucu: {req.downloadHandler.text.Trim()}; sonraki turda düzeltilecek");
         }
         else if (req.responseCode == 507)
         {
@@ -211,23 +316,40 @@ public class BalanceUploader : MonoBehaviour
         }
         else
         {
+            // Sunucu yeni boyutu döndürüyor ("ok 12345"): ofsetin tek doğruluk
+            // kaynağı o, biz yalnızca önbellekliyoruz. Kendi hesabımızı
+            // tutsaydık bir kayma sessizce birikirdi.
+            var yanit = req.downloadHandler.text.Trim().Split(' ');
+            if (yanit.Length == 2 && long.TryParse(yanit[1], out long yeniBoyut))
+                _gonderilen[Normalize(path)] = yeniBoyut;
+            else
+                _gonderilen.Remove(Normalize(path));   // beklenmedik yanıt: yeniden sor
+
             Debug.Log($"[BalanceUploader] {Path.GetFileName(path)} — " +
-                      $"{body.Length / 1024} KB gönderildi");
+                      $"+{body.Length / 1024} KB (ofset {ofset})");
+
             if (deleteOnSuccess) DeleteQuietly(path);
         }
     }
 
     /// <summary>
-    /// Kaydı tamamen okur. Dosya O SIRADA YAZILIYOR olabilir, bu yüzden
-    /// <c>FileShare.ReadWrite</c> şart: paylaşımsız açılırsa kilit çakışır ve
-    /// gönderim sessizce hiç çalışmaz.
+    /// Kaydın <paramref name="ofset"/> baytından SONRASINI okur. Dosya o sırada
+    /// yazılıyor olabilir, bu yüzden <c>FileShare.ReadWrite</c> şart:
+    /// paylaşımsız açılırsa kilit çakışır ve gönderim sessizce hiç çalışmaz.
+    ///
+    /// Ofset dosyadan büyükse boş dizi döner — sunucuda bizde olandan fazlası
+    /// var demektir (başka bir istemci ya da eski bir gönderim); o durumda
+    /// yazacak bir şeyimiz yok.
     /// </summary>
-    static byte[] ReadAll(string path)
+    static byte[] ReadFrom(string path, long ofset)
     {
         try
         {
             using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            var buf  = new byte[fs.Length];
+            if (ofset >= fs.Length) return System.Array.Empty<byte>();
+
+            fs.Seek(ofset, SeekOrigin.Begin);
+            var buf  = new byte[fs.Length - ofset];
             int read = 0;
             while (read < buf.Length)
             {
