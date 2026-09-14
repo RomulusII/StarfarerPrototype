@@ -433,7 +433,14 @@ public class ChapterManager : MonoBehaviour
 
     // ── Yardımcı metodlar ─────────────────────────────────────────────────────
 
-    static void FillByBudget(List<EnemyTypeData> list, EnemyTypeData[] pool, int budget)
+    /// <summary>
+    /// Dalga kompozisyonunu kuran asıl kural. PUBLIC olmasının tek sebebi
+    /// çevrimdışı denge modeli (bkz. CurveModel): model kompozisyonu yeniden
+    /// yazsaydı oyunla sessizce ayrışırdı ve tam da ayrıştığı yerde yanlış
+    /// sayı üretirdi. Metot rastgelelik içerdiği için model onu defalarca
+    /// örnekleyip ortalamasını alır.
+    /// </summary>
+    public static void FillByBudget(List<EnemyTypeData> list, EnemyTypeData[] pool, int budget)
     {
         int safety = 200;
         while (budget > 0 && safety-- > 0)
