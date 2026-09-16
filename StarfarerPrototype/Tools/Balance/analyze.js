@@ -2,6 +2,7 @@
 //
 //   node Tools/Balance/analyze.js <dosya.jsonl>
 //   node Tools/Balance/analyze.js            (en yeni kaydı otomatik bulur)
+//   node Tools/Balance/analyze.js --karsilastir <taban> <varyant>
 //
 // Dış bağımlılık yok (SkinGen ile aynı desen). Ham olaydan özet türetir;
 // hangi özeti isteyeceğimizi önceden bilmediğimiz için kayıt ham tutuluyor.
@@ -37,6 +38,255 @@ function latestLog() {
   return best ? best.p : null;
 }
 
+// Biçimlendirme yardımcıları. Her iki kip de kullandığı için dosya
+// çözümlemesinden ÖNCE tanımlanırlar.
+const pad = (s, n) => String(s).padStart(n);
+const h   = t => console.log("\n\x1b[1m── " + t + " " + "─".repeat(Math.max(0, 60 - t.length)) + "\x1b[0m");
+
+// ── Karşılaştırma kipi ──────────────────────────────────────────────────────
+//
+//   node Tools/Balance/analyze.js --karsilastir <taban> <varyant>
+//
+// Taraf bir KLASÖR (koşu kümesi) ya da tek bir dosya olabilir.
+//
+// Neden ayrı bir kip: tek dosyalık rapor bir A/B sorusunu cevaplayamaz.
+// Asıl mesele şu — **gürültü bandı olmayan bir fark, fark değildir.**
+// Bir koşu tohuma bağlıdır; AYNI parametreyle koşulan iki koşu arasında bile
+// fark çıkar. Bu yüzden her metrik KOŞU BAŞINA hesaplanır; ortalaması ve
+// yayılımı birlikte basılır ve fark ancak koşular arası yayılımın dışına
+// çıkıyorsa işaretlenir.
+//
+// Kapı kaba: n küçük (4–8 koşu), yani bu bir p-değeri değil. Cevapladığı soru
+// "bu fark istatistiksel olarak anlamlı mı" değil, "bu farkı konuşmaya değer
+// mi, yoksa tohum gürültüsü mü". Tek koşuyu tek koşuyla kıyaslamak — kipin
+// yerine geçen yöntem buydu — bu soruyu hiç sormuyordu.
+
+function jsonlFiles(target) {
+  if (!fs.existsSync(target)) return [];
+  if (fs.statSync(target).isFile()) return [target];
+  const out = [];
+  for (const e of fs.readdirSync(target, { withFileTypes: true })) {
+    const p = path.join(target, e.name);
+    if (e.isDirectory())                out.push(...jsonlFiles(p));
+    else if (e.name.endsWith(".jsonl")) out.push(p);
+  }
+  return out.sort();
+}
+
+function parseRows(file) {
+  const out = [];
+  for (const l of fs.readFileSync(file, "utf8").trim().split("\n")) {
+    try { out.push(JSON.parse(l)); } catch (e) { /* yarım kalmış son satır */ }
+  }
+  return out;
+}
+
+// Karşılaştırılan metrikler. `d` basamak sayısı, `hedef` CLAUDE.md'de yazılı
+// hedef eğri (varsa) — fark anlamlı çıktığında hangi yöne gittiğini okumak için.
+const KARSI_METRIK = [
+  { k: "level_dk",      ad: "level süresi (dk)",      d: 2, hedef: "3–4" },
+  { k: "ulasilan",      ad: "ulaşılan level",         d: 1 },
+  { k: "olum",          ad: "ölümle biten koşu %",    d: 0 },
+  { k: "isabet_ana",    ad: "isabet, ana silah %",    d: 1 },
+  { k: "isabet_turret", ad: "isabet, turret %",       d: 1 },
+  { k: "dovus",         ad: "ort. dövüş süresi (sn)", d: 2 },
+  { k: "govde_pay",     ad: "gövdeye geçen hasar %",  d: 1 },
+  { k: "hasar_level",   ad: "alınan hasar / level",   d: 0 },
+  { k: "yukseltme",     ad: "yükseltme + kurulum",    d: 1 },
+  { k: "metal",         ad: "toplanan metal",         d: 0 },
+  { k: "kristal",       ad: "toplanan kristal",       d: 0 },
+  { k: "metal_kayip",   ad: "toplanamayan metal %",   d: 0, hedef: "<15" },
+  { k: "kristal_kayip", ad: "toplanamayan kristal %", d: 0, hedef: "<15" },
+];
+
+/// Tek bir koşudan skaler metrikler. Her biri KOŞU BAŞINA bir sayıdır —
+/// bütün koşuları havuzlamak yayılımı görünmez kılardı.
+function kosuMetrikleri(file) {
+  const R    = parseRows(file);
+  const by   = t => R.filter(r => r.ev === t);
+  const topl = (a, f) => a.reduce((x, y) => x + (y[f] || 0), 0);
+  const oran = (p, q) => q ? 100 * p / q : NaN;
+
+  const ends   = by("level_end");
+  const son    = by("sim_end")[0];
+  const bas    = by("sim_start")[0];
+  const fired  = by("shot_fired"), hit = by("shot_hit");
+  const deaths = by("enemy_death");
+  const pd     = by("player_damage");
+  const res    = by("resource");
+
+  const isabet = k => oran(hit.filter(r => r.kaynak === k).length,
+                           fired.filter(r => r.kaynak === k).length);
+
+  const dustu    = t => topl(res.filter(r => r.olay === "dustu"    && r.tip === t), "miktar");
+  const toplandi = t => topl(res.filter(r => r.olay === "toplandi" && r.tip === t), "miktar");
+  const kayip    = t => { const D = dustu(t); return D ? oran(D - toplandi(t), D) : NaN; };
+
+  const dovusler = deaths.filter(d => d.dovus >= 0).map(d => d.dovus);
+  const gelen    = topl(pd, "gelen");
+
+  // Tip kırılımı koşu içinde havuzlanır: bir koşuda bir tipten 0–3 ölüm olur,
+  // koşu başına ortalamanın yayılımı ölümün kendisinden çok tipin o koşuda
+  // sahneye çıkıp çıkmadığını ölçerdi.
+  const tipler = {};
+  for (const d of deaths) {
+    const a = tipler[d.tip] ||
+              (tipler[d.tip] = { n: 0, dovus: 0, dovusN: 0, yenen: 0, tehdit: d.tehdit });
+    a.n++; a.yenen += d.yenen || 0;
+    if (d.dovus >= 0) { a.dovus += d.dovus; a.dovusN++; }
+  }
+
+  return {
+    file, tipler,
+    seed:  bas ? bas.seed : null,
+    sebep: son ? son.sebep : null,
+    olay:  R.length,
+    m: {
+      level_dk:      ends.length ? topl(ends, "sure") / ends.length / 60 : NaN,
+      ulasilan:      son ? son.level : (R.length ? Math.max(...R.map(r => r.lvl || 0)) : NaN),
+      olum:          son ? (son.sebep === "oldu" ? 100 : 0) : NaN,
+      isabet_ana:    isabet("ana"),
+      isabet_turret: isabet("turret"),
+      dovus:         dovusler.length ? dovusler.reduce((a, b) => a + b, 0) / dovusler.length : NaN,
+      govde_pay:     oran(topl(pd, "govde"), gelen),
+      hasar_level:   ends.length ? gelen / ends.length : NaN,
+      yukseltme:     by("upgrade").length + by("kurulum").length,
+      metal:         toplandi("RawMaterial"),
+      kristal:       toplandi("EnergyCrystal"),
+      metal_kayip:   kayip("RawMaterial"),
+      kristal_kayip: kayip("EnergyCrystal"),
+    },
+  };
+}
+
+/// Ortalama + örneklem standart sapması. Geçersiz (NaN) koşular SAYILMAZ:
+/// hiç turret kurmamış bir koşu turret isabetini sıfıra çekmemeli — o koşuda
+/// o metrik ölçülmemiştir, sıfır değildir.
+function ozet(degerler) {
+  const v = degerler.filter(x => typeof x === "number" && isFinite(x));
+  if (!v.length) return { n: 0, ort: NaN, sd: NaN };
+  const ort = v.reduce((a, b) => a + b, 0) / v.length;
+  const sd  = v.length < 2 ? 0
+            : Math.sqrt(v.reduce((a, b) => a + (b - ort) * (b - ort), 0) / (v.length - 1));
+  return { n: v.length, ort, sd };
+}
+
+function karsilastir(aYol, bYol) {
+  const yukle = (yol, etiket) => {
+    const dosyalar = jsonlFiles(yol);
+    if (!dosyalar.length) {
+      console.error(`${etiket}: kayıt bulunamadı — ${yol}`);
+      process.exit(1);
+    }
+    return {
+      // Koşu klasörleri "20260902-163137-nisan-sifir" gibi adlanır; sütun
+      // başlığında işe yarayan kısım ETİKETTİR, zaman damgası değil.
+      ad: path.basename(yol.replace(/[\\/]+$/, "")).replace(/^\d{8}-\d{6}-/, ""),
+      kosular: dosyalar.map(kosuMetrikleri),
+    };
+  };
+
+  const A = yukle(aYol, "taban"), B = yukle(bYol, "varyant");
+
+  const sag = (s, n) => String(s).padStart(n);
+  const sol = (s, n) => String(s).padEnd(n);
+  const say = (v, d) => (typeof v === "number" && isFinite(v)) ? v.toFixed(d) : "—";
+
+  for (const [etiket, S] of [["taban  ", A], ["varyant", B]]) {
+    const olay = S.kosular.reduce((a, k) => a + k.olay, 0);
+    console.log(`\x1b[1m${etiket}\x1b[0m : ${S.ad}  —  ${S.kosular.length} koşu, ${olay} olay`);
+  }
+
+  // Aynı tohumlarla koşulmamış iki küme, parametre farkını tohum farkından
+  // ayıramaz. Koşuyu durdurmaz — insan oturumlarının tohumu yoktur — ama
+  // sessizce geçilirse yanlış bir sonuç çıkarılır.
+  const tohum = S => S.kosular.map(k => k.seed).filter(s => s != null)
+                              .sort((x, y) => x - y).join(",");
+  const tA = tohum(A), tB = tohum(B);
+  if (tA && tB && tA !== tB)
+    console.log(`\x1b[33m  ⚠ tohum kümeleri farklı (${tA} vs ${tB}) — ` +
+                `fark parametreden mi tohumdan mı geldi, ayrılamaz\x1b[0m`);
+
+  for (const [etiket, S] of [["taban", A], ["varyant", B]]) {
+    const n = S.kosular.filter(k => k.sebep === "sure" || k.sebep === "duvar").length;
+    if (n) console.log(`\x1b[33m  ⚠ ${etiket}: ${n} koşu sınıra takılıp kesildi ` +
+                       `(sebep=sure/duvar) — ortalamaları aşağı çeker\x1b[0m`);
+  }
+
+  h("METRİKLER  (ortalama ±sapma, koşu başına)");
+  console.log(`  ${sol("", 26)}${sag(A.ad.slice(0, 15), 17)}${sag(B.ad.slice(0, 15), 17)}${sag("fark", 10)}`);
+
+  for (const M of KARSI_METRIK) {
+    const a = ozet(A.kosular.map(k => k.m[M.k]));
+    const b = ozet(B.kosular.map(k => k.m[M.k]));
+    if (!a.n && !b.n) continue;
+
+    const fark  = (isFinite(a.ort) && isFinite(b.ort)) ? b.ort - a.ort : NaN;
+    const yuzde = (isFinite(fark) && a.ort) ? 100 * fark / Math.abs(a.ort) : NaN;
+
+    // Gürültü bandı: iki ortalamanın standart hatası. n < 2 ise yayılım
+    // ölçülemez — "?" basılır, sıfır sayılmaz.
+    let isaret = " ?", renk = "\x1b[90m";
+    if (a.n >= 2 && b.n >= 2 && isFinite(fark)) {
+      const se = Math.sqrt(a.sd * a.sd / a.n + b.sd * b.sd / b.n);
+      if (Math.abs(fark) > 2 * se) { isaret = " ↑"; renk = "\x1b[33m"; if (fark < 0) isaret = " ↓"; }
+      else                         { isaret = " ≈"; renk = "\x1b[90m"; }
+    }
+
+    const hucre = s => `${say(s.ort, M.d)} ±${say(s.sd, M.d)}`;
+    console.log(`  ${sol(M.ad, 26)}${sag(hucre(a), 17)}${sag(hucre(b), 17)}` +
+                `${sag(isFinite(fark) ? (fark > 0 ? "+" : "") + say(fark, M.d) : "—", 10)}` +
+                `${renk}${sag(isFinite(yuzde) ? (yuzde > 0 ? "+" : "") + yuzde.toFixed(0) + "%" : "", 7)}` +
+                `${isaret}\x1b[0m` + (M.hedef ? `  \x1b[90mhedef ${M.hedef}\x1b[0m` : ""));
+  }
+  console.log(`  \x1b[90m↑↓ fark yayılımın dışında · ≈ gürültünün içinde · ` +
+              `? yayılım ölçülemedi (n<2)\x1b[0m`);
+
+  // ── Tip kırılımı ──────────────────────────────────────────────────────────
+  //
+  // Toplam bir metrik "hangi TİP zorlaştı" sorusunu yutar: Armored'ın dövüş
+  // süresi ikiye katlanırken Swarm'ınki yarılanırsa ortalama kıpırdamaz.
+  h("DÜŞMAN TİPİ  (ölüm/koşu · ort.dövüş sn · ort.yenen hasar)");
+  const birlestir = S => {
+    const t = {};
+    for (const k of S.kosular)
+      for (const [ad, a] of Object.entries(k.tipler)) {
+        const x = t[ad] || (t[ad] = { n: 0, dovus: 0, dovusN: 0, yenen: 0, tehdit: a.tehdit });
+        x.n += a.n; x.dovus += a.dovus; x.dovusN += a.dovusN; x.yenen += a.yenen;
+      }
+    return t;
+  };
+  const tipA = birlestir(A), tipB = birlestir(B);
+  const adlar = [...new Set([...Object.keys(tipA), ...Object.keys(tipB)])]
+    .sort((x, y) => ((tipB[y] || tipA[y]).tehdit || 0) - ((tipB[x] || tipA[x]).tehdit || 0));
+
+  if (adlar.length) {
+    console.log(`  ${sol("tip", 14)}${sag("tehdit", 7)}` +
+                `${sag(A.ad.slice(0, 18), 24)}${sag(B.ad.slice(0, 18), 24)}`);
+    const hucre = (t, kosu) => t
+      ? `${(t.n / kosu).toFixed(1)} · ${t.dovusN ? (t.dovus / t.dovusN).toFixed(1) : "—"} · ` +
+        `${(t.yenen / t.n).toFixed(0)}`
+      : "—";
+    for (const ad of adlar)
+      console.log(`  ${sol(ad, 14)}${sag(say((tipB[ad] || tipA[ad]).tehdit, 0), 7)}` +
+                  `${sag(hucre(tipA[ad], A.kosular.length), 24)}` +
+                  `${sag(hucre(tipB[ad], B.kosular.length), 24)}`);
+  }
+  console.log();
+}
+
+// Karşılaştırma kipi tek dosyalık raporun YERİNE geçer, yanına değil.
+const _argv = process.argv.slice(2);
+const _cmp  = _argv.indexOf("--karsilastir");
+if (_cmp >= 0) {
+  if (!_argv[_cmp + 1] || !_argv[_cmp + 2]) {
+    console.error("Kullanım: node Tools/Balance/analyze.js --karsilastir <taban> <varyant>");
+    process.exit(1);
+  }
+  karsilastir(_argv[_cmp + 1], _argv[_cmp + 2]);
+  process.exit(0);
+}
+
 const file = process.argv[2] || latestLog();
 if (!file || !fs.existsSync(file)) {
   console.error("Kayıt bulunamadı. Kullanım: node Tools/Balance/analyze.js <dosya.jsonl>");
@@ -52,8 +302,6 @@ const R = lines.map(l => { try { return JSON.parse(l); } catch (e) { dropped++; 
 const by  = t => R.filter(r => r.ev === t);
 const sum = (a, f) => a.reduce((x, y) => x + (y[f] || 0), 0);
 const avg = (a, f) => a.length ? sum(a, f) / a.length : 0;
-const pad = (s, n) => String(s).padStart(n);
-const h   = t => console.log("\n\x1b[1m── " + t + " " + "─".repeat(Math.max(0, 60 - t.length)) + "\x1b[0m");
 
 console.log(`\x1b[1m${path.basename(file)}\x1b[0m — ${R.length} olay` +
             (dropped ? `, ${dropped} bozuk satır atlandı` : ""));

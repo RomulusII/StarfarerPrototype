@@ -69,6 +69,42 @@ kopyada çalışılır. Bilinmeyen bir alan adı koşuyu hatayla durdurur — se
 yok sayılsaydı bütün bir tarama, hiç uygulanmamış bir parametre yüzünden
 "duyarsız" damgası yerdi.
 
+Kümeler tek tek değil **yan yana** okunur:
+
+```bash
+node Tools/Balance/analyze.js --karsilastir \
+     Tools/Balance/logs/sim/<tarih>-taban \
+     Tools/Balance/logs/sim/<tarih>-statStep-yuksek
+```
+
+Her metrik koşu başına hesaplanır ve `ortalama ±sapma` olarak basılır; fark
+ancak koşular arası yayılımın dışına çıkarsa `↑`/`↓` ile işaretlenir, içinde
+kalırsa `≈`. Sebebi şu: **gürültü bandı olmayan bir fark, fark değildir** —
+aynı parametreyle koşulan iki koşu arasında bile tohumdan gelen fark çıkar.
+Kapı kaba (n = 4–8), bir p-değeri değil; cevapladığı soru "bu farkı konuşmaya
+değer mi" sorusudur.
+
+İki tarafın **tohum kümesi aynı olmalı** (`--tohum` varsayılanı bunu zaten
+sağlar). Farklıysa araç uyarır: o durumda farkın parametreden mi tohumdan mı
+geldiği ayrılamaz. Sınıra takılıp kesilen koşular (`sebep=sure/duvar`) da
+uyarı basar — ortalamaları aşağı çekerler.
+
+Ölçülmüş örnek (nişan hatası 0° → 3°, 4'er koşu):
+
+| metrik | taban | varyant | |
+|---|---|---|---|
+| isabet, ana silah % | 58.8 ±2.2 | 37.5 ±4.1 | ↓ |
+| ort. dövüş süresi | 1.50 ±0.10 sn | 3.08 ±0.36 sn | ↑ |
+| level süresi | 0.72 ±0.02 dk | 0.91 ±0.06 dk | ↑ |
+| toplanan metal | 73 ±5 | 74 ±10 | ≈ |
+
+Son satır kipin ne işe yaradığını gösteriyor: gelir iki koşuda +1 farkla
+çıkıyor ve bu fark yayılımın içinde — tek koşu kıyaslansaydı o +1 bir etki
+sanılabilirdi.
+
+Toplam bir metrik "hangi TİP zorlaştı" sorusunu yutar, o yüzden ayrıca bir
+**tip kırılımı** basılır (ölüm/koşu · ort. dövüş · ort. yenen hasar).
+
 ---
 
 ## Sahte oyuncu
