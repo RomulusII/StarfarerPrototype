@@ -225,6 +225,30 @@ public class EnemyTypeData : ScriptableObject
     public float repairAuraRange = 5f;
 
     // ── Runtime factory metodları ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Tipin fabrika tanımı, adından. Kayıttan geri kurulan düşmanın sayıları
+    /// kayıttan gelir; buradan yalnızca kayda yazılamayan nesne referansları
+    /// (<see cref="splitInto"/>) alınır. Bilinmeyen ad null döner.
+    /// </summary>
+    public static EnemyTypeData ByName(string typeName) => typeName switch
+    {
+        "Swarm"       => CreateSwarm(),
+        "Armored"     => CreateArmored(),
+        "Shield"      => CreateShield(),
+        "Bomber"      => CreateBomber(),
+        "Interceptor" => CreateInterceptor(),
+        "Artillery"   => CreateArtillery(),
+        "Jammer"      => CreateJammer(),
+        "Phantom"     => CreatePhantom(),
+        "Regenerator" => CreateRegenerator(),
+        "Leech"       => CreateLeech(),
+        "Barrier"     => CreateBarrier(),
+        "Splitter"    => CreateSplitter(),
+        "Juggernaut"  => CreateJuggernaut(),
+        "BombRunner"  => CreateBombRunner(),
+        _             => null,
+    };
     // Editor'da SO asset oluşturulmadan önce oyunun çalışmasını sağlar.
 
     public static EnemyTypeData CreateSwarm()

@@ -243,6 +243,36 @@ public abstract class ShipComponentBase : MonoBehaviour
         }
     }
 
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Çalışma anı durumu. Kurulum (tip, statlar) ayrı yazılır
+    /// (bkz. SaveSystem.CaptureShip); alt sınıflar kendi alanlarını ekler.
+    /// </summary>
+    public virtual void CaptureRuntime(ComponentRuntimeState s)
+    {
+        s.hp          = currentHP;
+        s.deactivated = _deactivated;
+    }
+
+    /// <summary>
+    /// Deaktif hâl (Kolay mod) OnComponentDestroyed'ın yan etkileriyle birlikte
+    /// kurulur: halka kırmızıya döner ve enerji tüketimi düşülür. Yalnızca
+    /// bayrağı kurmak tüketimi sayılı bırakır ve enerji bütçesi yalan söylerdi.
+    /// </summary>
+    public virtual void RestoreRuntime(ComponentRuntimeState s)
+    {
+        currentHP = Mathf.Min(s.hp, maxHP);
+
+        if (s.deactivated && !_deactivated)
+        {
+            _deactivated = true;
+            if (_ringRenderer != null) _ringRenderer.color = RingColor(deactivated: true);
+            if (EnergyBus.Instance != null)
+                EnergyBus.Instance.UnregisterConsumer(energyConsumption);
+        }
+    }
+
     protected virtual void OnEnable()
     {
         if (EnergyBus.Instance != null)

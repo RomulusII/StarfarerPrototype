@@ -52,6 +52,59 @@ public class FormationGroup : MonoBehaviour
     /// <summary>Formasyon hâlâ geçerli mi? Dağıldıysa gemiler kendi AI'sına döner.</summary>
     public bool Active => !_broken;
 
+    public Vector2 Anchor => _anchor;
+    public float   Timer  => _timer;
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Yalnızca AKTİF grup kaydedilir: dağılmış bir grup bir saniye sonra zaten
+    /// yok oluyor ve üyeleri kendi AI'larına dönmüş durumda.
+    /// Ofsetler dünya biriminde yazılır (Add'in Spread çarpımından SONRA).
+    /// </summary>
+    public FormationState CaptureState()
+    {
+        var s = new FormationState
+        {
+            id     = WorldSave.IdOf(this),
+            anchor = _anchor,
+            target = _target,
+            speed  = _speed,
+            timer  = _timer,
+        };
+
+        foreach (var m in _members)
+        {
+            if (m == null) continue;
+            s.members.Add(WorldSave.IdOf(m));
+            s.offsets.Add(_offsets.TryGetValue(m, out var off) ? off : Vector2.zero);
+        }
+        return s;
+    }
+
+    /// <summary>Grubu kurar; üyeler düşmanlar kurulduktan SONRA bağlanır.</summary>
+    public static FormationGroup Rebuild(FormationState s)
+    {
+        var g = Create(s.anchor, s.target);
+        g._speed = s.speed;
+        g._timer = s.timer;
+        return g;
+    }
+
+    public void RestoreMembers(FormationState s)
+    {
+        for (int i = 0; i < s.members.Count && i < s.offsets.Count; i++)
+        {
+            var bot = WorldSave.Resolve<EnemyBot>(s.members[i]);
+            if (bot == null) continue;
+            _members.Add(bot);
+            _offsets[bot] = s.offsets[i];
+            bot.AssignFormation(this);
+        }
+
+        if (_members.Count == 0) Break();
+    }
+
     public static FormationGroup Create(Vector2 spawnAnchor, Vector2 target)
     {
         var go = new GameObject("FormationGroup");

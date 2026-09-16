@@ -36,4 +36,18 @@ public static class BoostController
     }
 
     static float _changedAt = -1f;
+
+    /// <summary>
+    /// Modu doğrudan kurar — kayıttan geri yüklemede ve yeni oyunda. Bir GEÇİŞ
+    /// değildir, telemetriye yazılmaz: geri yüklenen boost oyuncunun o an
+    /// verdiği bir karar değil.
+    ///
+    /// Mod statiktir ve sahne yeniden yüklenince sağ kalır; yeni oyun bunu
+    /// None ile çağırmazsa önceki oyunun boost'uyla başlar.
+    /// </summary>
+    public static void Restore(BoostMode mode)
+    {
+        Mode       = mode;
+        _changedAt = Time.time;
+    }
 }

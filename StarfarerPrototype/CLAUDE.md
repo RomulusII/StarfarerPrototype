@@ -726,9 +726,9 @@ kontrolünden ÖNCE — kaynağı harcayıp enerjiye takılmak kötü bir sürpr
 100 level tek oturumda oynanamaz; kayıt olmadan eğrinin ikinci yarısı test bile
 edilemez.
 
-- **Kayıt yalnızca level sınırlarında alınır** (`ChapterManager.CompleteLevel`).
-  Savaş ortasında kaydetmek yarım kalmış bir dalgayı geri yüklemeye çalışmak
-  demek olurdu. Ölünce o levelin başına değil, son tamamlanan levele dönülür.
+- **İki katman:** level BAŞI kaydı (PlayerPrefs, level sınırında yazılır) ve
+  DÜNYA kaydı (dosya, sahnenin tamamı — bkz. "Tam Kayıt"). Ölünce dünya kaydı
+  silinir ve son tamamlanan levele dönülür.
 - **PlayerPrefs + JsonUtility, tek slot.** Prototip için yeterli; "kayıt slotu
   seçme" akışı oynanışa bir şey katmıyor.
 - **Komponent tanımları runtime'da üretildiği için referansları kaydedilemez.**
@@ -743,6 +743,127 @@ edilemez.
   (1, 11, 21 …). İstenen her levele atlamak testi kolaylaştırırdı ama ilerlemeyi
   anlamsız kılardı; bölüm ortasından başlamak da o bölümün yeni düşman tipini
   tanıtan leveli atlamak demek olurdu.
+- **Dünya kaydı ölümle SİLİNİR.** Kalsaydı "Devam Et" ölümden hemen önceki
+  ana döndürür, ölüm bedelsiz bir geri sarmaya dönerdi. Kayıt; upgrade
+  ekranındaki ANA MENÜ ile, `OnApplicationPause` ile (telefonda uygulamayı arka
+  plandan kapatmak) ve `OnApplicationQuit` ile yazılır.
+- **Level sınırında yazılan kayıt dünya kaydını siler** — o artık bitmiş bir
+  levelin ortasını anlatıyor.
+- **Yeni oyun eski kaydı HEMEN siler.** Eskiden BAŞLA kaydı silmiyor, ilk level
+  sonunda üstüne yazıyordu — o ana kadar menüye dönen oyuncu "Devam Et"te hâlâ
+  eski kampanyayı buluyordu. Ulaşılmış en yüksek level silinmez.
+- **Zorluk kayıttan GERİ YÜKLENMEZ.** Eskiden "Devam Et" kayıttaki zorluğu
+  sessizce yazıyordu; menüde Zor işaretliyken Kolay oynanabiliyordu. Seçim
+  artık PlayerPrefs'te hatırlanıyor (`starfarer.difficulty`) ve menüde işaretli
+  olan oynanan zorluktur. Kayıttaki `difficulty` alanı yalnızca bilgi.
+  (Kayıttan dönen DÜŞMANLAR doğdukları zorluğun çarpanını taşır — sayıları
+  kayıttan gelir; yeni doğanlar menüdeki zorluğu kullanır.)
+
+### Tam Kayıt — Tasarım Kararları
+
+Menüye dönülüp devam edilince oyun **bırakıldığı anın aynısına** döner: her
+geminin pozisyonu, yönü, hız vektörü, HP'si, kalkanı, yapay zekâ fazı ve
+zamanlayıcıları; uçuştaki mermiler, bombalar, ışınlar; enkaz, asteroitler,
+toplayıcıların kargosu. Sahibi `WorldSave`, veri yapıları `WorldState`.
+
+**Neden tam, neden kısmi değil:** eksik kayıt bir KAÇIŞ YOLUDUR. İlk sürüm
+yalnızca rampa sayaçlarını yazıyordu; devam edince saha boş başlıyor ve bir
+sonraki dalga geliyordu — kötü giden dalgayı kapatıp açarak silmek mümkündü.
+Mermiler kaydedilmeseydi kalkana yaklaşan bir bombadan da aynı yolla
+kurtulunurdu. Kampanyada level ortası kaydının olmamasının sebebi (kaynak
+kasma açığı) da tam kayıtla ortadan kalktı: devam eden oyun kaldığı yerden
+sürer, levelin başına dönmez.
+
+**Neden dosya:** yoğun bir anda ~100 KB. WebGL'de PlayerPrefs toplamda ~1 MB ve
+tek blok; `persistentDataPath` tarayıcıda IndexedDB'ye gider ve şablonda
+otomatik senkron açık. Dosyalar `save/kampanya-dunya.json`,
+`save/serbest-dunya.json`; simülasyon `save-sim/` kullanır (sim player'ı oyunla
+aynı ürün adını taşıyor, test gerçek kaydı silerdi).
+
+**Üç kural:**
+
+| Kural | Gerekçe |
+|---|---|
+| Mutlak `Time.time` ASLA yazılmaz — kalan ya da geçen süre yazılır | Uygulama yeniden açılınca Time.time sıfırdan başlar; mutlak değer silahı dakikalarca susturur ya da her şeyi aynı anda tetiklerdi |
+| Nesneler arası referans KİMLİKLE yazılır (0 yok, -1 ana gemi; komponent = slot+1) | Hedef, formasyon, toplanan enkaz, güdümlü füzenin hedefi |
+| Her sınıf KENDİ durumunu yazar ve okur (`CaptureState` / `RestoreState`) | Alanlar private kalır; kayıt sistemi sınıfların içini bilmez |
+
+**Kayıt için değişen dört yapı** — hepsi davranışı korur, yalnızca durumu
+okunur kılar:
+
+| Önce | Sonra | Neden |
+|---|---|---|
+| `Destroy(go, ömür)` (mermi, bomba) | `lifeTime` alanı + Start'ta Destroy | Gecikmeli Destroy'un kalan süresi okunamaz |
+| Coroutine (turret şarjörü, boss ölüm sekansı, dalga/level arası bekleme) | Sayaç | Coroutine'in ilerlemesi kaydedilemez |
+| Kalkan yeniden aktifleşmesi animasyon callback'ine bağlı | Jeneratör süreyi kendisi sayar | Callback beklenen bir an kaydedilemez |
+| Serbest mod durumu spawner'ın ilk Update'inde uygulanıyordu | `ResumeFreeRun` anında uygular | Geri yüklenen dünya bir kare sıfır sayaçlarla yaşıyordu |
+
+**İki aşamalı geri yükleme.** Önce bütün nesneler kurulup kimlik tablosuna
+yazılır, sonra referanslar çözülür. Kurulumunu Start'ta yapan sınıflar
+(`EnemyBot`, `BossShip`, `Asteroid`) kayıttaki hâli Start'ın SONUNDA uygular —
+önce uygulansaydı Start tam HP, rastgele ateş sayacı ve yeni yaklaşma açısıyla
+üstüne yazardı. Son adım `WorldRestoreFinisher`'dır (yürütme sırası −10000):
+bütün Start'lar bitmiş, hiçbir nesne henüz Update çalıştırmamıştır. Işınlar
+(namlular Start'ta kuruluyor), silah beklemesi (mutlak zamana karşı) ve
+`Random.state` orada kurulur.
+
+**Ölçeklenmiş düşman verisi olduğu gibi yazılır** (`JsonUtility.ToJson`),
+tip adından yeniden türetilmez: düşman doğduğu levelin ve zorluğun
+çarpanlarını taşır. İki tuzak: JsonUtility `ScriptableObject`'in ADINI yazmaz
+(ayrı alan) ve nesne referanslarını örnek kimliğiyle yazar — o kimlik yeniden
+açılışta geçersiz, hatta başka bir nesneye denk gelebilir. Tek referans alanı
+`splitInto` fabrikadan (`EnemyTypeData.ByName`) yeniden bağlanır. Boss'un
+tanımı addan kurulur (`BossShipData.ForName` — drone havuzları referans), SAYILARI
+kayıttan ezilir.
+
+**Kayıt telemetriye yazılmaz.** Geri kurulan düşman `enemy_spawn`, geri kurulan
+enkaz `resource/dustu` üretmez — yazılsaydı tehdit ve gelir ölçümü aynı şeyi
+iki kez sayardı. Bu yüzden `EnemySpawner.Rebuild` ve `Debris.Rebuild` ayrı yollar;
+tek inşa yolu (`EnemySpawner.Build`) ortak.
+
+**Bilerek kaydedilmeyenler:** görsel efektler (kıvılcım, patlama, parlama);
+asteroidin kaya DOKUSU (her asteroit rastgele çizilir — boyut, HP, konum
+aynı, doku farklı); oyuncunun basılı tuttuğu girdi (sürekli lazer, plazma
+şarjı — menüye dönülürken zaten iptal); bölüm geçiş anlatımının içindeki yer
+(geçiş baştan oynar).
+
+**Kaydet → yükle → kaydet testi** (`SaveRoundTrip`, simülasyonda
+`--kayit-testi kampanya|serbest --kayit-ani S`). Koşu belirtilen anda dünyayı
+yazar, sahneyi yeniden yükler, "Devam Et" yoluyla geri yükler ve hiçbir nesne
+Update çalıştırmadan dünyayı YENİDEN yakalar; iki JSON satır satır
+karşılaştırılır (sayılar 1e-3 toleransla). Kayıt ~25 sınıfa dağılmış ~150 alan:
+sonradan eklenen ve kayda eklenmeyen bir alan çökme üretmez, devam edilen
+oyunda sessizce yanlış davranır. Bu test onu yakalamanın tek yolu.
+
+**KURAL: bir sahne sınıfına durum taşıyan bir alan eklendiğinde kayda da
+eklenir ve bu test koşulur.**
+
+**Testin yakaladığı geri yükleme hataları** (üçü de oyunda görülemeyecek kadar
+küçüktü, ama "dünya kayıttaki anda durur" iddiasını yanlışlıyordu):
+- Geri yükleme karenin ortasında çalışıyor (menü coroutine'i). Aynı karenin
+  LateUpdate'inde hareket modeli bir kare ilerliyor, bitirici bir SONRAKİ
+  karede çalışıyordu: yaş +1/60 sn, gemiler birkaç yüzde birim kaymış.
+  Geri yükleme süresince `Time.timeScale = 0` ve hareket modeli
+  `WorldSave.IsRestoring` iken entegrasyon yapmaz — timeScale tek başına
+  yetmedi, çünkü o karenin deltaTime'ı zaten hesaplanmıştı.
+- Namlunun dünya açısı gövdenin yönünden ÖNCE yazılıyordu; gövde dönünce
+  çocuk namlu da kayıyordu.
+- `splitInto` JSON'a örnek kimliğiyle yazılıyordu — yazılmıyor artık.
+
+**Test sonucu** (8 senaryo, hepsi birebir): level 1, 10 (boss + hardpoint'ler),
+21, 31, 61, 81 (bölünen), 91 ve serbest mod. **Sınanmamış kalanlar:** sahte
+oyuncu savaşçı hangarı satın almadığı ve test anlarında sahnede bulunmadıkları
+için savaşçılar, bombalar, lazer ve plazma ışınları, boss ölüm sekansı ve
+bölüm geçişi sırasındaki kayıt. Kodları yazılı, test edilmedi.
+
+Kaydın yakaladığı iki mevcut hata düzeltildi:
+- `TurretController.RebuildVisual` bütün çocukları siliyordu — komponentin
+  konum halkası ve HP barı dahil. Uzmanlaşma değiştiren turret halkasını ve
+  HP barını kaybediyordu; kayıttan kurulan uzmanlaşmış turret ise yanlış
+  renkte kalıyordu (görsel Awake'te varsayılan uzmanlaşmayla kuruluyordu).
+- Kayıt yüklenirken atılan başlangıç kalkan jeneratörü, kayıtta jeneratör
+  yoksa tam kalkanını yetim havuza taşıyordu (`ShieldGeneratorComponent.Discard`).
+- `BoostController.Mode` statikti ve yeni oyuna sızıyordu.
 
 ### Kaynak Ekonomisi — Tasarım Kararları
 
@@ -761,7 +882,7 @@ toplar → hangara döner → `ResourceInventory`'ye boşaltır.
 - Hız iki bileşenli: **saçılma** (patlama itmesi, ~1 sn'de söner) + **sabit sola
   kayma** (0.3 birim/sn, kalıcı). Enkaz asla durmaz; vaktinde toplanmazsa soldan
   çıkıp kaybolur. Tamamen dursaydı ekranın sağında kalan enkaz toplayıcının
-  menzili (hangardan 12 birim) dışında sonsuza dek asılı kalırdı.
+  menzili (hangardan 12 birim, solda 24) dışında sonsuza dek asılı kalırdı.
 - **Şekil KÖKENDEN, renk KAYNAK TİPİNDEN gelir** — iki ayrı eksen
   (`DebrisOrigin` / `ResourceType`). Bir gemi hem metal hem kristal enkaz
   bırakabilir ve ikisi de gemi parçasına benzemelidir; tek eksene bağlansaydı
@@ -784,6 +905,11 @@ toplar → hangara döner → `ResourceInventory`'ye boşaltır.
   yanıp söner.
 - Toplayıcı, topladığı enkaz sola kayarken onunla birlikte sürüklenir; enkaz
   menzil dışına çıkarsa bırakır — yoksa toplayıcı sahneden dışarı çekilirdi.
+- **Menzil sola doğru 2 kat uzun** (`CollectorShip.LeftRangeFactor`): hangardan
+  sağa ve yukarı-aşağı 12, sola 24 birim — daire değil elips. Enkaz hep sola
+  kaydığı için toplayıcı ona yanaşıp birlikte sürüklenirken 12'lik daire kısa
+  geliyor, enkazı yarım bırakıp dönüyordu. Menzilin tamamı büyütülmedi: sağ taraf
+  dövüş alanı, oraya daha derin dalan toplayıcı düşmanın içine uçar.
 
 **Savaşçılar asteroitleri de vurur.** Hedef seçimi `ITurretTarget` üzerinden
 yapılır ve iki tarama SIRALIDIR: önce menzildeki düşmanlar, hiç yoksa
@@ -1054,6 +1180,19 @@ nişan hattına girdikten sonra kesilir.
   - **Easy:** Komponent deaktif kalır (`_deactivated = true`), GO yok edilmez. RepairUnit maxHP'ye tamir edince otomatik yeniden açılır.
   - **Normal / Hard:** `ShipLoadout` slot'u temizler, GO yok edilir. Yeniden kurulum gerekir.
 - `DifficultyManager.Current` statik; oyun başında ayarlanır (default: Normal)
+- **Zorluk düşmanı da ölçekler** (`BalanceConfig.easyEnemyMultiplier` /
+  `hardEnemyMultiplier`): Kolay ×0.8, Normal ×1, Zor ×1.2. HP (kalkan ve şarjı
+  dahil) ve hasar AYNI çarpanı alır — yalnızca HP'yi büyütmek Zor modu tehlikeli
+  değil sadece uzun yapardı. Uzun süre zorluğun TEK etkisi yukarıdaki komponent
+  kuralıydı: Normal ile Zor birebir aynı oyundu, serbest modda ise (komponent
+  kaybı nadir) seçim hiçbir şey değiştirmiyordu.
+  - Normal düşmanlar `EnemyScaling.ForLevel` içinde çarpılır — kampanya ve
+    serbest mod aynı yoldan geçtiği için tek satır ikisini de kapsar.
+  - Boss o yoldan geçmez; `BossShipData.CreateForChapter` gövdeyi, hardpoint
+    HP'sini ve hardpoint hasarını ayrıca çarpar.
+  - **Gelir değişmez:** drop tehdit puanından gelir, HP'den değil. Kolay aynı
+    kaynağı daha az emekle verir — bilinçli.
+  - Telemetri oturum satırı `zorluk` alanını taşır; denge revizyonu 3.
 - RepairUnit en düşük HP oranlı komponenti önceliklendirir; Easy modda deaktif komponentleri de tamir eder
 
 ### Otomatik Turretler — Tasarım Kararları
@@ -1224,9 +1363,27 @@ dolayısıyla arkada düşman spawn olmaz.
 
 | Seçim | Sonuç |
 |---|---|
-| **BAŞLA** | `ChapterManager` kurulur, normal dalga akışı |
-| **SERBEST MOD** | `ChapterManager` kurulmaz, `EnemySpawner.debugFreeSpawn` açılır |
-| **ZORLUK** | `DifficultyManager.Current` — Kolay / Normal / Zor |
+| **BAŞLA** · **DEVAM ET** | `ChapterManager` kurulur, normal dalga akışı |
+| **SERBEST MOD** · **DEVAM ET** | `ChapterManager` kurulmaz, `EnemySpawner.debugFreeSpawn` açılır |
+| **ZORLUK** | `DifficultyManager.Current` — Kolay / Normal / Zor, iki modu da etkiler |
+
+Her mod kendi satırında: solda başlat, sağda devam. **DEVAM ET kayıt yokken de
+ekranda durur**, sönük ve basılamaz — kayıt varken ortaya çıkan bir düğme
+yerleşimi kaydırıyordu ve aynı noktaya dokunan oyuncu bir oturumda BAŞLA'ya,
+diğerinde DEVAM ET'e basıyordu. Serbest modun devam düğmesi serbest modun
+rengini taşır: satırın iki düğmesi aynı modun iki kapısı.
+
+**Kayıt varken BAŞLAT iki dokunuş ister.** İlk dokunuş düğmeyi "kayıt silinecek —
+tekrar bas" uyarısına çevirir, 4 sn içinde ikincisi başlatır. Ayrı bir "YENİ
+OYUN" düğmesi yerine var olan düğmenin ne yapacağını dürüstçe söylemesi seçildi;
+tek dokunuşla silmek, yan yana duran BAŞLA/DEVAM ET'te bir yanlış dokunuşun
+bütün kampanyayı götürmesi demekti.
+
+**Upgrade ekranında ANA MENÜ** (KAPAT'ın solunda). Sahneyi yeniden yükler, yani
+ölümdeki RESTART ile AYNI yoldan menüye döner — ikinci bir "oyunu sök" yolu,
+sıfırlanması unutulan bir statiğin sızması demekti (yetim kalkan havuzu hatası
+tam böyle doğmuştu). Her iki modda dünya olduğu gibi kaydedilir (bkz. "Tam
+Kayıt"); onay istemez, kaybedilecek bir ilerleme yok.
 
 Zorluk seçimi buraya taşındı; daha önce yalnızca Game Over panelindeydi ve oyuncu
 zorluğu ancak öldükten sonra değiştirebiliyordu.
@@ -1657,7 +1814,10 @@ bırakıldı.
 | SimShopper.cs | Sahte oyuncunun alışverişi — iki profil, çıkmaz kaçınma |
 | SimConfig.cs | Koşunun komut satırı yapılandırması |
 | GameProgress.cs | Kampanyadaki yer: 100 level, 10 bölüm, bölüm başına 1 boss |
-| SaveSystem.cs | Kampanya kaydı (PlayerPrefs), level sınırlarında yazılır |
+| SaveSystem.cs | Kayıt girişi — level başı kaydı (PlayerPrefs) + dünya kaydına yönlendirme |
+| WorldSave.cs | Dünyanın tam kaydı — yakalama, dosya, kimlik tablosu, iki aşamalı geri yükleme |
+| WorldState.cs | Tam kaydın veri yapıları, sahne nesnesi başına bir kayıt |
+| SaveRoundTrip.cs | Simülasyonda kaydet → yükle → kaydet testi |
 | StorageComponent.cs | Depo — kurulu olduğu sürece kaynak tavanını yükseltir |
 | ITurretTarget.cs | Turretlerin nişan alabileceği her şeyin ortak arayüzü |
 | CombatArea.cs | Dogfight sınırları — savaşçılar ekrandan çıkmasın |
@@ -1668,6 +1828,7 @@ bırakıldı.
 | EnemySpawner.cs | Düşmanın TEK inşa yolu — GameObject, HealthBar, level ölçeklemesi. Serbest test modu içerir |
 | AsteroidSpawner.cs | Asteroit alanının yoğunluğunu korur |
 | StartMenuUI.cs | Açılış ekranı — kampanya / devam / serbest mod / zorluk / level seçimi |
+| WebChrome.cs | Tarayıcı sayfasının APK / tam ekran düğmelerini yalnızca menü ve upgrade ekranında gösterir (`Plugins/WebGL/WebChrome.jslib`) |
 | StarField.cs | 400 yıldız, -15/+15 birim arası random pozisyon |
 | CameraController.cs | Parallax kayma + zoom, power curve (t²) |
 | HealthBar.cs | Can/kalkan barı, SpriteRenderer tabanlı, child olarak eklenir |

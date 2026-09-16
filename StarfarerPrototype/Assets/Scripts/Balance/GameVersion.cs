@@ -34,6 +34,10 @@ public static class GameVersion
     ///       görünüyor. İsabet oranının bundan etkilenmesi bekleniyor, yani
     ///       1 numaralı revizyonun %52'siyle bu revizyonun sayısı aynı
     ///       havuzda toplanamaz.
+    ///   3 — zorluk düşman HP'si ve hasarını çarpıyor (Kolay ×0.8, Zor ×1.2).
+    ///       Normal'in sayıları değişmedi, ama bu revizyondan önceki Kolay/Zor
+    ///       kayıtları Normal ile birebir aynı oyundu. Kayıtlar artık
+    ///       `zorluk` alanını taşıyor; analiz ona göre ayırmalı.
     /// </summary>
-    public const int Denge = 2;
+    public const int Denge = 3;
 }

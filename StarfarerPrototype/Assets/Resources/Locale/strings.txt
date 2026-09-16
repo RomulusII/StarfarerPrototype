@@ -26,6 +26,9 @@ menu.start	BAŞLA	START	STARTEN
 menu.continue	DEVAM ET  (Level {0})	CONTINUE  (Level {0})	FORTSETZEN  (Level {0})
 menu.freeplay	SERBEST MOD	FREE PLAY	FREIES SPIEL
 menu.freeplay.hint	Serbest mod: bölüm sistemi olmadan sürekli düşman akışı — test içindir	Free play: a continuous enemy stream without the chapter system — for testing	Freies Spiel: durchgehender Gegnerstrom ohne Kapitelsystem — nur zum Testen
+menu.continue.none	DEVAM ET	CONTINUE	FORTSETZEN
+menu.freeplay.continue	DEVAM ET  (Dalga {0})	CONTINUE  (Wave {0})	FORTSETZEN  (Welle {0})
+menu.newConfirm	KAYIT SİLİNECEK — TEKRAR BAS	SAVE WILL BE ERASED — TAP AGAIN	SPIELSTAND WIRD GELÖSCHT — NOCHMAL
 
 # ── Oyun içi HUD ─────────────────────────────────────────────────────────────
 hud.boost.shield	KALKAN\nBOOST	SHIELD\nBOOST	SCHILD\nBOOST
@@ -153,6 +156,7 @@ stat.hangar.speed	Gemi Hızı	Craft Speed	Schiffstempo
 
 # ── Upgrade ekranı ───────────────────────────────────────────────────────────
 upgrade.close	KAPAT	CLOSE	SCHLIESSEN
+upgrade.mainMenu	ANA MENÜ	MAIN MENU	HAUPTMENÜ
 upgrade.panel.general	GENEL BİLGİLER	GENERAL	ÜBERSICHT
 upgrade.panel.slot	SLOT BİLGİSİ	SLOT INFO	SLOT-INFO
 upgrade.panel.option	OPSİYON DETAYI	OPTION DETAIL	OPTIONSDETAIL

@@ -6,9 +6,18 @@ using UnityEngine.UI;
 /// Oyun açılış ekranı. Oyun buradan başlar; menü kapanana kadar bölüm sistemi
 /// kurulmaz, dolayısıyla arkada düşman spawn olmaz.
 ///
-/// İki mod:
+/// İki mod, her biri kendi satırında — solda BAŞLAT, sağda DEVAM ET:
 ///   Kampanya    — ChapterManager kurulur, normal dalga akışı
 ///   Serbest Mod — ChapterManager kurulmaz, EnemySpawner'ın test modu açılır
+///
+/// DEVAM ET kayıt yokken de ekranda durur, sönük ve basılamaz. Kayıt varken
+/// ortaya çıkan bir düğme yerleşimi kaydırıyordu: aynı noktaya dokunan oyuncu
+/// bir oturumda BAŞLA'ya, diğerinde DEVAM ET'e basıyordu.
+///
+/// Kayıt varken BAŞLAT iki dokunuş ister (bkz. <see cref="StartOrConfirm"/>).
+/// Eskiden BAŞLA eski kaydı silmiyor, ilk level sonunda üstüne yazıyordu:
+/// o ana kadar menüye dönen oyuncu "Devam Et"te hâlâ eski kampanyayı
+/// buluyordu, yani gerçek anlamda YENİ bir oyuna başlamanın yolu yoktu.
 ///
 /// Zorluk seçimi de buraya taşındı; daha önce yalnızca Game Over panelinde vardı
 /// ve oyuncu zorluğu ancak öldükten sonra değiştirebiliyordu.
@@ -17,7 +26,9 @@ using UnityEngine.UI;
 /// </summary>
 public class StartMenuUI : MonoBehaviour
 {
-    public enum GameMode { Campaign, FreePlay, Continue }
+    // Yeni değerler SONA eklenir — sıra numarası bir gün kayda girerse
+    // ortaya eklenen bir değer eski kayıtları sessizce başka moda çevirir.
+    public enum GameMode { Campaign, FreePlay, Continue, FreeContinue }
 
     /// <summary>
     /// Kampanyanın başlayacağı level. 100 levellik eğriyi baştan oynayarak test
@@ -34,9 +45,24 @@ public class StartMenuUI : MonoBehaviour
     Button           _easyBtn, _normalBtn, _hardBtn;
     Text             _levelText;
     int              _startLevel = 1;
+    Button           _startBtn, _freeBtn;
+
+    // İki dokunuşlu "yeni oyun" onayı: bekleyen düğme ve özgün etiketi.
+    const float ConfirmWindow = 4f;
+    Button _confirmBtn;
+    string _confirmLabel;
+    int    _confirmFontSize;
+    float  _confirmUntil;
 
     static readonly Color Selected   = new Color(1f, 0.85f, 0.25f);
     static readonly Color Unselected = new Color(0.30f, 0.30f, 0.34f);
+
+    static readonly Color CampaignColor = new Color(0.13f, 0.42f, 0.22f);
+    static readonly Color ContinueColor = new Color(0.15f, 0.28f, 0.45f);
+    // Serbest modun devam düğmesi aynı rengi taşır: satırın iki düğmesi aynı
+    // modun iki kapısı, renk hangi moda ait olduklarını söylüyor.
+    static readonly Color FreeColor     = new Color(0.28f, 0.24f, 0.12f);
+    static readonly Color ConfirmColor  = new Color(0.55f, 0.18f, 0.14f);
 
     /// <summary>Menüyü kurar ve gösterir. Seçim yapılınca onStart çağrılır.</summary>
     public static StartMenuUI Show(Action<GameMode> onStart)
@@ -44,11 +70,15 @@ public class StartMenuUI : MonoBehaviour
         var go   = new GameObject("StartMenuUI");
         var menu = go.AddComponent<StartMenuUI>();
         menu._onStart = onStart;
+
+        // Son seçilen zorluk işaretli gelsin — Build düğmeleri boyarken okur.
+        DifficultyManager.LoadPreference();
         menu.Build();
 
         // Menü açıkken oyun ilerlemesin. Projedeki pause protokolü SpeedController'da;
         // timeScale'i doğrudan ezmek hız sistemiyle çakışır.
         IsOpen = true;
+        WebChrome.Refresh();
         if (SpeedController.Instance != null) SpeedController.Instance.Pause();
         else                                  Time.timeScale = 0f;
 
@@ -110,33 +140,65 @@ public class StartMenuUI : MonoBehaviour
 
         BuildLevelSelect();
 
-        MakeButton("StartButton", Loc.T("menu.start"), 32,
-                   new Color(0.13f, 0.42f, 0.22f),
-                   new Vector2(0.34f, 0.25f), new Vector2(0.66f, 0.33f),
-                   () => Choose(GameMode.Campaign));
-
-        // Kayıt varsa devam etmek asıl akıştır; yeni başlamak kaydı siler
-        if (SaveSystem.HasSave)
-        {
-            MakeButton("ContinueButton", Loc.T("menu.continue", SaveSystem.SavedLevel), 24,
-                       new Color(0.15f, 0.28f, 0.45f),
-                       new Vector2(0.34f, 0.17f), new Vector2(0.66f, 0.24f),
-                       () => Choose(GameMode.Continue));
-        }
-
-        MakeButton("FreePlayButton", Loc.T("menu.freeplay"), 22,
-                   new Color(0.28f, 0.24f, 0.12f),
-                   new Vector2(0.38f, 0.09f), new Vector2(0.62f, 0.15f),
-                   () => Choose(GameMode.FreePlay));
+        BuildModeButtons();
 
         MakeText(_panel.transform, "FreePlayHint",
                  Loc.T("menu.freeplay.hint"),
                  17, new Color(0.40f, 0.42f, 0.48f),
-                 new Vector2(0f, 0.04f), new Vector2(1f, 0.08f));
+                 new Vector2(0f, 0.06f), new Vector2(1f, 0.11f));
 
         BuildVersionLabel();
 
         RefreshDifficultyButtons();
+    }
+
+    /// <summary>
+    /// İki satır: kampanya (BAŞLA · DEVAM ET) ve serbest mod (SERBEST MOD ·
+    /// DEVAM ET). Satırın iki yarısı eşit genişlikte — DEVAM ET kayıttaki
+    /// level/dalga numarasını taşıdığı için BAŞLA'dan uzun bir metin.
+    /// </summary>
+    void BuildModeButtons()
+    {
+        bool hasSave = SaveSystem.HasSave;
+        bool hasFree = SaveSystem.HasFreeSave;
+
+        _startBtn = MakeButton("StartButton", Loc.T("menu.start"), 32, CampaignColor,
+                               new Vector2(0.25f, 0.25f), new Vector2(0.49f, 0.33f),
+                               () => StartOrConfirm(_startBtn, GameMode.Campaign, SaveSystem.HasSave));
+
+        var cont = MakeButton("ContinueButton",
+                              hasSave ? Loc.T("menu.continue", SaveSystem.SavedLevel)
+                                      : Loc.T("menu.continue.none"),
+                              26, ContinueColor,
+                              new Vector2(0.51f, 0.25f), new Vector2(0.75f, 0.33f),
+                              () => Choose(GameMode.Continue));
+        SetAvailable(cont, hasSave);
+
+        _freeBtn = MakeButton("FreePlayButton", Loc.T("menu.freeplay"), 26, FreeColor,
+                              new Vector2(0.25f, 0.14f), new Vector2(0.49f, 0.22f),
+                              () => StartOrConfirm(_freeBtn, GameMode.FreePlay, SaveSystem.HasFreeSave));
+
+        var freeCont = MakeButton("FreeContinueButton",
+                                  hasFree ? Loc.T("menu.freeplay.continue", SaveSystem.SavedFreeWave)
+                                          : Loc.T("menu.continue.none"),
+                                  24, FreeColor,
+                                  new Vector2(0.51f, 0.14f), new Vector2(0.75f, 0.22f),
+                                  () => Choose(GameMode.FreeContinue));
+        SetAvailable(freeCont, hasFree);
+    }
+
+    /// <summary>Kayıt yoksa düğme yerinde durur ama sönük ve basılamaz.</summary>
+    static void SetAvailable(Button b, bool available)
+    {
+        b.interactable = available;
+        if (available) return;
+
+        var colors = b.colors;
+        colors.disabledColor = new Color(1f, 1f, 1f, 0.35f);
+        b.colors = colors;
+
+        var label = b.GetComponentInChildren<Text>();
+        if (label != null) label.color = new Color(1f, 1f, 1f, 0.35f);
     }
 
     /// <summary>
@@ -285,6 +347,9 @@ public class StartMenuUI : MonoBehaviour
     {
         if (Loc.Language == lang) return;
 
+        // Bekleyen onay eski canvas'ın düğmesine bağlı; yeniden kurulumda kaybolur.
+        _confirmBtn = null;
+
         Loc.Language = lang;
 
         // Destroy kare sonunda işler; eski canvas bir kare boyunca yenisiyle
@@ -301,6 +366,7 @@ public class StartMenuUI : MonoBehaviour
     void SelectDifficulty(Difficulty d)
     {
         DifficultyManager.Current = d;
+        DifficultyManager.SavePreference();
         RefreshDifficultyButtons();
     }
 
@@ -317,9 +383,65 @@ public class StartMenuUI : MonoBehaviour
             b.targetGraphic.color = selected ? Selected : Unselected;
     }
 
+    /// <summary>
+    /// Kayıt yoksa doğrudan başlatır. Kayıt varsa ilk dokunuş düğmeyi uyarıya
+    /// çevirir ("kayıt silinecek — tekrar bas"), ikinci dokunuş başlatır.
+    ///
+    /// Ayrı bir "YENİ OYUN" düğmesi yerine bu seçildi: ekrana yeni bir düğme
+    /// eklemek yerine var olan düğmenin ne yapacağını dürüstçe söylemesi. Tek
+    /// dokunuşla silmek ise bir yanlış dokunuşun bütün kampanyayı götürmesi
+    /// demekti — telefonda BAŞLA ile DEVAM ET yan yana.
+    ///
+    /// Onay <see cref="ConfirmWindow"/> saniye sonra kendiliğinden düşer.
+    /// Menü açıkken timeScale 0, süre bu yüzden duvar saatiyle ölçülür.
+    /// </summary>
+    void StartOrConfirm(Button btn, GameMode mode, bool hasSave)
+    {
+        if (!hasSave || _confirmBtn == btn)
+        {
+            Choose(mode);
+            return;
+        }
+
+        CancelConfirm();
+
+        var label = btn.GetComponentInChildren<Text>();
+        if (label == null) { Choose(mode); return; }
+
+        _confirmBtn      = btn;
+        _confirmLabel    = label.text;
+        _confirmFontSize = label.fontSize;
+        _confirmUntil    = Time.unscaledTime + ConfirmWindow;
+
+        label.text     = Loc.T("menu.newConfirm");
+        label.fontSize = 20;
+        btn.targetGraphic.color = ConfirmColor;
+    }
+
+    void CancelConfirm()
+    {
+        if (_confirmBtn == null) return;
+
+        var label = _confirmBtn.GetComponentInChildren<Text>();
+        if (label != null)
+        {
+            label.text     = _confirmLabel;
+            label.fontSize = _confirmFontSize;
+        }
+        _confirmBtn.targetGraphic.color = _confirmBtn == _startBtn ? CampaignColor : FreeColor;
+        _confirmBtn = null;
+    }
+
+    void Update()
+    {
+        if (_confirmBtn != null && Time.unscaledTime > _confirmUntil)
+            CancelConfirm();
+    }
+
     void Choose(GameMode mode)
     {
         IsOpen = false;
+        WebChrome.Refresh();
         SelectedStartLevel = mode == GameMode.Campaign ? _startLevel : 1;
 
         // Oyun 1x hızda başlasın
@@ -332,7 +454,11 @@ public class StartMenuUI : MonoBehaviour
         cb?.Invoke(mode);
     }
 
-    void OnDestroy() => IsOpen = false;
+    void OnDestroy()
+    {
+        IsOpen = false;
+        WebChrome.Refresh();
+    }
 
     // ── UI yardımcıları ───────────────────────────────────────────────────────
 

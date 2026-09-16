@@ -3,11 +3,21 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Kampanya kaydı. 100 level tek oturumda oynanamaz — kayıt olmadan eğrinin
-/// ikinci yarısı test bile edilemez.
+/// Kayıt girişi. İKİ KATMAN var ve ayrım anlamlıdır:
 ///
-/// PlayerPrefs + JsonUtility: prototip için yeterli, dosya yönetimi gerektirmez.
-/// Tek slot vardır; "kayıt slotu seçme" akışı oynanışa bir şey katmıyor.
+///   Level başı kaydı (kampanya) — PlayerPrefs, <c>starfarer.save.v2</c>.
+///       Geminin kurulumu ve kaynaklar; level sınırında yazılır. Ölüm buraya
+///       döndürür: kampanyanın cezası "son tamamlanan levele dön".
+///
+///   Dünya kaydı (kampanya + serbest) — dosya, bkz. <see cref="WorldSave"/>.
+///       Sahnenin TAMAMI: gemiler, mermiler, enkaz, zamanlayıcılar. Menüye
+///       dönüşte ve uygulama arka plana atıldığında yazılır; "Devam Et" tam bu
+///       ana döner. Ölüm onu siler.
+///
+/// Level ortası kaydı eskiden YOKTU, çünkü kısmi bir kayıt bir kaynak kasma
+/// açığıydı: yarım level oyna, kaynağı topla, çık, level başından devam et,
+/// tekrarla. Tam kayıtla bu açık kapanır — devam eden oyun kaldığı yerden
+/// sürer, levelin başına dönmez.
 ///
 /// Komponent tanımları runtime'da üretildiği için referansları kaydedilemez;
 /// tip + (turret ise) uzmanlaşma + (silah ise) silah tipi yazılır ve
@@ -52,6 +62,8 @@ public static class SaveSystem
         public int   level   = 1;
         public float metal;
         public float crystal;
+        // Bilgi amaçlı yazılır, GERİ YÜKLENMEZ — zorluğun sahibi menüdeki
+        // seçimdir (bkz. DifficultyManager).
         public int   difficulty;
         public int   activeWeapon;
         public List<SlotSave>   slots   = new();
@@ -60,15 +72,26 @@ public static class SaveSystem
 
     // ── Sorgular ──────────────────────────────────────────────────────────────
 
-    public static bool HasSave => PlayerPrefs.HasKey(Key);
+    // Anahtarın varlığına değil OKUNABİLİRLİĞİNE bakılır: geçersiz (v1) bir
+    // kayıt varken "Devam Et" etkin görünüp tıklanınca baştan başlatıyordu.
+    public static bool HasSave     => WorldSave.Exists(WorldSave.Slot.Campaign) || Load() != null;
+    public static bool HasFreeSave => WorldSave.Exists(WorldSave.Slot.Free);
 
-    /// <summary>Kayıttaki level — menüde "Devam Et (Level 34)" göstermek için.</summary>
+    /// <summary>Serbest kayıttaki dalga — menüde "Devam Et (Dalga 12)" için.</summary>
+    public static int SavedFreeWave => WorldSave.Load(WorldSave.Slot.Free)?.free.waveIndex ?? 0;
+
+    /// <summary>
+    /// Devam edilecek level — menüde "Devam Et (Level 34)" için. Dünya kaydı
+    /// varsa o, yoksa level başı kaydı: dünya kaydı her zaman daha yenidir,
+    /// level sınırında yazılan kayıt onu siler.
+    /// </summary>
     public static int SavedLevel
     {
         get
         {
-            var d = Load();
-            return d?.level ?? 1;
+            var w = WorldSave.Load(WorldSave.Slot.Campaign);
+            if (w != null) return w.level;
+            return Load()?.level ?? 1;
         }
     }
 
@@ -87,23 +110,42 @@ public static class SaveSystem
         }
     }
 
+    /// <summary>Kampanyanın İKİ katmanını da siler — yeni oyun.</summary>
     public static void Delete()
     {
         PlayerPrefs.DeleteKey(Key);
         PlayerPrefs.Save();
+        WorldSave.Delete(WorldSave.Slot.Campaign);
     }
+
+    public static void DeleteFree() => WorldSave.Delete(WorldSave.Slot.Free);
 
     // ── Kaydetme ──────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Sahnedeki durumu yazar. Level geçişlerinde çağrılır — savaş ortasında
-    /// kaydetmek yarım kalmış bir dalgayı geri yüklemeye çalışmak demek olurdu.
+    /// Level başı kaydı — level geçişlerinde çağrılır. Dünya kaydını SİLER:
+    /// o artık bitmiş bir levelin ortasını anlatıyor; kalsaydı "Devam Et"
+    /// oyuncuyu tamamladığı levelin içine geri götürürdü.
     /// </summary>
     public static void Save()
     {
+        var d = CaptureShip();
+        if (d == null) return;
+
+        d.level = GameProgress.CurrentLevel;
+        PlayerPrefs.SetString(Key, JsonUtility.ToJson(d));
+        PlayerPrefs.Save();
+        MaxReachedLevel = d.level;
+
+        WorldSave.Delete(WorldSave.Slot.Campaign);
+    }
+
+    /// <summary>Geminin kurulumu — iki katmanın ortak bölümü.</summary>
+    public static SaveData CaptureShip()
+    {
         var loadout = UnityEngine.Object.FindFirstObjectByType<ShipLoadout>();
         var inv     = ResourceInventory.Instance;
-        if (loadout == null || inv == null) return;
+        if (loadout == null || inv == null) return null;
 
         var d = new SaveData
         {
@@ -152,9 +194,7 @@ public static class SaveSystem
             });
         }
 
-        PlayerPrefs.SetString(Key, JsonUtility.ToJson(d));
-        PlayerPrefs.Save();
-        MaxReachedLevel = d.level;
+        return d;
     }
 
     // ── Yükleme ───────────────────────────────────────────────────────────────
@@ -175,19 +215,30 @@ public static class SaveSystem
     }
 
     /// <summary>
-    /// Kaydı sahneye uygular. ShipLoadout.Start() başlangıç donanımını kurduktan
-    /// SONRA çağrılmalıdır — yoksa bedava komponentler kaydın üstüne eklenir.
+    /// Level başı kaydını sahneye uygular. ShipLoadout.Start() başlangıç
+    /// donanımını kurduktan SONRA çağrılmalıdır — yoksa bedava komponentler
+    /// kaydın üstüne eklenir.
     /// </summary>
     public static bool Apply(SaveData d)
+    {
+        if (d == null) return false;
+        GameProgress.CurrentLevel = d.level;
+        return ApplyShip(d);
+    }
+
+    /// <summary>
+    /// Yalnızca geminin kurulumunu uygular (slotlar, silahlar, kaynaklar) — iki
+    /// katmanın ortak yolu. Aynı şartla: ShipLoadout.Start()'tan SONRA.
+    ///
+    /// Zorluk burada YAZILMAZ; menüde seçili olan geçerlidir.
+    /// </summary>
+    public static bool ApplyShip(SaveData d)
     {
         if (d == null) return false;
 
         var loadout = UnityEngine.Object.FindFirstObjectByType<ShipLoadout>();
         var inv     = ResourceInventory.Instance;
         if (loadout == null || inv == null) return false;
-
-        GameProgress.CurrentLevel = d.level;
-        DifficultyManager.Current = (Difficulty)d.difficulty;
 
         loadout.ClearAllSlots();
 

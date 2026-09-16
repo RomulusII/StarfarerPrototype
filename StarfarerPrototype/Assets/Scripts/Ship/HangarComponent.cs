@@ -86,6 +86,36 @@ public class HangarComponent : ShipComponentBase
         _fighters.Add(fig);
     }
 
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Kayıttan kurulan gemiyi hangarın listesine alır. Alınmasaydı hangar
+    /// onları yok sayar ve üretim sayacı kurulu gemilerin ÜSTÜNE yenisini yapardı.
+    /// </summary>
+    public void AdoptCollector(CollectorShip c)
+    {
+        if (c != null && !_collectors.Contains(c)) _collectors.Add(c);
+    }
+
+    public void AdoptFighter(FighterShip f)
+    {
+        if (f != null && !_fighters.Contains(f)) _fighters.Add(f);
+    }
+
+    public override void CaptureRuntime(ComponentRuntimeState s)
+    {
+        base.CaptureRuntime(s);
+        s.collectorTimer = _collectorTimer;
+        s.fighterTimer   = _fighterTimer;
+    }
+
+    public override void RestoreRuntime(ComponentRuntimeState s)
+    {
+        base.RestoreRuntime(s);
+        _collectorTimer = s.collectorTimer;
+        _fighterTimer   = s.fighterTimer;
+    }
+
     public override void OnStatUpgraded(string key)
     {
         if (key != "speed") return;

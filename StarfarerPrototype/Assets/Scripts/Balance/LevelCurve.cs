@@ -129,10 +129,16 @@ public struct EnemyScaling
     public static EnemyScaling ForLevel(int gameLevel)
     {
         var c = LevelCurve.Instance;
+
+        // Zorluk BURADA uygulanır: kampanya da serbest mod da düşmanını bu
+        // yoldan kurar (EnemySpawner.Spawn), yani tek satır iki modu birden
+        // kapsar. Boss bu yoldan geçmez — onun çarpanı BossShipData'da.
+        float zorluk = DifficultyManager.EnemyMultiplier;
+
         return new EnemyScaling
         {
-            hp       = c.HpMultiplier(gameLevel),
-            damage   = c.DamageMultiplier(gameLevel),
+            hp       = c.HpMultiplier(gameLevel)     * zorluk,
+            damage   = c.DamageMultiplier(gameLevel) * zorluk,
             evasion  = c.EvasionMultiplier(gameLevel),
             armor    = c.Armor(gameLevel),
             mobility = c.MobilityMultiplier(gameLevel),

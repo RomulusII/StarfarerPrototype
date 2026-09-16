@@ -19,6 +19,15 @@ public class GameManager : MonoBehaviour
     bool _gameOver = false;
     GameObject _gameOverPanel;
 
+    // Oyunun hangi moddan başlatıldığı: menüye dönüşte ve ölümde HANGİ kaydın
+    // yazılacağını/silineceğini belirler.
+    StartMenuUI.GameMode _mode;
+    bool                 _modeChosen;
+
+    public bool IsFreePlay =>
+        _modeChosen && (_mode == StartMenuUI.GameMode.FreePlay ||
+                        _mode == StartMenuUI.GameMode.FreeContinue);
+
     // Panel açılış menüsünden ÖNCE kurulur, yani metinleri dil seçilmeden
     // yazılır; gösterildiği anda tazelenirler (bkz. TriggerGameOver).
     Text _gameOverLabel, _restartLabel;
@@ -37,6 +46,11 @@ public class GameManager : MonoBehaviour
         // Kadraj önbelleği statiktir; sahne yeniden yüklenince (ölüm → restart)
         // hayatta kalır ve eski en-boy oranıyla hesaplanmış kalırdı.
         ViewBounds.Invalidate();
+
+        // Boost modu da statik. Menüye dönüp yeni oyuna başlayan oyuncu önceki
+        // oyunun boost'uyla başlıyordu; kayıttan devam eden ise onu zaten
+        // kayıttan alır.
+        BoostController.Restore(BoostMode.None);
 
         if (FindFirstObjectByType<EnergyBar>() == null)
         {
@@ -145,9 +159,12 @@ public class GameManager : MonoBehaviour
     /// <summary>Menüdeki seçime göre oyunu başlatır.</summary>
     void BeginGame(StartMenuUI.GameMode mode)
     {
-        if (mode == StartMenuUI.GameMode.FreePlay)
+        _mode       = mode;
+        _modeChosen = true;
+
+        if (IsFreePlay)
         {
-            BeginFreePlay();
+            StartCoroutine(BeginFreePlay(mode));
             return;
         }
 
@@ -163,6 +180,21 @@ public class GameManager : MonoBehaviour
     /// </summary>
     System.Collections.IEnumerator BeginSimRun()
     {
+        // Kaydet/yükle testi (bkz. SaveRoundTrip): sahne yeniden yüklendiğinde
+        // koşu kayıttan DEVAM eder — menüdeki "Devam Et" ile aynı yoldan, ki
+        // test oyuncunun kullandığı kodu sınasın.
+        bool free = SimRuntime.Config.saveTest == "serbest";
+        if (SaveRoundTrip.AwaitingRestore)
+        {
+            BeginGame(free ? StartMenuUI.GameMode.FreeContinue : StartMenuUI.GameMode.Continue);
+            yield break;
+        }
+        if (free)
+        {
+            BeginGame(StartMenuUI.GameMode.FreePlay);
+            yield break;
+        }
+
         yield return null;   // ShipLoadout.Start() bu karede çalışır
 
         GameProgress.CurrentLevel = SimRuntime.Config.startLevel;
@@ -175,12 +207,29 @@ public class GameManager : MonoBehaviour
 
         if (mode == StartMenuUI.GameMode.Continue)
         {
-            if (!SaveSystem.Apply(SaveSystem.Load()))
+            // Önce dünya kaydı (level ortası, tam sahne), yoksa level başı kaydı.
+            // Dünya kaydı varsa her zaman daha yenidir: level sınırında yazılan
+            // kayıt onu siliyor.
+            var world = WorldSave.Load(WorldSave.Slot.Campaign);
+            if (world != null && SaveSystem.ApplyShip(world.ship))
+            {
+                GameProgress.CurrentLevel = world.level;
+                WorldSave.RestoreWorld(world);
+
+                // Bölüm sistemi kaydın ANINA döner, leveli baştan kurmaz
+                ChapterManager.PendingRestore = world.chapter;
+                ChapterManager.PendingField   = world.asteroidField;
+            }
+            else if (!SaveSystem.Apply(SaveSystem.Load()))
                 GameProgress.Reset();   // kayıt bozuksa baştan başla
         }
         else
         {
-            // Yeni oyun: seçilen levelden başla, eski kaydın üstüne yazılacak
+            // Yeni oyun: eski kayıt menüde onaylanarak bırakıldı. Hemen silinir,
+            // ilk level sonunu beklemez — yoksa o ana kadar menüye dönen oyuncu
+            // "Devam Et"te sildiğini sandığı eski kampanyayı bulurdu.
+            // Ulaşılmış en yüksek level (level seçimi) SİLİNMEZ.
+            SaveSystem.Delete();
             GameProgress.CurrentLevel = StartMenuUI.SelectedStartLevel;
         }
 
@@ -211,7 +260,7 @@ public class GameManager : MonoBehaviour
     /// belirli bir levelin zorluğunu test etmek için spawner'ın debugLevel
     /// alanı Inspector'dan doldurulabilir.
     /// </summary>
-    void BeginFreePlay()
+    System.Collections.IEnumerator BeginFreePlay(StartMenuUI.GameMode mode)
     {
         var spawner = FindFirstObjectByType<EnemySpawner>();
         if (spawner == null)
@@ -220,6 +269,27 @@ public class GameManager : MonoBehaviour
             spawner = go.AddComponent<EnemySpawner>();
         }
 
+        if (mode == StartMenuUI.GameMode.FreeContinue)
+        {
+            // Gemi kaydı ShipLoadout.Start()'tan SONRA uygulanmalı — kampanyadaki
+            // devamla aynı gerekçe (bkz. BeginCampaign).
+            yield return null;
+
+            var world = WorldSave.Load(WorldSave.Slot.Free);
+            if (world != null && SaveSystem.ApplyShip(world.ship))
+            {
+                WorldSave.RestoreWorld(world);
+                spawner.ResumeFreeRun(world.free, world.asteroidField);
+            }
+        }
+        else
+        {
+            // Yeni serbest oyun: eski kayıt menüde onaylanarak bırakıldı.
+            SaveSystem.DeleteFree();
+        }
+
+        // Rampa geri yüklemesi bu bayrak açılmadan ÖNCE verilmiş olmalı:
+        // spawner koşuyu bayrağı gördüğü ilk karede kurar.
         spawner.debugFreeSpawn = true;
         BalanceLog.Begin("serbest");
         BalanceUploader.EnsureExists();
@@ -228,7 +298,11 @@ public class GameManager : MonoBehaviour
 
     // Kayıt tamponu diske ancak kapanışta boşalır. Editörde Play'den çıkmak
     // OnApplicationQuit tetikler; bu olmadan son satırlar kaybolurdu.
-    void OnApplicationQuit() => BalanceLog.Close();
+    void OnApplicationQuit()
+    {
+        SaveWorldIfPlaying();
+        BalanceLog.Close();
+    }
     void OnDisable()         => BalanceLog.Close();
 
     static void EnsureEventSystem()
@@ -251,6 +325,13 @@ public class GameManager : MonoBehaviour
     {
         _gameOver  = true;
         IsGameOver = true;
+
+        // Ölüm DÜNYA kaydını siler. Kalsaydı "Devam Et" ölümden hemen önceki ana
+        // döndürür, ölüm de bedeli olmayan bir geri sarmaya dönerdi. Serbest
+        // koşu burada biter; kampanyada level BAŞI kaydı yerinde kalır — oradaki
+        // ceza "son tamamlanan levele dön" olarak tasarlandı.
+        if (_modeChosen)
+            WorldSave.Delete(IsFreePlay ? WorldSave.Slot.Free : WorldSave.Slot.Campaign);
 
         // UpgradeUI açıksa zorla kapat (Tab ile resume'u engellemek için)
         if (UpgradeUI.IsPaused)
@@ -275,6 +356,49 @@ public class GameManager : MonoBehaviour
         IsGameOver = false;
         SpeedController.Instance?.Reset();
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+
+    /// <summary>
+    /// Upgrade ekranındaki ANA MENÜ düğmesi. Sahne yeniden yüklenir, yani
+    /// açılış menüsüne ölümdeki RESTART ile AYNI yoldan dönülür — ikinci bir
+    /// "oyunu sök" yolu yazılsaydı sıfırlanmayı unutulan bir statik (yetim
+    /// kalkan havuzu hatası tam böyle doğmuştu) er geç sızardı.
+    ///
+    /// Dünya olduğu gibi kaydedilir (bkz. WorldSave) — her iki modda.
+    /// </summary>
+    public void ReturnToMenu()
+    {
+        if (IsGameOver) return;
+
+        SaveWorldIfPlaying();
+
+        // IsPaused statiktir ve sahne yüklemesinden sağ çıkar; kapatılmazsa
+        // yeni oyunda spawner "upgrade ekranı açık" sanıp hiç dalga göndermezdi.
+        if (UpgradeUI.IsPaused)
+        {
+            UpgradeUI.IsPaused = false;
+            if (UpgradeUI.Instance != null) UpgradeUI.Instance.ForceClose();
+        }
+
+        Restart();
+    }
+
+    // Telefonda uygulama arka plana atılıp oradan kapatılabilir; o yolda ANA
+    // MENÜ düğmesine hiç basılmaz. Dünya burada da yazılır.
+    void OnApplicationPause(bool paused)
+    {
+        if (paused) SaveWorldIfPlaying();
+    }
+
+    /// <summary>
+    /// Oynanan modun dünyasını yazar. Menü açıkken, oyun bittikten sonra ve
+    /// simülasyonda yazmaz — simülasyonun kaydını yalnızca kaydet/yükle testi
+    /// yönetir.
+    /// </summary>
+    void SaveWorldIfPlaying()
+    {
+        if (!_modeChosen || IsGameOver || SimRuntime.Active) return;
+        WorldSave.Save(IsFreePlay ? WorldSave.Slot.Free : WorldSave.Slot.Campaign);
     }
 
     // ── UI Builder ─────────────────────────────────────────────────────────

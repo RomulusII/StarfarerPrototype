@@ -160,6 +160,9 @@ public class SimDirector : MonoBehaviour
         if (_ended) return;
         var cfg = SimRuntime.Config;
 
+        // Kaydet/yükle testi koşunun bitişini kendisi bildirir.
+        if (SaveRoundTrip.Tick(cfg)) return;
+
         if (GameManager.IsGameOver)                        { Finish("oldu",   0); return; }
         if (GameProgress.CurrentLevel > cfg.endLevel)       { Finish("bitti",  0); return; }
         if (ChapterManager.CampaignFinished)               { Finish("bitti",  0); return; }
@@ -170,6 +173,14 @@ public class SimDirector : MonoBehaviour
     void Finish(string reason, int exitCode)
     {
         _ended = true;
+
+        // Test istendi ama koşu test anına varamadı (öldü, level bitti): bu bir
+        // BAŞARI değil — sessizce 0 dönseydi test koşucusu geçti sanırdı.
+        if (!string.IsNullOrEmpty(SimRuntime.Config.saveTest) && !SaveRoundTrip.Started)
+        {
+            Debug.LogError($"[KayitTesti] koşu test anından önce bitti — sebep={reason}");
+            exitCode = 7;
+        }
 
         var ship = FindFirstObjectByType<PlayerShip>();
         var inv  = ResourceInventory.Instance;

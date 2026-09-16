@@ -81,6 +81,15 @@ public class SimConfig
     public Difficulty difficulty = Difficulty.Normal;
 
     /// <summary>
+    /// Kaydet/yükle testi: "kampanya" ya da "serbest"; boşsa kapalı
+    /// (bkz. SaveRoundTrip). Açıkken koşu testin sonucuyla biter.
+    /// </summary>
+    public string saveTest;
+
+    /// <summary>Testin dünyayı yakaladığı an — sahne yüklenişinden oyun saniyesi.</summary>
+    public float saveTestAt = 60f;
+
+    /// <summary>
     /// <c>BalanceConfig</c> alanlarının koşuya özgü ezmeleri (--set ad=değer).
     /// Duyarlılık analizi bunun üstünde yürür: her parametreyi ±%20 oynat,
     /// hedef metrikteki değişimi ölç.
@@ -122,6 +131,10 @@ public class SimConfig
                 case "--max-wall": c.maxWallSeconds = ParseFloat(Next(), c.maxWallSeconds); break;
                 case "--zorluk":
                 case "--difficulty": c.difficulty = ParseDifficulty(Next(), c.difficulty); break;
+                case "--kayit-testi":
+                case "--save-test":  c.saveTest   = Next() ?? "kampanya";               break;
+                case "--kayit-ani":
+                case "--save-at":    c.saveTestAt = ParseFloat(Next(), c.saveTestAt);   break;
 
                 case "--level":
                 case "--levels":

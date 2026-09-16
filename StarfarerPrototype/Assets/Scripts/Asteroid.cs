@@ -132,7 +132,39 @@ public class Asteroid : MonoBehaviour, ITurretTarget
         rb.gravityScale = 0f;
 
         BuildVisual();
+
+        // Kayıttan kurulan asteroit: Start HP'yi tam doldurdu, kayıttaki
+        // hasarlı hâl ve dönüş şimdi yazılır.
+        if (PendingRestore != null)
+        {
+            var s = PendingRestore;
+            PendingRestore = null;
+
+            hp                       = s.hp;
+            _spin                    = s.spin;
+            _healthBar.maxHealth     = s.maxHp;
+            _healthBar.currentHealth = s.hp;
+            transform.rotation       = Quaternion.Euler(0f, 0f, s.rotation);
+        }
     }
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    /// <summary>Kayıttan kurulurken Start'ın sonunda uygulanır (bkz. WorldSave).</summary>
+    public AsteroidState PendingRestore;
+
+    public AsteroidState CaptureState() => new AsteroidState
+    {
+        id         = WorldSave.IdOf(this),
+        size       = (int)size,
+        pos        = transform.position,
+        rotation   = transform.eulerAngles.z,
+        hp         = hp,
+        maxHp      = _healthBar != null ? _healthBar.maxHealth : hp,
+        spin       = _spin,
+        drift      = _drift,
+        separation = _separation,
+    };
 
     void Update()
     {

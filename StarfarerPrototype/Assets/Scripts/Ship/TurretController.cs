@@ -28,6 +28,7 @@ public class TurretController : ShipComponentBase
     float   _fireTimer;
     int     _currentMag;
     bool    _reloading;
+    float   _reloadTimer;   // eskiden coroutine'di — coroutine'in ilerlemesi kaydedilemez
     Transform _barrel;
 
     // Hedef kilidi — her karede değil, aralıklarla yeniden değerlendirilir
@@ -94,6 +95,18 @@ public class TurretController : ShipComponentBase
 
     void Update()
     {
+        // Şarjör dolumu turret çalışmıyorken de ilerler — eskiden bir
+        // coroutine'di ve WaitForSeconds turretin durumuna bakmıyordu.
+        if (_reloading && !UpgradeUI.IsPaused)
+        {
+            _reloadTimer -= Time.deltaTime;
+            if (_reloadTimer <= 0f)
+            {
+                _currentMag = magazineSize;
+                _reloading  = false;
+            }
+        }
+
         if (!IsOperational)     return;
         if (UpgradeUI.IsPaused) return;
 
@@ -230,9 +243,9 @@ public class TurretController : ShipComponentBase
 
         if (specType == TurretSpecType.Gatling)
         {
-            if (_currentMag <= 0) { StartCoroutine(Reload()); return; }
+            if (_currentMag <= 0) { BeginReload(); return; }
             _currentMag--;
-            if (_currentMag <= 0) StartCoroutine(Reload());
+            if (_currentMag <= 0) BeginReload();
         }
 
         SpawnBullet(target);
@@ -276,7 +289,8 @@ public class TurretController : ShipComponentBase
                   .End();
 
         BuildBulletVisual(go, specType);
-        Destroy(go, bulletLifeTime);
+        tb.visual   = (int)specType;
+        tb.lifeTime = bulletLifeTime;
     }
 
     void SpawnLaserBeam()
@@ -300,12 +314,11 @@ public class TurretController : ShipComponentBase
         beam.Init();
     }
 
-    IEnumerator Reload()
+    void BeginReload()
     {
-        _reloading = true;
-        yield return new WaitForSeconds(reloadTime);
-        _currentMag = magazineSize;
-        _reloading  = false;
+        if (_reloading) return;
+        _reloading   = true;
+        _reloadTimer = reloadTime;
     }
 
     WeaponType BulletWeaponType()
@@ -368,6 +381,7 @@ public class TurretController : ShipComponentBase
                                   30, 30, Color.white);
         baseSR.color        = baseColor * 0.7f;
         baseSR.sortingOrder = 3;
+        _base = baseGo;
 
         _barrel = new GameObject("Barrel").transform;
         _barrel.SetParent(transform, false);
@@ -379,15 +393,26 @@ public class TurretController : ShipComponentBase
         barrelSR.sortingOrder = 4;
     }
 
+    GameObject _base;
+
+    /// <summary>
+    /// Yalnızca turretin KENDİ görselini (taban + namlu) yeniden kurar.
+    ///
+    /// Eskiden bütün çocukları siliyordu — ShipComponentBase'in kurduğu konum
+    /// halkası ve HP barı da çocuk. Uzmanlaşma değiştiren her turret halkasını
+    /// ve HP barını sessizce kaybediyordu.
+    /// </summary>
     void RebuildVisual()
     {
-        foreach (Transform child in transform)
-            Destroy(child.gameObject);
+        if (_base   != null) Destroy(_base);
+        if (_barrel != null) Destroy(_barrel.gameObject);
+        _base   = null;
         _barrel = null;
         BuildVisual();
     }
 
-    static void BuildBulletVisual(GameObject go, TurretSpecType spec)
+    /// <summary>Kayıttan kurulan mermi de aynı görseli buradan alır.</summary>
+    internal static void BuildBulletVisual(GameObject go, TurretSpecType spec)
     {
         Color c = spec switch
         {
@@ -462,5 +487,35 @@ public class TurretController : ShipComponentBase
         componentName = BuildLabel();
         _currentMag   = magazineSize;
         ApplySpecTurnRate();
+
+        // Görsel Awake'te VARSAYILAN uzmanlaşmayla (None) kuruldu. Kayıttan ya
+        // da katalogdan uzmanlaşmış bir turret kurulunca rengi yanlış kalıyordu.
+        RebuildVisual();
+    }
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    public override void CaptureRuntime(ComponentRuntimeState s)
+    {
+        base.CaptureRuntime(s);
+        s.fireTimer     = _fireTimer;
+        s.magazine      = _currentMag;
+        s.reloading     = _reloading;
+        s.reloadTimer   = _reloadTimer;
+        s.rotation      = transform.eulerAngles.z;
+        s.retargetTimer = _retargetTimer;
+        s.lockedTarget  = WorldSave.RefOf(_lockedTarget);
+    }
+
+    public override void RestoreRuntime(ComponentRuntimeState s)
+    {
+        base.RestoreRuntime(s);
+        _fireTimer         = s.fireTimer;
+        _currentMag        = s.magazine;
+        _reloading         = s.reloading;
+        _reloadTimer       = s.reloadTimer;
+        _retargetTimer     = s.retargetTimer;
+        _lockedTarget      = WorldSave.ResolveTarget(s.lockedTarget);
+        transform.rotation = Quaternion.Euler(0f, 0f, s.rotation);
     }
 }

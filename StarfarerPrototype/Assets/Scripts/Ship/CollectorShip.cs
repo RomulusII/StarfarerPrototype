@@ -6,6 +6,7 @@ using UnityEngine;
 ///
 /// Kurallar:
 ///   - Enkaz hangardan MaxDebrisRange'den uzaksa hedef almaz / bırakır.
+///     Solda bu mesafe LeftRangeFactor katıdır (bkz. DebrisTooFar).
 ///   - Tip ayrımı yapmaz: ne bulursa toplar. Kargo tipe göre ayrı sayılır ama
 ///     kapasite toplam üzerinden işler; hangara varınca hepsi birden boşaltılır.
 ///   - TEK istisna: deposu DOLU olan kaynağı hedef almaz. Bir kaynağın dolması
@@ -46,6 +47,11 @@ public class CollectorShip : MonoBehaviour
 
     const float Mass          = 1.5f;
     const float MaxDebrisRange = 12f;   // hangardan max enkaz takip mesafesi
+
+    // Solda menzil bu kat uzun. Enkaz hep sola kayar; toplayıcı ona yanaşıp
+    // birlikte sürüklenirken 12 birimlik daire kısa geliyordu ve enkazı
+    // yarım bırakıp dönüyordu.
+    const float LeftRangeFactor = 2f;
 
     void Awake()
     {
@@ -159,10 +165,21 @@ public class CollectorShip : MonoBehaviour
         return inv == null || !inv.IsFull(d.resourceType);
     }
 
+    /// <summary>
+    /// Menzil bir DAİRE değil, sola doğru uzatılmış bir ELİPS: hangarın
+    /// solundaki enkazda yatay mesafe <see cref="LeftRangeFactor"/>'a bölünür.
+    ///
+    /// Menzilin tamamı büyütülmedi. Sağ taraf dövüş alanıdır — oraya daha
+    /// derin dalan toplayıcı düşmanın içine uçar; yukarı-aşağı uzatmak da
+    /// hiçbir enkazı kurtarmaz, çünkü enkaz dikeyde değil yatayda kaçıyor.
+    /// </summary>
     bool DebrisTooFar(Debris d)
     {
         if (_hangar == null) return false;
-        return Vector2.Distance(_hangar.position, d.transform.position) > MaxDebrisRange;
+
+        Vector2 offset = d.transform.position - _hangar.position;
+        if (offset.x < 0f) offset.x /= LeftRangeFactor;
+        return offset.magnitude > MaxDebrisRange;
     }
 
     void HoverNearHangar()
@@ -198,6 +215,56 @@ public class CollectorShip : MonoBehaviour
     public void SetSpeed(float speed)
     {
         _movement.enginePower = speed * Mass;
+    }
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    public CollectorState CaptureState() => new CollectorState
+    {
+        id          = WorldSave.IdOf(this),
+        pos         = transform.position,
+        hangarSlot  = WorldSave.SlotOf(_hangar != null ? _hangar.GetComponent<HangarComponent>() : null),
+        phase       = (int)_phase,
+        target      = WorldSave.IdOf(_target),
+        hp          = currentHP,
+        maxHp       = maxHP,
+        salvageRate = salvageRate,
+        hoverPhase  = _hoverPhase,
+        cargoTotal  = _cargoTotal,
+        cargo       = (float[])_cargo.Clone(),
+        movement    = _movement.CaptureState(),
+    };
+
+    /// <summary>
+    /// Kayıttan kurar ve hangarına bağlar. Hız hangardan okunur — kayıttaki
+    /// değil: hız, hangarın o anki stat seviyesinin sonucudur ve hangar zaten
+    /// kayıttan kuruldu. Hangar yoksa (satılmış) varsayılan hızla uçar.
+    /// </summary>
+    public static CollectorShip Rebuild(CollectorState s)
+    {
+        var hangar = WorldSave.ResolveSlot(s.hangarSlot) as HangarComponent;
+
+        var go = new GameObject("Collector");
+        go.transform.position = s.pos;
+
+        var c = go.AddComponent<CollectorShip>();
+        c.Init(hangar != null ? hangar.transform : null,
+               hangar != null ? hangar.EffShipSpeed : 3f, s.maxHp, s.salvageRate);
+        if (hangar != null) hangar.AdoptCollector(c);
+        return c;
+    }
+
+    /// <summary>Enkaz hedefi kimlikle çözülür — bütün nesneler kurulduktan sonra.</summary>
+    public void RestoreState(CollectorState s)
+    {
+        currentHP   = s.hp;
+        _phase      = (Phase)s.phase;
+        _target     = WorldSave.Resolve<Debris>(s.target);
+        _hoverPhase = s.hoverPhase;
+        _cargoTotal = s.cargoTotal;
+        if (s.cargo != null)
+            for (int i = 0; i < _cargo.Length && i < s.cargo.Length; i++) _cargo[i] = s.cargo[i];
+        _movement.RestoreState(s.movement);
     }
 
     public void TakeDamage(float amount)

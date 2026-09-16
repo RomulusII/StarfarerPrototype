@@ -166,6 +166,10 @@ public static class BalanceLog
             // olmadığını söyler.
             .Str("yonelim",    Screen.width >= Screen.height ? "yatay" : "portre")
             .Str("dil",        Loc.Language.ToString())
+            // Zorluk düşman HP'sini ve hasarını ±%20 oynatıyor (bkz.
+            // DifficultyManager). Alan olmadan Kolay ve Zor oturumları aynı
+            // havuza düşer ve TTK ölçümü iki ayarın ortasını gösterir.
+            .Str("zorluk",     DifficultyManager.Current.ToString())
             .Num("startLevel", GameProgress.CurrentLevel)
             .End();
 

@@ -366,6 +366,7 @@ public class ShipLoadout : MonoBehaviour
     {
         for (int i = 0; i < slotCount; i++)
         {
+            if (_slots[i] is ShieldGeneratorComponent sg) sg.Discard();
             if (_slotObjects[i] != null) Destroy(_slotObjects[i]);
             _slots[i]         = null;
             _installedDefs[i] = null;

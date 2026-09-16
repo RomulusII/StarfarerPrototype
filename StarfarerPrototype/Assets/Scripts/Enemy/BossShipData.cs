@@ -216,7 +216,37 @@ public class BossShipData : ScriptableObject
         }
 
         b.phases = StandardPhases(chapter, swarm, armored, bomber);
+
+        // Zorluk boss'a da uygulanır: gövde, hardpoint HP'si (kalkan
+        // jeneratörü dahil — boss kalkanı onun yaşamasına bağlı) ve hardpoint
+        // hasarı. Boss EnemySpawner.Spawn yolundan geçmediği için EnemyScaling
+        // çarpanı buraya kendiliğinden ulaşmaz; refakat dronları o yoldan
+        // geçer ve çarpanı zaten alır.
+        float zorluk = DifficultyManager.EnemyMultiplier;
+        b.maxHP *= zorluk;
+        if (b.hardpoints != null)
+            for (int k = 0; k < b.hardpoints.Length; k++)
+            {
+                b.hardpoints[k].hp         *= zorluk;
+                b.hardpoints[k].fireDamage *= zorluk;
+            }
         return b;
+    }
+
+    /// <summary>
+    /// Bir bölüm boss'unun tanımı, adından — kayıttan geri kurulum için. Sayılar
+    /// (gövde, hardpoint HP ve hasarı) çağıran tarafından kayıttakilerle ezilir;
+    /// buradan mekanik (hardpoint düzeni, fazlar, drone havuzları) gelir, çünkü
+    /// o yapılar tip referansları taşıyor ve kayda yazılamıyor.
+    /// </summary>
+    public static BossShipData ForName(string bossName)
+    {
+        for (int chapter = 1; chapter <= 10; chapter++)
+        {
+            var d = CreateForChapter(chapter);
+            if (d != null && d.name == bossName) return d;
+        }
+        return null;
     }
 
     // ── Hardpoint kurucuları ──────────────────────────────────────────────────

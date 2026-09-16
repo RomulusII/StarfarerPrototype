@@ -55,6 +55,13 @@ public class EnergyBus : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// Kayıttan geri yükleme. Burada tavana KIRPILMAZ: kapasitör bonusları
+    /// jeneratörler kurulurken ekleniyor ve sıra garanti değil; Update zaten
+    /// her karede kırpıyor.
+    /// </summary>
+    public void RestoreEnergy(float value) => _currentEnergy = Mathf.Max(0f, value);
+
     float _jamTimer;
 
     void Update()

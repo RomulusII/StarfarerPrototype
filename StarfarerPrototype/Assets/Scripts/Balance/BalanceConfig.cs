@@ -171,6 +171,27 @@ public class BalanceConfig : ScriptableObject
              "(Lv50 zırhında 2.13'e karşı 2.70 DPS).")]
     public float beamArmorBitesPerSecond = 2f;
 
+    // ── Zorluk ────────────────────────────────────────────────────────────────
+
+    [Header("Zorluk")]
+    [Tooltip("Kolay modda düşman HP'si (kalkan ve şarjı dahil) ve hasarı bu " +
+             "oranla çarpılır.\n\n" +
+             "Gelir DEĞİŞMEZ: drop tehdit puanından gelir, HP'den değil. Kolay " +
+             "mod aynı kaynağı daha az emekle verir — bilinçli, Kolay'ın vaadi " +
+             "budur.")]
+    public float easyEnemyMultiplier = 0.8f;
+
+    [Tooltip("Zor modda düşman HP'si (kalkan ve şarjı dahil) ve hasarı bu " +
+             "oranla çarpılır. Normal ×1 — dengenin kalibre edildiği mod.")]
+    public float hardEnemyMultiplier = 1.2f;
+
+    public float EnemyDifficultyMultiplier(Difficulty d) => d switch
+    {
+        Difficulty.Easy => easyEnemyMultiplier,
+        Difficulty.Hard => hardEnemyMultiplier,
+        _               => 1f,
+    };
+
     // ── Singleton ─────────────────────────────────────────────────────────────
 
     static BalanceConfig _instance;

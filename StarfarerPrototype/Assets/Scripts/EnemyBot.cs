@@ -18,6 +18,9 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 {
     public EnemyTypeData data;
 
+    /// <summary>Kayıttan kurulurken Start'ın SONUNDA uygulanır (bkz. WorldSave).</summary>
+    public EnemyState PendingRestore;
+
     PlayerShip   _playerShip;
     HealthBar    _healthBar;
     ShipMovement _movement;
@@ -189,6 +192,16 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
             BuildBarrel(data.barrelColor);
 
         _movement.Initialize(_initialFacing);
+
+        // Kayıttan kurulan gemi: Start tipin varsayılanlarıyla kurdu (tam HP,
+        // rastgele ateş sayacı, yeni yaklaşma açısı). Kayıttaki hâl şimdi
+        // yazılır — önce yazılsaydı Start onun üstüne kendi varsayılanlarını yazardı.
+        if (PendingRestore != null)
+        {
+            var s = PendingRestore;
+            PendingRestore = null;
+            ApplyRestore(s);
+        }
     }
 
     void ApplyStats()
@@ -1432,5 +1445,149 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         // varsayılan 0.60'ına zaten yakın; ayrıca oran vermeye gerek yok.
         ShieldEffect.Spawn(worldHitPos, transform.position, _shieldRadius,
                            BarrierShield.FlashColor, 55f, 0.60f, transform);
+    }
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    public Transform BarrelTransform => _barrelTransform;
+
+    /// <summary>Siper salınımının açısal hızı — faz Time.time'dan ayrılarak yazılır.</summary>
+    static float SwayOmega => Mathf.PI * 2f / ScreenSwayPeriod;
+
+    public EnemyState CaptureState() => new EnemyState
+    {
+        id       = WorldSave.IdOf(this),
+        dataJson = DataJson(),
+        typeName = data.name,
+        pos      = transform.position,
+        velocity = Velocity,
+
+        hp    = _healthBar != null ? _healthBar.currentHealth : 0f,
+        maxHp = _healthBar != null ? _healthBar.maxHealth     : 0f,
+
+        shieldHP            = _shieldHP,
+        maxShieldHP         = _maxShieldHP,
+        shieldRechargeTimer = _shieldRechargeTimer,
+
+        screenPhase    = (int)_screenPhase,
+        guardDir       = _guardDir,
+        guardScanTimer = _guardScanTimer,
+        screenLateral  = _screenLateral,
+        // Salınım Time.time'a bağlı; yeniden açılan uygulamada Time.time sıfırdan
+        // başlar. Yazılan, o anki TOPLAM faz — geri yüklerken yeni Time.time
+        // katkısı çıkarılır ve siper aynı noktadan salınmaya devam eder.
+        screenSwayPhase = _screenSwayPhase + Time.time * SwayOmega,
+
+        fireTimer       = _fireTimer,
+        targetScanTimer = _targetScanTimer,
+        fireScanTimer   = _fireScanTimer,
+        fireTarget      = WorldSave.RefOf(_fireTarget),
+        formation       = _formation != null && _formation.Active ? WorldSave.IdOf(_formation) : 0,
+        barrelRotation  = _barrelTransform != null ? _barrelTransform.eulerAngles.z : 0f,
+
+        approachPhase     = (int)_approachPhase,
+        approachFireTimer = _approachFireTimer,
+        approachShotsLeft = _approachShotsLeft,
+        approachHoverPos  = _approachHoverPos,
+        approachEscapeDir = _approachEscapeDir,
+
+        bombRunFireTimer = _bombRunFireTimer,
+        arDisengageTimer = _arDisengageTimer,
+        arEscapeAngle    = _arEscapeAngle,
+        arPhase          = (int)_arPhase,
+        arTargetSlot     = WorldSave.SlotOf(_arTarget),
+
+        escapeSide    = _escapeSide,
+        age           = _bornAt >= 0f ? Time.time - _bornAt : 0f,
+        sinceFirstHit = _firstHitAt >= 0f ? Time.time - _firstHitAt : -1f,
+        damageTaken   = _damageTaken,
+        phaseTimer    = _phaseTimer,
+        phaseCooldown = _phaseCooldown,
+        auraTimer     = _auraTimer,
+
+        movement = _movement.CaptureState(),
+        hasBrain = _brain != null,
+        brain    = _brain != null ? _brain.CaptureState() : null,
+    };
+
+    /// <summary>
+    /// Ölçeklenmiş verinin JSON'u. <c>splitInto</c> YAZILMAZ: JsonUtility nesne
+    /// referansını örnek kimliğiyle yazıyor ve o sayı bir sonraki açılışta
+    /// anlamsız — hatta başka bir nesneye denk gelebilir. Yüklemede fabrikadan
+    /// bağlanıyor (bkz. WorldSave.RebuildEnemyData).
+    /// </summary>
+    string DataJson()
+    {
+        var split = data.splitInto;
+        data.splitInto = null;
+        try     { return JsonUtility.ToJson(data); }
+        finally { data.splitInto = split; }
+    }
+
+    void ApplyRestore(EnemyState s)
+    {
+        // Gövdenin yönü İLK: namlunun açısı dünya uzayında yazılıyor; gövde
+        // sonradan dönerse çocuk olan namlu da onunla döner ve kayar.
+        _movement.RestoreState(s.movement);
+
+        if (_healthBar != null)
+        {
+            _healthBar.maxHealth     = s.maxHp;
+            _healthBar.currentHealth = s.hp;
+        }
+
+        if (_maxShieldHP > 0f)
+        {
+            _maxShieldHP         = s.maxShieldHP;
+            _shieldHP            = s.shieldHP;
+            _shieldRechargeTimer = s.shieldRechargeTimer;
+            if (_healthBar != null) _healthBar.maxShield = _maxShieldHP;
+            SyncShieldBar();
+            RefreshShieldVisual();
+        }
+
+        _screenPhase     = (ScreenPhase)s.screenPhase;
+        _guardDir        = s.guardDir;
+        _guardScanTimer  = s.guardScanTimer;
+        _screenLateral   = s.screenLateral;
+        _screenSwayPhase = s.screenSwayPhase - Time.time * SwayOmega;
+
+        _fireTimer       = s.fireTimer;
+        _targetScanTimer = s.targetScanTimer;
+        _fireScanTimer   = s.fireScanTimer;
+        _fireTarget      = WorldSave.ResolveTransform(s.fireTarget);
+
+        var group = WorldSave.Resolve<FormationGroup>(s.formation);
+        if (group != null) _formation = group;
+
+        if (_barrelTransform != null)
+            _barrelTransform.rotation = Quaternion.Euler(0f, 0f, s.barrelRotation);
+
+        _approachPhase     = (ApproachPhase)s.approachPhase;
+        _approachFireTimer = s.approachFireTimer;
+        _approachShotsLeft = s.approachShotsLeft;
+        _approachHoverPos  = s.approachHoverPos;
+        _approachEscapeDir = s.approachEscapeDir;
+
+        _bombRunFireTimer = s.bombRunFireTimer;
+        _arDisengageTimer = s.arDisengageTimer;
+        _arEscapeAngle    = s.arEscapeAngle;
+        _arPhase          = (ArPhase)s.arPhase;
+        _arTarget         = WorldSave.ResolveSlot(s.arTargetSlot);
+
+        _escapeSide  = s.escapeSide;
+        _bornAt      = Time.time - s.age;
+        _firstHitAt  = s.sinceFirstHit >= 0f ? Time.time - s.sinceFirstHit : -1f;
+        _damageTaken = s.damageTaken;
+
+        _phaseTimer    = s.phaseTimer;
+        _phaseCooldown = s.phaseCooldown;
+        _auraTimer     = s.auraTimer;
+        if (_phaseTimer > 0f) SetPhaseVisual(true);
+
+        Velocity = s.velocity;
+        _prevPos = transform.position;
+
+        if (_brain != null && s.brain != null) _brain.RestoreState(s.brain);
     }
 }

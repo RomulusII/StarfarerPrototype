@@ -69,7 +69,66 @@ public class PlasmaBeam : MonoBehaviour
 
     void Start()
     {
-        _initialEnergy = totalEnergy;   // Awake'de henüz atanmamış olabilir
+        // Kayıttan kurulan bolt başlangıç enerjisini kayıttan alır: Awake ile
+        // Start arasında totalEnergy KALAN enerjiye yazıldı, ondan türetilseydi
+        // yarısı harcanmış bolt tam parlaklıkta görünürdü.
+        _initialEnergy = _restoredInitial >= 0f ? _restoredInitial : totalEnergy;
+    }
+
+    float _restoredInitial = -1f;
+
+    public float TotalEnergy => totalEnergy;
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    public PlasmaBeamState CaptureState() => new PlasmaBeamState
+    {
+        origin        = _origin,
+        firingDir     = _firingDir,
+        rotAngle      = _rotAngle,
+        head          = _headDist,
+        tail          = _tailDist,
+        emitTimer     = _emitTimer,
+        initialEnergy = _initialEnergy > 0f ? _initialEnergy : totalEnergy,
+        totalEnergy   = totalEnergy,
+        width         = beamWidth,
+        maxLength     = maxLength,
+        speed         = headSpeed,
+        dps           = dps,
+        emitDuration  = emitDuration,
+        phase         = (int)_phase,
+        weaponType    = (int)weaponType,
+        sparkTimer    = _sparkTimer,
+    };
+
+    public static PlasmaBeam Rebuild(PlasmaBeamState s)
+    {
+        var go = new GameObject("PlasmaBeam");
+        go.transform.SetPositionAndRotation(s.origin, Quaternion.Euler(0f, 0f, s.rotAngle));
+
+        var p = go.AddComponent<PlasmaBeam>();   // Awake kökeni ve yönü transform'dan okur
+        p._origin          = s.origin;
+        p._firingDir       = s.firingDir;
+        p._rotAngle        = s.rotAngle;
+        p._headDist        = s.head;
+        p._tailDist        = s.tail;
+        p._emitTimer       = s.emitTimer;
+        p._phase           = (Phase)s.phase;
+        p._sparkTimer      = s.sparkTimer;
+        p.beamWidth        = s.width;
+        p.maxLength        = s.maxLength;
+        p.headSpeed        = s.speed;
+        p.totalEnergy      = s.totalEnergy;
+        p.dps              = s.dps;
+        p.emitDuration     = s.emitDuration;
+        p.weaponType       = (WeaponType)s.weaponType;
+        p._restoredInitial = s.initialEnergy;
+
+        // Transform Update'te türetilir; ilk kareden ÖNCE de doğru olsun
+        // (sıralama ve çarpışma o karede okunuyor).
+        go.transform.position   = s.origin + s.firingDir * ((s.head + s.tail) * 0.5f);
+        go.transform.localScale = new Vector3(s.width, Mathf.Max(0.001f, s.head - s.tail), 1f);
+        return p;
     }
 
     // ── Güncelleme ────────────────────────────────────────────────────────────

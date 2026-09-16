@@ -229,4 +229,42 @@ public class LaserBeam : MonoBehaviour
             Destroy(_line.material);
     }
 
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    public float Remaining => _remaining;
+
+    /// <summary>Sahibi (turret slotu / düşman) WorldSave tarafından doldurulur.</summary>
+    public LaserBeamState CaptureState() => new LaserBeamState
+    {
+        localPos        = transform.localPosition,
+        localRot        = transform.localEulerAngles.z,
+        damage          = damage,
+        burnDuration    = burnDuration,
+        remaining       = _remaining,
+        maxRange        = maxRange,
+        energyPerSecond = energyPerSecond,
+        weaponType      = (int)weaponType,
+        hitsPlayer      = hitsPlayer,
+    };
+
+    public static LaserBeam Rebuild(LaserBeamState s, Transform parent)
+    {
+        var go = new GameObject(s.hitsPlayer ? "EnemyLaserBeam" : "TurretLaserBeam");
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = s.localPos;
+        go.transform.localRotation = Quaternion.Euler(0f, 0f, s.localRot);
+
+        var beam             = go.AddComponent<LaserBeam>();
+        beam.damage          = s.damage;
+        beam.weaponType      = (WeaponType)s.weaponType;
+        beam.continuous      = false;
+        beam.burnDuration    = s.burnDuration;
+        beam.energyPerSecond = s.energyPerSecond;
+        beam.hitsPlayer      = s.hitsPlayer;
+        beam.maxRange        = s.maxRange;
+        beam.Init();
+        beam._remaining      = s.remaining;   // Init tam süreyle başlatır
+        return beam;
+    }
+
 }

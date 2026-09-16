@@ -70,6 +70,7 @@ public class UpgradeUI : MonoBehaviour
         if (_canvas == null) return;
         _canvas.enabled = false;
         IsPaused        = false;
+        WebChrome.Refresh();
         FindFirstObjectByType<CameraController>()?.RestoreFromUpgrade();
     }
 
@@ -87,8 +88,7 @@ public class UpgradeUI : MonoBehaviour
             Toggle();
 
         if (_canvas != null && _canvas.enabled)
-            UpdateStatBoxes();
-    }
+            UpdateStatBoxes();    }
 
     /// <summary>
     /// Upgrade ekranını açar/kapatır. Tab tuşu ve ekran düğmesi AYNI yoldan
@@ -121,6 +121,10 @@ public class UpgradeUI : MonoBehaviour
             FindFirstObjectByType<CameraController>()?.RestoreFromUpgrade();
             SpeedController.Instance?.Resume();
         }
+
+        // Tarayıcı sayfasının düğmeleri (APK, tam ekran) upgrade ekranıyla
+        // birlikte açılıp kapanır — oyun sırasında dövüş alanını örtüyorlardı.
+        WebChrome.Refresh();
     }
 
     // =========================================================================
@@ -1166,6 +1170,7 @@ public class UpgradeUI : MonoBehaviour
         BuildHoverDetailPanel();
         BuildListPanel();
         BuildCloseButton();
+        BuildMenuButton();
     }
 
     /// <summary>
@@ -1192,6 +1197,42 @@ public class UpgradeUI : MonoBehaviour
         r.sizeDelta        = Vector2.zero;
 
         AttachLabel(go.transform, Loc.T("upgrade.close"), 26);
+    }
+
+    /// <summary>
+    /// ANA MENÜ — oyunu bırakıp açılış menüsüne döner. KAPAT'ın hemen solunda,
+    /// aynı şeritte: ikisi de "bu ekrandan çık" düğmesi, biri oyuna diğeri
+    /// menüye. Rengi kasten sönük; KAPAT kırmızısıyla yarışmamalı, asıl düğme o.
+    ///
+    /// Dünya olduğu gibi kaydedilir (bkz. WorldSave) ve DEVAM ET tam bu ana
+    /// döner. Onay istemez: kaybedilecek bir ilerleme yok. (Tam kayıttan önce
+    /// kampanyada level ortası kaydedilemiyordu ve düğme bir onay istiyordu.)
+    /// </summary>
+    void BuildMenuButton()
+    {
+        var go = new GameObject("MenuBtn", typeof(RectTransform));
+        go.transform.SetParent(transform, false);
+
+        var img = go.AddComponent<Image>();
+        img.color = new Color(0.20f, 0.24f, 0.32f, 1f);
+
+        var btn = go.AddComponent<Button>();
+        btn.targetGraphic = img;
+        btn.onClick.AddListener(OnMenuPressed);
+
+        var r = (RectTransform)go.transform;
+        r.anchorMin        = new Vector2(0.80f, 0.955f);
+        r.anchorMax        = new Vector2(0.895f, 0.998f);
+        r.anchoredPosition = Vector2.zero;
+        r.sizeDelta        = Vector2.zero;
+
+        AttachLabel(go.transform, Loc.T("upgrade.mainMenu"), 22);
+    }
+
+    void OnMenuPressed()
+    {
+        var gm = FindFirstObjectByType<GameManager>();
+        if (gm != null) gm.ReturnToMenu();
     }
 
     // Sol şerit — tam yükseklik, dar
@@ -1602,7 +1643,7 @@ public class UpgradeUI : MonoBehaviour
         return t;
     }
 
-    static void AttachLabel(Transform parent, string text, int fontSize)
+    static Text AttachLabel(Transform parent, string text, int fontSize)
     {
         var go = new GameObject("Text", typeof(RectTransform));
         go.transform.SetParent(parent, false);
@@ -1618,6 +1659,8 @@ public class UpgradeUI : MonoBehaviour
         rect.anchorMin = Vector2.zero;
         rect.anchorMax = Vector2.one;
         rect.sizeDelta = Vector2.zero;
+
+        return t;
     }
 }
 

@@ -14,6 +14,9 @@ public class BossShip : MonoBehaviour, ITurretTarget
 {
     public BossShipData data;
 
+    /// <summary>Kayıttan kurulurken Start'ın SONUNDA uygulanır (bkz. WorldSave).</summary>
+    public BossState PendingRestore;
+
     // Bileşenler
     ShipMovement   _movement;
     PlayerShip     _playerShip;
@@ -44,6 +47,13 @@ public class BossShip : MonoBehaviour, ITurretTarget
     // Drone spawn
     float _droneSpawnTimer;
     bool  _dead;
+
+    // Ölüm sekansı: parça parça enkaz. Eskiden bir coroutine'di; coroutine'in
+    // ilerlemesi kaydedilemez, sayaç kaydedilir.
+    int   _deathPiecesLeft;
+    float _deathTimer;
+    const int   DeathPieces        = 8;
+    const float DeathPieceInterval = 0.18f;
 
     // Kalkan kapasitesinin kaçta kaçı kristal olarak düşer — EnemyBot ile aynı kural
     const float CrystalPerShieldPoint = 0.1f;
@@ -87,6 +97,13 @@ public class BossShip : MonoBehaviour, ITurretTarget
         _yChangeTimer  = Random.Range(2f, 5f);
 
         ApplyPhase(0);
+
+        if (PendingRestore != null)
+        {
+            var s = PendingRestore;
+            PendingRestore = null;
+            ApplyRestore(s);
+        }
     }
 
     void BuildBody()
@@ -157,7 +174,8 @@ public class BossShip : MonoBehaviour, ITurretTarget
 
     void Update()
     {
-        if (UpgradeUI.IsPaused || _dead) return;
+        if (UpgradeUI.IsPaused) return;
+        if (_dead) { UpdateDeath(Time.deltaTime); return; }
 
         UpdateMovement();
         UpdatePhase();
@@ -442,33 +460,140 @@ public class BossShip : MonoBehaviour, ITurretTarget
         foreach (var hp in _hardpoints)
             if (hp.IsAlive) hp.TakeDamage(99999f);
 
-        StartCoroutine(DeathSequence());
+        _deathPiecesLeft = DeathPieces;
+        _deathTimer      = 0f;
+        UpdateDeath(0f);   // ilk parça ölüm anında düşer
     }
 
-    IEnumerator DeathSequence()
+    /// <summary>
+    /// Ölüm sekansı: her <see cref="DeathPieceInterval"/> saniyede bir enkaz
+    /// parçası, sonuncusundan bir aralık sonra kristaller ve yok oluş. Kare
+    /// başına en fazla bir adım — eski coroutine'le aynı ritim.
+    /// </summary>
+    void UpdateDeath(float dt)
     {
-        // Bölüm kapanış primi: boss'un tehdit puanı × levelin drop oranı × prim
-        // çarpanı. Sabit 8–20 birimlik enkaz geç bölümlerde komik kalıyordu —
-        // 100. levelde bir boss'un getirisi bir wave'in altına düşerdi.
-        var   cfg   = BalanceConfig.Instance;
-        float total = cfg.bossThreatValue
-                    * cfg.DropPerThreat(GameProgress.CurrentLevel)
-                    * cfg.bossRewardMultiplier;
+        if (_deathPiecesLeft < 0) return;
 
-        const int pieces = 8;
-        for (int i = 0; i < pieces; i++)
+        _deathTimer -= dt;
+        if (_deathTimer > 0f) return;
+
+        if (_deathPiecesLeft > 0)
         {
+            // Bölüm kapanış primi: boss'un tehdit puanı × levelin drop oranı ×
+            // prim çarpanı. Sabit 8–20 birimlik enkaz geç bölümlerde komik
+            // kalıyordu — 100. levelde bir boss'un getirisi bir wave'in altına düşerdi.
+            var   cfg   = BalanceConfig.Instance;
+            float total = cfg.bossThreatValue
+                        * cfg.DropPerThreat(GameProgress.CurrentLevel)
+                        * cfg.bossRewardMultiplier;
+
             var go = new GameObject("Debris");
             go.transform.position = transform.position
                 + (Vector3)Random.insideUnitCircle * (data.bodyWidth / 100f * 0.6f);
             var d = go.AddComponent<Debris>();
             d.Init(Random.insideUnitCircle.normalized * Random.Range(0.4f, 1.2f),
-                   total / pieces);
-            yield return new WaitForSeconds(0.18f);
+                   total / DeathPieces);
+
+            _deathPiecesLeft--;
+            _deathTimer = DeathPieceInterval;
+            return;
         }
 
+        _deathPiecesLeft = -1;
         DropCrystals();
         Destroy(gameObject);
+    }
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    public BossState CaptureState()
+    {
+        var s = new BossState
+        {
+            id                  = WorldSave.IdOf(this),
+            bossName            = data.name,
+            pos                 = transform.position,
+            maxHP               = _maxHullHP,
+            hullHP              = _hullHP,
+            shieldHP            = _shieldHP,
+            shieldRechargeTimer = _shieldRechargeTimer,
+            phaseIndex          = _currentPhaseIndex,
+            droneSpawnTimer     = _droneSpawnTimer,
+            targetY             = _targetY,
+            yChangeTimer        = _yChangeTimer,
+            dead                = _dead,
+            deathPiecesLeft     = _deathPiecesLeft,
+            deathTimer          = _deathTimer,
+            movement            = _movement.CaptureState(),
+        };
+
+        foreach (var hp in _hardpoints)
+            s.hardpoints.Add(new HardpointState
+            {
+                hp         = hp.CurrentHP,
+                maxHp      = hp.def.hp,
+                fireDamage = hp.def.fireDamage,
+                fireTimer  = _fireTimers.TryGetValue(hp, out var t) ? t : 0f,
+                dead       = !hp.IsAlive,
+            });
+        return s;
+    }
+
+    /// <summary>
+    /// Tanım addan kurulur, SAYILAR kayıttan: gövde ve hardpoint'ler boss'un
+    /// doğduğu andaki zorluk çarpanını taşır, yükleme anındakini değil.
+    /// </summary>
+    public static BossShip Rebuild(BossState s)
+    {
+        var data = BossShipData.ForName(s.bossName);
+        if (data == null) return null;
+
+        data.maxHP = s.maxHP;
+        if (data.hardpoints != null)
+            for (int i = 0; i < data.hardpoints.Length && i < s.hardpoints.Count; i++)
+            {
+                data.hardpoints[i].hp         = s.hardpoints[i].maxHp;
+                data.hardpoints[i].fireDamage = s.hardpoints[i].fireDamage;
+            }
+
+        var go = new GameObject($"Boss_{data.displayName}");
+        go.transform.position = s.pos;
+
+        var boss = go.AddComponent<BossShip>();
+        boss.data           = data;
+        boss.PendingRestore = s;
+        return boss;
+    }
+
+    void ApplyRestore(BossState s)
+    {
+        _hullHP = s.hullHP;
+        if (_healthBar != null) _healthBar.currentHealth = s.hullHP;
+
+        if (s.phaseIndex >= 0) ApplyPhase(s.phaseIndex);
+        _droneSpawnTimer = s.droneSpawnTimer;
+        _targetY         = s.targetY;
+        _yChangeTimer    = s.yChangeTimer;
+
+        for (int i = 0; i < _hardpoints.Count && i < s.hardpoints.Count; i++)
+        {
+            var hp = _hardpoints[i];
+            hp.RestoreState(s.hardpoints[i].hp, s.hardpoints[i].dead);
+            if (_fireTimers.ContainsKey(hp)) _fireTimers[hp] = s.hardpoints[i].fireTimer;
+        }
+
+        // Kalkan hardpoint'lerden SONRA: yıkık jeneratörün geri yüklenmesi
+        // kalkanı sıfırlamaz ama sıra kayıttaki değeri garanti eder.
+        _shieldHP            = s.shieldHP;
+        _shieldRechargeTimer = s.shieldRechargeTimer;
+        SyncShieldBar();
+        RefreshShieldVisual();
+
+        _movement.RestoreState(s.movement);
+
+        _dead            = s.dead;
+        _deathPiecesLeft = s.deathPiecesLeft;
+        _deathTimer      = s.deathTimer;
     }
 
     /// <summary>

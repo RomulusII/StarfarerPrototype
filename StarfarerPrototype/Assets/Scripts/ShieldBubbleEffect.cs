@@ -23,15 +23,28 @@ public class ShieldBubbleEffect : MonoBehaviour
     const float CollapseTime = 0.28f;
     const float ExpandTime   = 1.1f;
 
+    /// <summary>
+    /// Genişleme animasyonunun süresi. Kalkan jeneratörü yeniden aktifleşmeyi
+    /// bu süreyle KENDİSİ sayar — callback'in beklediği bir animasyon
+    /// kaydedilemezdi (bkz. ShieldGeneratorComponent).
+    /// </summary>
+    public const float ExpandDuration = ExpandTime;
+
     // ── Spawn ─────────────────────────────────────────────────────────────────
 
     public static void SpawnCollapse(Vector2 center, float radius)
         => Create(center, radius, AnimMode.Collapse, null);
 
-    public static void SpawnExpand(Vector2 center, float radius, System.Action onComplete)
-        => Create(center, radius, AnimMode.Expand, onComplete);
+    /// <param name="elapsed">
+    /// Animasyonun ne kadarı zaten oynadı — kayıttan dönülen yeniden
+    /// aktifleşme animasyonu kaldığı yerden sürsün.
+    /// </param>
+    public static void SpawnExpand(Vector2 center, float radius, System.Action onComplete,
+                                   float elapsed = 0f)
+        => Create(center, radius, AnimMode.Expand, onComplete, elapsed);
 
-    static void Create(Vector2 center, float radius, AnimMode mode, System.Action onComplete)
+    static void Create(Vector2 center, float radius, AnimMode mode, System.Action onComplete,
+                       float elapsed = 0f)
     {
         var go = new GameObject("ShieldBubble");
         go.transform.position   = center;
@@ -45,7 +58,7 @@ public class ShieldBubbleEffect : MonoBehaviour
         var fx         = go.AddComponent<ShieldBubbleEffect>();
         fx._mode       = mode;
         fx._sr         = sr;
-        fx._timer      = 0f;
+        fx._timer      = Mathf.Max(0f, elapsed);
         fx._radius     = radius;
         fx._onComplete = onComplete;
     }

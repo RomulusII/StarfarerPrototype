@@ -281,6 +281,7 @@ public class ShipMovement : MonoBehaviour
     void LateUpdate()
     {
         if (UpgradeUI.IsPaused) return;
+        if (WorldSave.IsRestoring) return;   // bkz. WorldSave.IsRestoring
 
         float dt = Time.deltaTime;
         if (dt <= 0f) return;
@@ -471,4 +472,29 @@ public class ShipMovement : MonoBehaviour
     }
 
     static float DirToAngle(Vector2 dir) => Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Uçuşun kalıcı durumu. Komut alanları (_cmdHeading, _mode...) YAZILMAZ:
+    /// her kare yeniden veriliyorlar ve LateUpdate sonunda sıfırlanıyorlar.
+    /// Yapılandırma (kütle, motor gücü, çeviklik) sahibi tarafından kurulur.
+    /// </summary>
+    public MovementState CaptureState() => new MovementState
+    {
+        velocity      = _velocity,
+        facing        = _facingAngle,
+        wanderPhase   = _wanderPhase,
+        wanderCurrent = _wanderCurrent,
+    };
+
+    public void RestoreState(MovementState s)
+    {
+        if (s == null) return;
+        _velocity          = s.velocity;
+        _facingAngle       = s.facing;
+        _wanderPhase       = s.wanderPhase;
+        _wanderCurrent     = s.wanderCurrent;
+        transform.rotation = Quaternion.Euler(0f, 0f, _facingAngle);
+    }
 }

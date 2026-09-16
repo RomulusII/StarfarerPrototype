@@ -300,6 +300,17 @@ public class WeaponController : MonoBehaviour
         return Sprite.Create(tex, new Rect(0, 0, res, res), new Vector2(0.5f, 0.5f), res);
     }
 
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Bir sonraki atışa KALAN süre. _nextFireTime mutlak bir Time.time değeri;
+    /// uygulama yeniden açılınca Time.time sıfırdan başladığı için mutlak değer
+    /// kaydedilseydi silah dakikalarca ateş edemezdi.
+    /// </summary>
+    public float CooldownRemaining => Mathf.Max(0f, _nextFireTime - Time.time);
+
+    public void RestoreCooldown(float remaining) => _nextFireTime = Time.time + Mathf.Max(0f, remaining);
+
     /// <summary>ShipLoadout tarafından çağrılır.</summary>
     public void Configure(ComponentDefinition def)
     {

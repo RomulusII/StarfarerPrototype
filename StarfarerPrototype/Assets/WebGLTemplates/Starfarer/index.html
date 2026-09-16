@@ -143,9 +143,32 @@
       // Paket sunucuda gerçekten duruyor mu? Yoksa link hiç gösterilmez —
       // tıklayınca 404 veren bir düğme, olmayan düğmeden kötüdür.
       var apkVar = false;
+
+      // DÜĞMELER YALNIZCA MENÜDE VE UPGRADE EKRANINDA GÖRÜNÜR. Oyun sırasında
+      // sağ alt köşe dövüş alanıdır: düğmeler oradaki düşmanın üstünü
+      // örtüyor, telefonda nişan alan parmak yanlışlıkla tam ekrana ya da APK
+      // indirmeye basıyordu. Hangi ekranın açık olduğunu yalnızca oyun bilir;
+      // Unity bunu WebChrome.jslib üzerinden bildirir (bkz. WebChrome.cs).
+      //
+      // Üç koşulun VE'si: oyun yüklendi, oyun "göster" dedi, (APK için) paket
+      // var. Üçü farklı anlarda gelir — menü ilk karelerde açılır ve bildirimi
+      // createUnityInstance'ın then'inden ÖNCE gelebilir, HEAD yoklaması ise
+      // herhangi bir anda döner. Bu yüzden her biri yalnızca kendi durumunu
+      // yazar ve görünürlük tek yerden uygulanır.
+      var unityReady = false, gameWantsChrome = false;
+      function applyChrome() {
+        var show = unityReady && gameWantsChrome;
+        fs.style.display  = show ? "block" : "none";
+        apk.style.display = show && apkVar ? "block" : "none";
+      }
+      window.starfarerSetChrome = function (visible) {
+        gameWantsChrome = !!visible;
+        applyChrome();
+      };
+
       fetch(apk.getAttribute("href"), { method: "HEAD" })
-        .then(function (r) { apkVar = r.ok; })
-        .catch(function () { apkVar = false; });
+        .then(function (r) { apkVar = r.ok; applyChrome(); })
+        .catch(function () { apkVar = false; applyChrome(); });
 
       createUnityInstance(canvas, {
         arguments: [],
@@ -173,7 +196,16 @@
         fill.style.width = (100 * progress) + "%";
       }).then(function (unityInstance) {
         loader.style.display = "none";
-        fs.style.display = "block";
+        unityReady = true;
+        applyChrome();
+
+        // "Tam ekrandan çıkmak için aşağı kaydırın" bildirimi TARAYICININDIR,
+        // sayfanın değil: süresi buradan kısaltılamaz, gizlenemez. Tam ekranı
+        // taklit eden bir sayfanın kullanıcıyı kandırmasını önleyen bir
+        // güvenlik arayüzüdür ve bilerek sayfanın erişimi dışında tutulur.
+        // Onu hiç görmemenin tek yolu Fullscreen API'sini hiç kullanmamak:
+        // APK, ya da ana ekrana eklenmiş (display: fullscreen) bir web
+        // uygulaması.
         fs.onclick = function () {
           unityInstance.SetFullscreen(1);
           // Yönelim kilidi YALNIZCA tam ekranda çalışır (tarayıcı kuralı) ve
@@ -185,7 +217,6 @@
             if (o && o.lock) { try { o.lock("landscape").catch(function () {}); } catch (e) {} }
           }, 250);
         };
-        if (apkVar) apk.style.display = "block";
       }).catch(function (message) {
         // Hata metni çubuğun YERİNE geçer ama sürüm satırı KALIR: "oyun
         // açılmıyor" bildiriminin işe yaraması için hangi paketin açılmadığını

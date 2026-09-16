@@ -33,6 +33,23 @@ public class AsteroidSpawner : MonoBehaviour
         interval    = spawnInterval;
     }
 
+    public AsteroidFieldState CaptureState() => new AsteroidFieldState
+    {
+        present     = true,
+        targetCount = targetCount,
+        interval    = interval,
+        timer       = _timer,
+    };
+
+    /// <summary>Configure'dan SONRA çağrılır; kayıttaki yoğunluk ve sayaç geçerli.</summary>
+    public void RestoreState(AsteroidFieldState s)
+    {
+        if (s == null || !s.present) return;
+        targetCount = s.targetCount;
+        interval    = s.interval;
+        _timer      = s.timer;
+    }
+
     void Update()
     {
         if (targetCount <= 0 || UpgradeUI.IsPaused) return;

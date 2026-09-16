@@ -13,8 +13,15 @@ public class EnemyBullet : MonoBehaviour
     public ShipComponentBase  targetComponent;     // null → hull modu
     public bool               bypassShields   = false;
 
+    /// <summary>
+    /// Ömür — alan olarak tutulur ki uçuştaki mermi kaydedilebilsin (bkz. Bomb).
+    /// </summary>
+    public float lifeTime = 10f;
+
     Vector2 _dir;
     bool    _hitHandled; // aynı frame'de çift trigger'ı önler
+    float   _bornAt;
+    bool    _started;
 
     static readonly Color ColHull      = new Color(1f,   0.35f, 0.1f,  1f); // turuncu
     static readonly Color ColComponent = new Color(0.8f, 0.1f,  0.9f,  1f); // mor
@@ -50,7 +57,9 @@ public class EnemyBullet : MonoBehaviour
             rb.gravityScale = 0f;
         }
 
-        Destroy(gameObject, 10f);
+        _bornAt  = Time.time;
+        _started = true;
+        Destroy(gameObject, lifeTime);
     }
 
     /// <summary>Hull modu için hareket yönünü ayarlar.</summary>
@@ -150,5 +159,45 @@ public class EnemyBullet : MonoBehaviour
                               ImpactSurface.Hull, damage);
         _hitHandled = true;
         Destroy(gameObject);
+    }
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    float LifeLeft => _started ? Mathf.Max(0.01f, lifeTime - (Time.time - _bornAt)) : lifeTime;
+
+    public EnemyBulletState CaptureState() => new EnemyBulletState
+    {
+        pos        = transform.position,
+        dir        = _dir,
+        speed      = speed,
+        damage     = damage,
+        life       = LifeLeft,
+        scale      = transform.localScale.x,
+        bypass     = bypassShields,
+        targetSlot = WorldSave.SlotOf(targetComponent),
+    };
+
+    /// <summary>
+    /// Hedef komponenti artık yoksa mermi KURULMAZ: canlı oyunda da hedefi
+    /// yok olan komponent mermisi bir sonraki karede kendini yok ediyor.
+    /// Kurulsaydı hedefsiz kalıp gövde moduna düşer ve yanlış yöne uçardı.
+    /// </summary>
+    public static EnemyBullet Rebuild(EnemyBulletState s)
+    {
+        var target = WorldSave.ResolveSlot(s.targetSlot);
+        if (s.targetSlot > 0 && target == null) return null;
+
+        var go = new GameObject(target != null ? "EnemyBullet_Comp" : "EnemyBullet");
+        go.transform.position   = s.pos;
+        go.transform.localScale = Vector3.one * s.scale;
+
+        var eb = go.AddComponent<EnemyBullet>();
+        eb.speed           = s.speed;
+        eb.damage          = s.damage;
+        eb.bypassShields   = s.bypass;
+        eb.targetComponent = target;
+        eb.lifeTime        = s.life;
+        eb.SetDirection(s.dir);
+        return eb;
     }
 }

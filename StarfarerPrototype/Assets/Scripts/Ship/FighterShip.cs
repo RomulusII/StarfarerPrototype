@@ -179,19 +179,70 @@ public class FighterShip : MonoBehaviour
         tb.speed      = 5f;
         tb.weaponType = WeaponType.Kinetic;
         tb.isGuided   = false;
+        tb.visual     = -1;
+        tb.lifeTime   = 1.5f;
         tb.SetDirection(dir);
 
+        BuildBulletVisual(go);
+    }
+
+    /// <summary>Kayıttan kurulan savaşçı mermisi de aynı görseli buradan alır.</summary>
+    internal static void BuildBulletVisual(GameObject go)
+    {
         var sr  = go.AddComponent<SpriteRenderer>();
         sr.sprite       = SkinLibrary.Get(SkinId.FighterBullet, 8, 4, Color.yellow,
                               new Vector2(0f, 0.5f));
         sr.sortingOrder = 3;
-
-        Destroy(go, 1.5f);
     }
 
     public void SetSpeed(float speed)
     {
         _movement.enginePower = speed * Mass;
+    }
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    public FighterState CaptureState() => new FighterState
+    {
+        id          = WorldSave.IdOf(this),
+        pos         = transform.position,
+        hangarSlot  = WorldSave.SlotOf(_hangar != null ? _hangar.GetComponent<HangarComponent>() : null),
+        target      = WorldSave.RefOf(_currentTarget),
+        hp          = currentHP,
+        maxHp       = maxHP,
+        fireRate    = fireRate,
+        damage      = damage,
+        fireTimer   = _fireTimer,
+        scanTimer   = _targetScanTimer,
+        patrolPoint = _patrolPoint,
+        movement    = _movement.CaptureState(),
+        brain       = _brain.CaptureState(),
+    };
+
+    /// <summary>Hız hangardan okunur — bkz. CollectorShip.Rebuild.</summary>
+    public static FighterShip Rebuild(FighterState s)
+    {
+        var hangar = WorldSave.ResolveSlot(s.hangarSlot) as HangarComponent;
+
+        var go = new GameObject("Fighter");
+        go.transform.position = s.pos;
+
+        var f = go.AddComponent<FighterShip>();
+        f.Init(hangar != null ? hangar.transform : null,
+               hangar != null ? hangar.EffShipSpeed : 3f, s.maxHp, s.fireRate, s.damage);
+        if (hangar != null) hangar.AdoptFighter(f);
+        return f;
+    }
+
+    public void RestoreState(FighterState s)
+    {
+        currentHP        = s.hp;
+        _fireTimer       = s.fireTimer;
+        _targetScanTimer = s.scanTimer;
+        _patrolPoint     = s.patrolPoint;
+        _currentTarget   = WorldSave.ResolveTarget(s.target);
+        _movement.RestoreState(s.movement);
+        _brain.RestoreState(s.brain);
     }
 
     public void TakeDamage(float amount)

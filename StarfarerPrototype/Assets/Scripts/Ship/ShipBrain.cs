@@ -238,4 +238,35 @@ public class ShipBrain : MonoBehaviour
 
     float EffectiveOrbitRadius =>
         Mathf.Max(orbitRadius, _movement.MinTurnRadius * 1.15f);
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    public BrainState CaptureState() => new BrainState
+    {
+        state         = (int)_state,
+        stateTimer    = _stateTimer,
+        approachAngle = _approachAngle,
+        orbitDir      = _orbitDir,
+        strafeInbound = _strafeInbound,
+        escapeOffset  = _escapeOffset,
+        escapeSide    = _escapeSide,
+        target        = WorldSave.RefOf(_target),
+    };
+
+    /// <summary>
+    /// SetTarget ÇAĞRILMAZ: o, yaklaşma açısını yeniden rastgeleler ve durumu
+    /// Approaching'e çeker — dalışın ortasında kaydedilen gemi baştan yaklaşırdı.
+    /// </summary>
+    public void RestoreState(BrainState s)
+    {
+        if (s == null) return;
+        _state         = (TacticalState)s.state;
+        _stateTimer    = s.stateTimer;
+        _approachAngle = s.approachAngle;
+        _orbitDir      = s.orbitDir;
+        _strafeInbound = s.strafeInbound;
+        _escapeOffset  = s.escapeOffset;
+        _escapeSide    = s.escapeSide;
+        _target        = WorldSave.ResolveTransform(s.target);
+    }
 }

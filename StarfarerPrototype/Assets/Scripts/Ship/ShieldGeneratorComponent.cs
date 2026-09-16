@@ -40,8 +40,12 @@ public class ShieldGeneratorComponent : ShipComponentBase
     const float DepletionPenalty      = -10f;
     const float ReactivationThreshold =  10f;
 
-    bool _reactivating;
-    bool _depleted;     // true yalnızca DepletionPenalty'ye düşüldüğünde; animasyon bitince temizlenir
+    bool  _reactivating;
+    bool  _depleted;     // true yalnızca DepletionPenalty'ye düşüldüğünde; animasyon bitince temizlenir
+
+    // Yeniden aktifleşmeye kalan süre. Eskiden animasyonun callback'i
+    // bekleniyordu; bir callback'in ilerlemesi kaydedilemez, süre kaydedilir.
+    float _reactivateTimer;
 
     // ── Orphan state: generator yokken kalan kalkan HP'si ─────────────────────
     static float s_orphanShield    = 0f;
@@ -121,9 +125,18 @@ public class ShieldGeneratorComponent : ShipComponentBase
         s_active.Remove(this);
     }
 
+    // Kayıt yüklenirken ClearAllSlots tarafından atıldı. Destroy kare sonunda
+    // işler; o anda kayıttan gelen donanımda hiç jeneratör yoksa, atılan
+    // başlangıç jeneratörünün tam kalkanı yetim havuza taşınır ve kayıttaki
+    // yetim değeri ezilirdi.
+    bool _discarded;
+
+    public void Discard() => _discarded = true;
+
     void OnDestroy()
     {
         s_active.Remove(this);   // OnDisable zaten çıkarmış olmalı; güvence
+        if (_discarded) return;
 
         // Başka generator hayattaysa yetim havuz AÇILMAZ. Açılsaydı canlı
         // jeneratörün üstüne binen ikinci, gizli bir havuz oluşurdu: bar
@@ -137,6 +150,18 @@ public class ShieldGeneratorComponent : ShipComponentBase
 
     void Update()
     {
+        // Animasyon süresi komponentin durumundan bağımsız sayılır — eskiden
+        // animasyonun kendisi sayıyordu ve o da jeneratöre bakmıyordu.
+        if (_reactivating && !UpgradeUI.IsPaused)
+        {
+            _reactivateTimer -= Time.deltaTime;
+            if (_reactivateTimer <= 0f)
+            {
+                _reactivating = false;
+                _depleted     = false;   // deplete döngüsü tamamlandı
+            }
+        }
+
         if (!IsOperational) return;
         if (BoostController.Mode == BoostMode.Weapon) return;
         if (IsShieldFull) return;
@@ -171,15 +196,52 @@ public class ShieldGeneratorComponent : ShipComponentBase
 
     void TriggerReactivation()
     {
-        _reactivating = true;
+        _reactivating    = true;
+        _reactivateTimer = ShieldBubbleEffect.ExpandDuration;
+        SpawnReactivationVisual(0f);
+    }
+
+    void SpawnReactivationVisual(float elapsed)
+    {
         var ship   = GetComponentInParent<PlayerShip>();
         var center = ship != null ? (Vector2)ship.transform.position : (Vector2)transform.position;
-        ShieldBubbleEffect.SpawnExpand(center, ShieldEffect.ShieldRadius, () =>
-        {
-            if (this == null) return;
-            _reactivating = false;
-            _depleted     = false; // deplete döngüsü tamamlandı
-        });
+        ShieldBubbleEffect.SpawnExpand(center, ShieldEffect.ShieldRadius, null, elapsed);
+    }
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    public override void CaptureRuntime(ComponentRuntimeState s)
+    {
+        base.CaptureRuntime(s);
+        s.shield          = currentShield;
+        s.depleted        = _depleted;
+        s.reactivating    = _reactivating;
+        s.reactivateTimer = _reactivateTimer;
+    }
+
+    public override void RestoreRuntime(ComponentRuntimeState s)
+    {
+        base.RestoreRuntime(s);
+        currentShield    = s.shield;
+        _depleted        = s.depleted;
+        _reactivating    = s.reactivating;
+        _reactivateTimer = s.reactivateTimer;
+
+        if (_reactivating)
+            SpawnReactivationVisual(ShieldBubbleEffect.ExpandDuration - _reactivateTimer);
+    }
+
+    /// <summary>Yetim kabuk statiktir — kayıt onu ayrıca taşır.</summary>
+    public static void CaptureOrphan(out float shield, out float maxShield)
+    {
+        shield    = s_orphanShield;
+        maxShield = s_orphanMaxShield;
+    }
+
+    public static void RestoreOrphan(float shield, float maxShield)
+    {
+        s_orphanShield    = shield;
+        s_orphanMaxShield = maxShield;
     }
 
     // ── Hasar emme ────────────────────────────────────────────────────────────

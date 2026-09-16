@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// Ateşlenen mermi. Kendi yerel yukarı yönünde ileri gider,
-/// 3 saniye sonra otomatik olarak yok olur.
+/// menzili kadar uçtuktan sonra otomatik olarak yok olur.
 /// </summary>
 public class Bullet : MonoBehaviour
 {
@@ -27,6 +27,15 @@ public class Bullet : MonoBehaviour
     /// </summary>
     public float zoomAtFire;
 
+    /// <summary>
+    /// Ömür (sn). 0 ya da altı: menzilden türet (varsayılan). Kayıttan kurulan
+    /// mermi buraya KALAN süreyi yazar.
+    /// </summary>
+    public float lifeTime;
+
+    float _bornAt;
+    bool  _started;
+
     void Awake()
     {
         BoxCollider2D col = gameObject.AddComponent<BoxCollider2D>();
@@ -43,7 +52,12 @@ public class Bullet : MonoBehaviour
         // Ömür MENZİLDEN türer, sabit değil. 3 saniye + 6 hız = 18 birimlik bir
         // menzil demekti; kadraj ise zoom-out'ta 32 birime açılıyor, yani mermi
         // ekranın ortasında buharlaşıyordu.
-        Destroy(gameObject, ViewBounds.MaxShotRange / Mathf.Max(speed, 0.01f));
+        if (lifeTime <= 0f)
+            lifeTime = ViewBounds.MaxShotRange / Mathf.Max(speed, 0.01f);
+
+        _bornAt  = Time.time;
+        _started = true;
+        Destroy(gameObject, lifeTime);
     }
 
     void Update()
@@ -81,5 +95,47 @@ public class Bullet : MonoBehaviour
                 DamageUtil.ShieldFlash(other, transform.position);
             Destroy(gameObject);
         }
+    }
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    /// <summary>Start'ı çalışmamış merminin ömrü henüz türetilmedi: 0 = türet.</summary>
+    float LifeLeft => _started ? Mathf.Max(0.01f, lifeTime - (Time.time - _bornAt)) : lifeTime;
+
+    public PlayerBulletState CaptureState() => new PlayerBulletState
+    {
+        pos        = transform.position,
+        rotation   = transform.eulerAngles.z,
+        scale      = transform.localScale.x,
+        speed      = speed,
+        damage     = damage,
+        zoom       = zoomAtFire,
+        life       = LifeLeft,
+        weaponType = (int)weaponType,
+        boost      = (int)boostAtFire,
+    };
+
+    /// <summary>
+    /// Görsel WeaponController.SpawnBullet ile aynı çağrıdan gelir — ana silahın
+    /// mermi tanesi yalnızca kinetik silahta var.
+    /// </summary>
+    public static Bullet Rebuild(PlayerBulletState s)
+    {
+        var go = new GameObject("Bullet");
+        go.transform.SetPositionAndRotation(s.pos, Quaternion.Euler(0f, 0f, s.rotation));
+        go.transform.localScale = Vector3.one * s.scale;
+
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite       = SkinLibrary.Get(SkinId.PlayerBulletKinetic, 10, 30, Color.white);
+        sr.sortingOrder = 20;
+
+        var b = go.AddComponent<Bullet>();
+        b.speed       = s.speed;
+        b.damage      = s.damage;
+        b.weaponType  = (WeaponType)s.weaponType;
+        b.boostAtFire = (BoostMode)s.boost;
+        b.zoomAtFire  = s.zoom;
+        b.lifeTime    = s.life;
+        return b;
     }
 }

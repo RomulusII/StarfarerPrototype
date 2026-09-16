@@ -16,7 +16,8 @@ public class BossHardpoint : MonoBehaviour
     HealthBar      _healthBar;
     bool           _dead;
 
-    public bool IsAlive => !_dead;
+    public bool  IsAlive   => !_dead;
+    public float CurrentHP => _hp;
     public HardpointType Type => def.type;
 
     public void Init(BossHardpointDef definition)
@@ -60,6 +61,24 @@ public class BossHardpoint : MonoBehaviour
 
         if (_hp <= 0f)
             Die();
+    }
+
+    /// <summary>
+    /// Kayıttan geri yükleme. Yıkılmış hardpoint Die()'ın GÖRSEL yan etkileriyle
+    /// kurulur ama enkaz düşürmez ve olay tetiklemez — enkaz o an zaten düşmüştü
+    /// ve kaydın kendi enkaz listesinde duruyor.
+    /// </summary>
+    public void RestoreState(float hp, bool dead)
+    {
+        _hp = hp;
+        if (_healthBar != null) _healthBar.currentHealth = hp;
+        if (!dead || _dead) return;
+
+        _dead = true;
+        if (_sr != null) _sr.color = new Color(0.15f, 0.12f, 0.10f, 0.85f);
+        if (_healthBar != null) _healthBar.gameObject.SetActive(false);
+        var col = GetComponent<BoxCollider2D>();
+        if (col != null) col.enabled = false;
     }
 
     void Die()

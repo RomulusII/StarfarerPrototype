@@ -54,6 +54,19 @@ public class ChapterManager : MonoBehaviour
 
     readonly List<EnemyTypeData> _pendingSpawns = new();
 
+    // Bekleyen geçiş. Eskiden dalga ve level arası gecikmeler coroutine'di;
+    // bir coroutine'in ilerlemesi kaydedilemez, bir sayaç kaydedilir.
+    enum Pending { None, BeginWave, BeginLevel, ChapterTransition }
+    Pending _pending;
+    float   _pendingTimer;
+
+    /// <summary>
+    /// Kayıttan devam: GameManager bölüm sistemini kurmadan ÖNCE doldurur,
+    /// Start leveli baştan kurmak yerine kayıttaki ana döner.
+    /// </summary>
+    public static ChapterRunState    PendingRestore;
+    public static AsteroidFieldState PendingField;
+
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
     void Start()
@@ -84,6 +97,15 @@ public class ChapterManager : MonoBehaviour
 
         // GameProgress burada SIFIRLANMAZ: level, GameManager tarafından menüden
         // (yeni oyun = seçilen level, devam = kayıttaki level) zaten ayarlandı.
+        if (PendingRestore != null)
+        {
+            var s = PendingRestore;
+            PendingRestore = null;
+            RestoreRun(s, PendingField);
+            PendingField = null;
+            return;
+        }
+
         BeginLevel();
     }
 
@@ -91,7 +113,73 @@ public class ChapterManager : MonoBehaviour
     {
         if (UpgradeUI.IsPaused) return;
 
+        if (_pending == Pending.BeginWave || _pending == Pending.BeginLevel)
+        {
+            _pendingTimer -= Time.deltaTime;
+            if (_pendingTimer > 0f) return;
+
+            var next = _pending;
+            _pending = Pending.None;
+            if (next == Pending.BeginWave) BeginWave();
+            else                           BeginLevel();
+            return;
+        }
+
         if (_phase == Phase.WaitClear) UpdateWaitClear();
+    }
+
+    void Schedule(Pending what, float delay)
+    {
+        _pending      = what;
+        _pendingTimer = delay;
+    }
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    public ChapterRunState CaptureState() => new ChapterRunState
+    {
+        waveIndex    = _waveIndex,
+        phase        = (int)_phase,
+        pending      = (int)_pending,
+        pendingTimer = _pendingTimer,
+        levelElapsed = Time.time - _levelStartedAt,
+    };
+
+    /// <summary>
+    /// Levelin dalga PLANI yeniden kurulur — BuildWaves rastgelelik içermez,
+    /// aynı level aynı planı verir. Dalganın KADROSU (hangi gemiler) ise
+    /// yeniden çekilmez: o gemiler zaten sahnede, kayıttan geldiler.
+    ///
+    /// Bölüm geçişi sürerken kaydedildiyse anlatım baştan oynar; anlatımın
+    /// içindeki yer bir oyun durumu değil.
+    /// </summary>
+    void RestoreRun(ChapterRunState s, AsteroidFieldState field)
+    {
+        int level   = GameProgress.CurrentLevel;
+        var chapter = ChapterFor(GameProgress.CurrentChapter);
+        CurrentChapter = chapter;
+
+        _asteroids.Configure(chapter.asteroidCount, chapter.asteroidInterval);
+        _asteroids.RestoreState(field);
+
+        _levelWaves     = BuildWaves(level, chapter);
+        _waveIndex      = s.waveIndex;
+        _phase          = (Phase)s.phase;
+        _pending        = (Pending)s.pending;
+        _pendingTimer   = s.pendingTimer;
+        _levelStartedAt = Time.time - s.levelElapsed;
+
+        if (_pending == Pending.ChapterTransition)
+        {
+            if (_transitionUI != null) _transitionUI.Show(chapter, BeginLevel);
+            else                       Schedule(Pending.BeginLevel, 1f);
+        }
+
+        if (_phase == Phase.Done)
+        {
+            _transitionUI?.ShowCredits();
+            CampaignFinished = true;
+        }
     }
 
     // ── Level kurulumu ────────────────────────────────────────────────────────
@@ -104,6 +192,8 @@ public class ChapterManager : MonoBehaviour
 
     void BeginLevel()
     {
+        _pending = Pending.None;
+
         int level   = GameProgress.CurrentLevel;
         var chapter = ChapterFor(GameProgress.CurrentChapter);
         CurrentChapter = chapter;
@@ -359,15 +449,9 @@ public class ChapterManager : MonoBehaviour
         _phase = Phase.Transition;   // geçici duraksatma
 
         if (_waveIndex < _levelWaves.Count)
-            StartCoroutine(DelayedBeginWave(2f));
+            Schedule(Pending.BeginWave, 2f);
         else
             CompleteLevel();
-    }
-
-    IEnumerator DelayedBeginWave(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        BeginWave();
     }
 
     // ── Level / bölüm geçişi ──────────────────────────────────────────────────
@@ -413,22 +497,19 @@ public class ChapterManager : MonoBehaviour
             // Bölüm değişti — hikâye ve yeni tip tanıtımı için geçiş ekranı
             var next = ChapterFor(GameProgress.CurrentChapter);
             if (_transitionUI != null)
+            {
+                _pending = Pending.ChapterTransition;
                 _transitionUI.Show(next, BeginLevel);
+            }
             else
-                StartCoroutine(DelayedBeginLevel(1f));
+                Schedule(Pending.BeginLevel, 1f);
         }
         else
         {
             // Bölüm içi level geçişi sessizdir: her 10 levelde bir tam durak
             // yeterli, her levelde bir ekran akışı boğar.
-            StartCoroutine(DelayedBeginLevel(2.5f));
+            Schedule(Pending.BeginLevel, 2.5f);
         }
-    }
-
-    IEnumerator DelayedBeginLevel(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        BeginLevel();
     }
 
     // ── Yardımcı metodlar ─────────────────────────────────────────────────────

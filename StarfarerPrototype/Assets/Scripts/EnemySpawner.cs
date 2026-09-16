@@ -231,12 +231,7 @@ public class EnemySpawner : MonoBehaviour
     {
         if (data == null) return null;
 
-        var go = new GameObject($"EnemyBot_{data.displayName}");
-        go.transform.position = position;
-        go.AddComponent<HealthBar>();
-
-        var bot = go.AddComponent<EnemyBot>();
-        bot.data = ApplyScaling(data, scaling);
+        var bot = Build(ApplyScaling(data, scaling), position);
 
         // Ölçekli kopya kaydedilir, asset'teki taban değil: bu levelde gerçekten
         // geçerli olan sayı budur (düşman bilgi kutusuyla aynı gerekçe).
@@ -250,6 +245,28 @@ public class EnemySpawner : MonoBehaviour
                   .Num("manevra", bot.data.maneuverScale)
                   .End();
 
+        return bot;
+    }
+
+    /// <summary>
+    /// Kayıttan kurar. Veri ZATEN ölçeklenmiş — doğduğu levelin ve zorluğun
+    /// çarpanlarını taşır, yükleme anındakileri değil. Doğum telemetriye
+    /// YAZILMAZ: gemi yeniden doğmadı, yazılsaydı tehdit ölçümü aynı gemiyi iki
+    /// kez sayardı.
+    ///
+    /// Tek inşa yolu korunur: Spawn ile aynı <see cref="Build"/>'i kullanır.
+    /// </summary>
+    public static EnemyBot Rebuild(EnemyTypeData scaledData, Vector3 position)
+        => scaledData != null ? Build(scaledData, position) : null;
+
+    static EnemyBot Build(EnemyTypeData runtimeData, Vector3 position)
+    {
+        var go = new GameObject($"EnemyBot_{runtimeData.displayName}");
+        go.transform.position = position;
+        go.AddComponent<HealthBar>();
+
+        var bot = go.AddComponent<EnemyBot>();
+        bot.data = runtimeData;
         return bot;
     }
 
@@ -566,6 +583,56 @@ public class EnemySpawner : MonoBehaviour
 
     FormationTemplate[] _formations;
 
+    // ── Serbest koşunun kaydı ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Serbest koşuyu devam ettirmek için gereken HER ŞEY. İki kadranın ikisi
+    /// de burada: rampa (temizlenen tehdit → düşman GÜCÜ) ve bütçe (toplanan
+    /// kaynak → düşman SAYISI). Biri eksik yazılsaydı devam eden koşu, ya
+    /// güçlü gemisiyle ilk dakikanın zayıf düşmanlarını ya da başlangıç
+    /// kalabalığında geç oyunun sert düşmanlarını görürdü.
+    /// </summary>
+    [System.Serializable]
+    public struct FreeRunState
+    {
+        public float timer;
+        public float cleared;
+        public float collected;
+        public float runTime;
+        public int   waveIndex;
+        public float waveBudget;
+    }
+
+    bool         _hasResume;
+    FreeRunState _resume;
+
+    public FreeRunState CaptureFreeRun() => new FreeRunState
+    {
+        timer      = _timer,
+        cleared    = s_clearedThreat,
+        collected  = s_collected,
+        runTime    = _runTime,
+        waveIndex  = _waveIndex,
+        waveBudget = _waveBudget,
+    };
+
+    /// <summary>
+    /// Koşuyu kayıttaki duruma kurar — HEMEN, ilk Update'i beklemeden.
+    /// Beklenseydi geri yüklenen dünya bir kare boyunca sıfırlanmış sayaçlarla
+    /// yaşardı: saha doluyken dalga sayacı 0 ve rampa 0 görünürdü.
+    /// debugFreeSpawn açılmadan ÖNCE çağrılmalı.
+    /// </summary>
+    public void ResumeFreeRun(FreeRunState state, AsteroidFieldState field)
+    {
+        _resume    = state;
+        _hasResume = true;
+        BeginFreeRun();
+        _freeRunning = true;
+
+        var asteroids = FindFirstObjectByType<AsteroidSpawner>();
+        if (asteroids != null) asteroids.RestoreState(field);
+    }
+
     /// <summary>
     /// Serbest mod açıldığında sayaçları sıfırlar, asteroit alanını kurar.
     /// Temizlenen tehdit STATİK tutulur (ölüm anında ulaşılabilir olmalı), bu
@@ -580,6 +647,19 @@ public class EnemySpawner : MonoBehaviour
         _timer          = 0f;
         _waveIndex      = 0;
         _waveBudget     = Mathf.Max(1f, startWaveBudget);
+
+        // Sıfırla, SONRA geri yükle: statikleri önce temizlemek, kayıt eksik
+        // bir alan taşısa bile önceki oyunun artığının sızmamasını garanti eder.
+        if (_hasResume)
+        {
+            _hasResume      = false;
+            _timer          = _resume.timer;
+            s_clearedThreat = _resume.cleared;
+            s_collected     = _resume.collected;
+            _runTime        = _resume.runTime;
+            _waveIndex      = _resume.waveIndex;
+            _waveBudget     = Mathf.Max(1f, _resume.waveBudget);
+        }
 
         _formations = new[]
         {

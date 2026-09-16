@@ -184,6 +184,42 @@ public class Debris : MonoBehaviour
         return actual;
     }
 
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    public DebrisState CaptureState() => new DebrisState
+    {
+        id      = WorldSave.IdOf(this),
+        pos     = transform.position,
+        type    = (int)resourceType,
+        origin  = (int)origin,
+        variant = _variant,
+        amount  = resourceAmount,
+        life    = _life,
+        scatter = _scatter,
+    };
+
+    /// <summary>
+    /// Kayıttan geri kurar. Init ÇAĞRILMAZ: o, enkazın DÜŞTÜĞÜ anı telemetriye
+    /// yazıyor — geri yüklenen enkaz yeniden düşmüş sayılsaydı gelir ölçümü
+    /// aynı kaynağı iki kez sayardı. Varyant da rastgelelenmez, kayıttakidir.
+    /// </summary>
+    public static Debris Rebuild(DebrisState s)
+    {
+        var type = (ResourceType)s.type;
+        var go   = new GameObject(type == ResourceType.EnergyCrystal ? "Debris_Crystal" : "Debris");
+        go.transform.position = s.pos;
+
+        var d = go.AddComponent<Debris>();
+        d.resourceType   = type;
+        d.resourceAmount = s.amount;
+        d.origin         = (DebrisOrigin)s.origin;
+        d._variant       = s.variant;
+        d._life          = s.life;
+        d._scatter       = s.scatter;
+        d.RefreshVisual();
+        return d;
+    }
+
     void BuildVisual()
     {
         // Doku beyaz/gri; renk sr.color ile verilir — tip rengi ve solma tek

@@ -27,7 +27,22 @@ public class TurretBullet : MonoBehaviour
     /// </summary>
     public float      zoomAtFire;
 
+    /// <summary>
+    /// Ömür (sn). Eskiden ateşleyen taraf <c>Destroy(go, ömür)</c> çağırıyordu;
+    /// gecikmeli Destroy'un kalan süresi okunamaz, yani uçuştaki mermi
+    /// kaydedilemezdi. 0 = sınırsız.
+    /// </summary>
+    public float      lifeTime;
+
+    /// <summary>
+    /// Görselin kaynağı — kayıttan kurulurken aynı sprite'ı çizebilmek için.
+    /// ≥ 0: turret uzmanlaşması (TurretSpecType), -1: savaşçı mermisi.
+    /// </summary>
+    public int        visual;
+
     Vector2 _dir;
+    float   _bornAt;
+    bool    _started;
 
     /// <summary>Collider yarıçapı — süpürme mesafesi buna göre uzatılır.</summary>
     const float Radius = 0.07f;
@@ -52,6 +67,13 @@ public class TurretBullet : MonoBehaviour
         var rb = gameObject.AddComponent<Rigidbody2D>();
         rb.bodyType    = RigidbodyType2D.Kinematic;
         rb.gravityScale = 0f;
+    }
+
+    void Start()
+    {
+        _bornAt  = Time.time;
+        _started = true;
+        if (lifeTime > 0f) Destroy(gameObject, lifeTime);
     }
 
     public void SetDirection(Vector2 dir)
@@ -195,5 +217,50 @@ public class TurretBullet : MonoBehaviour
         }
 
         return false;
+    }
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    float LifeLeft => !_started || lifeTime <= 0f
+        ? lifeTime
+        : Mathf.Max(0.01f, lifeTime - (Time.time - _bornAt));
+
+    public TurretBulletState CaptureState() => new TurretBulletState
+    {
+        pos        = transform.position,
+        dir        = _dir,
+        speed      = speed,
+        damage     = damage,
+        turnRate   = turnRate,
+        hp         = hp,
+        zoom       = zoomAtFire,
+        life       = LifeLeft,
+        weaponType = (int)weaponType,
+        visual     = visual,
+        guided     = isGuided,
+        target     = WorldSave.RefOf(guidedTarget),
+    };
+
+    public static TurretBullet Rebuild(TurretBulletState s)
+    {
+        var go = new GameObject(s.visual < 0 ? "FighterBullet" : "TurretBullet");
+        go.transform.position = s.pos;
+
+        var tb = go.AddComponent<TurretBullet>();
+        tb.damage       = s.damage;
+        tb.speed        = s.speed;
+        tb.weaponType   = (WeaponType)s.weaponType;
+        tb.isGuided     = s.guided;
+        tb.guidedTarget = WorldSave.ResolveTransform(s.target);
+        tb.turnRate     = s.turnRate;
+        tb.hp           = s.hp;
+        tb.zoomAtFire   = s.zoom;
+        tb.lifeTime     = s.life;
+        tb.visual       = s.visual;
+        tb.SetDirection(s.dir);
+
+        if (s.visual < 0) FighterShip.BuildBulletVisual(go);
+        else              TurretController.BuildBulletVisual(go, (TurretSpecType)s.visual);
+        return tb;
     }
 }

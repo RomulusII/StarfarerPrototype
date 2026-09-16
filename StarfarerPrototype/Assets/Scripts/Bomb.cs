@@ -10,7 +10,16 @@ public class Bomb : MonoBehaviour, ITurretTarget
     public float damage = 30f;
     public float hp     = 1f;
 
+    /// <summary>
+    /// Ömür. Eskiden Awake'te sabit <c>Destroy(gameObject, 8f)</c> çağrılıyordu;
+    /// gecikmeli Destroy'un kalan süresi okunamaz, yani uçuştaki bir bomba
+    /// kaydedilemezdi. Artık ömür bir alan ve doğum anı biliniyor.
+    /// </summary>
+    public float lifeTime = 8f;
+
     Vector2 _dir;
+    float   _bornAt;
+    bool    _started;
 
     static readonly Color BombColor = new Color(1f, 0.35f, 0f);
 
@@ -36,8 +45,15 @@ public class Bomb : MonoBehaviour, ITurretTarget
         // renkte (ikisi de sıcak turuncu) olduğu için oyuncu hangisinin
         // durdurulabileceğini göremiyordu; yanıp sönen çerçeve o farkı söyler.
         ShootableMarker.Attach(transform, 0.30f, MarkerColor, sortingOrder: 2);
+    }
 
-        Destroy(gameObject, 8f);
+    // Ömür Start'ta başlar: kayıttan kurulan bomba lifeTime'ına KALAN süreyi
+    // Awake ile Start arasında yazar.
+    void Start()
+    {
+        _bornAt  = Time.time;
+        _started = true;
+        Destroy(gameObject, lifeTime);
     }
 
     public Vector2 Velocity => _dir * speed;
@@ -100,5 +116,35 @@ public class Bomb : MonoBehaviour, ITurretTarget
                                   ImpactSurface.Hull, damage);
             Destroy(gameObject);
         }
+    }
+
+    // ── Kayıt ─────────────────────────────────────────────────────────────────
+
+    /// <summary>Kalan ömür. Start'ı henüz çalışmamış bomba ömrünün tamamına sahip.</summary>
+    float LifeLeft => _started ? Mathf.Max(0.01f, lifeTime - (Time.time - _bornAt)) : lifeTime;
+
+    public BombState CaptureState() => new BombState
+    {
+        id     = WorldSave.IdOf(this),
+        pos    = transform.position,
+        dir    = _dir,
+        speed  = speed,
+        damage = damage,
+        hp     = hp,
+        life   = LifeLeft,
+    };
+
+    public static Bomb Rebuild(BombState s)
+    {
+        var go = new GameObject("Bomb");
+        go.transform.position = s.pos;
+
+        var b = go.AddComponent<Bomb>();
+        b.speed    = s.speed;
+        b.damage   = s.damage;
+        b.hp       = s.hp;
+        b.lifeTime = s.life;
+        b.SetDirection(s.dir);
+        return b;
     }
 }
