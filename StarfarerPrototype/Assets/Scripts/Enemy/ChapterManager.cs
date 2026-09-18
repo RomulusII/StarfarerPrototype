@@ -520,10 +520,26 @@ public class ChapterManager : MonoBehaviour
     /// yazsaydı oyunla sessizce ayrışırdı ve tam da ayrıştığı yerde yanlış
     /// sayı üretirdi. Metot rastgelelik içerdiği için model onu defalarca
     /// örnekleyip ortalamasını alır.
+    ///
+    /// Tip seçimi AĞIRLIKLIDIR: ağırlık = tehdit^(−alfa), bkz.
+    /// <see cref="BalanceConfig.compositionAlpha"/>. Eskiden bütçeye sığan
+    /// tipler arasından düzgün rastgele seçiliyordu — Swarm ile Kaleci eşit
+    /// sıklıkta geliyor, dalganın dokusu yalnızca bütçenin tükenme sırasından
+    /// doğuyordu. Düşman statı düzleşip sayı tek para birimi hâline gelince bu
+    /// seçim dalganın KARAKTERİNİ belirleyen şey oldu: alfa ucuzların kalabalık
+    /// gelmesini sağlarken bütçenin çoğunu pahalı tiplerde tutar.
     /// </summary>
     public static void FillByBudget(List<EnemyTypeData> list, EnemyTypeData[] pool, int budget)
     {
-        int safety = 200;
+        var cfg = BalanceConfig.Instance;
+
+        // Emniyet sayacı bütçeden TÜREYECEK, sabit olmayacak. En ucuz tip 1
+        // tehdit ettiği için bir dalga en fazla `budget` tane gemi üretebilir;
+        // sabit 200, düşman statı düzleşip bütçeler yüzlere çıkınca (Lv100'de
+        // ~955) dalgayı sessizce kırpardı — hata değil, EKSİK dalga olarak
+        // görünürdü. +16 pay, boş-dalga taşması gibi kenar durumlar için.
+        int safety = budget + 16;
+
         while (budget > 0 && safety-- > 0)
         {
             // Refakat gerektiren tipler (siper gemileri) ancak dalgada koruyacak
@@ -568,7 +584,25 @@ public class ChapterManager : MonoBehaviour
                 break;
             }
 
-            var chosen = affordable[Random.Range(0, affordable.Count)];
+            // AĞIRLIKLI SEÇİM: ağırlık = tehdit^(−alfa) (bkz.
+            // BalanceConfig.compositionAlpha). Eskiden düzgün rastgeleydi, yani
+            // Swarm ile Kaleci eşit sıklıkta geliyordu ve dalganın dokusu
+            // yalnızca bütçenin tükenme sırasından doğuyordu.
+            //
+            // Ağırlıklar her turda YENİDEN hesaplanır: bütçe azaldıkça uygun
+            // küme daralır, bir kez hesaplanmış tablo yanlış kümeye ait olurdu.
+            float total = 0f;
+            for (int i = 0; i < affordable.Count; i++)
+                total += cfg.CompositionWeight(affordable[i].threatScore);
+
+            var chosen = affordable[affordable.Count - 1];
+            float roll = Random.value * total;
+            for (int i = 0; i < affordable.Count; i++)
+            {
+                roll -= cfg.CompositionWeight(affordable[i].threatScore);
+                if (roll <= 0f) { chosen = affordable[i]; break; }
+            }
+
             list.Add(chosen);
             budget -= chosen.threatScore;
         }

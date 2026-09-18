@@ -58,7 +58,17 @@ public class EnemySpawner : MonoBehaviour
              "türer: zorluk oyuncunun eline geçen kaynakla büyür.")]
     public float resourcePerPower = 75f;
 
-    [Tooltip("Bütçe katsayısı — güç seviyesi başına dalga büyüklüğü.")]
+    [Tooltip("Bütçe katsayısı — güç seviyesi başına dalga büyüklüğü.\n\n" +
+             "ÖLÇÜLECEK: düşman statı düzleştikten sonra serbest mod BİR GÜÇ " +
+             "EKSENİ KAYBETTİ. Eskiden rampa (temizlenen tehdit) düşmanın HP ve " +
+             "zırhını da büyütüyordu; artık yalnızca tip açıyor, tavan koyuyor " +
+             "ve uçuşu kıvraklaştırıyor. Kampanyada kaybolan büyüme bütçe " +
+             "katsayısına devredildi (BalanceConfig.budgetGrowth); serbest modun " +
+             "bütçesi AYRI bir formülden geldiği için aynı devir buraya " +
+             "kendiliğinden ulaşmaz.\n\n" +
+             "Telafi noktası bu alan ve budgetExponent. Ama ölçmeden " +
+             "dokunulmuyor: denge r1'in kuralı, iki kadranı aynı anda " +
+             "oynatmamak.")]
     public float budgetScale = 5f;
 
     [Tooltip("Bütçe üssü. 1'İN ALTINDA OLMASI KASITLIDIR: oyuncunun geliri " +
@@ -274,9 +284,10 @@ public class EnemySpawner : MonoBehaviour
     /// Ölçekleme çarpanlarını uygular. Orijinal asset'e dokunmaz — runtime
     /// kopyası döner.
     ///
-    /// Zırh ÇARPILMAZ, EKLENİR: levelin taban zırhı tipin kendi zırhının
-    /// üstüne biner. Çarpılsaydı zırhsız tipler sonsuza dek zırhsız kalır ve
-    /// eşiğin geç bölümlerdeki işlevi kaybolurdu.
+    /// HP ve hasar yalnızca ZORLUK çarpanını alır; levelden gelen büyüme
+    /// kaldırıldı (bkz. LevelCurve sınıf dokümanı). Zırha hiç dokunulmaz —
+    /// tipin kendi değeri neyse odur. Eskiden levelin taban zırhı her tipin
+    /// üstüne eklenirdi.
     /// </summary>
     static EnemyTypeData ApplyScaling(EnemyTypeData src, EnemyScaling s)
     {
@@ -296,7 +307,6 @@ public class EnemySpawner : MonoBehaviour
         d.fireDamage    = src.fireDamage    * s.damage;
         d.evasionAngle  = src.evasionAngle  * s.evasion;
         d.escapeAngle   = src.escapeAngle   * s.evasion;
-        d.armor         = src.armor         + s.armor;
 
         // Manevra çarpanı AYRI bir alanda taşınır, agility'nin üstüne yazılmaz:
         // agility aynı zamanda tipin kimliğidir (PursuesFighters onu okur).
@@ -702,14 +712,23 @@ public class EnemySpawner : MonoBehaviour
     /// <summary>
     /// Rampanın ölçekleme çarpanları — doğrudan <see cref="LevelCurve"/>'den.
     ///
+    /// DÜŞMAN STATI DÜZLEŞTİKTEN SONRA bu yalnızca UÇUŞ KARAKTERİNİ taşır
+    /// (kaçamak salınımı ve manevra kabiliyeti); HP, hasar ve zırh levelden
+    /// gelmiyor. Yani serbest modun rampası artık üç şey yapıyor: hangi
+    /// tiplerin açıldığı, sahadaki tehdit tavanı, ve uçuşun ne kadar kıvrak
+    /// olduğu. Düşmanın SERTLİĞİ tamamen dalga bütçesinden (yani oyuncunun
+    /// topladığı kaynaktan) geliyor.
+    ///
+    /// Bu bir sadeleşme: iki kadran (rampa = güç, bütçe = sayı) bir kadrana
+    /// indi. Ölçümü kolaylaştırır, ama rampanın artık düşmanı GÜÇLENDİRMEDİĞİ
+    /// bilinerek okunmalı — eski ismi ("zorluk rampası") yalnızca yarısını
+    /// anlatıyor.
+    ///
     /// Eskiden burada AYRI bir formül vardı ve tehlikeli olan zırhtı:
-    /// <c>armor = level × 1.2</c>, yani 5 dakikada 6 zırh. Kampanyada 6 zırha
-    /// ancak ~level 45'te ulaşılır; oyuncu ise serbest modda başlangıç
-    /// donanımıyla oynuyor. Raylı topun 10 hasarı zırh eşiğinden 4'e, sonra
-    /// tabana (%10 = 1) düşüyordu: düşmanlar birkaç dakikada VURULAMAZ hâle
-    /// geliyordu. "Serbest mod da kampanyayla aynı ölçekleme yolunu kullanır"
-    /// kuralı yazılıydı ama yalnızca yapıya (EnemyScaling) uyuluyordu, sayılara
-    /// değil — tek formül olunca zırh eğrisi de kendiliğinden doğru yerde.
+    /// <c>armor = level × 1.2</c>, yani 5 dakikada 6 zırh — oyuncu başlangıç
+    /// donanımıyla oynarken düşmanlar birkaç dakikada VURULAMAZ hâle geliyordu.
+    /// O tuzak artık iki kez kapalı: hem tek formül var, hem de o formül zırhı
+    /// hiç ölçeklemiyor.
     /// </summary>
     EnemyScaling CurrentRamp(float level) => EnemyScaling.ForLevel(EquivalentLevel(level));
 

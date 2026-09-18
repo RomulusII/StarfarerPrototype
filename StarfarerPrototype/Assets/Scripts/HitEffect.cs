@@ -118,6 +118,54 @@ public static class HitEffect
     }
 
     /// <summary>
+    /// Alan hasarı patlaması — roket ve flak mermisi (bkz. DamageUtil.AreaDamage).
+    ///
+    /// Çarpma kıvılcımından iki yönden ayrılır ve ikisi de oyuncuya BİLGİ verir:
+    ///
+    /// 1. **360° saçılır**, yüzeyden sekmez. Patlamanın bir çarpma yönü yok.
+    /// 2. **Kıvılcım hızı yarıçaptan türer** (`radius / ömür`), yani saçılma tam
+    ///    patlama kenarında söner. Yarıçap oyuncuya başka hiçbir yerde
+    ///    GÖSTERİLMİYOR: efektin boyutu ile hasarın boyutu aynı şeyi anlatmazsa
+    ///    oyuncu nişan almayı öğrenemez — "şuraya atarsam üçünü birden yakalarım"
+    ///    ancak yarıçap görünürse düşünülebilir bir şey olur.
+    ///
+    /// Kıvılcım sayısı yarıçapla büyür ama HASARLA değil: küçük yarıçaplı ağır
+    /// bir patlama ile geniş yarıçaplı hafif bir patlama farklı görünmeli.
+    /// </summary>
+    public static void SpawnBlast(Vector2 center, float radius, float damage)
+    {
+        if (radius <= 0f) return;
+
+        int count = Mathf.Clamp(Mathf.RoundToInt(10f + radius * 14f), 10, 48);
+        Color color = new Color(1f, 0.72f, 0.28f);
+        float size  = SizeScale(damage);
+
+        for (int i = 0; i < count; i++)
+        {
+            // Düzgün dağılım + küçük bir sapma: tam eşit aralık bir çark gibi
+            // okunuyor, tamamen rastgele ise kümelenip delik bırakıyor.
+            float angle    = i * 360f / count + Random.Range(-8f, 8f);
+            float lifetime = Random.Range(0.22f, 0.40f);
+            float reach    = radius * Random.Range(0.65f, 1.0f);
+            float sizeMult = Random.Range(0.7f, 1.3f) * size;
+
+            var go = new GameObject("BlastSpark");
+            go.transform.position   = center;
+            go.transform.localScale = Vector3.one * sizeMult * 2.5f;
+
+            var sr          = go.AddComponent<SpriteRenderer>();
+            sr.sprite       = SharedSprite();
+            sr.sortingOrder = 25;
+            sr.color        = color;
+
+            var sp      = go.AddComponent<Spark>();
+            sp.velocity = Rotate(Vector2.right, angle) * (reach / lifetime);
+            sp.lifetime = lifetime;
+            sp.baseSize = sizeMult * 2.5f;
+        }
+    }
+
+    /// <summary>
     /// Lazer temas noktası için sürekli, az sayıda elektrik kıvılcımı.
     /// LaserBeam.Update() içinden periyodik olarak çağrılır.
     /// </summary>

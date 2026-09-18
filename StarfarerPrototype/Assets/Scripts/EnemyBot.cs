@@ -1101,8 +1101,9 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     // ── Zırh ve özel davranışlar ──────────────────────────────────────────────
 
     /// <summary>
-    /// Bu düşmanın toplam zırhı: levelin taban zırhı + tipin bonusu.
-    /// EnemySpawner ölçekleme sırasında data.armor'a zaten leveli eklemiştir.
+    /// Bu düşmanın zırhı — YALNIZCA tipin kendi değeri. Levelden gelen taban
+    /// zırh kaldırıldı (bkz. LevelCurve sınıf dokümanı): zırh artık bir tip
+    /// özelliğidir, bir level özelliği değil.
     /// </summary>
     public float EffectiveArmor => data != null ? Mathf.Max(0f, data.armor) : 0f;
 

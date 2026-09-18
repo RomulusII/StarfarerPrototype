@@ -193,17 +193,16 @@ arkasındakilere siper olmazsa hiçbir şey ifade etmez.
 Eskiden `EnemyBot` içinde sabitti (5/s, 4 sn), yani her kalkanlı tip aynı hızda
 şarj oluyordu.
 
-**Kalkan VE şarj hızı levelle birlikte ölçeklenir**, ikisi de aynı çarpanla
-(`EnemySpawner.ApplyScaling`). Aynı çarpan olması şart: yalnızca kalkan
-büyüseydi geç levellerde doldurma süresi de 10 katına çıkar ve "boşalt, pencereyi
-kullan" mekaniği tek seferlik bir olaya dönerdi. Şimdi pencerenin UZUNLUĞU
-kampanya boyunca sabit (7.1 sn), yalnızca kırmak zorlaşıyor.
+**Kalkan VE şarj hızı AYNI çarpanı alır** (`EnemySpawner.ApplyScaling`). Aynı
+çarpan olması şart: yalnızca kalkan büyüseydi doldurma süresi de aynı oranda
+uzar ve "boşalt, pencereyi kullan" mekaniği tek seferlik bir olaya dönerdi.
+Pencerenin UZUNLUĞU her koşulda sabit: **7.1 sn**.
 
-| Level | Kalkan | Şarj/sn | Dolma |
-|---|---|---|---|
-| 12 | 219 | 31 | 7.1 sn |
-| 50 | 526 | 74 | 7.1 sn |
-| 100 | 1662 | 235 | 7.1 sn |
+**Düşman statı düzleştikten sonra o çarpan artık yalnızca ZORLUKTUR** — kalkan
+levelle büyümüyor (bkz. "Düz Düşman Statı"). Bariyerin kalkanı kampanya boyunca
+150'de kalır (Kolay 120, Zor 180) ve pencere hep 7.1 saniyedir. Eskiden Lv100'de
+1.662 kalkana çıkıyordu; o büyüme artık "aynı bariyerden daha çok gelmesi"
+olarak geliyor.
 
 **Tehdit puanı 8 → 3 → 7.** Bir ara 3'e indirilmişti: 8'de bir DALGANIN bütçesi
 8'e ulaşana kadar hiç seçilemiyor, gerçek ilk çıkışı ~level 40'a kayıyordu.
@@ -417,6 +416,131 @@ Eski değerin gerekçesi "ışın hiç ıskalamaz, çarpanı 3.0" idi; o çarpan
 zaman ölçülmemişti ve mermili turretler de çoğu hedefi vuruyor. Isınma
 1.35 kabul edildi. Ana lazer 40 → 46.
 
+### Düz Düşman Statı — Tasarım Kararları
+
+**Çöp gemilerin statı levelle BÜYÜMEZ.** Bir Swarm 1. levelde neyse 100.
+levelde de odur: aynı HP, aynı hasar, aynı zırh. Levelin zorluğu yalnızca
+**kaç tane** geldiğinden ve **hangi tiplerin** geldiğinden gelir.
+(`EnemyScaling.ForLevel` artık yalnızca zorluk çarpanını taşır.)
+
+**Boss bu kuralın dışında** — `BossHullHP` hâlâ levelle büyür.
+
+**Neden: tehdit puanı yalan söylüyordu.** `threatScore` tip başına sabit bir
+sayı ama o tipin gerçek değeri levelle şişiyordu — Lv100'de aynı gemi 9.8× HP,
+4× hasar ve +20 zırh taşıyor, yani "1 puan" Lv1'de bir şey, Lv100'de ~39 katı
+bir şey. Bu birim dört sistemde birden kullanılıyor: dalga bütçesi, gelir,
+serbest modun rampası, valfin saha tavanı. Dördü de enflasyona uğramış bir
+birimle hesap yapıyordu. Üstelik tehdit formülünün veriyle doğrulanması
+(aynı tipin her levelde tek bir α/β'ya oturması) yapısal olarak imkânsızdı.
+
+**İkinci gerekçe: geç oyunda dalga diye bir şey kalmamıştı.** Lv100'ün en büyük
+dalgası 33 puandı; ortalama tip maliyeti 9 olduğuna göre bu **üç-dört gemi**
+demek. Yüz levellik kampanyanın finali, ekrana üç şişman süngerin süzülmesiydi.
+Büyümenin tamamı HP barının uzamasına gidiyordu — ve uzun HP barı "tehlike"
+değil "mermi süngeri" diye okunur.
+
+**Kaybolan büyüme bütçeye devredildi** ve yer değiştirme TAMDIR:
+
+| | Lv10 | Lv25 | Lv50 | Lv100 |
+|---|---|---|---|---|
+| Eski: bütçe × HP çarpanı | 10.9 | 23.1 | 79.8 | **956.9** |
+| Şimdi: düz bütçe | 10.9 | 23.1 | 79.8 | **957.0** |
+| Level başına gemi | 9 | 9 | 19 | **139** |
+| En büyük dalgadaki gemi | 6 | 3 | 6 | **46** |
+
+`budgetGrowth` 1.027 → **1.05093** (= 1.027 × 1.0233). Sapma en fazla %0.01.
+
+**Gelir de korundu — ama düzeltme BÜYÜMEYE değil TABANA yazıldı.** İlk hesap
+"`dropGrowth` 1.0 olsun, çarpımlar zaten denk" diyordu; ölçünce denk
+olmadığı görüldü: 1.027×1.022 = 1.04959 ile 1.05093×1.0 arasındaki binde 1.3'lük
+fark 99 levelde bileşik olarak **%11.3 gelir şişmesi** üretiyor.
+`dropGrowth`'u 0.9989'a çekmek geliri düzeltirdi ama "tehdit başına drop bir
+sabittir" ifadesini bozardı. Sabit kaldı, değeri değişti:
+`baseDropPerThreat` 2.1 → **1.8972**. Kampanya geliri fark %0.00.
+
+**Bedeli — tek kol, üç iş.** Düz statta sayım tek para birimidir: EHP, gelen DPS
+ve ekran kalabalığı artık birlikte hareket eder. Bugün ayrıydılar (HP 9.8× /
+hasar 4× / sayı 14×). Sayıyı 137×'e çıkarmak EHP'yi korur ama gelen DPS'i
+56× yerine **137×** yapar, yani geç oyun ~2.4 kat ölümcül.
+
+Korunacak eksen olarak **EHP seçildi**, çünkü ölçüm iki taraftan da aynı yeri
+gösteriyordu: level süresi 0.84 dk (hedef 3–4) ve 8 koşuda **0 ölüm, gövdeye
+geçen hasar %0**. Hem çok kısa hem tehlikesizdi; EHP'yi korumak ikisini birden
+düzeltir. Doğrulanacak.
+
+**`budgetGrowth` bir ALT SINIRDIR.** Zırhın da düzleşmesi ayrıca bir
+kolaylaştırmadır ve etkisi silaha göre ×0.78 (Sv10 raylı top) ile ×0.10
+(Point Defence) arasında değişir — yani build'e bağlıdır ve kağıtta
+fiyatlanamaz. Gerçek katsayıyı simülasyon söyleyecek.
+
+**DOKUNULMADI: kaçamak manevra ve manevra kabiliyeti eğrileri.** Erken
+levellerin düz ve hantal uçması bir stat değil bir ÖĞRENME rampasıdır; oyuncu
+nişan almayı yavaş hedeflerde öğrenir. `evasion` ve `mobility` eskisi gibi
+levelden gelir.
+
+**Serbest mod bir güç ekseni kaybetti.** Rampa (temizlenen tehdit) artık yalnızca
+tip açıyor, saha tavanı koyuyor ve uçuşu kıvraklaştırıyor — düşmanı
+GÜÇLENDİRMİYOR. Kampanyadaki devir oraya kendiliğinden ulaşmaz, çünkü serbest
+modun bütçesi ayrı bir formülden gelir. Telafi noktası `budgetScale` /
+`budgetExponent`; **ölçmeden dokunulmadı** (denge r1'in kuralı: iki kadranı aynı
+anda oynatma).
+
+**Ölçülen bir artefakt:** level 10 → 25 arasında gemi SAYISI artmıyor (9 → 9),
+çünkü o aralıkta bütçe küçük ve kadroyu α değil "hangi tip bütçeye sığıyor"
+belirliyor. Lv50'den sonra düzeliyor. Sorun mu, yoksa "orta bölümler tip
+çeşitliliğiyle zorlaşır" olarak doğru mu — ölçülecek.
+
+### Dalga Kompozisyonu — Kuvvet Yasası
+
+Dalga kadrosu kurulurken tip seçimi **ağırlıklıdır**:
+
+```
+ağırlık(tip) = threatScore ^ (−alfa)        alfa = 0.5
+```
+
+Eskiden bütçeye sığan tipler arasından **düzgün rastgele** seçiliyordu, yani
+Swarm ile Kaleci eşit sıklıkta geliyordu ve dalganın dokusu yalnızca bütçenin
+tükenme sırasından doğuyordu. Düşman statı düzleşip sayı tek para birimi hâline
+gelince bu seçim dalganın KARAKTERİNİ belirleyen şey oldu.
+
+Kuvvet yasasının iki sonucu birbirinden bağımsızdır:
+
+```
+adet payı  ∝ tehdit^(−alfa)
+bütçe payı ∝ tehdit^(1−alfa)
+```
+
+"Ucuzlar kalabalık olsun ama bütçenin azını yesin" ancak **0 < alfa < 1**
+aralığında sağlanır: alfa ≥ 1 bütçeyi de ucuzlara kaydırır, alfa ≤ 0 ağırları
+hem pahalı hem kalabalık yapar. **0.5 özel bir noktadır** — adet oranı ile bütçe
+oranı tam ayna olur (c^−0.5 ile c^+0.5 birbirinin tersi).
+
+Ölçülen (Lv100 bütçesi, 400 örnek):
+
+| tip | tehdit | adet payı | bütçe payı |
+|---|---|---|---|
+| Swarm | 1 | **%19.8** | %2.7 |
+| Avcı | 4 | %9.5 | %5.3 |
+| Armored | 9 | %6.4 | %7.9 |
+| Bomb Runner | 13 | %5.0 | %9.0 |
+| Kaleci | 27 | %3.5 | **%12.9** |
+
+Swarm, Kaleci'den 5.2 kat kalabalık; Kaleci bütçenin 5.2 katını yiyor. Ortalama
+gemi maliyeti 9.14 → **7.24**, yani aynı bütçe ~%26 daha çok gemi.
+
+**Neden bant değil kuvvet yasası:** bant sınırları ("%20 hafif / %45 orta /
+%35 ağır") tehdit puanları değiştiği anda kırılır — Bariyer 3→7, Armored 7→9
+daha yeni oldu. Kuvvet yasası havuz büyüdükçe kendini ayarlar ve tek alandır.
+Bantın tek gerçek üstünlüğü, ağırlara bugünkünden DAHA ÇOK bütçe payı
+verebilmesi: kuvvet yasasıyla bütçe payı en fazla maliyetle orantılı olabilir,
+üstüne çıkamaz.
+
+**İleride alfa dalga başına ezilecek** ve levelin karakteri olacak: yüksek alfa
+(~2) aynı bütçeyi ~450 gemiye çevirir (**cümbüş**), negatif alfa az ve ağır bir
+duvar kurar. Negatif ucun şu anda karşılığı yok — havuzun en pahalısı Kaleci
+(27) olduğu için "seyrek ve ağır" bir dalga kurulamıyor. Ağır zırhlı tipin
+gerekçesi süs değil, yapısal olarak budur.
+
 ### Tehdit Puanı — Formül
 
 `threatScore` oyunun en çok iş yapan sayısı: **dalga bütçesini** harcar
@@ -512,9 +636,27 @@ Zırh bu eşitliği bozar ve atış başına hasarı ödüllendirir. Zırh 18'e 
 turret `EffectiveShotDamage`'ını bildirir, `TurretTargeting` cezayı hesaplar.
 Bu olmadan turret asla vuramayacağı hedefe kilitlenip mermi harcardı.
 
-Zırh iki kaynaktan gelir ve **toplanır**: levelin taban zırhı (`LevelCurve.Armor`)
-+ tipin kendi bonusu (`EnemyTypeData.armor`). Çarpılsaydı zırhsız tipler sonsuza
-dek zırhsız kalırdı.
+**Zırh artık YALNIZCA tipin kendi özelliğidir** (`EnemyTypeData.armor`). Levelin
+taban zırhı (`LevelCurve.Armor`, 0 → 20) kaldırıldı — eğri, üssü ve alanı
+silindi.
+
+Gerekçe düz stat kararının kendisiyle aynı (bkz. "Düz Düşman Statı"): yarısı
+düzleşmiş bir düşman düzleşmemiştir. Lv100'ün 20 zırhı, 10 hasarlı raylı topa
+karşı **%90 kesinti** demekti — `hpGrowth`'un ürettiğinden daha büyük bir
+efektif HP çarpanı. Üstelik tehdit formülünün "dayanıklılık" terimi doğrudan
+efektif HP'den türüyor, yani levelle büyüyen zırh tehdit puanını her levelde
+yeniden yalanlıyordu.
+
+Eşiğin amacı — atış başına hasarı ödüllendirmek — kaybolmadı, **kompozisyona
+taşındı**: baskı zırhlı tipler sahneye çıktığında gelir. Oyuncuya "aynı Swarm
+gizemli biçimde sertleşti" diye değil, "artık Kaleci yolluyorlar" diye görünür.
+
+**Bilinçli geçici durum:** şu anda zırhı olan yalnızca Kaleci (+12) ve Obüs (+3);
+13 tipin 11'i zırhsız. Yani eşik mekanizması duruyor ama nadiren ateşleniyor ve
+çok sayıda zayıf atış yapan build'ler (Point Defence, Gatling) geç oyunda
+belirgin biçimde güçlendi. Bunu kapatacak olan **Aşama 4'teki yeni zırhlı
+tiplerdir** (ağır zırhlı + zırh aurası). Ölçüm bu boşluk açıkken koşuluyor;
+bilerek.
 
 **Gelecek:** Büyük düşman gemilerinin attığı **area-effect bombalar** komponentlere de hasar verebilir (tasarım kararı bekliyor).
 
@@ -982,17 +1124,27 @@ ve gelir yalnızca wave bütçesiyle büyüyordu; 100. levelde gereken kaynağı
 
 | Bileşen | Formül | Lv1 → Lv100 |
 |---|---|---|
-| Level tehdit bütçesi | `7 × 1.027^(n−1)` | 7 → 98 (14× daha çok düşman) |
-| Tehdit başına drop | `2.1 × 1.022^(n−1)` | 2.1 → 18 |
+| Level tehdit bütçesi | `7 × 1.05093^(n−1)` | 7 → 957 (137× daha çok düşman) |
+| Tehdit başına drop | `1.8972` (SABİT) | değişmez |
 | Asteroit bütçesi | `10 × 1.035^(n−1)` | 10 → 301 |
 | Boss primi | `25 × drop × 3` | bölüm kapanışı |
 
-Kalabalık ve birim değeri farklı hızlarda büyür. Kampanya toplam geliri
-**≈45.800** — eğriler değişti ama toplam korundu (aşağıya bak).
+Kampanya toplam geliri **≈45.800** — eğriler birkaç kez değişti ama toplam her
+seferinde korundu.
 
-**Bütçe büyümesi oyuncu gücünden TÜRER.** Oyuncu kampanya boyunca ~13.8 kat
-güçleniyor (`LevelCurve`); bütçe de aynı oranda büyürse level SÜRESİ sabit
-kalır ve büyümenin tamamı dalga BOYUTUNA gider. `13.8^(1/99) = 1.0267`.
+**Tehdit başına drop artık bir SABİTTİR.** Düşman statı düzleştiği için tehdit
+puanı dürüst bir sabit oldu (bkz. "Düz Düşman Statı"); sabit bir şeyin birim
+fiyatının levelle büyümesi için sebep yok. Gelirin tamamı tek bir şeyden gelir:
+**kaç gemi öldürdüğünden**. Bir Swarm 1. levelde ne düşürürse 100. levelde de
+onu düşürür.
+
+**Bütçe büyümesi İKİ EĞRİNİN ÇARPIMIDIR:** `1.027 × 1.0233 = 1.05093`.
+
+- **1.027** — oyuncunun güç eğrisi. Oyuncu kampanya boyunca ~13.8 kat
+  güçleniyor; bütçe aynı oranda büyürse level SÜRESİ sabit kalır ve büyümenin
+  tamamı dalga BOYUTUNA gider. `13.8^(1/99) = 1.0267`.
+- **1.0233** — eskiden düşmanın HP eğrisiydi (`LevelCurve.hpGrowth`). Çöp
+  gemiler levelle büyümediği için o büyüme buraya devredildi.
 
 **Neden level başına %10-15 değil:** 100 level bileşik faizdir.
 
@@ -1000,17 +1152,18 @@ kalır ve büyümenin tamamı dalga BOYUTUNA gider. `13.8^(1/99) = 1.0267`.
 |---|---|---|---|
 | %10 | 17 | 750 | **87.700** |
 | %15 | 25 | 6.600 | **7.100.000** |
-| %2.7 | 9 | 26 | 98 |
+| %5.1 | 11 | 80 | 957 |
 
 %10 ile 100. levelin bütçesi 87.700 tehdit puanı, yani tek levelde 87.700
-Swarm eder. Level başına anlamlı olan oran ~%2.7; **hissedilen birim BÖLÜMDÜR**
-ve orada artış ×1.31 olur. Bölüm 1 → bölüm 10 arası ×11.
+Swarm eder. **Hissedilen birim BÖLÜMDÜR** ve orada artış ×1.64 olur.
 
-**Gelir sabit tutuldu.** `budgetGrowth` 1.018 → 1.027 çıkarken `dropGrowth`
-1.031 → 1.022'ye indirildi; kampanya geliri = Σ(bütçe × drop) olduğu için
-çarpımları sabit kalmalıydı (1.018×1.031 ≈ 1.027×1.022). Yoksa toplam gelir iki
-katına çıkar ve az önce ayarlanan yükseltme fiyatlarının tamamı geçersizleşirdi.
-Artık düşman daha çok ama tanesi daha ucuz.
+**Gelir sabit tutuldu — ama düzeltme büyümeye değil tabana yazıldı.**
+`budgetGrowth` 1.027 → 1.05093 çıkarken `dropGrowth` 1.022 → **1.0** oldu; bu
+tek başına geliri **%11.3 şişiriyordu**, çünkü 1.027×1.022 = 1.04959 ile
+1.05093 arasındaki binde 1.3'lük fark 99 levelde bileşik olarak birikiyor.
+Telafi `baseDropPerThreat` 2.1 → **1.8972** ile yapıldı: büyümeye yazmak
+"drop bir sabittir" ifadesini bozardı. Ölçülen fark %0.00.
+(Daha önce: `budgetGrowth` 1.018 → 1.027 çıkarken `dropGrowth` 1.031 → 1.022.)
 
 **Asteroit geliri artık süre bazlı bir kaçak değil.** `Asteroid.SmallResourceAmount`
 sabit 5 iken asteroit geliri düşman gelirinin **3 katıydı** ve bölümü uzatarak
@@ -1208,8 +1361,10 @@ Slot'a kurulunca otomatik ateş açar, oyuncu müdahalesi gerekmez. Enerji tüke
 | **Gatling** | Hızlı (1f) | Düşük | Orta | Düşük | 3s | Şarjör + reload mekaniği |
 | **Plazma** | Düşük (20f) | Orta | Düşük | Yüksek | 4s | — |
 | **Lazer** | Orta (5f) | Orta | Yüksek | Yüksek | 4s | — |
-| **Roket** | Çok düşük (30f+) | Yüksek | Orta | Düşük | 10s | Güdümlü, hedefi izler |
-| **Point Defence** | Çok hızlı (0.28f) | Düşük/atış, **28.6 DPS** | **Çok yüksek (20)** | Düşük | 0.6s | Menzil 10.4 — yalnızca mühimmat ve hafif gövde |
+| **Roket** | Çok düşük (15f) | Yüksek | Orta | Düşük | 7.7s | Güdümlü, **çarpınca patlar** (yarıçap 1.2) |
+| **Nükleer Başlık** | Çok düşük (30f) | Çok yüksek (110) | Düşük (2.5) | Orta | 10.8s | Güdümlü, hantal döner, **yarıçap 3.2** |
+| **Flak** | Hızlı (2f) | Düşük (12) | Orta (6) | Orta | 4.5s | **Yarıçap 1.8** — kalabalığın cevabı |
+| **Point Defence** | Çok hızlı (0.28f) | Düşük/atış, **28.6 DPS** | **Çok yüksek (20)** | Düşük | 0.6s | Menzil 10.4 — önce mühimmat, sonra hafif gövde, sonra her şey |
 
 **Hedefleme — puanlama formülü** (`TurretTargeting`):
 
@@ -1249,13 +1404,25 @@ dokunmak gerekmez — arayüzü uygulamak yeterlidir.
 Point Defence yalnızca `IsPointDefencePriority` olan hedefleri alır: bombalar,
 yakın saldırgan gemiler (Approach / BombRun / AttackRun) ve küçük asteroit parçaları.
 
-**PD İKİ KADEMELİ SEÇER** (`PointDefenceClass`):
+**PD ÜÇ KADEMELİ SEÇER** (`PointDefenceClass`) ve kademe MUTLAK önceliktir —
+puanla çözülmez:
 
 1. Menzilde **mühimmat** (bomba/füze) varsa YALNIZCA ona ateş eder ve kilit
    histerezisi uygulanmaz — bomba kalkana varmadan vurulmalı, 0.35 saniyelik
    bir gecikme bile onu kaçırmaya yeter.
 2. Mühimmat yoksa **hafif gövdeli** gemilere ve küçük asteroit parçalarına.
-3. Büyük/zırhlı gövdelere **hiç** ateş etmez.
+3. İkisi de yoksa menzildeki **her gemiye**.
+
+Üçüncü kademe eskiden yoktu ("büyük/zırhlı gövdeye hiç ateş etme, 8 hasar
+zırhta erir"). O gerekçe düz stat kararıyla büyük ölçüde geçersiz kaldı:
+levelden gelen +20 zırh yok, 13 tipin 11'i zırhsız. Boştaki bir PD'nin
+menzildeki gemiye ateş etmemesi saf israftı. Zırhlı hedefte eşik hâlâ işliyor
+ve puanlama onu biliyor, yani PD zırhlı gemiyi ancak başka bir şey yokken seçer.
+
+**Kademe atlaması kilidi kırar, düşüşü kırmaz.** İri gövdeye kilitli PD'nin
+menziline küçük bir gemi girerse hemen döner; küçük gemiye kilitliyken iri bir
+gövdenin yaklaşması kilidi bozmaz. Puanla çözülseydi yakındaki iri bir gövde,
+biraz ötedeki küçük gemiyi puanla geçip PD'yi asıl işinden alıkoyabilirdi.
 
 **Eskiden hiçbir şeye ateş etmiyordu.** Filtre `movementKind ∈ {Approach,
 BombRun, AttackRun}` idi; bölüm 1–3'ün havuzunda (Swarm=Strafe,
@@ -1263,6 +1430,84 @@ Armored=HoverFire, Shield=Charge, Barrier=Screen) bu üçünden hiçbiri yok —
 yani PD turreti bölüm 4'e kadar tek el bile ateş etmiyordu. Ölçü artık
 GÖVDE KÜTLESİ (`EnemyTypeData.IsLightHull`, eşik 2.5) ve bu eşik savaşçı
 kovalamayla AYNI: "küçük gemi" oyunda tek bir kavram olmalı.
+
+### Kalabalığın Cevabı — Alan Hasarı
+
+Düşman statı düzleşince dalgalar 4 gemiden 46'ya çıktı (Lv100) — ama oyuncunun
+cephaneliğinde **tek bir alan hasarı yoktu**: beş turret uzmanlaşması da, üç ana
+silah da tek hedefliydi. Tek hedefli bir cephanelik kalabalığa matematiksel
+olarak yetişemez; cevabı eklenmeden gelen kalabalık bir cümbüş değil bir duvar
+olurdu. Üç parça eklendi, üçü de mevcut mimariye oturuyor.
+
+| | Yarıçap | Tek hedefe DPS | Kimlik |
+|---|---|---|---|
+| **Flak** (kinetik) | 1.8 | 6.0 (diğerleriyle aynı) | kalabalıkta üstün, tek hedefte sıradan |
+| **Güdümlü roket** | 1.2 | 4.0 (değişmedi) | patlama yalnızca KALABALIKTA kazanç |
+| **Nükleer başlık** | 3.2 | **3.67** (güdümlüden düşük) | formasyonu siler, boss'ta zayıf |
+
+**Tek yol: `DamageUtil.AreaDamage`.** Roket ve flak aynı fonksiyondan geçer
+(`HitEffect.SpawnImpact` ile aynı gerekçe: ikinci bir yol sessizce sapar).
+Dört karar:
+
+- **Aynı hedefe iki kez vurmaz.** Kalkanlı bir geminin gövdesi ve kalkanı AYRI
+  collider'lardır; naif bir tarama o gemiye iki kez hasar verirdi. Alıcılar
+  kimliğe göre tekilleştirilir ve kalkan gövdeye tercih edilir — dışarıdan gelen
+  patlama önce kabuğa çarpar. İki geçişte yapılır; tek geçişte sonuç collider
+  sırasına bağlı olur, aynı patlama bazen kalkana bazen gövdeye vururdu.
+- **Boss gövdesi ve hardpoint'leri AYRI alıcılardır**, ikisi de vurulur —
+  uzayda farklı parçalar, aynı şeyin iki collider'ı değil.
+- **Kenar sönümü %40.** Sönüm olmasa patlama sert kenarlı bir daire olur ve
+  atışı kalabalığın merkezine koymanın kenarına koymaya üstünlüğü kalmazdı.
+  Sıfıra söndürmek de yanlış: efektif yarıçap gösterilenden küçük kalır.
+  Mesafe hedefin merkezinden değil collider'ının en yakın noktasından ölçülür —
+  boss gibi iri bir gövdede merkez ölçüsü, patlama gövdenin üstündeyken "uzak" derdi.
+- **Bombalar da patlamada ölür.** Bomba `TryDamage`'ın bilmediği tek alıcı
+  (çağıranlar onu özel ele alıyor); patlamanın içinde kalan bir bombanın sağ
+  çıkması, oyuncunun gördüğü ile oyunun bildiği arasında fark olurdu.
+
+**Patlayan mermide ayrı "doğrudan hasar" yoktur.** Çarptığı hedef de patlamanın
+içindedir ve mesafesi ~0 olduğu için tam hasarı zaten alır. Bu yüzden güdümlü
+roketin sayıları DEĞİŞMEDİ ve tek hedefe karşı eskisiyle birebir aynı: füze
+tabanı kalabalığın cevabı olurken boss'un cevabı olmuyor.
+
+**Nükleer başlık bir yükseltme değil bir TAKAS.** Tek hedefe DPS'i güdümlüden
+düşük — biri her durumda daha iyi olsaydı ortada karar kalmazdı. Daha hantal da
+döner (dönüş hızı 150 → 70): geniş patlaması kaçamak hedefi zaten yakalıyor,
+üstüne keskin güdüm onu her açıdan üstün kılardı. Menzil 27'de tutuldu, yavaş
+mermi zaten yeterli bir bedel.
+
+**Flak zırha karşı zayıf ve bu kasıtlı** — 12 hasarlı atış, zırh eşiğinin tam
+olarak cezalandırdığı şey. Bir döngü doğuyor: kalabalık flak'i ister, flak
+zırhı davet eder. Ağır zırhlı tipler (Aşama 4) flak'in doğal cevabı.
+
+**Log'a TEK isabet yazılır**, yakaladığı hedef sayısı ayrı alanda
+(`shot_hit.yakalanan`). İsabet oranı `shot_hit / shot_fired` olarak
+hesaplanıyor; sekiz gemi yakalayan bir flak mermisi sekiz satır yazsaydı oran
+%100'ü aşar ve metrik sessizce anlamsızlaşırdı.
+
+**Patlama efekti yarıçapı GÖSTERİR** (`HitEffect.SpawnBlast`): kıvılcımlar 360°
+saçılır ve hızları yarıçaptan türer (`yarıçap / ömür`), yani saçılma tam
+patlama kenarında söner. Yarıçap oyuncuya başka hiçbir yerde gösterilmiyor;
+"şuraya atarsam üçünü birden yakalarım" ancak yarıçap görünürse düşünülebilir.
+
+**İki tuzak kapatıldı:**
+- `TurretController` def'ten statları "0 ise mevcut değeri koru" deseniyle
+  alıyor. Patlama yarıçapında 0 bir eksiklik değil BİR DEĞERDİR ("patlamaz");
+  o desenle atansaydı Flak'ten Gatling'e geçen turret patlamaya devam ederdi.
+  Yarıçap koşulsuz atanır.
+- `TurretSpecType` kayda `(int)` olarak yazılıyor. `NuclearRocket`
+  `HomingRocket`'in hemen ardına kondu; ondan sonrakiler (`ClusterMissile`,
+  `DecoyLauncher`) hiç ulaşılamayan değerler, yani hiçbir kayıt bozulmadı.
+  Kural enum'un üstünde yazılı.
+
+**Park edildi — lazer yansıması.** Lazerin delip geçmesi reddedildi (lazerin
+kimliği tek hedefe sürekli DPS). Yansıma ilginç ama ucuz değil: çarpma normali,
+N sekme segmenti, segment başına hasar ve çok parçalı görsel gerekir. Flak ve
+roketlerin sonucu görüldükten sonra, kalabalık cevabı hâlâ eksikse ele alınır.
+
+**Oyunda denenmedi.** Yarıçaplar (1.2 / 1.8 / 3.2) formasyon aralığından
+tahmin edildi, ölçülmedi. Sim bunları ölçemiyor — sahte oyuncu uzmanlaşma
+satın almıyor.
 
 ### Mermi Hızı — Turretler Ana Silahla Aynı Hızda Atar
 
@@ -1560,7 +1805,7 @@ saniyede 60 kez sorulmasının karşılığı yok.
 | Açık tipler | `threatScore ≤ 1 + seviye × 0.7` | Swarm | +Avcı | +Bomber | +Bariyer, Shield, Sülük, Hayalet, Bölünen, **Armored** | +Obüs, Karıştırıcı, Onarıcı, BombRunner |
 | Sahadaki tehdit tavanı (valf) | `6 + seviye × 2` (tavan 60) | **6** | 15 | 21 | 33 | 45 |
 | Denk kampanya leveli | `1 + seviye × 1.5` | 1 | 8 | 12 | 20 | 27 |
-| HP / zırh | o levelin `LevelCurve` değerleri | 1.00 / 0.0 | 1.17 / 0.4 | 1.29 / 0.7 | 1.55 / 1.5 | 1.82 / 2.5 |
+| Manevra / kaçamak | o levelin `LevelCurve` değerleri | 0.70 / 0.00 | 0.79 / 0.29 | 0.84 / 0.46 | 0.93 / 0.79 | 1.00 / 1.00 |
 
 `threatPerLevel` 0.4 → 0.7: tehdit tablosu formüle geçince tüm sayılar yükseldi
 (Armored 7 → 9, Bariyer 3 → 7), yani AYNI kilit oranı tipleri çok daha geriye
@@ -1576,7 +1821,20 @@ Oysa bir Swarm daha eklemek TEMPO'yu artırır, yeni bir TİP açmak DUVAR örer
 seçiyor (`EquivalentLevel`) ve çarpanları `LevelCurve`'den okuyor. Ayrı
 formülün en tehlikeli parçası zırhtı: `armor = seviye × 1.2` ile birkaç
 dakikada **6 zırh** oluşuyordu; kampanyada 6 zırha ancak ~level 45'te ulaşılır,
-oysa oyuncu serbest modda başlangıç donanımıyla.
+oysa oyuncu serbest modda başlangıç donanımıyla. O tuzak artık iki kez kapalı —
+tek formül var ve o formül zırhı hiç ölçeklemiyor.
+
+**Rampa artık düşmanı GÜÇLENDİRMİYOR.** Düşman statı düzleştikten sonra
+(bkz. "Düz Düşman Statı") rampanın taşıdığı tek şey uçuş karakteri; HP, hasar ve
+zırh levelden gelmiyor. Yani serbest modun rampası üç iş yapıyor: tip açmak,
+saha tavanı koymak, uçuşu kıvraklaştırmak. Sertlik tamamen dalga bütçesinden —
+yani oyuncunun topladığı kaynaktan — geliyor.
+
+Bu bir sadeleşme ama aynı zamanda **kapatılmamış bir açık**: kampanyada kaybolan
+HP büyümesi bütçe katsayısına devredildi, serbest modun bütçesi ise AYRI bir
+formülden geldiği için aynı devir oraya ulaşmadı. Serbest mod ölçülebilir
+biçimde kolaylaştı. Telafi noktası `budgetScale` / `budgetExponent`;
+**ölçmeden dokunulmadı** — denge r1'in kuralı, iki kadranı aynı anda oynatmamak.
 
 **Açılış SIRASI artık doğru.** Tehdit tablosu formülden gelince sıra
 kendiliğinden düzeldi: Avcı (4) → Bomber (6) → Shield/Sülük (7) → **Armored (9)**.
@@ -1679,18 +1937,23 @@ dalga tek bir olay olduğuna göre "dalga içi aralık" diye bir şey yok.
 **Bölüm = 10 level. Her bölümün 10. leveli boss levelidir.** Tek gerçek sayı
 `GameProgress.CurrentLevel`'dır (1–100); bölüm ondan türer.
 
-**Zorluk bölümden değil LEVELDEN gelir** (`LevelCurve`). Bölüm sınırı yalnızca
-tema ve yeni bir düşman tipi getirir — zorluk orada sıçramaz, sürekli akar.
-Eskiden her bölümde elle yazılmış `enemyHpMultiplier` ve wave dizileri vardı;
-10 bölüm için idare edilebilirdi, 100 level için edilemez.
+**Zorluk bölümden değil LEVELDEN gelir.** Bölüm sınırı yalnızca tema ve yeni bir
+düşman tipi getirir — zorluk orada sıçramaz, sürekli akar. Eskiden her bölümde
+elle yazılmış `enemyHpMultiplier` ve wave dizileri vardı; 10 bölüm için idare
+edilebilirdi, 100 level için edilemez.
+
+**Ama zorluk artık STATTAN değil SAYIDAN gelir** (bkz. "Düz Düşman Statı"):
 
 | Formül | Değer | Lv100 |
 |---|---|---|
-| Bütçe `ThreatBudget(n)` | `7 × 1.027^(n−1)` | 98 (14×) |
-| `HpMultiplier(n)` | `1.0233^(n−1)` | 9.8× |
-| `DamageMultiplier(n)` | `1.0141^(n−1)` | 4.0× (eskiden sabit 1.0 idi) |
-| `Armor(n)` | `20 × (n/100)^1.6` | 20 |
+| Bütçe `ThreatBudget(n)` | `7 × 1.05093^(n−1)` | **957 (137×)** |
+| Çöp gemi HP / hasar / zırh | **levelden gelmez** | 1.0 / 1.0 / +0 |
 | `EvasionMultiplier(n)` | `n = 1..25 arası doğrusal` | 1.0 |
+| `MobilityMultiplier(n)` | `0.7 → 1.0`, aynı eğri | 1.0 |
+| `HpMultiplier(n)` — **yalnızca boss** | `1.0233^(n−1)` | 9.8× |
+
+`DamageMultiplier(n)` ve `Armor(n)` eğrileri SİLİNDİ — çağıranları kalmamıştı
+ve çalışmayan bir eğriyi taşımak, olmayan eğriden kötüdür.
 
 **Wave'ler elle yazılmaz.** `ChapterManager` levelin tehdit bütçesini dalgalara
 böler (level < 50 → 3 dalga, sonrası 4).
@@ -1807,7 +2070,7 @@ bırakıldı.
 | LevelBannerUI.cs | Her level başında üstte 2–3 sn görünen level / bölüm bandı |
 | ComponentCatalog.cs | Tüm komponent tanımlarının tek sahibi — ne var, kaça, hangi zincirle |
 | BalanceConfig.cs | Gelir ve zırh eğrilerinin tek sahibi (SO; asset yoksa varsayılan) |
-| LevelCurve.cs | Düşman ölçeklemesi: HP, hasar, zırh, kaçamak, manevra — levelden türer |
+| LevelCurve.cs | Düşman ölçeklemesi: kaçamak ve manevra levelden türer; HP/hasar/zırh DÜZ (yalnızca boss levelle büyür) |
 | BalanceLog.cs | Denge ölçümü — ham olay kaydı (JSONL), her build'de açık |
 | SimRuntime.cs | Simülasyon koşusu — tohum, hızlandırma, `--set` ezmeleri, bitiş |
 | SimPilot.cs | Sahte oyuncunun nişan ve ateşi — isabet modeli burada |
@@ -2502,6 +2765,18 @@ kendi içinde tutarlı. Tek yerden değiştirilebilir: `BuildWarningText`.
       koşuyor: sahte oyuncu (nişan + alışveriş), ÖLÇÜLMÜŞ isabet modeli,
       seed'li koşu, `--set` ile parametre ezme, paralel koşucu.
       Ayrıntı: "Headless Denge Simülasyonu — Tasarım Kararları"
+- [x] **Düz düşman statı** — çöp gemiler levelle güçlenmiyor (HP, hasar, zırh);
+      kaybolan büyüme bütçeye devredildi (`budgetGrowth` 1.027 → 1.05093),
+      drop tehdit başına sabit oldu (taban 2.1 → 1.8972), dalga kompozisyonu
+      `tehdit^(−0.5)` ağırlıklı seçime geçti. Toplam iş ve toplam gelir birebir
+      korundu (sapma %0.01 / %0.00). Denge revizyonu **4**.
+      **ÖLÇÜLMEDİ** — sim geç levelleri ölçemiyor (bkz. sim "Kalan işler").
+- [x] **Kalabalığın cevabı** — `DamageUtil.AreaDamage` tek yolu; roket çarpınca
+      patlar, Flak ve Nükleer Başlık uzmanlaşmaları, PD üçüncü kademe.
+      Denge revizyonu **5**. Oyunda denenmedi.
+- [ ] **%90 dalga temizlenme eşiği + cümbüş dalgaları (Aşama 3)**
+- [ ] **Zırhlı tipler (Aşama 4)** — ağır zırhlı (tehdit ~55-70) ve zırh aurası.
+      İkisi birden zırh eşiğini geri getirir ve α'nın ağır ucunu açar.
 - [ ] **Denge testleri** — aşağıdaki listeye bak; sayıların hiçbiri oyunda denenmedi
 - [ ] Point defence turretleri — küçük/hızlı hedeflere odaklı otomatik turret
 - [ ] Mobil UI
@@ -2672,6 +2947,23 @@ yazılmaya adaydı:
   iş parçacıklarının sıralaması). Miktarlar ve dövüş dizisi birebir aynı.
 - **Ölüm sonrası devam yok** — koşu ölümle biter, gerçek oyuncu son
   tamamlanan levelden devam eder.
+- **`--level N-M` ile GEÇ LEVELDEN BAŞLAMAK ÖLÇÜM ÜRETMEZ.** Sahte oyuncu
+  hangi levelden başlarsa başlasın `ComponentCatalog.StartingLoadout` ile ve
+  **sıfır kaynakla** giriyor: bedava raylı top, tek jeneratör, tek kalkan.
+  Level 40'tan başlatılan 6 koşunun 6'sı da 92–141 saniyede öldü — ama bu
+  dengeyle ilgili değil. Kontrol koşusu bunu kanıtladı: ESKİ bütçe eğrisiyle
+  (`--set budgetGrowth=1.027`) de 4/4 koşu aynı yerde öldü.
+
+  Yani `--level 40-50` "level 40 dengeli mi" sorusunu değil, "başlangıç
+  donanımı level 40'ı kaldırır mı" sorusunu ölçüyor — ve cevabı tasarım gereği
+  hayır. Geç levelleri ölçmenin iki yolu var, ikisi de yazılmadı:
+  (a) level 1'den kesintisiz koşmak (uzun), (b) başlangıç donanımını ve
+  kaynağını o levele uygun hâle getiren bir "bootstrap" (o da neyin uygun
+  olduğu varsayımını ölçüme sokar — asıl ölçülmek istenen şeyi baştan
+  varsaymak olur).
+
+  **Düz stat değişikliği bu yüzden ÖLÇÜLMEDİ.** Level 1–10 koşuları geçerli
+  ama orada bütçe 7 → 11, yani değişikliğin etkisi zaten yok denecek kadar az.
 
 ---
 

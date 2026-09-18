@@ -30,13 +30,24 @@ using UnityEngine;
 ///   Mermili turretlere ceza YAZILMADI: iki taraflı bir model tüm dengeyi
 ///   kaydırırdı, oysa çözülmek istenen tek şey ışının rolünü bulması.
 ///
-/// POINT DEFENCE — iki kademe:
+/// POINT DEFENCE — üç kademe, kademe MUTLAK önceliktir (puanla çözülmez):
 ///   1. Menzilde bomba/füze varsa YALNIZCA onlara ateş eder ve kilit
 ///      histerezisi uygulanmaz: bomba kalkana varmadan vurulmalı.
 ///   2. Mühimmat yoksa hafif gövdeli gemilere (bkz. EnemyTypeData.IsLightHull)
 ///      ve küçük asteroit parçalarına.
-///   3. Büyük/zırhlı gövdelere HİÇ ateş etmez — atış başına hasarı orada
-///      zırh eşiğinde erir, mermi de enerji de boşa gider.
+///   3. İkisi de yoksa menzildeki HER gemiye.
+///
+///   Üçüncü kademe eskiden yoktu: "büyük/zırhlı gövdeye hiç ateş etme, atış
+///   başına 8 hasar zırh eşiğinde erir" deniyordu. O gerekçe düşman statı
+///   düzleşince büyük ölçüde geçersiz kaldı — levelden gelen +20 zırh yok,
+///   13 tipin 11'i zırhsız. Boştaki bir PD'nin menzildeki bir gemiye ateş
+///   etmemesi ise saf israftı. Zırhlı hedefte eşik hâlâ işliyor ve puanlama
+///   onu zaten biliyor (ArmorEfficiency), yani PD zırhlı bir gemiyi ancak
+///   başka hiçbir şey yokken ve düşük puanla seçer.
+///
+///   Kademe atlaması kilidi kırar, kademe düşüşü kırmaz: iri bir gövdeye
+///   kilitli PD'nin menziline küçük bir gemi girerse hemen döner; küçük bir
+///   gemiye kilitliyken iri bir gövdenin yaklaşması kilidi bozmaz.
 ///
 /// KİLİTLENME:
 ///   - Hedef her karede değil, ReevaluateInterval'de bir yeniden değerlendirilir.
@@ -81,18 +92,15 @@ public static class TurretTargeting
         float         currentScore = 0f;
         bool          currentStillValid = false;
 
-        // Point Defence iki kademeli seçer: menzilde MÜHİMMAT varsa yalnızca
-        // onlara bakar, yoksa küçük gemilere. Tek geçişte ikisini de topluyoruz;
-        // ayrı bir tarama, sahneyi iki kez gezmek demek olurdu.
-        ITurretTarget bestMunition = null;
-        float         munitionScore = 0f;
+        // Point Defence ÜÇ kademeli seçer (bkz. sınıf dokümanı). Üç kova tek
+        // geçişte doldurulur; ayrı taramalar sahneyi üç kez gezmek olurdu.
+        ITurretTarget bestMunition = null, bestSmall = null, bestOther = null;
+        float munitionScore = 0f, smallScore = 0f, otherScore = 0f;
+        int   currentTier = PdTier(current);
 
         foreach (var t in EnumerateTargets())
         {
             if (!t.IsValidTarget) continue;
-
-            var pd = t.PdClass;
-            if (pointDefenceOnly && pd == PointDefenceClass.None) continue;
 
             float dist = Vector2.Distance(turretPos, t.TargetTransform.position);
             if (dist > range) continue;
@@ -105,9 +113,20 @@ public static class TurretTargeting
                 currentScore      = score;
             }
 
-            if (pointDefenceOnly && pd == PointDefenceClass.Munition)
+            if (pointDefenceOnly)
             {
-                if (score > munitionScore) { munitionScore = score; bestMunition = t; }
+                switch (t.PdClass)
+                {
+                    case PointDefenceClass.Munition:
+                        if (score > munitionScore) { munitionScore = score; bestMunition = t; }
+                        break;
+                    case PointDefenceClass.Small:
+                        if (score > smallScore) { smallScore = score; bestSmall = t; }
+                        break;
+                    default:
+                        if (score > otherScore) { otherScore = score; bestOther = t; }
+                        break;
+                }
                 continue;
             }
 
@@ -118,12 +137,37 @@ public static class TurretTargeting
         // onu 0.35 saniye geciktirmesi bile bir bombayı kaçırmaya yeter.
         if (bestMunition != null) return bestMunition;
 
+        // PD'de kademe MUTLAK önceliktir: daha üst kademede bir hedef belirdiyse
+        // puan karşılaştırmasına hiç girilmez. Puanla çözülseydi yakındaki iri
+        // bir gövde, biraz ötedeki küçük gemiyi puanla geçip PD'yi asıl işinden
+        // alıkoyabilirdi.
+        if (pointDefenceOnly)
+        {
+            if (bestSmall != null) { best = bestSmall; bestScore = smallScore; }
+            else                   { best = bestOther; bestScore = otherScore; }
+
+            int bestTier = PdTier(best);
+            if (currentStillValid && bestTier < currentTier) return best;   // yükseliş: kilidi kır
+            if (currentStillValid && bestTier > currentTier) return current; // düşüş: kilidi koru
+        }
+
         // Kilit korunuyor mu? Rakip yeterince üstün değilse mevcut hedefte kal.
         if (currentStillValid && bestScore < currentScore * SwitchAdvantage)
             return current;
 
         return best;
     }
+
+    /// <summary>
+    /// Point Defence kademesi: küçük sayı = yüksek öncelik.
+    /// Hedefi olmayan (null) durum en dibe konur ki her gerçek hedef onu geçsin.
+    /// </summary>
+    static int PdTier(ITurretTarget t) => t == null ? 3 : t.PdClass switch
+    {
+        PointDefenceClass.Munition => 0,
+        PointDefenceClass.Small    => 1,
+        _                          => 2,
+    };
 
     /// <summary>Tek bir hedefin puanı — formül sınıf dokümanında açıklanmıştır.</summary>
     public static float Score(ITurretTarget t, float dist, Vector3 shipPos,

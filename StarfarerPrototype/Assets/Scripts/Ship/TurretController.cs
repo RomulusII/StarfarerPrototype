@@ -22,6 +22,12 @@ public class TurretController : ShipComponentBase
     public int            magazineSize   = 10;
     public float          reloadTime     = 3f;
     public float          burnDuration   = 0.5f; // Lazer spec: beam yanma süresi
+
+    /// <summary>
+    /// Merminin patlama yarıçapı (dünya birimi). 0 = tek hedefli.
+    /// Flak ve roket uzmanlaşmalarında dolu (bkz. ComponentCatalog.TurretSpec).
+    /// </summary>
+    public float          blastRadius    = 0f;
     [Tooltip("Saniyede derece — turretin maksimum dönüş hızı.")]
     public float          turnRate       = 180f;
 
@@ -271,10 +277,18 @@ public class TurretController : ShipComponentBase
         tb.weaponType  = BulletWeaponType();
 
         bool isRocket = specType == TurretSpecType.HomingRocket ||
+                        specType == TurretSpecType.NuclearRocket ||
                         (baseType == TurretBaseType.Missile && specType == TurretSpecType.None);
         tb.isGuided     = isRocket;
         tb.guidedTarget = isRocket ? target : null;
         if (isRocket) { tb.turnRate = 150f; tb.hp = 3f; }
+
+        // Nükleer başlık daha hantal döner: geniş patlaması kaçamak bir hedefi
+        // zaten yakalıyor, üstüne güdümün de keskin olması onu her açıdan
+        // güdümlü rokete üstün kılardı — takas olmaktan çıkardı.
+        if (specType == TurretSpecType.NuclearRocket) tb.turnRate = 70f;
+
+        tb.blastRadius = blastRadius;
 
         tb.SetDirection(transform.right);
         tb.zoomAtFire = CameraController.ZoomOrani;
@@ -349,6 +363,13 @@ public class TurretController : ShipComponentBase
         reloadTime     = newDef.turretReloadTime     > 0 ? newDef.turretReloadTime     : reloadTime;
         burnDuration   = newDef.turretBurnDuration   > 0 ? newDef.turretBurnDuration   : burnDuration;
 
+        // KOŞULSUZ atanır, yukarıdaki "0 ise koru" deseniyle DEĞİL. O desen
+        // "tanımda belirtilmemişse mevcut değeri sürdür" demek; patlama
+        // yarıçapında 0 bir eksiklik değil BİR DEĞERDİR — "bu uzmanlaşma
+        // patlamaz". Korumalı atansaydı Flak'ten Gatling'e geçen turret
+        // patlamaya devam ederdi.
+        blastRadius    = newDef.turretBlastRadius;
+
         _currentMag = magazineSize;
         ApplySpecTurnRate();
         componentName = BuildLabel();
@@ -419,13 +440,20 @@ public class TurretController : ShipComponentBase
             TurretSpecType.Plasma       => new Color(0.4f, 1f, 0.3f),
             TurretSpecType.Laser        => Color.cyan,
             TurretSpecType.HomingRocket => new Color(1f, 0.5f, 0.1f),
+            // Nükleer başlık kendi rengini taşır: aynı turuncu olsaydı oyuncu
+            // ekranda hangi roketin patladığını göremezdi — biri 1.2, diğeri
+            // 3.2 yarıçapla patlıyor ve bu fark nişan kararını değiştiriyor.
+            TurretSpecType.NuclearRocket => new Color(0.6f, 1f, 0.35f),
             TurretSpecType.PointDefence => Color.yellow,
+            TurretSpecType.Flak         => new Color(1f, 0.72f, 0.28f),
             _                           => Color.white,
         };
 
         // Füze mermiden üç kat uzun: siluetten "bu bir füze" okunmalı.
-        int w = spec == TurretSpecType.HomingRocket ? 14 : 8;
-        int h = spec == TurretSpecType.HomingRocket ? 6  : 4;
+        bool isRocket = spec == TurretSpecType.HomingRocket ||
+                        spec == TurretSpecType.NuclearRocket;
+        int w = isRocket ? 14 : 8;
+        int h = isRocket ? 6  : 4;
 
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite       = SkinLibrary.Get(SkinId.TurretBullet + "." + spec.ToString().ToLowerInvariant(), SkinId.TurretBullet,
@@ -441,6 +469,8 @@ public class TurretController : ShipComponentBase
         TurretSpecType.Laser        => new Color(0.2f, 0.8f, 1f),
         TurretSpecType.Plasma       => new Color(0.3f, 0.9f, 0.3f),
         TurretSpecType.HomingRocket => new Color(1f,   0.5f, 0.1f),
+        TurretSpecType.NuclearRocket => new Color(0.55f, 0.9f, 0.3f),
+        TurretSpecType.Flak         => new Color(0.95f, 0.68f, 0.25f),
         _ => baseType switch
         {
             TurretBaseType.Energy  => new Color(0.4f, 0.8f, 0.9f),
@@ -483,6 +513,7 @@ public class TurretController : ShipComponentBase
         magazineSize   = def.turretMagazineSize   > 0 ? def.turretMagazineSize   : magazineSize;
         reloadTime     = def.turretReloadTime     > 0 ? def.turretReloadTime     : reloadTime;
         burnDuration   = def.turretBurnDuration   > 0 ? def.turretBurnDuration   : burnDuration;
+        blastRadius    = def.turretBlastRadius;   // koşulsuz — bkz. Specialize
 
         componentName = BuildLabel();
         _currentMag   = magazineSize;

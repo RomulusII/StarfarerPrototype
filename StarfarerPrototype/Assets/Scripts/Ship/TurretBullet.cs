@@ -20,6 +20,16 @@ public class TurretBullet : MonoBehaviour
     public float      hp         = 0f;
 
     /// <summary>
+    /// Patlama yarıçapı (dünya birimi). 0 = patlamaz, hasar yalnızca çarptığı
+    /// hedefe gider.
+    ///
+    /// Patlayan mermide DOĞRUDAN hasar diye ayrı bir şey YOKTUR: çarptığı hedef
+    /// de patlamanın içindedir ve mesafesi ~0 olduğu için tam hasarı zaten alır.
+    /// İkisini ayrı uygulamak, merkeze en yakın hedefe iki kez vurmak olurdu.
+    /// </summary>
+    public float      blastRadius = 0f;
+
+    /// <summary>
     /// Ateşlendiği andaki kadraj genişliği. Turret kendi nişan alıyor, yani
     /// zoom onun isabetini ETKİLEMEMELİ — alan tam da bunu sınamak için var:
     /// ana silahın isabeti zoom'la düşerken turret'ınki düşmüyorsa, sebep
@@ -184,11 +194,21 @@ public class TurretBullet : MonoBehaviour
         var bomb = other.GetComponent<Bomb>();
         if (bomb != null)
         {
+            if (blastRadius > 0f) { Explode(hitPos, other); return true; }
+
             bomb.TakeDamage(damage);
             // Bomba tek vuruşta gider: Point Defence'in işini yaptığı görünsün
             HitEffect.SpawnImpact(hitPos, _dir, other.transform.position,
                                   ImpactSurface.Hull, damage, lethal: true);
             Destroy(gameObject);
+            return true;
+        }
+
+        // Patlayan mermi hedefi AYIRMAZ: çarptığı her şeyde patlar ve hasarı
+        // alan hasarı yolundan gider.
+        if (blastRadius > 0f && DamageUtil.IsBlastTarget(other))
+        {
+            Explode(hitPos, other);
             return true;
         }
 
@@ -219,6 +239,35 @@ public class TurretBullet : MonoBehaviour
         return false;
     }
 
+    /// <summary>
+    /// Patlar: yarıçaptaki her hedefe hasar uygular ve mermiyi yok eder.
+    ///
+    /// LOG'A TEK BİR İSABET YAZILIR, kaç hedef yakaladığı ayrı bir alanda.
+    /// İsabet oranı <c>shot_hit / shot_fired</c> olarak hesaplanıyor; sekiz
+    /// gemi yakalayan bir flak mermisi sekiz satır yazsaydı oran %100'ü aşar ve
+    /// metrik sessizce anlamsızlaşırdı. "Atışım tuttu mu" ile "kaç tanesini
+    /// yakaladı" iki ayrı sorudur.
+    /// </summary>
+    void Explode(Vector2 at, Collider2D primary)
+    {
+        int caught = DamageUtil.AreaDamage(at, blastRadius, damage, weaponType);
+
+        var surface = DamageUtil.SurfaceOf(primary);
+        BalanceLog.Event("shot_hit")
+                  .Str("kaynak", "turret")
+                  .Str("silah",  weaponType.ToString())
+                  .Str("yuzey",  surface.ToString())
+                  .Str("hedef",  DamageUtil.TypeNameOf(primary))
+                  .Num("hasar",  damage)
+                  .Num("zoom",   zoomAtFire)
+                  .Num("yakalanan", caught)
+                  .Bool("oldurdu", false)
+                  .End();
+
+        HitEffect.SpawnBlast(at, blastRadius, damage);
+        Destroy(gameObject);
+    }
+
     // ── Kayıt ─────────────────────────────────────────────────────────────────
 
     float LifeLeft => !_started || lifeTime <= 0f
@@ -233,6 +282,7 @@ public class TurretBullet : MonoBehaviour
         damage     = damage,
         turnRate   = turnRate,
         hp         = hp,
+        blast      = blastRadius,
         zoom       = zoomAtFire,
         life       = LifeLeft,
         weaponType = (int)weaponType,
@@ -254,6 +304,7 @@ public class TurretBullet : MonoBehaviour
         tb.guidedTarget = WorldSave.ResolveTransform(s.target);
         tb.turnRate     = s.turnRate;
         tb.hp           = s.hp;
+        tb.blastRadius  = s.blast;
         tb.zoomAtFire   = s.zoom;
         tb.lifeTime     = s.life;
         tb.visual       = s.visual;

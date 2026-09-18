@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -157,5 +158,123 @@ public static class DamageUtil
         }
 
         return false;
+    }
+
+    // ── Alan hasarı ───────────────────────────────────────────────────────────
+
+    /// <summary>Patlama merkezindeki hasarın yayın KENARINDA kalan oranı.</summary>
+    /// <remarks>
+    /// Sönüm olmasaydı patlama sert kenarlı bir daire olurdu: menzile giren
+    /// her hedef aynı hasarı alır, yani atışı kalabalığın MERKEZİNE koymanın
+    /// kenarına koymaya göre hiçbir üstünlüğü kalmazdı. Nişan almanın karşılığı
+    /// olmalı. Kenarda tamamen sıfırlamak da yanlış: o zaman efektif yarıçap
+    /// gösterilenden küçük olur ve oyuncu "değdi ama saymadı" hissi yaşar.
+    /// </remarks>
+    public const float BlastEdgeFalloff = 0.4f;
+
+    // Paylaşılan tampon: her patlama dizi ayırsaydı yoğun bir dalgada GC yükü
+    // olurdu (TurretBullet'in süpürme tamponuyla aynı gerekçe).
+    static readonly List<Collider2D> _blastHits = new();
+    static readonly HashSet<Object>  _blastSeen = new();
+
+    /// <summary>
+    /// Bir yarıçap içindeki HER hedefe hasar uygular. Patlayan roket ve flak
+    /// mermisi buradan geçer.
+    ///
+    /// AYNI HEDEFE İKİ KEZ VURMAZ. Kalkanlı bir geminin gövdesi ve kalkanı AYRI
+    /// collider'lardır; ikisi de yarıçapın içindeyse naif bir tarama o gemiye
+    /// iki kez hasar verirdi. Alıcılar kimliğe göre tekilleştirilir ve kalkan
+    /// gövdeye TERCİH EDİLİR — dışarıdan gelen bir patlama önce kabuğa çarpar,
+    /// tıpkı <see cref="TryDamage"/>'ın sırası gibi.
+    ///
+    /// Boss gövdesi ile hardpoint'leri AYRI alıcılardır ve ikisi de vurulur:
+    /// onlar uzayda farklı parçalar, aynı şeyin iki collider'ı değil.
+    ///
+    /// Mesafe hedefin MERKEZİNDEN değil, collider'ının en yakın noktasından
+    /// ölçülür: boss gibi iri bir gövdede merkez ölçüsü, patlama gövdenin
+    /// üstündeyken bile "uzak" derdi.
+    /// </summary>
+    /// <returns>Hasar alan AYRI hedef sayısı.</returns>
+    public static int AreaDamage(Vector2 center, float radius, float damage,
+                                 WeaponType weaponType)
+    {
+        if (radius <= 0f || damage <= 0f) return 0;
+
+        _blastHits.Clear();
+        _blastSeen.Clear();
+        Physics2D.OverlapCircle(center, radius, new ContactFilter2D().NoFilter(), _blastHits);
+        if (_blastHits.Count == 0) return 0;
+
+        // İki geçiş: önce kalkan yüzeyleri kaydedilir, sonra gövdeler. Tek
+        // geçişte sonuç collider sırasına bağlı olurdu — aynı patlama bazen
+        // kalkana bazen gövdeye vururdu.
+        int hit = 0;
+        for (int pass = 0; pass < 2; pass++)
+        {
+            for (int i = 0; i < _blastHits.Count; i++)
+            {
+                var col = _blastHits[i];
+                if (col == null) continue;
+
+                var shieldOwner = ShieldOwnerOf(col);
+                bool isShield   = shieldOwner != null;
+                if (pass == 0 != isShield) continue;
+
+                Object key = isShield ? (Object)shieldOwner : ReceiverKey(col);
+                if (key == null || !_blastSeen.Add(key)) continue;
+
+                float dist  = Vector2.Distance(center, col.ClosestPoint(center));
+                float scale = Mathf.Lerp(1f, BlastEdgeFalloff,
+                                         Mathf.Clamp01(dist / radius));
+
+                // Bomba TryDamage'ın bilmediği tek alıcı: çağıranlar onu
+                // kendileri özel olarak ele alıyor (bkz. TurretBullet.TryHit).
+                // Patlamada ele alınması şart — patlamanın İÇİNDE kalan bir
+                // bombanın sağ çıkması, oyuncunun GÖRDÜĞÜ ile oyunun BİLDİĞİ
+                // arasında fark demekti.
+                var bomb = col.GetComponent<Bomb>();
+                if (bomb != null) { bomb.TakeDamage(damage * scale); hit++; continue; }
+
+                if (TryDamage(col, damage * scale, weaponType))
+                {
+                    hit++;
+                    if (isShield) ShieldFlash(col, col.ClosestPoint(center));
+                }
+                else _blastSeen.Remove(key);   // vurulamadıysa kimliği tutma
+            }
+        }
+        return hit;
+    }
+
+    /// <summary>
+    /// Bu collider patlamayı TETİKLER mi? Patlayan mermi yalnızca gerçek bir
+    /// hedefe çarpınca patlamalı; yoksa sahnedeki alakasız bir collider'a
+    /// değip havada patlar ve menzili sessizce kısalırdı.
+    /// </summary>
+    public static bool IsBlastTarget(Collider2D col)
+        => col != null && (ShieldOwnerOf(col) != null || ReceiverKey(col) != null);
+
+    /// <summary>
+    /// Bu collider'ın hasar ALICISI kim? Tekilleştirme anahtarı budur; bir
+    /// nesnenin kaç collider'ı olursa olsun tek bir alıcıya karşılık gelir.
+    /// </summary>
+    static Object ReceiverKey(Collider2D col)
+    {
+        var hardpoint = col.GetComponent<BossHardpoint>();
+        if (hardpoint != null) return hardpoint;
+
+        var boss = col.GetComponent<BossShip>();
+        if (boss != null) return boss;
+
+        var enemy = col.GetComponent<EnemyBot>();
+        if (enemy != null) return enemy;
+
+        var asteroid = col.GetComponent<Asteroid>();
+        if (asteroid != null) return asteroid;
+
+        var bomb = col.GetComponent<Bomb>();
+        if (bomb != null) return bomb;
+
+        return null;   // oyuncu gemisi, komponentler, mermiler: patlama onlara işlemez
     }
 }

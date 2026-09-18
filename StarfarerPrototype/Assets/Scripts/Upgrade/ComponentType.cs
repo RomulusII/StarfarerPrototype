@@ -4,6 +4,18 @@ public enum WeaponType { Kinetic, Laser, Plasma }
 
 public enum TurretBaseType { Kinetic, Energy, Missile }
 
+/// <remarks>
+/// SIRA KAYDA YAZILIR. Uzmanlaşma kayda <c>(int)</c> olarak giriyor
+/// (bkz. SaveSystem.ApplyShip) ve mermiler de görsellerini <c>(int)specType</c>
+/// ile saklıyor. Yani araya değer eklemek, o değerden SONRAKİ her uzmanlaşmayı
+/// eski kayıtlarda başka bir şeye çevirir — kurulu bir Point Defence sessizce
+/// Flak olarak geri gelirdi.
+///
+/// Yeni değer eklerken kural: ya listenin SONUNA, ya da yalnızca hiç
+/// ulaşılamayan ([ileride]) değerlerin önüne. NuclearRocket ikinci yolla
+/// eklendi — ardındaki ClusterMissile ve DecoyLauncher hiçbir kayıtta olamaz,
+/// çünkü ne GetSpecsForBase onları listeliyor ne de TurretSpec tanımlıyor.
+/// </remarks>
 public enum TurretSpecType
 {
     None,           // Uzmanlaşmamış — temel tip davranışı
@@ -11,7 +23,7 @@ public enum TurretSpecType
     // Kinetic
     Gatling,        // Hızlı ateş, şarjör sistemi
     PointDefence,   // Kısa menzil, bomba/roket düşürür
-    Flak,           // Alan hasarı  [ileride]
+    Flak,           // Yakınlık tapalı serpinti — kalabalığa alan hasarı
     Railgun,        // Yavaş, çok yüksek tek atış hasarı  [ileride]
 
     // Energy
@@ -20,7 +32,8 @@ public enum TurretSpecType
     EMP,            // Hasar vermez, yavaşlatır  [ileride]
 
     // Missile
-    HomingRocket,   // Güdümlü roket
+    HomingRocket,   // Güdümlü roket — çarpınca patlar, alan hasarı
+    NuclearRocket,  // Nükleer başlık — çok yavaş, geniş ve ağır patlama
     ClusterMissile, // Parçalanmalı roket  [ileride]
     DecoyLauncher,  // Sahte hedef fırlatır  [ileride]
 }
@@ -37,6 +50,7 @@ public static class TurretSpecHelper
         TurretSpecType.Plasma         => TurretBaseType.Energy,
         TurretSpecType.EMP            => TurretBaseType.Energy,
         TurretSpecType.HomingRocket   => TurretBaseType.Missile,
+        TurretSpecType.NuclearRocket  => TurretBaseType.Missile,
         TurretSpecType.ClusterMissile => TurretBaseType.Missile,
         TurretSpecType.DecoyLauncher  => TurretBaseType.Missile,
         _                             => TurretBaseType.Kinetic,
@@ -65,6 +79,7 @@ public static class TurretSpecHelper
         TurretSpecType.Plasma         => "Plasma",
         TurretSpecType.EMP            => "EMP",
         TurretSpecType.HomingRocket   => "Homing Rocket",
+        TurretSpecType.NuclearRocket  => "Nuclear Warhead",
         TurretSpecType.ClusterMissile => "Cluster Missile",
         TurretSpecType.DecoyLauncher  => "Decoy Launcher",
         _                             => "—",
@@ -72,9 +87,11 @@ public static class TurretSpecHelper
 
     public static TurretSpecType[] GetSpecsForBase(TurretBaseType bt) => bt switch
     {
-        TurretBaseType.Kinetic => new[] { TurretSpecType.Gatling, TurretSpecType.PointDefence },
+        TurretBaseType.Kinetic => new[] { TurretSpecType.Gatling, TurretSpecType.PointDefence,
+                                          TurretSpecType.Flak },
         TurretBaseType.Energy  => new[] { TurretSpecType.Laser, TurretSpecType.Plasma },
-        TurretBaseType.Missile => new[] { TurretSpecType.HomingRocket },
+        TurretBaseType.Missile => new[] { TurretSpecType.HomingRocket,
+                                          TurretSpecType.NuclearRocket },
         _                      => new TurretSpecType[0],
     };
 }

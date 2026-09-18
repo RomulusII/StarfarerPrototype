@@ -38,6 +38,34 @@ public static class GameVersion
     ///       Normal'in sayıları değişmedi, ama bu revizyondan önceki Kolay/Zor
     ///       kayıtları Normal ile birebir aynı oyundu. Kayıtlar artık
     ///       `zorluk` alanını taşıyor; analiz ona göre ayırmalı.
+    ///   4 — ÇÖP GEMİLERİN STATI DÜZLEŞTİ. HP, hasar ve zırh artık levelle
+    ///       büyümüyor (boss hariç); kaybolan büyüme dalga bütçesine devredildi
+    ///       (budgetGrowth 1.027 -> 1.05093) ve drop tehdit başına SABİT oldu
+    ///       (dropGrowth 1.0, taban 2.1 -> 1.8972). Bir levele gelen toplam
+    ///       efektif HP ve kampanya geliri birebir korundu; değişen şey aynı
+    ///       işin uzun HP barları yerine DAHA ÇOK GEMİ olarak gelmesi — Lv100'de
+    ///       level başına ~11 gemi yerine ~139.
+    ///
+    ///       Bu revizyonun kayıtları öncekilerle KARIŞTIRILAMAZ: tehdit puanı
+    ///       3'te ve öncesinde levelle şişen bir birimdi (Lv100'de gerçek değeri
+    ///       ~39 katıydı), 4'te dürüst bir sabittir. Tehdit doğrulama
+    ///       regresyonu ancak 4 ve sonrasının verisiyle koşulabilir.
+    ///
+    ///       Yan etki, kasıtlı: gelen DPS Lv100'de 56× yerine 137×, yani geç
+    ///       oyun ~2.4 kat ölümcül. EHP'yi korumak tercih edildi çünkü ölçüm
+    ///       hem level süresinin kısa (0.84 dk) hem ölümün sıfır (8/8 koşu)
+    ///       olduğunu söylüyordu.
+    ///
+    ///       Kompozisyon da değişti: dalga kadrosu artık tehdit^(-0.5) ağırlıklı
+    ///       seçiliyor (eskiden düzgün rastgele).
+    ///   5 — KALABALIĞIN CEVABI. Oyuncuya ilk kez alan hasarı geldi:
+    ///       güdümlü roket çarpınca patlar (yarıçap 1.2), iki yeni turret
+    ///       uzmanlaşması — Flak (yarıçap 1.8) ve Nükleer Başlık (yarıçap 3.2,
+    ///       yarı ateş hızı). Point Defence üçüncü kademe kazandı: mühimmat ve
+    ///       küçük hedef yoksa menzildeki her gemiye ateş eder.
+    ///
+    ///       Log'da patlama TEK isabet yazar, yakaladığı hedef sayısı ayrı
+    ///       alandadır (`yakalanan`) — isabet oranı %100'ü aşmasın diye.
     /// </summary>
-    public const int Denge = 3;
+    public const int Denge = 5;
 }

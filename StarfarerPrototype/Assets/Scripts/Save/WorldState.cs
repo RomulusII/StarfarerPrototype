@@ -167,6 +167,9 @@ public class TurretBulletState
     public int     weaponType, visual;
     public bool    guided;
     public int     target;
+
+    /// <summary>Patlama yarıçapı. 0 = patlamayan mermi.</summary>
+    public float   blast;
 }
 
 [Serializable]

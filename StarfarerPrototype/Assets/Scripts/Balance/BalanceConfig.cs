@@ -28,28 +28,58 @@ public class BalanceConfig : ScriptableObject
     public float baseThreatBudget = 7f;
 
     [Tooltip("Level başına bütçe büyümesi.\n\n" +
-             "OYUNCU GÜCÜNDEN TÜRER: oyuncu kampanya boyunca ~13.8 kat güçleniyor " +
-             "(LevelCurve). Bütçe de aynı oranda büyürse level SÜRESİ sabit kalır " +
-             "ve büyüme tamamen dalga BOYUTUNA gider — istenen buydu. " +
-             "13.8^(1/99) = 1.0267.\n\n" +
+             "İKİ EĞRİNİN ÇARPIMIDIR: 1.027 × 1.0233 = 1.05093.\n\n" +
+             "  1.027  — oyuncunun güç eğrisi. Oyuncu kampanya boyunca ~13.8 kat " +
+             "güçleniyor; bütçe aynı oranda büyürse level SÜRESİ sabit kalır ve " +
+             "büyümenin tamamı dalga BOYUTUNA gider. 13.8^(1/99) = 1.0267.\n\n" +
+             "  1.0233 — eskiden düşmanın HP eğrisiydi (LevelCurve.hpGrowth). " +
+             "Çöp gemiler artık levelle büyümediği için o büyüme BURAYA devredildi. " +
+             "Yer değiştirme TAMDIR, yaklaşık değil: bir levele gelen toplam " +
+             "efektif HP birebir korunur — Lv100'de 959 -> 955. Değişen tek şey, " +
+             "aynı işin uzun HP barları yerine daha çok gemi olarak gelmesi.\n\n" +
+             "DİKKAT: bu sayı bir ALT SINIRDIR. Zırhın da düzleşmesi (levelden " +
+             "gelen +20 zırhın kalkması) ayrıca bir kolaylaştırmadır ve etkisi " +
+             "silaha göre ×0.78 ile ×0.10 arasında değişir, yani oyuncunun " +
+             "build'ine bağlıdır ve kağıtta fiyatlanamaz. Gerçek telafi " +
+             "katsayısını simülasyon söyleyecek.\n\n" +
              "Neden %10-15 değil: 100 level bileşik faizdir. %10 ile Lv100 bütçesi " +
-             "87.700 tehdit puanı eder, yani tek levelde 87.700 Swarm. Level " +
-             "başına anlamlı olan oran %2.7; hissedilen birim BÖLÜMDÜR ve orada " +
-             "artış ×1.31 olur.")]
-    public float budgetGrowth = 1.027f;
+             "87.700 tehdit puanı eder, yani tek levelde 87.700 Swarm. " +
+             "Hissedilen birim BÖLÜMDÜR ve orada artış ×1.64 olur.")]
+    public float budgetGrowth = 1.05093f;
 
     [Header("Düşman Değeri")]
-    [Tooltip("Tehdit puanı başına düşen kaynak (level 1). Eskiden sabit 4'tü.")]
-    public float baseDropPerThreat = 2.1f;
+    [Tooltip("Tehdit puanı başına düşen kaynak. dropGrowth 1.0 olduğu için bu " +
+             "artık bir LEVEL 1 DEĞERİ değil, kampanyanın tamamında geçerli tek " +
+             "sayıdır: bir Swarm her levelde bunu düşürür.\n\n" +
+             "2.1 -> 1.8972: bütçe eğrisi dikleşince (1.027 -> 1.05093) toplam " +
+             "gelir %11.3 şişiyordu. 'budgetGrowth × dropGrowth sabit kalsın' " +
+             "kuralı BÜYÜME katsayılarıyla tam tutturulamıyor — 1.027×1.022 = " +
+             "1.04959 ile 1.05093×1.0 arasındaki binde 1.3'lük fark 99 levelde " +
+             "bileşik olarak %14'e çıkıyor. Düzeltme büyümeye değil TABANA " +
+             "yazıldı: dropGrowth'u 0.9989 gibi bir sayıya çekmek geliri " +
+             "düzeltirdi ama 'tehdit başına drop bir sabittir' ifadesini de " +
+             "bozardı. Sabit kaldı, değeri değişti.\n\n" +
+             "Sonuç: kampanya geliri değişmiyor (ölçülen fark %0.0).\n\n" +
+             "Eskiden 4'tü ve hiç ölçeklenmiyordu.")]
+    public float baseDropPerThreat = 1.8972f;
 
-    [Tooltip("Level başına drop büyümesi. Bütçeden AYRI tutulur: kalabalık ve " +
-             "birim değeri farklı hızlarda büyür.\n\n" +
-             "budgetGrowth 1.018 -> 1.027 çıkarken bu 1.031 -> 1.022'ye indirildi. " +
-             "Kampanya geliri = Σ(bütçe × drop) olduğu için çarpımları sabit " +
-             "tutulmalıydı (1.018×1.031 ≈ 1.027×1.022); yoksa toplam gelir iki " +
-             "katına çıkar ve yükseltme fiyatlarının tamamı geçersizleşirdi. " +
-             "Artık düşman daha çok ama tanesi daha ucuz.")]
-    public float dropGrowth = 1.022f;
+    [Tooltip("Level başına drop büyümesi. ARTIK 1.0 — yani tehdit puanı başına " +
+             "düşen kaynak bir SABİTTİR. Bir Swarm 1. levelde ne düşürüyorsa " +
+             "100. levelde de onu düşürür.\n\n" +
+             "İki gerekçe aynı yere çıkıyor:\n\n" +
+             "  1. Muhasebe: kampanya geliri = Σ(bütçe × drop) ve bu toplam " +
+             "korunmalıydı, yoksa yükseltme fiyatlarının tamamı geçersizleşirdi. " +
+             "Büyümeyi 1.0'a sabitlemek tek başına geliri %11.3 şişiriyor; " +
+             "telafi baseDropPerThreat'e yazıldı (2.1 -> 1.8972), çünkü " +
+             "düzeltmeyi büyümeye yazmak sabitliği bozardı.\n\n" +
+             "  2. Anlam: düşman statı düzleştiği için tehdit puanı artık DÜRÜST " +
+             "bir sabit. Sabit bir şeyin birim fiyatının levelle büyümesi için " +
+             "hiçbir sebep yok. Gelirin tamamı artık tek bir şeyden gelir: kaç " +
+             "gemi öldürdüğünden.\n\n" +
+             "1.0 olduğu için matematiksel olarak gereksiz bir alan; ayarlanabilir " +
+             "kalması bilinçli — ölçüm gelirin eğilmesi gerektiğini söylerse " +
+             "dokunulacak yer burasıdır.")]
+    public float dropGrowth = 1.0f;
 
     [Header("Asteroit")]
     [Tooltip("Level başına asteroit kaynak bütçesi. Asteroit geliri eskiden süre " +
@@ -69,6 +99,39 @@ public class BalanceConfig : ScriptableObject
              "katsayının o gerekçesi kalmadı; ölçülmemiş bir kaydırmayı taşımak " +
              "için sebep yok.")]
     public float waveBudgetGrowth = 1.25f;
+
+    [Header("Dalga Kompozisyonu")]
+    [Tooltip("Dalga kadrosu kurulurken bir tipin seçilme ağırlığı: " +
+             "tehdit^(−alfa).\n\n" +
+             "Eskiden bütçeye SIĞAN tipler arasından düzgün rastgele seçiliyordu, " +
+             "yani Swarm ile Kaleci eşit sıklıkta geliyordu. Düşman statı " +
+             "düzleşince sayı tek para birimi hâline geldi ve bu seçim artık " +
+             "levelin ŞEKLİNİ belirliyor — tek tip dalga yerine dokusu olan " +
+             "dalgalar isteniyor.\n\n" +
+             "Kuvvet yasasının iki sonucu var ve ikisi birbirinden bağımsız:\n" +
+             "    adet payı  ∝ tehdit^(−alfa)\n" +
+             "    bütçe payı ∝ tehdit^(1−alfa)\n\n" +
+             "'Ucuzlar kalabalık olsun ama bütçenin azını yesin' ancak " +
+             "0 < alfa < 1 aralığında sağlanır: alfa >= 1 bütçeyi de ucuzlara " +
+             "kaydırır, alfa <= 0 ağırları hem pahalı hem kalabalık yapar.\n\n" +
+             "0.5 özel bir nokta — adet oranı ile bütçe oranı TAM AYNA olur " +
+             "(c^-0.5 ile c^+0.5 birbirinin tersi). Swarm, Kaleci'den 5.2 kat " +
+             "kalabalık gelir; Kaleci bütçenin 5.2 katını yer. Ortalama gemi " +
+             "maliyeti 9.14 -> 7.38 düşer, yani aynı bütçe ~%24 daha çok gemi.\n\n" +
+             "İLERİDE: bu alan dalga başına ezilebilir hâle gelince levelin " +
+             "karakteri olur — yüksek alfa (~2) aynı bütçeyi ~450 gemiye " +
+             "çevirir (cümbüş), negatif alfa az ve ağır bir duvar kurar. " +
+             "Negatif ucun şu anda karşılığı yok: havuzun en pahalısı Kaleci " +
+             "(27) olduğu için 'seyrek ve ağır' bir dalga kurulamıyor.")]
+    public float compositionAlpha = 0.5f;
+
+    /// <summary>
+    /// Bir tipin dalga kadrosunda seçilme ağırlığı — <see cref="compositionAlpha"/>
+    /// ile. Tehdit puanı en az 1 sayılır; 0 veya negatif bir puan sonsuz ağırlık
+    /// üretir ve dalga tek tipten oluşurdu.
+    /// </summary>
+    public float CompositionWeight(int threatScore)
+        => Mathf.Pow(Mathf.Max(1, threatScore), -compositionAlpha);
 
     [Header("Boss")]
     [Tooltip("Bölümü kapatan boss'un tehdit değeri ve kapanış primi çarpanı.")]

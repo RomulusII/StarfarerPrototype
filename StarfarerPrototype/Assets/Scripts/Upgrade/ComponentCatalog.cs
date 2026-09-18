@@ -315,15 +315,59 @@ public static class ComponentCatalog
                 fireRate: 3f,  damage: 26f, speed: 14f,  life: 4f,   energy: 3f, burnDuration: 0.5f),
             TurretSpecType.Plasma       => Spec(baseDef, spec, specCost: 40,
                 fireRate: 6f,  damage: 36f, speed: 5f,   life: 4f,   energy: 4f),
+            // FLAK — kalabalığın cevabı. Tek hedefe karşı diğerleriyle AYNI
+            // ligde (12 / 2.0 = 6.0 DPS); bütün değeri yakaladığı hedef
+            // sayısından gelir. Yani flak bir GÜÇ yükseltmesi değil, bir
+            // DURUM yükseltmesi: sahne kalabalıkken üstün, tek hedefte sıradan.
+            //
+            // Bu oyunun şu anki hâlinde bir eksiği kapatıyor: düşman statı
+            // düzleşip dalgalar 4 gemiden 46'ya çıktı, oysa oyuncunun
+            // cephaneliğinde tek bir alan hasarı yoktu (bkz. CLAUDE.md,
+            // "Kalabalığın Cevabı").
+            //
+            // Yarıçap 1.8: Swarm'ların formasyon aralığı ~0.6-1.0 birim, yani
+            // iyi nişan alınmış bir atış 3-5 gemi yakalar. Kenar sönümü
+            // (%40) merkeze nişan almayı ödüllendirir.
+            //
+            // Zırha KARŞI ZAYIF ve bu kasıtlı: 12 hasarlı atış, zırh eşiğinin
+            // tam olarak cezalandırdığı şeydir. Ağır zırhlı tipler flak'in
+            // doğal cevabıdır — kalabalık flak'i ister, flak zırhı davet eder.
+            TurretSpecType.Flak         => Spec(baseDef, spec, specCost: 30,
+                fireRate: 2f,  damage: 12f, speed: 6f,   life: 4.5f, energy: 1f,
+                blastRadius: 1.8f),                                                    // menzil 27 sabit
+            // Roket artık ÇARPINCA PATLAR. Sayıları değişmedi, yani tek hedefe
+            // karşı eskisiyle birebir aynı (birincil hedef patlamanın
+            // merkezinde, mesafe ~0, tam hasar). Kazanç YALNIZCA kalabalıkta.
+            //
+            // Bu ayrımın hoş bir sonucu var: füze tabanı kalabalığın cevabı
+            // olurken BOSS'un cevabı olmuyor — boss tek hedeftir, orada hiçbir
+            // şey değişmez.
             TurretSpecType.HomingRocket => Spec(baseDef, spec, specCost: 35,
-                fireRate: 15f, damage: 60f, speed: 3.5f, life: 7.71f, energy: 0.5f),   // menzil 27 sabit
+                fireRate: 15f, damage: 60f, speed: 3.5f, life: 7.71f, energy: 0.5f,
+                blastRadius: 1.2f),                                                    // menzil 27 sabit
+            // NÜKLEER BAŞLIK — güdümlü roketin takas kardeşi, üstü değil.
+            // Ateş hızı yarıya iner (15 -> 30 sn), buna karşılık yarıçap 1.2 ->
+            // 3.2 ve atış başına hasar 60 -> 110.
+            //
+            // TEK HEDEFE KARŞI DAHA KÖTÜDÜR ve bu bilinçli: 110/30 = 3.67 DPS,
+            // güdümlünün 4.0'ına karşı. Yükseltme değil SEÇİM olması için tek
+            // yol bu — biri her durumda daha iyi olsaydı ortada karar kalmazdı.
+            // Nükleer, sahne kalabalıkken açık ara üstündür (3.2 yarıçap bir
+            // formasyonun tamamını kapsar) ve boss'ta belirgin biçimde zayıftır.
+            //
+            // Menzil 27'de tutuldu (hız 2.5 × ömür 10.8) — diğer roketlerle
+            // aynı. Yavaş mermi zaten yeterli bir bedel; menzili de kırpmak
+            // aynı şeyi iki kez cezalandırmak olurdu.
+            TurretSpecType.NuclearRocket => Spec(baseDef, spec, specCost: 55,
+                fireRate: 30f, damage: 110f, speed: 2.5f, life: 10.8f, energy: 2f,
+                blastRadius: 3.2f),
             _ => baseDef,
         };
     }
 
     static ComponentDefinition Spec(ComponentDefinition baseDef, TurretSpecType spec, int specCost,
         float fireRate, float damage, float speed, float life, float energy,
-        int mag = 0, float reload = 0f, float burnDuration = 0f)
+        int mag = 0, float reload = 0f, float burnDuration = 0f, float blastRadius = 0f)
     {
         // Ad taban tipin anahtarından gelir; uzmanlaşma eki DisplayName'de
         // turretSpecType'tan üretilir, yani burada birleşik bir metin doğmaz.
@@ -343,6 +387,7 @@ public static class ComponentCatalog
         d.turretMagazineSize   = mag;
         d.turretReloadTime     = reload;
         d.turretBurnDuration   = burnDuration;
+        d.turretBlastRadius    = blastRadius;
         return d;
     }
 

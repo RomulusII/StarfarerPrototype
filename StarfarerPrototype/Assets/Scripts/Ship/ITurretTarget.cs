@@ -1,14 +1,17 @@
 using UnityEngine;
 
 /// <summary>
-/// Point Defence'in bir hedefe nasıl baktığı.
+/// Point Defence'in bir hedefe nasıl baktığı — öncelik KADEMESİ.
 ///
-/// Tek bir bool yetmiyordu: PD'nin "önce mühimmat, o yoksa küçük gemi, büyük
-/// gövdeye ASLA" kuralı üç durumlu ve bool yalnızca ikisini anlatabiliyordu.
+/// Tek bir bool yetmiyordu: PD'nin "önce mühimmat, o yoksa küçük gemi, o da
+/// yoksa geri kalan" kuralı üç durumlu (bkz. TurretTargeting sınıf dokümanı).
 /// </summary>
 public enum PointDefenceClass
 {
-    /// <summary>PD ateş etmez. Büyük ve zırhlı gövdeler — DPS'i orada boşa gider.</summary>
+    /// <summary>
+    /// En düşük kademe: büyük gövdeler. PD bunlara ANCAK menzilde mühimmat
+    /// ve küçük hedef yokken ateş eder. (Eskiden hiç ateş etmezdi.)
+    /// </summary>
     None,
 
     /// <summary>Küçük, hafif gemiler ve asteroit parçaları. Mühimmat yoksa hedeftir.</summary>
