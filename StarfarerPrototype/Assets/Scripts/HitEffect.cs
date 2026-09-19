@@ -136,6 +136,8 @@ public static class HitEffect
     {
         if (radius <= 0f) return;
 
+        SpawnShockWave(center, radius);
+
         int count = Mathf.Clamp(Mathf.RoundToInt(10f + radius * 14f), 10, 48);
         Color color = new Color(1f, 0.72f, 0.28f);
         float size  = SizeScale(damage);
@@ -163,6 +165,55 @@ public static class HitEffect
             sp.lifetime = lifetime;
             sp.baseSize = sizeMult * 2.5f;
         }
+    }
+
+    /// <summary>
+    /// Patlamanın şok dalgası: merkezden dışa doğru çok hızlı büyüyen, büyüdükçe
+    /// silikleşen bir halka.
+    ///
+    /// Kıvılcımlarla AYNI işi yapar ama daha okunur biçimde: yarıçap oyuncuya
+    /// başka hiçbir yerde gösterilmiyor ve saçılan kıvılcımlardan sınırın tam
+    /// nerede bittiğini okumak kalabalıkta zor. Halkanın kenarı o sınırı tek bir
+    /// çizgi olarak söyler — "şuraya atarsam üçünü birden yakalarım" ancak
+    /// yarıçap görünürse düşünülebilir bir şey olur.
+    ///
+    /// Bu yüzden yarıçap hasar yarıçapının TA KENDİSİDİR; ayrı bir "görsel
+    /// büyüklük" parametresi yok. Efektin sınırı ile hasarın sınırı ayrılsaydı
+    /// oyuncu yanlış bir nişan alma dersi öğrenirdi.
+    ///
+    /// Büyüme YAVAŞLAYARAK ilerler (1−(1−t)³): şok dalgası ilk anda fırlar,
+    /// sonra kenarda durulur. Doğrusal büyüme bir patlama değil, açılan bir
+    /// çember gibi okunuyor. Alfa aynı sürede tepe değerinin %10'una iner ve
+    /// halka orada yok edilir — sıfıra indirmek son karelerde görünmeyen bir
+    /// nesneyi beklemek demekti.
+    ///
+    /// Halka sprite'ı <see cref="BubbleShield.Shell"/>'den gelir: şekil birebir
+    /// aynı (içi neredeyse boş, kenarı parlak bir daire) ve o üreteç zaten
+    /// önbellekli. İkinci bir halka üreteci yazmak, zamanla birbirinden sapan
+    /// iki kopya demekti — bu proje o hatayı kalkan kabuğunda bir kez yaşadı.
+    /// </summary>
+    static void SpawnShockWave(Vector2 center, float radius)
+    {
+        var go = new GameObject("ShockWave");
+        go.transform.position   = center;
+        go.transform.localScale = Vector3.one * (radius * ShockWave.StartRatio);
+
+        var sr          = go.AddComponent<SpriteRenderer>();
+        sr.sprite       = BubbleShield.Shell();
+        // Kıvılcımların (25) ALTINDA: dalga sınırı çizer, kıvılcım olayı anlatır.
+        sr.sortingOrder = 24;
+        sr.color        = new Color(1f, 0.85f, 0.55f, ShockWave.PeakAlpha);
+
+        var w        = go.AddComponent<ShockWave>();
+        w.maxRadius  = radius;
+        // Geniş patlama biraz daha uzun yaşar ama fark küçük: şok dalgası her
+        // boyutta ANİ olmalı, yoksa bir patlama değil bir animasyon olur.
+        //
+        // Üç sayı da 1.2 ile çarpıldı (0.16/0.05/0.36 → 0.192/0.06/0.432):
+        // ilk hâli gözle fazla çabuk bitiyordu. Katsayının da ölçeklenmesi şart,
+        // yoksa uzama yalnızca küçük yarıçaplarda hissedilir ve eğrinin şekli
+        // yarıçapa göre değişirdi; böyle her boyutta TAM %20 uzuyor.
+        w.duration   = Mathf.Clamp(0.192f + radius * 0.06f, 0.192f, 0.432f);
     }
 
     /// <summary>
@@ -326,6 +377,56 @@ public class DeathFragment : MonoBehaviour
         }
 
         transform.localScale = initialScale * (1f - t * 0.25f);
+    }
+}
+
+/// <summary>
+/// Alan hasarı patlamasının şok dalgası: hızla büyüyen ve silikleşen halka.
+/// <see cref="HitEffect.SpawnBlast"/> tarafından kurulur.
+///
+/// Ölçek UNIFORM'dur ve doğrudan dünya yarıçapıdır — <c>BubbleShield.Shell</c>
+/// sprite'ının dış kenarı 1 birimde (bkz. projenin uniform-ölçek kuralı).
+/// </summary>
+public class ShockWave : MonoBehaviour
+{
+    /// <summary>Halkanın doğduğu yarıçap, son yarıçapın oranı olarak.</summary>
+    public const float StartRatio = 0.12f;
+
+    /// <summary>Doğuştaki alfa. Kalkan kabuğundan daha belirgin: bu bir OLAY.</summary>
+    public const float PeakAlpha = 0.65f;
+
+    /// <summary>Sönerken inilen alfa oranı — orada yok edilir.</summary>
+    public const float EndAlphaRatio = 0.10f;
+
+    public float maxRadius;
+    public float duration;
+
+    float          _timer;
+    SpriteRenderer _sr;
+
+    void Awake() => _sr = GetComponent<SpriteRenderer>();
+
+    void Update()
+    {
+        if (UpgradeUI.IsPaused) return;
+
+        _timer += Time.deltaTime;
+        float t = duration > 0f ? Mathf.Clamp01(_timer / duration) : 1f;
+
+        if (t >= 1f) { Destroy(gameObject); return; }
+
+        // 1−(1−t)³ : ilk anda fırlar, kenarda durulur.
+        float inv  = 1f - t;
+        float ease = 1f - inv * inv * inv;
+
+        transform.localScale = Vector3.one * Mathf.Lerp(maxRadius * StartRatio, maxRadius, ease);
+
+        if (_sr != null)
+        {
+            Color c   = _sr.color;
+            c.a       = PeakAlpha * Mathf.Lerp(1f, EndAlphaRatio, t);
+            _sr.color = c;
+        }
     }
 }
 

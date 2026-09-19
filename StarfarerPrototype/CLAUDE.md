@@ -1547,6 +1547,23 @@ saçılır ve hızları yarıçaptan türer (`yarıçap / ömür`), yani saçıl
 patlama kenarında söner. Yarıçap oyuncuya başka hiçbir yerde gösterilmiyor;
 "şuraya atarsam üçünü birden yakalarım" ancak yarıçap görünürse düşünülebilir.
 
+**Üstüne bir ŞOK DALGASI biner** (`ShockWave`): merkezden hasar yarıçapına kadar
+çok hızlı büyüyen, büyüdükçe silikleşen bir halka. Kıvılcımlarla aynı bilgiyi
+verir ama tek bir ÇİZGİ olarak: saçılan onlarca kıvılcımdan sınırın tam nerede
+bittiğini okumak kalabalıkta zor, halkanın kenarı onu bir anda söyler.
+
+| Karar | Gerekçe |
+|---|---|
+| Yarıçap = **hasar yarıçapının kendisi** | Ayrı bir "görsel büyüklük" olsaydı oyuncu yanlış bir nişan alma dersi öğrenirdi — kıvılcım kuralının aynısı |
+| Büyüme **yavaşlayarak** (`1−(1−t)³`) | Doğrusal büyüme bir patlama değil, açılan bir çember gibi okunuyor |
+| Süre 0.192–0.432 sn (yarıçapla) | Geniş patlama biraz daha uzun yaşar ama şok dalgası her boyutta ANİ olmalı. İlk değerler (0.16–0.36) gözle fazla çabuk bitiyordu; üç sayı da 1.2 ile çarpıldı, yani eğrinin şekli aynı kaldı ve her yarıçapta tam %20 uzadı |
+| Alfa 0.65 → **%10**, orada yok edilir | Sıfıra indirmek son kareleri görünmeyen bir nesneyi beklemekle geçirirdi |
+| Sprite `BubbleShield.Shell`'den | Şekil birebir aynı (içi boş, kenarı parlak daire) ve üreteç önbellekli. İkinci bir halka üreteci, zamanla sapan iki kopya demekti — bu hata kalkan kabuğunda bir kez yaşandı |
+| sortingOrder 24 (kıvılcımların altı) | Dalga sınırı çizer, kıvılcım olayı anlatır |
+
+**Bombada şok dalgası YOK** — çünkü bombanın alan hasarı yok, tek hedefe vurur
+(`Bomb.OnTriggerEnter2D`). Halka çizmek, olmayan bir yarıçapı göstermek olurdu.
+
 **İki tuzak kapatıldı:**
 - `TurretController` def'ten statları "0 ise mevcut değeri koru" deseniyle
   alıyor. Patlama yarıçapında 0 bir eksiklik değil BİR DEĞERDİR ("patlamaz");
