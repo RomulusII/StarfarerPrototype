@@ -8,6 +8,9 @@ değil, makinede; scriptler tek bir ortam değişkenini düzeltmek için var.
 | `_env.cmd` | Ortak kurulum — proje kökü, Unity yolu, TEMP düzeltmesi. Doğrudan çalıştırılmaz. |
 | `build-android.cmd` | Editör kapalıyken APK üretir. Argümansız release, `dev` argümanıyla development. |
 | `unity-editor.cmd` | Editörü düzeltme uygulanmış halde açar — Build & Run'ın çalışması için. |
+| `build-web.cmd` | Yalnızca web build'i (`Builds\Web`). Build numarasını artırır; `apk` argümanıyla APK'yı da üretir. |
+| `upload-web.cmd` | Yalnızca yükleme: `Builds\Web`'i sunucuya taşır ve yayına alır. `noswap` / `swaponly` argümanları. |
+| `deploy-web.cmd` | İkisini arka arkaya çalıştırır; build düşerse yükleme yapılmaz. |
 
 Unity sürümü `ProjectSettings/ProjectVersion.txt`'ten okunur, yani Unity
 yükseltilince scriptleri güncellemek gerekmez. Unity başka bir yerdeyse

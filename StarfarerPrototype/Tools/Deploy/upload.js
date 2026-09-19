@@ -30,13 +30,22 @@ const cfgArg  = process.argv.indexOf("--config");
 const cfgPath = cfgArg >= 0 ? path.resolve(process.argv[cfgArg + 1])
                             : path.join(here, "deploy.config.json");
 
-if (!fs.existsSync(cfgPath)) {
+// Ortam değişkeni config dosyasını ezer: Tools/Build/*.local.cmd token'ı
+// böyle geçirir (o dosyalar .gitignore kapsamında). Değişken varsa config
+// dosyası zorunlu değildir; uç adresi varsayılana düşer.
+const envToken = process.env.STARFARER_DEPLOY_TOKEN;
+
+if (!fs.existsSync(cfgPath) && !envToken) {
   console.error(`Yapılandırma yok: ${cfgPath}`);
   console.error(`Örnek:\n{\n  "deployEndpoint": "https://akinayan.de/starfarer/deploy.php",\n` +
                 `  "deployToken": "...",\n  "publicUrl": "https://akinayan.de/starfarer/game/"\n}`);
   process.exit(1);
 }
-const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+const cfg = fs.existsSync(cfgPath)
+  ? JSON.parse(fs.readFileSync(cfgPath, "utf8"))
+  : { deployEndpoint: "https://akinayan.de/starfarer/deploy.php",
+      publicUrl:      "https://akinayan.de/starfarer/game/" };
+if (envToken) cfg.deployToken = envToken;
 for (const alan of ["deployEndpoint", "deployToken"]) {
   if (!cfg[alan]) { console.error(`Yapılandırmada ${alan} yok: ${cfgPath}`); process.exit(1); }
 }

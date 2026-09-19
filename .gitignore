@@ -114,3 +114,6 @@ StarfarerPrototype/.claude/worktrees/
 # Ayni desen pull.config.json ile ayni: yapilandirma diskte, repo temiz.
 /StarfarerPrototype/Tools/Deploy/deploy.config.json
 
+
+# Gercek token tasiyan yerel batch dosyalari (upload-web.local.cmd, deploy-web.local.cmd)
+/StarfarerPrototype/Tools/Build/*.local.cmd

@@ -9,7 +9,9 @@ Tools\Build\deploy-web.cmd
 
 | Dosya | İşi |
 |---|---|
-| `Tools/Build/deploy-web.cmd` | Build numarasını artırır, web build'ini alır, APK'yı yanına kopyalar, yükler. |
+| `Tools/Build/build-web.cmd` | Build numarasını artırır, web build'ini alır, APK'yı yanına kopyalar. |
+| `Tools/Build/upload-web.cmd` | `Builds/Web`'i yükler ve yayına alır (`upload.js` sarmalayıcısı). |
+| `Tools/Build/deploy-web.cmd` | İkisini arka arkaya çalıştırır. |
 | `Tools/Deploy/upload.js` | Dosyaları HTTPS ile sunucuya taşır ve takası tetikler. |
 | `Tools/Deploy/server/deploy.php` | Sunucudaki uç. `httpdocs/Starfarer/deploy.php` olarak durur. |
 | `Tools/Deploy/deploy.config.json` | Uç adresi ve TOKEN. `.gitignore` kapsamında, repoya girmez. |
