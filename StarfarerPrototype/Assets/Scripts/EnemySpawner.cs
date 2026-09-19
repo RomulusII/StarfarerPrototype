@@ -536,10 +536,12 @@ public class EnemySpawner : MonoBehaviour
     }
 
     /// <summary>Dalganın gemilerini formasyon düzeninde doğurur.</summary>
-    public static void SpawnFormation(List<EnemyTypeData> types, FormationTemplate formation,
-                                      Vector3 basePos, EnemyScaling scaling)
+    /// <returns>Doğan gemiler — çağıran onları etiketleyebilsin diye.</returns>
+    public static List<EnemyBot> SpawnFormation(List<EnemyTypeData> types, FormationTemplate formation,
+                                                Vector3 basePos, EnemyScaling scaling)
     {
-        var group = FormationGroup.Create(basePos, FormationTarget());
+        var spawned = new List<EnemyBot>(types.Count);
+        var group   = FormationGroup.Create(basePos, FormationTarget());
 
         int slotCount = formation != null && formation.slots != null && formation.slots.Length > 0
             ? formation.slots.Length : 1;
@@ -557,10 +559,11 @@ public class EnemySpawner : MonoBehaviour
                                                 offset.y * FormationGroup.SpreadY, 0f);
 
             var bot = Spawn(types[i], pos, scaling);
-            if (bot != null) group.Add(bot, offset);
+            if (bot != null) { group.Add(bot, offset); spawned.Add(bot); }
         }
 
         group.Seal();
+        return spawned;
     }
 
     /// <summary>Taşan sıralar arası mesafe (normalize ofset biriminde).</summary>

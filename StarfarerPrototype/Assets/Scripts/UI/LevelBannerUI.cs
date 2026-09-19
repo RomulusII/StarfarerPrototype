@@ -48,6 +48,22 @@ public class LevelBannerUI : MonoBehaviour
         _instance.Play(level, chapter, sectorTitle, bossLevel);
     }
 
+    /// <summary>
+    /// Cümbüş uyarısı — aynı bant, farklı metin ve renk. Ayrı bir UI öğesi
+    /// değil: oyuncu o bandı her levelde görüyor ve yerini biliyor; uyarının
+    /// okunması için yeni bir yere bakmayı öğrenmesi gerekmemeli.
+    /// </summary>
+    public static void ShowSurge()
+    {
+        if (_instance == null)
+        {
+            var go = new GameObject("LevelBannerUI");
+            _instance = go.AddComponent<LevelBannerUI>();
+        }
+        _instance.PlayText(Loc.T("banner.surge"), Loc.T("banner.surgeSub"),
+                           new Color(1f, 0.45f, 0.25f));
+    }
+
     void Awake()
     {
         if (_instance != null && _instance != this) { Destroy(gameObject); return; }
@@ -137,6 +153,19 @@ public class LevelBannerUI : MonoBehaviour
                          ? Loc.T("banner.chapter", chapter)
                          : Loc.T("banner.chapterSector", chapter, Loc.ToUpper(sectorTitle));
 
+        Restart();
+    }
+
+    void PlayText(string title, string subtitle, Color titleColor)
+    {
+        _levelText.text  = title;
+        _levelText.color = titleColor;
+        _sectorText.text = subtitle;
+        Restart();
+    }
+
+    void Restart()
+    {
         // Hızlı ilerleyen bir oyuncu bir önceki bandı görmeden yenisine geçebilir;
         // iki coroutine üst üste binerse alfa titrer.
         if (_running != null) StopCoroutine(_running);

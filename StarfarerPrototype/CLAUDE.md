@@ -1900,6 +1900,96 @@ otomatik kapatılır. Aynı `Spawn()` metodunu çağırdığı için gerçek oyu
 bir düşman üretmesi mümkün değildir — eskiden ayrı bir kod yolu olduğu için
 çarpansız düşman üretiyor ve testi yanıltıyordu.
 
+### Dalga Temposu — %90 Eşiği, Kollar ve Cümbüş
+
+Düz statla dalgalar onlarca gemiye çıkınca eski akış iki yerden kırıldı:
+sonraki dalga ancak SON gemi ölünce geliyordu (son üç gemiyi kovalamak leveli
+dakikalarca, hiçbir şeyin olmadığı bir bekleyişte uzatıyordu) ve dalganın
+bütün gemileri tek noktada doğuyordu (46 gemi üst üste binmiş upuzun bir
+kolondu). Üç kural bunları çözüyor ve üçü de `ChapterManager`'da.
+
+**1. Ara dalgalar %90'da geçer** (`BalanceConfig.waveClearRatio`). Dalganın
+tehdidinin %90'ı yok edilince sonraki dalga gelir. **Kalanlar KAÇMAZ** —
+savaşmaya devam eder, yeni dalga onların üstüne biner. Üst üste binme
+kalabalığın asıl hissi.
+
+- Yalnızca **o dalganın** gemileri sayılır: her gemi doğduğu dalganın seri
+  numarasını taşır (`EnemyBot.waveTag`). Önceki dalgadan kalanlar yeni dalganın
+  eşiğini etkilemez.
+- **Payda kadronun TAMAMIDIR**, doğmuş gemiler değil — kollar hâlinde gelen bir
+  dalgada ilk kol hızla ölürse henüz doğmamış kollar sayılmadan dalga
+  "temizlendi" sanılırdı. Kollar bitmeden dalga zaten bitmez.
+- Küçük dalgalarda kural kendiliğinden devre dışı: 3 Swarm'da %10 = 0.3 tehdit,
+  yani hepsi ölmeli. Kıyas kayan noktaya karşı payla yapılır; 10 × (1 − 0.9)
+  float'ta 1'in hemen altına düşebilir ve kalan tek Swarm yuvarlamaya kalırdı.
+- Bölünen'in parçaları ve boss dronları etiketsizdir: ara eşiğe girmezler,
+  diğer artıklar gibi savaşmaya devam ederler.
+- **Biten dalganın SİPERLERİ çekilir**, savaşan gemileri değil. Eskiden her
+  dalga sonunda sahne boşaldığı için siperler de çekiliyordu; artık ara dalgalarda
+  kimse çekilmediğinden level içinde birikir ve üç siper bir duvar ederdi.
+
+**Levelin SON dalgası tam temizlenme bekler** — ve o an sahnedeki HER
+engelleyici gemi sayılır, hangi dalgadan kalmış olursa olsun. Level sınırı temiz
+olmalı: kayıt alınıyor, bant çıkıyor, bölüm sonunda diyalog ekranı açılıyor.
+Level başı kaydı gemileri tutmadığı için sınırda sağ kalan bir gemi, kapatıp
+açarak silinebilen bir kaçış yolu olurdu.
+
+**2. Büyük dalga KOLLAR hâlinde gelir.** 12 gemiye kadar her şey eskisi gibi
+tek seferde doğar. Daha büyük kadro önce kollara **kart dağıtır gibi** dağıtılır
+(sırayla kesilseydi ilk kol bütün öncüleri, son kol bütün ağırları taşırdı), her
+kol kendi formasyonunu seçer ve 1.5 sn arayla gelir. Kuralın ruhu korunur:
+dalga bir OLAYDIR, damla damla sızmaz.
+
+**3. Cümbüş** — her bölümün **5. levelinde** orta dalga (`surgeLevelInChapter`).
+
+| | Değer | Neden |
+|---|---|---|
+| Kompozisyon alfası | **2** (normal 0.5) | Swarm, Kaleci'den 729× sık seçilir; aynı bütçe ~3.4× gemi |
+| Bütçe payı | levelin **%55'i** | diğer dalgalar kalanı eski oranlarıyla paylaşır |
+| Uyarı | bant + **5 sn** nefes (normal 2) | oyuncu upgrade ekranında karar verebilsin |
+
+**Cümbüş bütçe EKLEMEZ, yeniden dağıtır.** Levelin toplamı değişmediği için gelir
+eğrisi ve ekonomi etkilenmez; değişen levelin ŞEKLİ. Ölçülen (toplam her levelde
+±1 korunuyor):
+
+| Level | Normal dalgalar | Cümbüş leveli | Cümbüş dalgası | Kol |
+|---|---|---|---|---|
+| 5 | 2/3/3 | 2/**5**/2 | 5 gemi | 1 |
+| 25 | 6/8/9 | 4/**13**/6 | 8 gemi | 1 |
+| 45 | 16/20/26 | 11/**34**/17 | 18 gemi | 2 |
+| 75 | 48/60/75/94 | 30/37/**152**/58 | 74 gemi | 7 |
+| 95 | 129/162/202/253 | 80/100/**411**/156 | **197 gemi** | 17 |
+
+**Neden ORTA dalga:** son dalga tam temizlenme bekler; cümbüş sonda olsaydı %90
+kuralı onun için hiç işlemez ve oyuncu ~190 geminin son birkaçını kovalardı.
+Ortada olunca kalanları son dalganın üstüne biner.
+
+**Neden deterministik (hep 5. level):** kaçamak manevra desenleriyle aynı
+gerekçe — oyuncu kalıbı öğrenip ona göre hazırlanabilmeli.
+
+**Uyarı aynı banttır** (`LevelBannerUI.ShowSurge`), ayrı bir UI öğesi değil:
+oyuncu o bandı her levelde görüyor ve yerini biliyor.
+
+**Kayıt:** `EnemyBot.waveTag`, dalganın seri numarası ve doğurduğu tehdit, ve
+**henüz doğmamış kolların kadrosu** (tip adıyla) kaydedilir. Kolların ortasında
+kaydedip açmak dalganın geri kalanını silerdi — tam kayıt kuralının kapattığı
+kaçış yolunun aynısı. Dalga etiketi geri yüklemede `Start`'ı BEKLEMEZ, gemi
+kurulurken atanır: `ChapterManager` aynı karede sahneyi sayarsa etiketsiz
+gemileri görüp dalgayı erkenden geçirirdi. Geri yükleme sürerken temizlik
+kontrolü hiç yapılmaz (`WorldSave.IsRestoring`).
+
+**Kaydet → yükle → kaydet testi bu değişiklik için KOŞULMADI** — proje kuralı
+gereği koşulmalı (`--kayit-testi`), sim player'ı yeniden alınarak.
+
+**Ölçülmemiş / açık:**
+- **Erken cümbüşler yumuşak.** Bölüm 1–3'te cümbüş dalgası 5–8 gemi, normal
+  dalgadan birkaç fazlası; "aşırı kalabalık" ancak bölüm 5'ten sonra başlıyor.
+  Ayar noktası `surgeBudgetShare` — ama oynamadan dokunulmadı.
+- **Performans tavanı ölçülmedi.** Lv95 cümbüşü ~197 gemi, üstüne önceki
+  dalgaların artıkları ve mermileri.
+- Temizlik taraması artık kare başına değil 0.25 sn'de bir (`FindObjectsByType`
+  bütün sahneyi geziyor ve sahne onlarca gemiye çıktı).
+
 ### Formasyon Sistemi — Düzeltilen Hata
 
 Formasyon şablonları (`FormationTemplate`) yazılmıştı ama **hiç çalışmıyordu**;
@@ -1987,10 +2077,13 @@ Bir ara `waveBudgetGrowth` 1.25 → 1.6 yapılmıştı, aynı amaçla (7 bütçe
 son dalgalardı: Lv100'ün son dalgası 33'ten 43'e çıkıyordu. Açılış elle
 yazılınca o gerekçe kalktı ve katsayı 1.25'e geri alındı.
 
-**BİR DALGANIN TÜM GEMİLERİ AYNI ANDA DOĞAR VE FORMASYONLA GELİR.**
-Ayrıntı: "Formasyon Sistemi" bölümü.
+**BİR DALGA TEK BİR OLAYDIR VE FORMASYONLA GELİR.** 12 gemiye kadar bütün
+gemiler aynı anda doğar; daha büyük dalgalar 12'lik formasyonlar hâlinde 1.5 sn
+arayla KOLLAR hâlinde gelir. Ayrıntı: "Formasyon Sistemi" ve "Dalga Temposu"
+bölümleri.
 
-**İki özel level tipi:**
+**Üç özel level tipi:**
+- **Bölümün 5. leveli** cümbüştür — bkz. "Dalga Temposu".
 - **Bölümün 1. leveli** yalnızca o bölümün yeni tipini getirir. Oyuncu bir tipin
   davranışını kalabalık içinde öğrenemez.
 - **Bölümün 10. leveli** boss: önce escort dalgası, sonra boss + refakat.
@@ -2774,7 +2867,10 @@ kendi içinde tutarlı. Tek yerden değiştirilebilir: `BuildWarningText`.
 - [x] **Kalabalığın cevabı** — `DamageUtil.AreaDamage` tek yolu; roket çarpınca
       patlar, Flak ve Nükleer Başlık uzmanlaşmaları, PD üçüncü kademe.
       Denge revizyonu **5**. Oyunda denenmedi.
-- [ ] **%90 dalga temizlenme eşiği + cümbüş dalgaları (Aşama 3)**
+- [x] **Dalga temposu** — ara dalgalar %90'da geçer (kalanlar savaşmaya devam
+      eder), 12 gemiden büyük dalgalar kollar hâlinde gelir, her bölümün 5.
+      levelinde cümbüş. Denge revizyonu **6**. Oyunda denenmedi; kayıt
+      round-trip testi koşulmadı.
 - [ ] **Zırhlı tipler (Aşama 4)** — ağır zırhlı (tehdit ~55-70) ve zırh aurası.
       İkisi birden zırh eşiğini geri getirir ve α'nın ağır ucunu açar.
 - [ ] **Denge testleri** — aşağıdaki listeye bak; sayıların hiçbiri oyunda denenmedi

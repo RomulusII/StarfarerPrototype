@@ -100,6 +100,20 @@ public class BalanceConfig : ScriptableObject
              "için sebep yok.")]
     public float waveBudgetGrowth = 1.25f;
 
+    [Tooltip("Bir dalganın tehdidinin bu oranı yok edilince sonraki dalga gelir. " +
+             "Geride kalanlar KAÇMAZ, savaşmaya devam eder — yeni dalga onların " +
+             "üstüne biner.\n\n" +
+             "Neden: dalgalar düz statla onlarca gemiye çıktı; son üç gemiyi " +
+             "kovalamak leveli dakikalarca, hiçbir şeyin olmadığı bir bekleyişte " +
+             "uzatıyordu. Küçük dalgalarda kural kendiliğinden devre dışı: 3 " +
+             "Swarm'lık bir dalgada %10 = 0.3 tehdit, yani hepsi ölmeli.\n\n" +
+             "LEVELİN SON DALGASINA UYGULANMAZ — orası tam temizlenme bekler. " +
+             "Level sınırında kayıt alınıyor, bant çıkıyor ve bölüm sonunda " +
+             "diyalog ekranı açılıyor; arkada ateş eden gemiler kalmamalı. " +
+             "Üstelik level başı kaydı gemileri tutmuyor: sınırda sağ kalan bir " +
+             "gemi, kapatıp açarak silinebilen bir kaçış yolu olurdu.")]
+    [Range(0.5f, 1f)] public float waveClearRatio = 0.9f;
+
     [Header("Dalga Kompozisyonu")]
     [Tooltip("Dalga kadrosu kurulurken bir tipin seçilme ağırlığı: " +
              "tehdit^(−alfa).\n\n" +
@@ -131,7 +145,31 @@ public class BalanceConfig : ScriptableObject
     /// üretir ve dalga tek tipten oluşurdu.
     /// </summary>
     public float CompositionWeight(int threatScore)
-        => Mathf.Pow(Mathf.Max(1, threatScore), -compositionAlpha);
+        => CompositionWeight(threatScore, compositionAlpha);
+
+    /// <summary>Alfa'yı açıkça vererek — cümbüş dalgası kendi alfasını taşır.</summary>
+    public float CompositionWeight(int threatScore, float alpha)
+        => Mathf.Pow(Mathf.Max(1, threatScore), -alpha);
+
+    [Header("Cümbüş")]
+    [Tooltip("Her bölümün kaçıncı levelinde cümbüş dalgası gelir. DETERMİNİSTİK: " +
+             "oyuncu kalıbı öğrenip ona göre hazırlanabilmeli (kaçamak manevra " +
+             "desenleriyle aynı gerekçe). 5 — bölümün ortası; 1. level tanıtım, " +
+             "10. level boss.")]
+    public int surgeLevelInChapter = 5;
+
+    [Tooltip("Cümbüş dalgasının kompozisyon alfası. 2'de ağırlık tehdit^-2: " +
+             "Swarm, Kaleci'den 729 kat sık seçilir ve ortalama gemi maliyeti " +
+             "~7.2'den ~2.1'e düşer — aynı bütçe ~3.4 kat gemi.")]
+    public float surgeAlpha = 2f;
+
+    [Tooltip("Cümbüş levelinde orta dalganın levelin bütçesinden aldığı pay. " +
+             "Diğer dalgalar kalanı eski oranlarıyla paylaşır.\n\n" +
+             "CÜMBÜŞ BÜTÇE EKLEMEZ, YENİDEN DAĞITIR. Levelin toplamı değişmediği " +
+             "için gelir eğrisi ve kampanya ekonomisi etkilenmez; değişen yalnızca " +
+             "levelin ŞEKLİ. Eklenen bütçe hem zorluğu hem geliri sessizce " +
+             "kaydırırdı.")]
+    [Range(0.3f, 0.8f)] public float surgeBudgetShare = 0.55f;
 
     [Header("Boss")]
     [Tooltip("Bölümü kapatan boss'un tehdit değeri ve kapanış primi çarpanı.")]

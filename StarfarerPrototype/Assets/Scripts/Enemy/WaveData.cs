@@ -27,4 +27,9 @@ public class WaveData
     [Tooltip("Bütçeye sığmasa bile bu dalgada EN AZ BİR tane bulunması garanti " +
              "edilen tip. Bölümün kimliğini taşıyan tip için kullanılır.")]
     public EnemyTypeData guaranteedType;
+
+    [Tooltip("Cümbüş dalgası: kadro BalanceConfig.surgeAlpha ile kurulur (ucuz " +
+             "tipler ağır basar, aynı bütçe çok daha fazla gemi olur) ve önce " +
+             "uyarı bandı çıkar. Bkz. ChapterManager.BuildWaves.")]
+    public bool isSurge;
 }

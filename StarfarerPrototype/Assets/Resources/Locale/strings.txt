@@ -49,6 +49,8 @@ banner.level	LEVEL {0}	LEVEL {0}	LEVEL {0}
 banner.levelBoss	LEVEL {0}  —  BOSS	LEVEL {0}  —  BOSS	LEVEL {0}  —  BOSS
 banner.chapter	BÖLÜM {0}	CHAPTER {0}	KAPITEL {0}
 banner.chapterSector	BÖLÜM {0}  ·  {1}	CHAPTER {0}  ·  {1}	KAPITEL {0}  ·  {1}
+banner.surge	SÜRÜ YAKLAŞIYOR	SWARM INCOMING	SCHWARM IM ANFLUG
+banner.surgeSub	Büyük bir dalga, kollar hâlinde	A massive wave, in columns	Eine riesige Welle, in Kolonnen
 
 # ── Oyun sonu ────────────────────────────────────────────────────────────────
 gameover.title	OYUN BİTTİ	GAME OVER	SPIEL VORBEI

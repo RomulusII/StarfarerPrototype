@@ -21,6 +21,15 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     /// <summary>Kayıttan kurulurken Start'ın SONUNDA uygulanır (bkz. WorldSave).</summary>
     public EnemyState PendingRestore;
 
+    /// <summary>
+    /// Doğduğu dalganın seri numarası (bkz. ChapterManager, %90 eşiği).
+    /// 0 = hiçbir dalgaya ait değil: serbest mod, boss dronları ve Bölünen'in
+    /// parçaları. Dalga temizlenmesi yalnızca KENDİ etiketli gemilerini sayar;
+    /// eşik geçilince geride kalanlar savaşmaya devam eder ve sonraki dalga
+    /// onların üstüne gelir.
+    /// </summary>
+    public int waveTag;
+
     PlayerShip   _playerShip;
     HealthBar    _healthBar;
     ShipMovement _movement;
@@ -1509,6 +1518,7 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         movement = _movement.CaptureState(),
         hasBrain = _brain != null,
         brain    = _brain != null ? _brain.CaptureState() : null,
+        waveTag  = waveTag,
     };
 
     /// <summary>

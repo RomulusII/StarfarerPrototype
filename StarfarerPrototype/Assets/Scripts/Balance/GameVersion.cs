@@ -66,6 +66,13 @@ public static class GameVersion
     ///
     ///       Log'da patlama TEK isabet yazar, yakaladığı hedef sayısı ayrı
     ///       alandadır (`yakalanan`) — isabet oranı %100'ü aşmasın diye.
+    ///   6 — DALGA TEMPOSU. Ara dalgalar tehditlerinin %90'ı yok edilince
+    ///       geçer; kalanlar savaşmaya devam eder, yeni dalga üstlerine biner.
+    ///       Levelin son dalgası hâlâ tam temizlenme bekler. Her bölümün 5.
+    ///       levelinde orta dalga CÜMBÜŞ olur (bütçenin %55'i, alfa 2). 12
+    ///       gemiden büyük dalgalar 1.5 sn arayla kollar hâlinde gelir.
+    ///       Level süresi ve üst üste binen tehdit bu revizyondan önceki
+    ///       kayıtlarla kıyaslanamaz. `wave` olayı `cumbus` alanını taşır.
     /// </summary>
-    public const int Denge = 5;
+    public const int Denge = 6;
 }

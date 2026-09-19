@@ -79,6 +79,9 @@ public class EnemyState
     public MovementState movement;
     public bool          hasBrain;
     public BrainState    brain;
+
+    /// <summary>Doğduğu dalganın seri numarası; 0 = hiçbir dalgaya ait değil.</summary>
+    public int waveTag;
 }
 
 [Serializable]
@@ -249,6 +252,19 @@ public class ChapterRunState
 {
     public int   waveIndex, phase, pending;
     public float pendingTimer, levelElapsed;
+
+    /// <summary>Açık dalganın seri numarası ve doğurduğu tehdit (%90 eşiği için).</summary>
+    public int   waveSerial;
+    public float waveThreat;
+
+    /// <summary>
+    /// Henüz doğmamış kolların kadrosu, TİP ADIYLA. Yazılmasaydı kolların ortasında
+    /// kaydedip açmak dalganın geri kalanını silerdi — tam kayıt kuralının
+    /// kapattığı kaçış yolunun aynısı.
+    /// </summary>
+    public List<string> stream = new();
+    public float        streamTimer;
+    public int          streamSide;
 }
 
 [Serializable]

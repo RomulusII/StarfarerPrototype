@@ -383,6 +383,10 @@ public static class WorldSave
             var bot = EnemySpawner.Rebuild(RebuildEnemyData(s.dataJson, s.typeName), s.pos);
             if (bot == null) continue;
             bot.PendingRestore = s;   // Start'ın sonunda uygulanır
+            // Dalga etiketi Start'ı BEKLEMEZ: ChapterManager aynı karede
+            // sahneyi sayabilir ve etiketsiz gemileri görse dalgayı "boş"
+            // sanıp erkenden geçerdi (bkz. EnemyBot.waveTag).
+            bot.waveTag = s.waveTag;
             Register(s.id, bot);
         }
 
