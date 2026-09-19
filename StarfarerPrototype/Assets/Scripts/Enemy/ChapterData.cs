@@ -64,6 +64,13 @@ public class ChapterData : ScriptableObject
         var splitter    = EnemyTypeData.CreateSplitter();
         var juggernaut  = EnemyTypeData.CreateJuggernaut();
 
+        // Zırhlı tipler tanıtılan tip DEĞİL, havuza eklenir: levelden gelen
+        // taban zırh kaldırıldıktan sonra zırh eşiğini geç bölümlerde yaşatan
+        // onlar. Muhafız 6. bölümden (level 51), Tabya 8. bölümden (level 71)
+        // itibaren — o levellerde dalga bütçesi 55 puanlık bir gemiyi taşıyor.
+        var warden      = EnemyTypeData.CreateWarden();
+        var bastion     = EnemyTypeData.CreateBastion();
+
         return new[]
         {
             Make(1,
@@ -93,28 +100,30 @@ public class ChapterData : ScriptableObject
 
             Make(6,
                 introduced: artillery,
-                pool: new[] { swarm, armored, shield, barrier, interceptor, artillery },
+                pool: new[] { swarm, armored, shield, barrier, interceptor, artillery, warden },
                 asteroids: 4),
 
             Make(7,
                 introduced: jammer,
-                pool: new[] { swarm, armored, interceptor, artillery, jammer, phantom },
+                pool: new[] { swarm, armored, interceptor, artillery, jammer, phantom, warden },
                 asteroids: 4),
 
             Make(8,
                 introduced: regenerator,
-                pool: new[] { swarm, armored, shield, barrier, interceptor, jammer, regenerator, leech },
+                pool: new[] { swarm, armored, shield, barrier, interceptor, jammer, regenerator, leech,
+                              warden, bastion },
                 asteroids: 4),
 
             Make(9,
                 introduced: splitter,
-                pool: new[] { swarm, armored, interceptor, artillery, phantom, regenerator, splitter },
+                pool: new[] { swarm, armored, interceptor, artillery, phantom, regenerator, splitter,
+                              warden, bastion },
                 asteroids: 4),
 
             Make(10,
                 introduced: juggernaut,
                 pool: new[] { armored, shield, barrier, interceptor, artillery, jammer,
-                              phantom, regenerator, splitter, juggernaut },
+                              phantom, regenerator, splitter, juggernaut, warden, bastion },
                 asteroids: 4),
         };
     }

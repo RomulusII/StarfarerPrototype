@@ -1114,7 +1114,32 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     /// zırh kaldırıldı (bkz. LevelCurve sınıf dokümanı): zırh artık bir tip
     /// özelliğidir, bir level özelliği değil.
     /// </summary>
-    public float EffectiveArmor => data != null ? Mathf.Max(0f, data.armor) : 0f;
+    public float EffectiveArmor => data == null ? 0f
+        : Mathf.Max(0f, data.armor) + (_auraArmorTimer > 0f ? _auraArmor : 0f);
+
+    /// <summary>
+    /// Bir Muhafız'ın bu gemiye verdiği zırh (bkz. EnemyTypeData.armorAura).
+    /// Süreli verilir: aura 0.25 sn'de bir tazeler, gemi menzilden çıkınca
+    /// ArmorAuraHold içinde kendiliğinden düşer — ayrı bir "kaldır" yolu yok.
+    /// </summary>
+    float _auraArmor;
+    float _auraArmorTimer;
+
+    /// <summary>Tazeleme aralığının iki katından uzun: iki tarama arasında bonus titremesin.</summary>
+    const float ArmorAuraHold = 0.6f;
+
+    /// <summary>
+    /// Zırh aurası alır. ÜST ÜSTE BİNMEZ — birden fazla Muhafız'ın içindeki gemi
+    /// en yükseğini alır. Toplansaydı üç Muhafız aynı Swarm'a +18 zırh verir ve
+    /// onu her silaha karşı ölümsüz yapardı.
+    /// </summary>
+    public void ReceiveArmorAura(float bonus)
+    {
+        _auraArmor      = _auraArmorTimer > 0f ? Mathf.Max(_auraArmor, bonus) : bonus;
+        _auraArmorTimer = ArmorAuraHold;
+    }
+
+    GameObject _auraRing;
 
     /// <summary>Hayalet fazı — vurulamaz olduğu pencere.</summary>
     public bool IsPhased => _phaseTimer > 0f;
@@ -1129,7 +1154,9 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         if (data == null) return;
 
         UpdatePhasing();
-        UpdateRepairAura();
+        UpdateAuras();
+
+        if (_auraArmorTimer > 0f) _auraArmorTimer -= Time.deltaTime;
     }
 
     /// <summary>
@@ -1166,28 +1193,70 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     }
 
     /// <summary>
-    /// Onarıcı aurası — menzildeki düşmanların HP'sini geri getirir. Oyuncunun
-    /// DPS'i aurayı aşamıyorsa hedefler hiç ölmez; öncelik hedeflemeyi zorunlu kılar.
+    /// Destek auraları — tek tarama, iki etki:
+    ///
+    ///   Onarıcı aurası: menzildeki düşmanların HP'sini geri getirir. Oyuncunun
+    ///   DPS'i aurayı aşamıyorsa hedefler hiç ölmez; öncelik hedeflemeyi zorunlu kılar.
+    ///
+    ///   Muhafız aurası: menzildeki DİĞER düşmanlara zırh verir (bkz.
+    ///   ReceiveArmorAura). Muhafız kendini korumaz — öncelik hedefi olduğu açık
+    ///   kalmalı.
+    ///
+    /// İki aura AYNI sayacı (_auraTimer, kayda giriyor) ve aynı taramayı
+    /// paylaşır: ikinci bir sayaç, kayda eklenmesi unutulacak ikinci bir alan
+    /// ve sahnenin iki kez gezilmesi demekti.
     /// </summary>
-    void UpdateRepairAura()
+    void UpdateAuras()
     {
-        if (data.repairAura <= 0f) return;
+        bool repair = data.repairAura > 0f;
+        bool armor  = data.armorAura  > 0f;
+        if (!repair && !armor) return;
+
+        if (armor) EnsureAuraRing();
 
         _auraTimer -= Time.deltaTime;
         if (_auraTimer > 0f) return;
         _auraTimer = 0.25f;   // her karede tarama yapmaya değmez
 
-        float heal = data.repairAura * 0.25f;
-        float r2   = data.repairAuraRange * data.repairAuraRange;
+        float heal     = data.repairAura * 0.25f;
+        float repairR2 = data.repairAuraRange * data.repairAuraRange;
+        float armorR2  = data.armorAuraRange  * data.armorAuraRange;
 
         foreach (var other in FindObjectsByType<EnemyBot>(FindObjectsSortMode.None))
         {
-            if (other == this || other._healthBar == null) continue;
-            if (((Vector2)other.transform.position - (Vector2)transform.position).sqrMagnitude > r2)
-                continue;
-            other._healthBar.currentHealth =
-                Mathf.Min(other._healthBar.maxHealth, other._healthBar.currentHealth + heal);
+            if (other == this) continue;
+            float d2 = ((Vector2)other.transform.position - (Vector2)transform.position).sqrMagnitude;
+
+            if (repair && d2 <= repairR2 && other._healthBar != null)
+                other._healthBar.currentHealth =
+                    Mathf.Min(other._healthBar.maxHealth, other._healthBar.currentHealth + heal);
+
+            if (armor && d2 <= armorR2)
+                other.ReceiveArmorAura(data.armorAura);
         }
+    }
+
+    /// <summary>
+    /// Muhafız'ın aura menzilini gösteren soluk altın halka. Görünmeyen bir aura
+    /// "bu neden ölmüyor" sorusunu cevapsız bırakırdı — düşman bilgi kutusunun
+    /// var olma sebebi tam o soru. Kabuk sprite'ı küresel kalkanla paylaşılır
+    /// (tek çember üreteci); rengi ve yarıçapı farklı. Görsel olduğu için kayda
+    /// girmez, geri yüklemeden sonra ilk karede yeniden kurulur.
+    /// </summary>
+    void EnsureAuraRing()
+    {
+        if (_auraRing != null) return;
+
+        _auraRing = new GameObject("ArmorAuraRing");
+        _auraRing.transform.SetParent(transform, false);
+        _auraRing.transform.localPosition = Vector3.zero;
+        // Sprite'ın dış kenarı 1 birim → ölçek doğrudan yarıçap.
+        _auraRing.transform.localScale = Vector3.one * data.armorAuraRange;
+
+        var sr = _auraRing.AddComponent<SpriteRenderer>();
+        sr.sprite       = BubbleShield.Shell();
+        sr.color        = new Color(0.95f, 0.78f, 0.30f, 0.22f);
+        sr.sortingOrder = data.sizeOrder - 1;
     }
 
     /// <summary>
@@ -1514,6 +1583,8 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         phaseTimer    = _phaseTimer,
         phaseCooldown = _phaseCooldown,
         auraTimer     = _auraTimer,
+        auraArmor      = _auraArmor,
+        auraArmorTimer = _auraArmorTimer,
 
         movement = _movement.CaptureState(),
         hasBrain = _brain != null,
@@ -1594,6 +1665,8 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         _phaseTimer    = s.phaseTimer;
         _phaseCooldown = s.phaseCooldown;
         _auraTimer     = s.auraTimer;
+        _auraArmor      = s.auraArmor;
+        _auraArmorTimer = s.auraArmorTimer;
         if (_phaseTimer > 0f) SetPhaseVisual(true);
 
         Velocity = s.velocity;

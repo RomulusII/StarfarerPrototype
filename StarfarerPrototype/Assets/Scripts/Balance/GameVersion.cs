@@ -73,6 +73,12 @@ public static class GameVersion
     ///       gemiden büyük dalgalar 1.5 sn arayla kollar hâlinde gelir.
     ///       Level süresi ve üst üste binen tehdit bu revizyondan önceki
     ///       kayıtlarla kıyaslanamaz. `wave` olayı `cumbus` alanını taşır.
+    ///   7 — İKİ ZIRHLI TİP. Tabya (tehdit 55, zırh 20, 400 HP) 8. bölümden,
+    ///       Muhafız (tehdit 10, çevresine +6 zırh aurası) 6. bölümden itibaren
+    ///       havuzlarda. Levelden gelen taban zırh kaldırıldıktan sonra zırh
+    ///       eşiğini geç bölümlerde yaşatan onlar; Tabya ayrıca kompozisyon
+    ///       alfasının ağır ucunu açıyor. 6. bölümden sonraki dalga kadroları
+    ///       önceki revizyonlarla kıyaslanamaz.
     /// </summary>
-    public const int Denge = 6;
+    public const int Denge = 7;
 }

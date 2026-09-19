@@ -215,6 +215,7 @@ public class EnemyInfoHUD : MonoBehaviour
         if (d.energyDrain   > 0f) sb.AppendLine(Loc.T("enemyinfo.energyDrain", d.energyDrain * 100f, d.energyDrainRange));
         if (d.phaseInterval > 0f) sb.AppendLine(Loc.T("enemyinfo.phase", d.phaseInterval, d.phaseDuration));
         if (d.repairAura    > 0f) sb.AppendLine(Loc.T("enemyinfo.repairAura", d.repairAura, d.repairAuraRange));
+        if (d.armorAura     > 0f) sb.AppendLine(Loc.T("enemyinfo.armorAura",  d.armorAura,  d.armorAuraRange));
         if (d.splitInto  != null) sb.AppendLine(Loc.T("enemyinfo.split", d.splitHpRatio * 100f));
         if (bot.IsPhased)         sb.AppendLine(Loc.T("enemyinfo.phased"));
 

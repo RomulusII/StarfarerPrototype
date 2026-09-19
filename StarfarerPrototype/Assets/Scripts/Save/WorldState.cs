@@ -75,6 +75,7 @@ public class EnemyState
     public int   escapeSide;
     public float age, sinceFirstHit, damageTaken;
     public float phaseTimer, phaseCooldown, auraTimer;
+    public float auraArmor, auraArmorTimer;   // Muhafız'dan alınan zırh ve kalan süresi
 
     public MovementState movement;
     public bool          hasBrain;

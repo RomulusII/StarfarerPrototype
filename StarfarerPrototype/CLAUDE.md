@@ -94,6 +94,8 @@ Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 1), Otomatik Turretler, İki
 | **Splitter** (Bölünen) | 8 | Ölünce ikiye ayrılır (%50 HP) | Alan hasarı talebi |
 | **Juggernaut** (Kaleci) | 27 | Zırh +12, çok yavaş, 200 HP | Zırh eşiğinin doruk testi |
 | **Barrier** (Bariyer) | 7 | Silahsız; önünde YÖNLÜ yay kalkanı, ana geminin önüne park eder | Ateş hattı — del, dolan ya da bekle |
+| **Warden** (Muhafız) | 10 | Çevresindeki DİĞER gemilere +6 zırh aurası; kendisi 70 HP | Öncelik hedefleme — sürüyü PD/flak'e karşı zırhlar |
+| **Bastion** (Tabya) | 55 | Zırh 20, 400 HP, mevzi tutar (HoverFire) | Atış başına hasar — flak ve PD'nin doğal cevabı |
 
 Jammer `EnergyBus.JamFactor` üzerinden üretimi kısar; Phantom faz sırasında
 `IsValidTarget = false` döner (turretler boşa mermi harcamasın); Splitter
@@ -602,6 +604,8 @@ kendi kendine prim yazmaz.
 | Onarıcı | 5.15 | 2.67 | 4.4 | +7 | **11** | 13 |
 | Bomb Runner | 2.00 | 20.00 | 9.8 | +3 | **13** | 12 |
 | Kaleci | 12.13 | 7.33 | 23.6 | +3 | **27** | 20 |
+| Muhafız | 4.01 | 2.50 | 3.3 | +7 | **10** | — |
+| Tabya | 22.90 | 8.33 | 50.0 | +5 | **55** | — |
 
 **Bariyer 3 → 7 bilinçli bir geri dönüştür.** Daha önce 8'den 3'e indirilmişti
 çünkü 8'de bir dalganın bütçesine hiç sığmıyor ve ~level 40'a kadar hiç
@@ -616,6 +620,59 @@ Defence'li bir oyuncu için çok daha ucuz. Ölçülüp elle düşürülebilir.
 **Kaleci 27**, formülün doğal sonucu: 12× dayanıklılık ve 7× hasar çarpılıyor.
 Bir dalga bütçesi 27'ye ancak çok geç ulaşır, ama bölüm 10'un tanıtılan tipi
 olduğu için `guaranteedType` onu her levelde sahneye koyar.
+
+### Zırhlı Tipler — Tabya ve Muhafız
+
+Levelden gelen taban zırh kaldırıldığında (bkz. "Düz Düşman Statı") zırh
+eşiğinin geç bölümlerdeki işi boşta kaldı: 13 tipin 10'u zırhsızdı ve çok
+sayıda zayıf atış yapan build'ler — tam da kalabalığın cevabı olarak eklenen
+Flak ve Point Defence — cezasız güçlendi. İki tip bu boşluğu kapatır, ikisi de
+FARKLI bir iş yapar. Tanıtılan tip değiller, havuzlara eklenirler.
+
+| | Tabya | Muhafız |
+|---|---|---|
+| Tehdit | **55** | **10** |
+| HP / zırh | 400 / **20** | 70 / 2 |
+| Davranış | mevzi tutar (HoverFire), top 30 hasar / 6 sn | arkada durur, zayıf lazer |
+| Havuzda | 8. bölümden (level 71) | 6. bölümden (level 51) |
+| Sınadığı | atış başına hasar | öncelik hedefleme |
+
+**Tabya — oyunun en ağır zırhı.** Zırh 20'ye karşı 10 hasarlı raylı top atış
+başına 1, Sv10 raylı top (93) 73, nükleer başlık (110) 90 geçirir. Flak (12) ve
+PD (8) tabana düşer. Kaleci'den ayrışması bilinçli: Kaleci üstüne **sürer**
+(Charge) ve kinetiğe dirençlidir; Tabya menzilde **durur** ve direnci yoktur —
+kimliği yalnızca zırh. İkisi üst üste binseydi raylı top hiç işlemezdi.
+
+İkinci işi yapısal: **kompozisyon alfasının AĞIR ucunu açar.** Havuzun en
+pahalısı Kaleci (27) iken "seyrek ve ağır" bir dalga kurulamıyordu; 55 puanlık
+bir gemi bütçenin büyük bir dilimini tek başına yer. 8. bölümde dalga bütçeleri
+(~50–90) onu taşıyacak büyüklükte.
+
+**Muhafız — zırh aurası.** Menzilindeki (4.5) DİĞER gemilere +6 zırh.
+Onarıcı'nın zırh eşleniği: o HP'yi geri getirir, bu HP'nin gitmesini
+zorlaştırır. Kalabalık temasıyla çarpışır: tek başına PD ve flak yemi olan bir
+sürü, başında bir Muhafız varsa o silahları etkisiz kılar (PD 8 → 2, flak 12 →
+6, raylı top 10 → 4). Sürü "çok sayıda kolay hedef" olmaktan çıkıp **öncelik
+hedefleme sınavına** döner — Karıştırıcı'nın enerjiye yaptığını zırha yapar.
+
+| Karar | Gerekçe |
+|---|---|
+| **+6, +8 değil** | +8 başlangıç raylı topunu %80 kesiyor, korunan sürüyü başlangıç donanımına karşı neredeyse ölümsüz yapıyordu |
+| **Üst üste binmez** — en yüksek aura geçerli | Toplansaydı üç Muhafız aynı Swarm'a +18 verir ve onu her silaha karşı ölümsüz yapardı |
+| **Kendini korumaz**, 70 HP | Öncelik hedefi olduğu açık kalmalı |
+| **Süreli verilir** (0.6 sn, tazeleme 0.25 sn) | Menzilden çıkan gemi kendiliğinden kaybeder — ayrı bir "kaldır" yolu yok |
+| **Menzil halkası görünür** (soluk altın) | Görünmeyen aura "bu neden ölmüyor" sorusunu cevapsız bırakırdı |
+
+Onarıcı ile Muhafız **tek tarama ve tek sayacı** paylaşır (`EnemyBot.UpdateAuras`,
+`_auraTimer`): ikinci bir sayaç, kayda eklenmesi unutulacak ikinci bir alan
+olurdu. Alınan aura zırhı ve kalan süresi kayda girer. Düşman bilgi kutusu zırhı
+`ArmorValue`'dan okuduğu için aura bonusu orada kendiliğinden görünür.
+
+**Tehditler formülden** (bkz. "Tehdit Puanı — Formül"); yetenek puanları mevcut
+ölçekten: Tabya +5 (zırh 20; Kaleci'nin 12'si +3), Muhafız +7 (Onarıcı'nın
+aurasıyla aynı).
+
+**Skin yok** — ikisi de prosedürel dikdörtgenle çiziliyor. **Oyunda denenmedi.**
 
 ### Zırh Eşiği — Tasarım Kararları
 
@@ -651,12 +708,12 @@ Eşiğin amacı — atış başına hasarı ödüllendirmek — kaybolmadı, **k
 taşındı**: baskı zırhlı tipler sahneye çıktığında gelir. Oyuncuya "aynı Swarm
 gizemli biçimde sertleşti" diye değil, "artık Kaleci yolluyorlar" diye görünür.
 
-**Bilinçli geçici durum:** şu anda zırhı olan yalnızca Kaleci (+12) ve Obüs (+3);
-13 tipin 11'i zırhsız. Yani eşik mekanizması duruyor ama nadiren ateşleniyor ve
-çok sayıda zayıf atış yapan build'ler (Point Defence, Gatling) geç oyunda
-belirgin biçimde güçlendi. Bunu kapatacak olan **Aşama 4'teki yeni zırhlı
-tiplerdir** (ağır zırhlı + zırh aurası). Ölçüm bu boşluk açıkken koşuluyor;
-bilerek.
+**Zırh taşıyan tipler:** Tabya (20), Kaleci (12), Onarıcı (4), Obüs (3),
+Muhafız (2) — ve Muhafız'ın aurası menzilindeki her gemiye **+6** ekler. Düz
+stata geçildiği an 13 tipin 10'u zırhsız kalmış, eşik nadiren ateşlenir ve çok
+sayıda zayıf atış yapan build'ler (Point Defence, Gatling, Flak) geç oyunda
+belirgin biçimde güçlenmişti. İki yeni tip bu boşluğu kapatmak için eklendi
+(bkz. "Zırhlı Tipler").
 
 **Gelecek:** Büyük düşman gemilerinin attığı **area-effect bombalar** komponentlere de hasar verebilir (tasarım kararı bekliyor).
 
@@ -2871,8 +2928,9 @@ kendi içinde tutarlı. Tek yerden değiştirilebilir: `BuildWarningText`.
       eder), 12 gemiden büyük dalgalar kollar hâlinde gelir, her bölümün 5.
       levelinde cümbüş. Denge revizyonu **6**. Oyunda denenmedi; kayıt
       round-trip testi koşulmadı.
-- [ ] **Zırhlı tipler (Aşama 4)** — ağır zırhlı (tehdit ~55-70) ve zırh aurası.
-      İkisi birden zırh eşiğini geri getirir ve α'nın ağır ucunu açar.
+- [x] **Zırhlı tipler** — Tabya (tehdit 55, zırh 20) ve Muhafız (tehdit 10,
+      +6 zırh aurası). Zırh eşiğini geç bölümlerde geri getirir, α'nın ağır
+      ucunu açar. Denge revizyonu **7**. Oyunda denenmedi, skin'leri yok.
 - [ ] **Denge testleri** — aşağıdaki listeye bak; sayıların hiçbiri oyunda denenmedi
 - [ ] Point defence turretleri — küçük/hızlı hedeflere odaklı otomatik turret
 - [ ] Mobil UI

@@ -224,6 +224,13 @@ public class EnemyTypeData : ScriptableObject
     public float repairAura = 0f;
     public float repairAuraRange = 5f;
 
+    [Tooltip("Muhafız: menzilindeki DİĞER düşmanlara bu kadar zırh ekler. " +
+             "Üst üste binmez — birden fazla auranın içindeki gemi en yükseğini " +
+             "alır. Kalabalığı Point Defence/flak yemi olmaktan çıkarıp öncelik " +
+             "hedefleme sınavına çevirir.")]
+    public float armorAura = 0f;
+    public float armorAuraRange = 4.5f;
+
     // ── Runtime factory metodları ─────────────────────────────────────────────
 
     /// <summary>
@@ -247,6 +254,8 @@ public class EnemyTypeData : ScriptableObject
         "Splitter"    => CreateSplitter(),
         "Juggernaut"  => CreateJuggernaut(),
         "BombRunner"  => CreateBombRunner(),
+        "Bastion"     => CreateBastion(),
+        "Warden"      => CreateWarden(),
         _             => null,
     };
     // Editor'da SO asset oluşturulmadan önce oyunun çalışmasını sağlar.
@@ -642,6 +651,95 @@ public class EnemyTypeData : ScriptableObject
             new DamageModifier { weaponType = WeaponType.Kinetic, multiplier = 0.60f },
             new DamageModifier { weaponType = WeaponType.Plasma,  multiplier = 1.40f },
         };
+        return d;
+    }
+
+    /// <summary>
+    /// Tabya — oyunun en ağır zırhı (20). Levelden gelen taban zırh
+    /// kaldırıldıktan sonra zırh eşiğinin asıl sınavı: 10 hasarlı raylı top
+    /// atış başına 1 geçirir, Sv10 raylı top (93) 73, nükleer başlık (110) 90.
+    /// Flak'in (12) ve Point Defence'in (8) doğal cevabıdır.
+    ///
+    /// İKİNCİ İŞİ YAPISAL: kompozisyon alfasının AĞIR ucunu açar. Havuzun en
+    /// pahalısı Kaleci (27) iken "seyrek ve ağır" bir dalga kurulamıyordu;
+    /// 55 puanlık bir gemi bütçenin büyük bir dilimini tek başına yer.
+    ///
+    /// Direnç YOK — kimliği zırh. Kaleci'nin kinetik direnci ile üst üste
+    /// binseydi raylı top hiç işlemezdi; zırh yeterince net bir mesaj.
+    ///
+    /// TEHDİT FORMÜLDEN (bkz. CLAUDE.md "Tehdit Puanı — Formül"):
+    ///   dayanıklılık 400 / 17.47 = 22.9 · DPS 5.0 / 0.6 = 8.33
+    ///   0.234 × 22.9 × 9.33 = 50.0, yetenek +5 (zırh 20; Kaleci'nin 12'si +3)
+    /// </summary>
+    public static EnemyTypeData CreateBastion()
+    {
+        var d = CreateInstance<EnemyTypeData>();
+        d.name          = "Bastion";
+        d.displayName   = "enemy.type.bastion";
+        d.role          = EnemyRole.Center;
+        d.threatScore   = 55;
+        d.maxHP         = 400f;
+        d.armor         = 20f;
+        d.mass          = 14f;  d.enginePower   = 10f;
+        d.bodyWidth     = 130;  d.bodyHeight    = 84;   d.sizeOrder = 1;
+        d.hitboxWidth   = 118;  d.hitboxHeight  = 76;
+        d.bodyColor     = new Color(0.36f, 0.33f, 0.28f);
+        d.barrelColor   = new Color(0.28f, 0.26f, 0.22f);
+        // Kaleci üstüne SÜRER (Charge); Tabya menzilde DURUR. Aynı rol iki kez
+        // olmasın: biri ezerek gelen duvar, öteki mevzi tutan kale.
+        d.movementKind  = EnemyMovementKind.HoverFire;
+        d.engageRange   = 7f;   d.fireRange     = 6f;
+        d.orbitRadius   = 5f;   d.engageDuration = 14f;
+        d.agility       = 0.3f; d.grip          = 0.6f;
+        d.evasionAngle  = 2f;   d.evasionPeriod = 5f;
+        d.escapeAngle   = 10f;
+        d.weaponKind    = EnemyWeaponKind.Cannon;
+        d.fireDamage    = 30f;  d.fireRate      = 6f;   d.bulletSpeed = 2f;
+        return d;
+    }
+
+    /// <summary>
+    /// Muhafız — menzilindeki diğer gemilere +6 zırh verir. Onarıcı'nın zırh
+    /// eşleniği: o HP'yi geri getirir, bu HP'nin gitmesini zorlaştırır.
+    ///
+    /// Kalabalık temasıyla çarpışır: tek başına PD ve flak yemi olan bir Swarm
+    /// sürüsü, başında bir Muhafız varsa o silahları etkisiz kılar (PD 8 → 2,
+    /// flak 12 → 6 hasar). Sürü bir "çok sayıda kolay hedef" olmaktan çıkıp
+    /// ÖNCELİK HEDEFLEME sınavına döner — Karıştırıcı'nın enerjiye yaptığını
+    /// zırha yapar.
+    ///
+    /// +6, +8 DEĞİL: +8 başlangıç raylı topunu (10) %80 kesiyor ve korunan
+    /// sürüyü başlangıç donanımına karşı neredeyse ölümsüz yapıyordu.
+    ///
+    /// Kendisi korunmaz ve kırılgandır (70 HP) — öncelik hedefi olduğu açık
+    /// olmalı. Aura menzilini gösteren soluk altın bir halka taşır.
+    ///
+    /// TEHDİT FORMÜLDEN: dayanıklılık 70 / 17.47 = 4.0 · DPS 1.5 / 0.6 = 2.5
+    ///   0.234 × 4.0 × 3.5 = 3.3, yetenek +7 (Onarıcı'nın aurasıyla aynı)
+    /// </summary>
+    public static EnemyTypeData CreateWarden()
+    {
+        var d = CreateInstance<EnemyTypeData>();
+        d.name          = "Warden";
+        d.displayName   = "enemy.type.warden";
+        d.role          = EnemyRole.Rear;
+        d.threatScore   = 10;
+        d.maxHP         = 70f;
+        d.armor         = 2f;
+        d.mass          = 4f;   d.enginePower   = 6f;
+        d.bodyWidth     = 70;   d.bodyHeight    = 52;   d.sizeOrder = 4;
+        d.bodyColor     = new Color(0.80f, 0.66f, 0.24f);
+        d.barrelColor   = new Color(0.62f, 0.50f, 0.18f);
+        d.movementKind  = EnemyMovementKind.HoverFire;
+        d.engageRange   = 6.5f; d.fireRange     = 6f;
+        d.orbitRadius   = 5f;   d.engageDuration = 10f;
+        d.agility       = 0.7f; d.grip          = 0.8f;
+        d.evasionAngle  = 8f;   d.evasionPeriod = 2.8f;
+        d.escapeAngle   = 30f;
+        d.weaponKind    = EnemyWeaponKind.Laser;
+        d.fireDamage    = 6f;   d.fireRate      = 4f;   d.bulletSpeed = 4f;
+        d.armorAura      = 6f;
+        d.armorAuraRange = 4.5f;
         return d;
     }
 

@@ -83,6 +83,7 @@ enemyinfo.directionalShield	⚠ YÖNLÜ kalkan: yalnızca öndeki {0:0}° yayı 
 enemyinfo.shieldRecharge	Kalkan şarjı: {0:0.#}/s ({1:0.#}s gecikme)	Shield recharge: {0:0.#}/s ({1:0.#}s delay)	Schildaufladung: {0:0.#}/s ({1:0.#}s Verzögerung)
 enemyinfo.energyDrain	⚠ Enerji karıştırıcı: üretimi %{0:0} kısar ({1:0.#} menzil)	⚠ Energy disruptor: cuts output by {0:0}% ({1:0.#} range)	⚠ Energiestörer: senkt die Produktion um {0:0}% ({1:0.#} Reichweite)
 enemyinfo.phase	⚠ Faz: {0:0.#}s'de bir {1:0.#}s vurulamaz	⚠ Phase: untargetable for {1:0.#}s every {0:0.#}s	⚠ Phase: alle {0:0.#}s für {1:0.#}s unverwundbar
+enemyinfo.armorAura	⚠ Zırh aurası: +{0:0.#} zırh ({1:0.#} menzil, kendisi hariç)	⚠ Armor aura: +{0:0.#} armor ({1:0.#} range, not itself)	⚠ Panzeraura: +{0:0.#} Panzerung ({1:0.#} Reichweite, nicht selbst)
 enemyinfo.repairAura	⚠ Onarım aurası: {0:0.#} HP/s ({1:0.#} menzil)	⚠ Repair aura: {0:0.#} HP/s ({1:0.#} range)	⚠ Reparaturaura: {0:0.#} HP/s ({1:0.#} Reichweite)
 enemyinfo.split	⚠ Ölünce ikiye bölünür (%{0:0} HP)	⚠ Splits in two on death ({0:0}% HP)	⚠ Teilt sich beim Tod in zwei ({0:0}% HP)
 enemyinfo.phased	⚠ ŞU AN VURULAMAZ	⚠ CURRENTLY UNTARGETABLE	⚠ AKTUELL UNVERWUNDBAR
@@ -261,6 +262,8 @@ enemy.type.leech	Sülük	Leech	Blutegel
 enemy.type.barrier	Bariyer	Barrier	Barriere
 enemy.type.splitter	Bölünen	Splitter	Teiler
 enemy.type.juggernaut	Kaleci	Juggernaut	Juggernaut
+enemy.type.bastion	Tabya	Bastion	Bastion
+enemy.type.warden	Muhafız	Warden	Wächter
 
 # ── Boss adları ──────────────────────────────────────────────────────────────
 boss.type.sentinel	Nöbetçi	Sentinel	Wächter
