@@ -79,6 +79,12 @@ public static class GameVersion
     ///       eşiğini geç bölümlerde yaşatan onlar; Tabya ayrıca kompozisyon
     ///       alfasının ağır ucunu açıyor. 6. bölümden sonraki dalga kadroları
     ///       önceki revizyonlarla kıyaslanamaz.
+    ///   8 — KAMPANYA ZORLAŞTI. Level bütçesi tabanı 7 -> 9, büyümesi
+    ///       1.05093 -> 1.053: Lv10 ×1.33, Lv50 ×1.42, Lv100 ×1.56 tehdit.
+    ///       Drop tehdit başına sabit, yani gelir de aynı oranda arttı.
+    ///       Lazer turreti döngünün yarısında yanıyor (1.5 sn / 3 sn), ışın
+    ///       DPS'i 26 -> 8.67 — ortalama DPS aynı, zırha karşı daha zayıf.
+    ///       Nükleer başlık hızı 2.5 -> 1.25 (menzil korunarak).
     /// </summary>
-    public const int Denge = 7;
+    public const int Denge = 8;
 }

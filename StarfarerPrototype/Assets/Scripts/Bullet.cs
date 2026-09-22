@@ -33,6 +33,9 @@ public class Bullet : MonoBehaviour
     /// </summary>
     public float lifeTime;
 
+    /// <summary>Ana silah mermisinin hâlesi — sıcak beyaz.</summary>
+    public static readonly Color GlowColor = new Color(1f, 0.85f, 0.55f);
+
     float _bornAt;
     bool  _started;
 
@@ -125,9 +128,12 @@ public class Bullet : MonoBehaviour
         go.transform.SetPositionAndRotation(s.pos, Quaternion.Euler(0f, 0f, s.rotation));
         go.transform.localScale = Vector3.one * s.scale;
 
-        var sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite       = SkinLibrary.Get(SkinId.PlayerBulletKinetic, 10, 30, Color.white);
-        sr.sortingOrder = 20;
+        // Boyut boost'suz hasardan türer — WeaponController.SpawnBullet ile aynı
+        var boost = (BoostMode)s.boost;
+        float rawDamage = s.damage / (boost == BoostMode.Weapon ? 2f :
+                                      boost == BoostMode.Shield ? 1f / 3f : 1f);
+        ProjectileLook.Apply(go, SkinLibrary.Get(SkinId.PlayerBulletKinetic, 10, 30, Color.white),
+                             Color.white, GlowColor, 20, rawDamage);
 
         var b = go.AddComponent<Bullet>();
         b.speed       = s.speed;

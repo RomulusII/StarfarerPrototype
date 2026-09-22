@@ -950,11 +950,11 @@ public class UpgradeUI : MonoBehaviour
 
                 if (tc.specType == TurretSpecType.Laser)
                 {
-                    // Lazer: DPS during beam × burnDuration / fireRate = gerçek DPS
-                    float beamDps      = dmg * tc.burnDuration / tc.fireRate;
+                    // Lazer: döngünün yarısı yanar — ortalama DPS = ışın DPS × görev oranı
+                    float beamDps = tc.LaserBeamDps;
                     sb.AppendLine(DeltaLine(Loc.T("detail.beamDamage"), dmg, "damage", false));
-                    sb.AppendLine(Loc.T("detail.burn", tc.burnDuration, tc.fireRate));
-                    sb.AppendLine(Loc.T("detail.effectiveDps", beamDps));
+                    sb.AppendLine(Loc.T("detail.burn", tc.LaserBurnTime, tc.EffectiveFireInterval));
+                    sb.AppendLine(Loc.T("detail.effectiveDps", beamDps * TurretController.LaserDutyCycle));
                     sb.AppendLine(Loc.T("detail.energyPerShot", eng));
                 }
                 else

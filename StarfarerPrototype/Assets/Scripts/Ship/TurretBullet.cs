@@ -310,8 +310,8 @@ public class TurretBullet : MonoBehaviour
         tb.visual       = s.visual;
         tb.SetDirection(s.dir);
 
-        if (s.visual < 0) FighterShip.BuildBulletVisual(go);
-        else              TurretController.BuildBulletVisual(go, (TurretSpecType)s.visual);
+        if (s.visual < 0) FighterShip.BuildBulletVisual(go, s.damage);
+        else              TurretController.BuildBulletVisual(go, (TurretSpecType)s.visual, s.damage);
         return tb;
     }
 }

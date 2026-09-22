@@ -183,16 +183,15 @@ public class FighterShip : MonoBehaviour
         tb.lifeTime   = 1.5f;
         tb.SetDirection(dir);
 
-        BuildBulletVisual(go);
+        BuildBulletVisual(go, damage);
     }
 
     /// <summary>Kayıttan kurulan savaşçı mermisi de aynı görseli buradan alır.</summary>
-    internal static void BuildBulletVisual(GameObject go)
+    internal static void BuildBulletVisual(GameObject go, float damage)
     {
-        var sr  = go.AddComponent<SpriteRenderer>();
-        sr.sprite       = SkinLibrary.Get(SkinId.FighterBullet, 8, 4, Color.yellow,
-                              new Vector2(0f, 0.5f));
-        sr.sortingOrder = 3;
+        ProjectileLook.Apply(go, SkinLibrary.Get(SkinId.FighterBullet, 8, 4, Color.yellow,
+                                                 new Vector2(0f, 0.5f)),
+                             Color.white, Color.yellow, 3, damage);
     }
 
     public void SetSpeed(float speed)

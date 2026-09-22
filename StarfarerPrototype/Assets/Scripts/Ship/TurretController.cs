@@ -21,7 +21,6 @@ public class TurretController : ShipComponentBase
     public float          energyPerShot  = 1f;
     public int            magazineSize   = 10;
     public float          reloadTime     = 3f;
-    public float          burnDuration   = 0.5f; // Lazer spec: beam yanma süresi
 
     /// <summary>
     /// Merminin patlama yarıçapı (dünya birimi). 0 = tek hedefli.
@@ -57,6 +56,34 @@ public class TurretController : ShipComponentBase
     /// mermili turretlerin zorlandığı kaçamak hedefler onun işidir.
     /// </summary>
     const float LaserSpeedBias = 1.5f;
+
+    /// <summary>
+    /// Lazer turretinin döngüsünün ışın yanan kısmı. Döngü ateş aralığının
+    /// kendisidir (fireRate); YARISI yanar, yarısı soğur.
+    ///
+    /// Eskiden sabit 0.5 sn yanıp 3 sn'lik döngünün geri kalanında susuyordu:
+    /// ışın bir çakıp sönüyor, turret zamanının %83'ünde hiçbir şey yapmıyor
+    /// gibi görünüyordu. Oran sabit olduğu için yanma süresi ATEŞ HIZI
+    /// statıyla birlikte kısalır — sabit bir süre olsaydı hızlanan döngü
+    /// önceki ışın bitmeden yenisini açar ve iki ışın üst üste binerdi.
+    /// </summary>
+    public const float LaserDutyCycle = 0.5f;
+
+    /// <summary>Stat yükseltmesi uygulanmış döngü süresi (sn).</summary>
+    public float EffectiveFireInterval => fireRate / GetMultiplier("fireRate");
+
+    /// <summary>Lazer ışınının bir döngüdeki yanma süresi (sn).</summary>
+    public float LaserBurnTime => EffectiveFireInterval * LaserDutyCycle;
+
+    /// <summary>
+    /// Işının yanarken verdiği saniyelik hasar. Görev oranı sabit olduğu için
+    /// ateş hızı statı döngüyü kısaltmakla kalsaydı ortalama DPS hiç
+    /// değişmezdi — oyuncu hiçbir şey yapmayan bir yükseltmeye ödeme yapardı
+    /// (ana lazerin "Ateş Hızı" hatasının aynısı). Bu yüzden ateş hızı statı
+    /// ışının yoğunluğunu da çarpar; ortalama DPS diğer turretlerdeki gibi
+    /// hasar × ateş hızı ile büyür.
+    /// </summary>
+    public float LaserBeamDps => damage * GetMultiplier("damage") * GetMultiplier("fireRate");
 
     /// <summary>Merminin ömrü boyunca gidebildiği mesafe — bunun ötesi vurulamaz.</summary>
     public float EffectiveRange => specType == TurretSpecType.PointDefence
@@ -129,7 +156,7 @@ public class TurretController : ShipComponentBase
         }
 
         _fireTimer -= Time.deltaTime;
-        float effectiveFireRate = fireRate / GetMultiplier("fireRate");
+        float effectiveFireRate = EffectiveFireInterval;
         if (_fireTimer <= 0f && !_reloading && target != null && IsAimed(_aimPos))
         {
             bool hasEnergy = EnergyBus.Instance == null ||
@@ -302,7 +329,7 @@ public class TurretController : ShipComponentBase
                   .Num("zoom",   tb.zoomAtFire)
                   .End();
 
-        BuildBulletVisual(go, specType);
+        BuildBulletVisual(go, specType, tb.damage);
         tb.visual   = (int)specType;
         tb.lifeTime = bulletLifeTime;
     }
@@ -318,10 +345,10 @@ public class TurretController : ShipComponentBase
         go.transform.localRotation = Quaternion.Euler(0f, 0f, -90f);
 
         var beam             = go.AddComponent<LaserBeam>();
-        beam.damage          = damage * GetMultiplier("damage");
+        beam.damage          = LaserBeamDps;
         beam.weaponType      = WeaponType.Laser;
         beam.continuous      = false;
-        beam.burnDuration    = burnDuration;
+        beam.burnDuration    = LaserBurnTime;
         beam.energyPerSecond = 0f;   // enerji ateş anında ödendi (TurretController.Update)
         beam.hitsPlayer      = false;
         beam.maxRange        = bulletLifeTime * bulletSpeed; // efektif menzil
@@ -361,7 +388,6 @@ public class TurretController : ShipComponentBase
         energyPerShot  = newDef.turretEnergyPerShot  > 0 ? newDef.turretEnergyPerShot  : energyPerShot;
         magazineSize   = newDef.turretMagazineSize   > 0 ? newDef.turretMagazineSize   : magazineSize;
         reloadTime     = newDef.turretReloadTime     > 0 ? newDef.turretReloadTime     : reloadTime;
-        burnDuration   = newDef.turretBurnDuration   > 0 ? newDef.turretBurnDuration   : burnDuration;
 
         // KOŞULSUZ atanır, yukarıdaki "0 ise koru" deseniyle DEĞİL. O desen
         // "tanımda belirtilmemişse mevcut değeri sürdür" demek; patlama
@@ -433,7 +459,7 @@ public class TurretController : ShipComponentBase
     }
 
     /// <summary>Kayıttan kurulan mermi de aynı görseli buradan alır.</summary>
-    internal static void BuildBulletVisual(GameObject go, TurretSpecType spec)
+    internal static void BuildBulletVisual(GameObject go, TurretSpecType spec, float damage)
     {
         Color c = spec switch
         {
@@ -455,11 +481,11 @@ public class TurretController : ShipComponentBase
         int w = isRocket ? 14 : 8;
         int h = isRocket ? 6  : 4;
 
-        var sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite       = SkinLibrary.Get(SkinId.TurretBullet + "." + spec.ToString().ToLowerInvariant(), SkinId.TurretBullet,
-                              w, h, Color.white, new Vector2(0f, 0.5f));
-        sr.color        = c;   // sprite gri tonlamalı — bkz. BuildVisual
-        sr.sortingOrder = 3;
+        // Sprite gri tonlamalı — rengi tint verir (bkz. BuildVisual).
+        // Boyut atış hasarından: hasar statı yükseldikçe mermi büyür.
+        var sprite = SkinLibrary.Get(SkinId.TurretBullet + "." + spec.ToString().ToLowerInvariant(), SkinId.TurretBullet,
+                                     w, h, Color.white, new Vector2(0f, 0.5f));
+        ProjectileLook.Apply(go, sprite, c, c, 3, damage);
     }
 
     Color TurretColor() => specType switch
@@ -512,7 +538,6 @@ public class TurretController : ShipComponentBase
         energyPerShot  = def.turretEnergyPerShot  > 0 ? def.turretEnergyPerShot  : energyPerShot;
         magazineSize   = def.turretMagazineSize   > 0 ? def.turretMagazineSize   : magazineSize;
         reloadTime     = def.turretReloadTime     > 0 ? def.turretReloadTime     : reloadTime;
-        burnDuration   = def.turretBurnDuration   > 0 ? def.turretBurnDuration   : burnDuration;
         blastRadius    = def.turretBlastRadius;   // koşulsuz — bkz. Specialize
 
         componentName = BuildLabel();

@@ -24,8 +24,12 @@ public class BalanceConfig : ScriptableObject
     // ── Gelir eğrisi ──────────────────────────────────────────────────────────
 
     [Header("Wave Bütçesi")]
-    [Tooltip("Level 1'in tehdit puanı bütçesi.")]
-    public float baseThreatBudget = 7f;
+    [Tooltip("Level 1'in tehdit puanı bütçesi (formülün tabanı; level 1'in " +
+             "kendisi elle yazılır — ChapterManager.OpeningWaveBudgets).\n\n" +
+             "7 -> 9 (denge r8): oyuncu kampanyayı 'çok kolay' buldu. Taban " +
+             "bütün levelleri AYNI oranda (+%29) kaydırır; geç levellerin ayrıca " +
+             "sertleşmesi budgetGrowth'tan gelir.")]
+    public float baseThreatBudget = 9f;
 
     [Tooltip("Level başına bütçe büyümesi.\n\n" +
              "İKİ EĞRİNİN ÇARPIMIDIR: 1.027 × 1.0233 = 1.05093.\n\n" +
@@ -44,8 +48,12 @@ public class BalanceConfig : ScriptableObject
              "katsayısını simülasyon söyleyecek.\n\n" +
              "Neden %10-15 değil: 100 level bileşik faizdir. %10 ile Lv100 bütçesi " +
              "87.700 tehdit puanı eder, yani tek levelde 87.700 Swarm. " +
-             "Hissedilen birim BÖLÜMDÜR ve orada artış ×1.64 olur.")]
-    public float budgetGrowth = 1.05093f;
+             "Hissedilen birim BÖLÜMDÜR ve orada artış ×1.64 olur.\n\n" +
+             "1.05093 -> 1.053 (denge r8): kampanya kolay bulundu. Tabanla " +
+             "birlikte eski eğriye göre Lv10 ×1.33, Lv50 ×1.42, Lv100 ×1.56. " +
+             "Drop tehdit başına sabit kaldığı için gelir de aynı oranda artar — " +
+             "daha çok iş, daha çok kaynak; zorluğun bir kısmını oyuncu geri alır.")]
+    public float budgetGrowth = 1.053f;
 
     [Header("Düşman Değeri")]
     [Tooltip("Tehdit puanı başına düşen kaynak. dropGrowth 1.0 olduğu için bu " +

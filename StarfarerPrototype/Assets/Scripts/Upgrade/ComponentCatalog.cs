@@ -280,7 +280,7 @@ public static class ComponentCatalog
     /// <summary>
     /// Bir temel turretin verilen uzmanlaşmadaki hâli.
     /// EFEKTİF_DPS = TEMEL_DPS × hedefleme_çarpanı ≈ 6 (hepsi)
-    ///   Lazer:   TEMEL=4.33, çarpan=1.35 → 5.8 (damage × burnDuration / fireRate = 26×0.5/3)
+    ///   Lazer:   TEMEL=4.33, çarpan=1.35 → 5.8 (damage × görev oranı = 8.67 × 0.5)
     ///   Gatling: sustained = 10×8/(10×1+3) = 80/13 ≈ 6.15
     ///   Roket:   TEMEL=4.0, çarpan=1.5 → 6.0  (60/15)
     ///   PD:      TEMEL=28.6 — YALNIZCA küçük hedef ve en kısa menzil (10.4u);
@@ -311,8 +311,18 @@ public static class ComponentCatalog
             // hiçbir zaman ölçülmemişti; mermili turretler de çoğu hedefi
             // vuruyor. Isınma hiç ıskalamamanın gerçek değeri ~1.35; hedefi
             // 4.33 efektif DPS.
+            //
+            // IŞIN DÖNGÜNÜN YARISINDA YANAR (TurretController.LaserDutyCycle):
+            // 3 sn'lik döngüde 1.5 sn ateş, 1.5 sn soğuma. Eskiden 0.5 sn
+            // yanıyordu; yanma 3 katına çıkınca ışının saniyelik hasarı 26 ->
+            // 8.67'ye indi, yani ORTALAMA DPS birebir aynı (4.33). Değişen tek
+            // şey hasarın zamana yayılması.
+            //
+            // Bedeli zırhta: ışın zırhı saniyelik hasardan düşerek öder
+            // (BalanceConfig.BeamArmorEfficiency), yani aynı ortalama DPS'i daha
+            // düşük yoğunlukla veren ışın zırha karşı daha çok kaybeder.
             TurretSpecType.Laser        => Spec(baseDef, spec, specCost: 30,
-                fireRate: 3f,  damage: 26f, speed: 14f,  life: 4f,   energy: 3f, burnDuration: 0.5f),
+                fireRate: 3f,  damage: 8.67f, speed: 14f,  life: 4f,   energy: 3f),
             TurretSpecType.Plasma       => Spec(baseDef, spec, specCost: 40,
                 fireRate: 6f,  damage: 36f, speed: 5f,   life: 4f,   energy: 4f),
             // FLAK — kalabalığın cevabı. Tek hedefe karşı diğerleriyle AYNI
@@ -355,11 +365,16 @@ public static class ComponentCatalog
             // Nükleer, sahne kalabalıkken açık ara üstündür (3.2 yarıçap bir
             // formasyonun tamamını kapsar) ve boss'ta belirgin biçimde zayıftır.
             //
-            // Menzil 27'de tutuldu (hız 2.5 × ömür 10.8) — diğer roketlerle
+            // Menzil 27'de tutuldu (hız 1.25 × ömür 21.6) — diğer roketlerle
             // aynı. Yavaş mermi zaten yeterli bir bedel; menzili de kırpmak
             // aynı şeyi iki kez cezalandırmak olurdu.
+            //
+            // Hız 2.5 -> 1.25: ağır bir başlık ağır uçmalı; ekranda süzülüşü
+            // görülebilmeli. Ömür hızla BİRLİKTE ikiye katlandı, yoksa menzil
+            // sessizce 13.5'e düşerdi (bkz. "Mermi Hızı"). Bedeli: menzilin
+            // ucundaki hedefe uçuş 21.6 sn, yani hızlı hedef güdümden kaçabilir.
             TurretSpecType.NuclearRocket => Spec(baseDef, spec, specCost: 55,
-                fireRate: 30f, damage: 110f, speed: 2.5f, life: 10.8f, energy: 2f,
+                fireRate: 30f, damage: 110f, speed: 1.25f, life: 21.6f, energy: 2f,
                 blastRadius: 3.2f),
             _ => baseDef,
         };
@@ -367,7 +382,7 @@ public static class ComponentCatalog
 
     static ComponentDefinition Spec(ComponentDefinition baseDef, TurretSpecType spec, int specCost,
         float fireRate, float damage, float speed, float life, float energy,
-        int mag = 0, float reload = 0f, float burnDuration = 0f, float blastRadius = 0f)
+        int mag = 0, float reload = 0f, float blastRadius = 0f)
     {
         // Ad taban tipin anahtarından gelir; uzmanlaşma eki DisplayName'de
         // turretSpecType'tan üretilir, yani burada birleşik bir metin doğmaz.
@@ -386,7 +401,6 @@ public static class ComponentCatalog
         d.turretEnergyPerShot  = energy;
         d.turretMagazineSize   = mag;
         d.turretReloadTime     = reload;
-        d.turretBurnDuration   = burnDuration;
         d.turretBlastRadius    = blastRadius;
         return d;
     }

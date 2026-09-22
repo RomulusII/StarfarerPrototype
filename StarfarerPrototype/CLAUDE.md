@@ -418,6 +418,22 @@ Eski değerin gerekçesi "ışın hiç ıskalamaz, çarpanı 3.0" idi; o çarpan
 zaman ölçülmemişti ve mermili turretler de çoğu hedefi vuruyor. Isınma
 1.35 kabul edildi. Ana lazer 40 → 46.
 
+**Işın döngünün YARISINDA yanar** (`TurretController.LaserDutyCycle` = 0.5).
+3 sn'lik döngüde 1.5 sn ateş, 1.5 sn soğuma; eskiden 0.5 sn yanıp 2.5 sn
+susuyordu ve ışın çakıp sönen bir flaş gibi okunuyordu. Işının saniyelik
+hasarı 26 → **8.67**: ortalama DPS birebir aynı (4.33), değişen hasarın zamana
+yayılması.
+
+- Yanma süresi ATEŞ HIZI statıyla birlikte kısalır — sabit bir süre olsaydı
+  hızlanan döngü önceki ışın bitmeden yenisini açar, iki ışın üst üste binerdi
+  (eski 0.5 sn'lik yanma Sv8'den sonra zaten biniyordu).
+- Görev oranı sabit olduğu için ateş hızı statı ışının YOĞUNLUĞUNU da çarpar
+  (`LaserBeamDps`); yoksa ortalama DPS'i hiç değiştirmeyen bir yükseltme olurdu.
+- **Bedeli zırhta:** ışın zırhı saniyelik hasarından düşerek öder
+  (`BeamArmorEfficiency`), yani aynı ortalamayı daha düşük yoğunlukla veren ışın
+  zırha karşı daha çok kaybeder — yükseltmesiz, Muhafız aurasındaki (+6) bir
+  hedefe tabana (%10) düşer. Oyunda denenmedi.
+
 ### Düz Düşman Statı — Tasarım Kararları
 
 **Çöp gemilerin statı levelle BÜYÜMEZ.** Bir Swarm 1. levelde neyse 100.
@@ -1181,7 +1197,7 @@ ve gelir yalnızca wave bütçesiyle büyüyordu; 100. levelde gereken kaynağı
 
 | Bileşen | Formül | Lv1 → Lv100 |
 |---|---|---|
-| Level tehdit bütçesi | `7 × 1.05093^(n−1)` | 7 → 957 (137× daha çok düşman) |
+| Level tehdit bütçesi | `9 × 1.053^(n−1)` | 9 → 1.494 (r8; önceden `7 × 1.05093^(n−1)`, 7 → 957) |
 | Tehdit başına drop | `1.8972` (SABİT) | değişmez |
 | Asteroit bütçesi | `10 × 1.035^(n−1)` | 10 → 301 |
 | Boss primi | `25 × drop × 3` | bölüm kapanışı |
@@ -1419,7 +1435,7 @@ Slot'a kurulunca otomatik ateş açar, oyuncu müdahalesi gerekmez. Enerji tüke
 | **Plazma** | Düşük (20f) | Orta | Düşük | Yüksek | 4s | — |
 | **Lazer** | Orta (5f) | Orta | Yüksek | Yüksek | 4s | — |
 | **Roket** | Çok düşük (15f) | Yüksek | Orta | Düşük | 7.7s | Güdümlü, **çarpınca patlar** (yarıçap 1.2) |
-| **Nükleer Başlık** | Çok düşük (30f) | Çok yüksek (110) | Düşük (2.5) | Orta | 10.8s | Güdümlü, hantal döner, **yarıçap 3.2** |
+| **Nükleer Başlık** | Çok düşük (30f) | Çok yüksek (110) | Çok düşük (**1.25**) | Orta | **21.6s** | Güdümlü, hantal döner, **yarıçap 3.2** |
 | **Flak** | Hızlı (2f) | Düşük (12) | Orta (6) | Orta | 4.5s | **Yarıçap 1.8** — kalabalığın cevabı |
 | **Point Defence** | Çok hızlı (0.28f) | Düşük/atış, **28.6 DPS** | **Çok yüksek (20)** | Düşük | 0.6s | Menzil 10.4 — önce mühimmat, sonra hafif gövde, sonra her şey |
 
@@ -1582,6 +1598,26 @@ roketlerin sonucu görüldükten sonra, kalabalık cevabı hâlâ eksikse ele al
 **Oyunda denenmedi.** Yarıçaplar (1.2 / 1.8 / 3.2) formasyon aralığından
 tahmin edildi, ölçülmedi. Sim bunları ölçemiyor — sahte oyuncu uzmanlaşma
 satın almıyor.
+
+### Mermi Görünümü — `ProjectileLook`
+
+Mermiler oyun ölçeğinde neredeyse görünmüyordu (turret mermisi 0.08 × 0.04
+birim, Swarm mermisi 0.024). Bütün mermiler — ana silah, turret, savaşçı,
+düşman, boss — görselini tek yerden alır:
+
+    görsel ölçek = 1.7 × clamp((hasar / 10)^0.3, 0.85, 2.0)
+
+- **Boyut HASARDAN türer**, mutlak hasardan: yükseltilen mermi büyür (Sv10
+  raylı top 2×), nükleer başlık gatling mermisinden iri görünür. Kayıttan
+  kurulan mermi de boyutunu hasarından bulur, ayrı bir kayıt alanı gerekmez.
+- **Görsel ayrı bir çocuk nesnedir, collider kökte kalır** — bu bir
+  okunabilirlik değişikliği, denge değil. Kökteki ölçekler (boost ×1.5/×0.6,
+  düşman mermisinin hasara bağlı ölçeği) isabet alanı kuralıdır ve aynen
+  duruyor; düşman mermisinde kök ölçeği görselden düşülür, yoksa hasar iki kez
+  sayılırdı.
+- **Parlaklık:** renk %35 beyaza çekilir ve arkasına merminin renginde yumuşak
+  bir hâle (α 0.45) konur. Oyunda denenmedi — kalabalık bir dalgada hâlelerin
+  sahneyi boyayıp boyamadığına bakılmalı (`GlowAlpha`, `GlowSize`).
 
 ### Mermi Hızı — Turretler Ana Silahla Aynı Hızda Atar
 
@@ -2110,7 +2146,7 @@ edilebilirdi, 100 level için edilemez.
 
 | Formül | Değer | Lv100 |
 |---|---|---|
-| Bütçe `ThreatBudget(n)` | `7 × 1.05093^(n−1)` | **957 (137×)** |
+| Bütçe `ThreatBudget(n)` | `9 × 1.053^(n−1)` (r8) | **1.494 (166×)** |
 | Çöp gemi HP / hasar / zırh | **levelden gelmez** | 1.0 / 1.0 / +0 |
 | `EvasionMultiplier(n)` | `n = 1..25 arası doğrusal` | 1.0 |
 | `MobilityMultiplier(n)` | `0.7 → 1.0`, aynı eğri | 1.0 |
@@ -2279,6 +2315,7 @@ bırakıldı.
 | EnemyInfoHUD.cs | Fare düşman üstündeyken sol üstte açılan bilgi kutusu |
 | EnergyBar.cs | Üst HUD şeridi: enerji + metal + kristal barları ve uyarı satırı |
 | HitEffect.cs | Çarpma kıvılcımlarının tek giriş noktası (`SpawnImpact`) + DeathEffect |
+| ProjectileLook.cs | Mermi görünümünün tek sahibi — boyut hasardan türer, parlaklık + hâle; collider'a dokunmaz |
 | SkinLibrary.cs | TÜM görsel üretiminin tek giriş noktası — skin varsa sprite, yoksa prosedürel dikdörtgen |
 | SkinSet.cs | Skin'lerin tek sahibi (SO; Resources/SkinSet.asset). Ana aç/kapa anahtarı burada |
 | SkinId.cs | Skin anahtarları. Düşman/boss anahtarları tip adından türer |

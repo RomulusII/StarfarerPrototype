@@ -30,9 +30,8 @@ public class EnemyBullet : MonoBehaviour
     {
         // Awake'de sadece sprite — targetComponent henüz set edilmemiş olabilir.
         // Collider/Rigidbody ve renk düzeltmesi Start()'ta yapılır.
-        var sr = gameObject.AddComponent<SpriteRenderer>();
-        sr.sprite       = SkinLibrary.Get(SkinId.EnemyBullet, 8, 8, ColHull); // Start'ta gerekirse düzeltilir
-        sr.sortingOrder = 20;
+        ProjectileLook.Apply(gameObject, SkinLibrary.Get(SkinId.EnemyBullet, 8, 8, ColHull),
+                             Color.white, ColHull, 20, damage, cancelRootScale: true); // Start'ta hasar ve tiple düzeltilir
     }
 
     void Start()
@@ -40,10 +39,16 @@ public class EnemyBullet : MonoBehaviour
         // targetComponent bu noktada kesin olarak set edilmiştir
         bool isCompBullet = targetComponent != null;
 
+        // Hasar artık biliniyor: boyut ondan türer (bkz. ProjectileLook)
+        if (isCompBullet)
+            ProjectileLook.Apply(gameObject, SkinLibrary.Get(SkinId.EnemyBulletComponent, 8, 8, ColComponent),
+                                 Color.white, ColComponent, 20, damage, cancelRootScale: true);
+        else
+            ProjectileLook.Apply(gameObject, SkinLibrary.Get(SkinId.EnemyBullet, 8, 8, ColHull),
+                                 Color.white, ColHull, 20, damage, cancelRootScale: true);
+
         if (isCompBullet)
         {
-            GetComponent<SpriteRenderer>().sprite =
-                SkinLibrary.Get(SkinId.EnemyBulletComponent, 8, 8, ColComponent);
             // Komponent mermisi: collider yok — yalnızca proximity ile çarpar
         }
         else

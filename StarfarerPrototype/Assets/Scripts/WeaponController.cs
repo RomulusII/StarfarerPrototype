@@ -246,9 +246,8 @@ public class WeaponController : MonoBehaviour
             transform.rotation);
         go.transform.localScale = Vector3.one * scaleMulti;
 
-        var sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite       = sprite;
-        sr.sortingOrder = 20;
+        // Boyut boost'suz hasardan: boost'un kendi boyut çarpanı zaten kökte
+        ProjectileLook.Apply(go, sprite, Color.white, Bullet.GlowColor, 20, damage);
 
         var b = go.AddComponent<Bullet>();
         b.speed       = speed;
