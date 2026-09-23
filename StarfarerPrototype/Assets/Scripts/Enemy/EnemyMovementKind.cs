@@ -8,4 +8,5 @@ public enum EnemyMovementKind
     BombRun,     // Düz çizgide geçer, bomba atar — Point Defence'in öncelikli hedefi
     AttackRun,   // Yavaş dön, baktığı yöne it, yakında ateş et — geniş kavisler (Bomber)
     Screen,      // Ana geminin önüne geçip bekler; kalkanı bitince kaçar, dolunca döner (Bariyer)
+    Support,     // Korunan geminin ARKASINDA durur; yalnız kalınca uzaklaşıp yana kayar (Muhafız, Besleyici)
 }

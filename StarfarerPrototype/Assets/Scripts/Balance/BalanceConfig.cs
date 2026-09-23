@@ -218,6 +218,12 @@ public class BalanceConfig : ScriptableObject
              "alan bir iz olarak açık ara en verimli yükseltme olurdu.")]
     public float armorStatCostFactor = 3f;
 
+    [Tooltip("Zırh (isabet başına hasar düşümü, onarım biriminin 'plating' izi) " +
+             "maliyet çarpanı. Gövde izinden ucuz: kalabalığa karşı güçlü ama ağır " +
+             "toplara (15–30 hasar) neredeyse dokunmuyor, yani gövde HP'si kadar " +
+             "genel bir hayatta kalma satmıyor.")]
+    public float platingStatCostFactor = 2f;
+
     [Tooltip("Kapasitör (enerji tamponu) statının maliyet çarpanı. Jeneratörün " +
              "üretim iziyle aynı tabanı paylaşıyordu, oysa ikisi aynı şeyi " +
              "satmıyor: üretim her saniyeye, tampon yalnızca BURST anlarına " +
@@ -245,6 +251,7 @@ public class BalanceConfig : ScriptableObject
     public float StatCostFactor(string key) => key switch
     {
         "armor"     => armorStatCostFactor,
+        "plating"   => platingStatCostFactor,
         "capacitor" => capacitorStatCostFactor,
         _           => 1f,
     };

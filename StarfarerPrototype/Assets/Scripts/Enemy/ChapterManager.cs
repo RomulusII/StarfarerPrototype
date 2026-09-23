@@ -784,19 +784,24 @@ public class ChapterManager : MonoBehaviour
 
         while (budget > 0 && safety-- > 0)
         {
-            // Refakat gerektiren tipler (siper gemileri) ancak dalgada koruyacak
-            // biri VARSA seçilebilir — yalnız gelen bir bariyer bir olay değil,
-            // yalnızca bir gecikmedir.
-            bool hasEscorted = false;
+            // Refakat gerektiren tipler (siper ve destek gemileri) ancak dalgada
+            // koruyacak biri VARSA seçilebilir — yalnız gelen bir bariyer bir
+            // olay değil, yalnızca bir gecikmedir. Besleyici ayrıca KALKANLI
+            // birini ister (bkz. EnemyTypeData.EscortSatisfied).
+            bool hasEscorted = false, hasShielded = false;
             foreach (var t in list)
-                if (t != null && !t.RequiresEscort) { hasEscorted = true; break; }
+            {
+                if (t == null) continue;
+                if (t.CountsAsEscort) hasEscorted = true;
+                if (t.maxShield > 0f && !t.IsSupport) hasShielded = true;
+            }
 
             // Bütçeye sığan tipleri filtrele
             var affordable = new List<EnemyTypeData>();
             foreach (var t in pool)
             {
                 if (t == null || t.threatScore > budget) continue;
-                if (t.RequiresEscort && !hasEscorted) continue;
+                if (!t.EscortSatisfied(hasEscorted, hasShielded)) continue;
                 affordable.Add(t);
             }
 
@@ -818,7 +823,7 @@ public class ChapterManager : MonoBehaviour
                 {
                     EnemyTypeData cheapest = null;
                     foreach (var t in pool)
-                        if (t != null && !t.RequiresEscort &&
+                        if (t != null && t.CountsAsEscort &&
                             (cheapest == null || t.threatScore < cheapest.threatScore))
                             cheapest = t;
                     if (cheapest != null) list.Add(cheapest);

@@ -335,12 +335,14 @@ public class EnemySpawner : MonoBehaviour
             EnemyTypeData.CreateJuggernaut(),
             EnemyTypeData.CreateWarden(),
             EnemyTypeData.CreateBastion(),
+            EnemyTypeData.CreateConduit(),
         };
         _defaultWeights = new[]
         {
             0.28f, 0.12f, 0.09f, 0.07f, 0.05f, 0.05f,
             0.08f, 0.06f, 0.05f, 0.05f, 0.05f, 0.03f, 0.02f,
-            0.03f, 0.01f,   // Muhafız, Tabya — tip kilidi (tehdit 10 / 55) zaten geç açar
+            0.03f, 0.01f,   // Muhafız, Tabya — tip kilidi (tehdit 8 / 55) zaten geç açar
+            0.03f,          // Besleyici — sahada kalkanlı gemi yoksa hiç seçilmez
         };
     }
 
@@ -809,6 +811,7 @@ public class EnemySpawner : MonoBehaviour
 
     readonly Dictionary<string, int> _aliveByType = new();
     bool _hasEscorted;
+    bool _hasShielded;   // Besleyici'nin dolduracağı kalkanlı bir gemi var mı
     int  _barriers;
 
     /// <summary>Dalga kurulmaya başlarken sahnenin durumunu okur.</summary>
@@ -816,6 +819,7 @@ public class EnemySpawner : MonoBehaviour
     {
         _aliveByType.Clear();
         _hasEscorted = false;
+        _hasShielded = false;
         _barriers    = 0;
 
         if (alive == null) return;
@@ -834,7 +838,8 @@ public class EnemySpawner : MonoBehaviour
     {
         if (t == null) return;
         if (t.RequiresEscort) _barriers++;
-        else                  _hasEscorted = true;
+        if (t.CountsAsEscort) _hasEscorted = true;
+        if (t.maxShield > 0f && !t.IsSupport) _hasShielded = true;
 
         _aliveByType.TryGetValue(t.name, out int c);
         _aliveByType[t.name] = c + 1;
@@ -846,6 +851,7 @@ public class EnemySpawner : MonoBehaviour
         if (t == null || t.threatScore > threatCap) return false;
         if (t.threatScore > budgetLeft)             return false;
         if (t.RequiresEscort && !barriersAllowed)   return false;
+        if (!t.EscortSatisfied(_hasEscorted, _hasShielded)) return false;
 
         if (t.threatScore >= heavyAt)
         {

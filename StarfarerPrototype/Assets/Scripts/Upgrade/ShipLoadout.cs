@@ -388,9 +388,11 @@ public class ShipLoadout : MonoBehaviour
         var comp = _slots[slotIndex];
         if (comp != null && stats != null)
         {
-            foreach (var kv in stats) comp.StatLevels[kv.Key] = kv.Value;
+            foreach (var kv in stats)
+                if (!ComponentCatalog.IsRetiredStat(kv.Key)) comp.StatLevels[kv.Key] = kv.Value;
             comp.SetEnergyBase(def.baseEnergyCost);
-            foreach (var key in stats.Keys) comp.OnStatUpgraded(key);
+            foreach (var key in stats.Keys)
+                if (!ComponentCatalog.IsRetiredStat(key)) comp.OnStatUpgraded(key);
         }
         return true;
     }

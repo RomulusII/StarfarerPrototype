@@ -85,6 +85,19 @@ public static class GameVersion
     ///       Lazer turreti döngünün yarısında yanıyor (1.5 sn / 3 sn), ışın
     ///       DPS'i 26 -> 8.67 — ortalama DPS aynı, zırha karşı daha zayıf.
     ///       Nükleer başlık hızı 2.5 -> 1.25 (menzil korunarak).
+    ///   9 — DESTEK GEMİLERİ. Muhafız silahsız bir destek gemisine döndü
+    ///       (tehdit 10 -> 8): en yakın gemiye bağlanıp onun arkasında durur,
+    ///       yalnız kalınca uzaklaşır. Yeni tip Besleyici (tehdit 8): 2 sn'de bir
+    ///       yaydığı dalga kalkanlı gemileri maks. kalkanlarının %20'si kadar
+    ///       doldurur. 6, 7, 8 ve 10. bölüm havuzlarında. Kalkanlı gemilerin
+    ///       dayanıklılığı ve Muhafız'lı dalgaların DPS'i önceki revizyonlarla
+    ///       kıyaslanamaz.
+    ///  10 — ANA GEMİYE ZIRH. Onarım biriminin "Enerji Verimi" izi kaldırıldı,
+    ///       yerine Zırh geldi: gövdeye gelen her isabetten seviye × 0.5 düşer
+    ///       (düşmanlardaki eşik formülü; ışında oran). Komponentlere işlemez,
+    ///       birden fazla birimde en yükseği geçerli ve yalnızca biri taşıyabilir.
+    ///       Onarım birimi boştayken artık enerji çekmiyor (eskiden sürekli
+    ///       1/sn). `player_damage` olayı `zirh` alanını taşır.
     /// </summary>
-    public const int Denge = 8;
+    public const int Denge = 10;
 }

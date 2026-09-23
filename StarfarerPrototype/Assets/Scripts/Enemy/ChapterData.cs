@@ -71,6 +71,11 @@ public class ChapterData : ScriptableObject
         var warden      = EnemyTypeData.CreateWarden();
         var bastion     = EnemyTypeData.CreateBastion();
 
+        // Besleyici kalkanlı gemileri doldurur; yalnızca havuzunda kalkanlı tip
+        // (Kalkan, Karıştırıcı, Bariyer) olan bölümlere girer. 9. bölümde hiç
+        // kalkanlı tip yok — orada dalgaya giremez, havuza konmaz.
+        var conduit     = EnemyTypeData.CreateConduit();
+
         return new[]
         {
             Make(1,
@@ -100,18 +105,18 @@ public class ChapterData : ScriptableObject
 
             Make(6,
                 introduced: artillery,
-                pool: new[] { swarm, armored, shield, barrier, interceptor, artillery, warden },
+                pool: new[] { swarm, armored, shield, barrier, interceptor, artillery, warden, conduit },
                 asteroids: 4),
 
             Make(7,
                 introduced: jammer,
-                pool: new[] { swarm, armored, interceptor, artillery, jammer, phantom, warden },
+                pool: new[] { swarm, armored, interceptor, artillery, jammer, phantom, warden, conduit },
                 asteroids: 4),
 
             Make(8,
                 introduced: regenerator,
                 pool: new[] { swarm, armored, shield, barrier, interceptor, jammer, regenerator, leech,
-                              warden, bastion },
+                              warden, bastion, conduit },
                 asteroids: 4),
 
             Make(9,
@@ -123,7 +128,8 @@ public class ChapterData : ScriptableObject
             Make(10,
                 introduced: juggernaut,
                 pool: new[] { armored, shield, barrier, interceptor, artillery, jammer,
-                              phantom, regenerator, splitter, juggernaut, warden, bastion },
+                              phantom, regenerator, splitter, juggernaut, warden, bastion,
+                              conduit },
                 asteroids: 4),
         };
     }

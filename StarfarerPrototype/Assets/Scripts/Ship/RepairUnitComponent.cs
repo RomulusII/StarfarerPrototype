@@ -5,18 +5,37 @@ using UnityEngine;
 /// Pasif tamir ünitesi. Sahnedeki hasarlı komponentleri enerji harcayarak
 /// yavaşça tamir eder. Bir anda tek komponenti hedefler: HP oranı en düşük olan.
 ///
-/// Ayrıca gövde ZIRHINI taşır: "armor" statı ana geminin max HP'sini yükseltir.
-/// Onarım birimine bağlanmasının sebebi tematik değil, yapısal — gövde bakımı
-/// zaten bu modülün işi ve zırh, tamir hızıyla aynı slotta rekabet ediyor:
-/// "daha çok HP" ile "HP'yi daha hızlı geri kazan" arasında bir seçim doğuyor.
+/// Ayrıca ana geminin gövdesini taşır — iki ayrı iz, iki ayrı soru:
+///
+///   Gövde ("armor")   — max gövde HP'si. "Daha çok HP."
+///   Zırh  ("plating") — gövdeye gelen HER İSABETTEN sabit hasar düşer,
+///                       düşmanlardaki zırh eşiğinin aynısı. "Küçük isabetler
+///                       sayılmasın."
+///
+/// Onarım birimine bağlanmalarının sebebi tematik değil, yapısal — gövde bakımı
+/// zaten bu modülün işi ve ikisi tamir hızıyla aynı slotta rekabet ediyor.
+///
+/// Gövde izinin anahtarı tarihsel olarak "armor"dır ve kayıtlarda o adla
+/// duruyor; ekranda "Gövde" yazar. Zırh izi eski "Enerji Verimi"nin yerini aldı
+/// (o iz, en yüksek iz olduğunda tasarruf ettiğinden fazla enerji yakıyordu).
 /// </summary>
 public class RepairUnitComponent : ShipComponentBase
 {
     public float repairRate      = 8f;
     public float energyPerRepair = 1f;
 
-    /// <summary>Zırh statının anahtarı — UpgradeUI, BalanceConfig ve kayıt aynı adı kullanır.</summary>
+    /// <summary>Gövde (max HP) izinin anahtarı — kayıtla uyum için adı "armor" kaldı.</summary>
     public const string ArmorKey = "armor";
+
+    /// <summary>Zırh (isabet başına hasar düşümü) izinin anahtarı.</summary>
+    public const string PlatingKey = "plating";
+
+    /// <summary>
+    /// Seviye başına zırh. 0.5: Sv2 = 1 zırh Swarm'ın 3 hasarlı mermisini 2'ye
+    /// indirir, Sv6 = 3 zırh onu tabana (%10) düşürür. Ağır toplara (15–30)
+    /// neredeyse dokunmaz — kalabalığın cevabıdır, ağır tipleri önemsizleştirmez.
+    /// </summary>
+    public const float PlatingPerLevel = 0.5f;
 
     // Kurulu onarım birimlerinin kaydı. FindObjectsByType her yükseltmede
     // taranabilirdi ama OnDisable sırasında yok edilmekte olan komponent hâlâ
@@ -48,7 +67,7 @@ public class RepairUnitComponent : ShipComponentBase
         if (key == ArmorKey) RefreshHullArmor();
     }
 
-    // ── Zırh ──────────────────────────────────────────────────────────────────
+    // ── Gövde ─────────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Bu birimin gövdeye kattığı EK HP. Çarpan değil toplam kullanılır: iki
@@ -59,7 +78,7 @@ public class RepairUnitComponent : ShipComponentBase
     public float HullBonus(float baseHull)
         => baseHull * (BalanceConfig.Instance.StatMultiplier(GetStatLevel(ArmorKey)) - 1f);
 
-    /// <summary>Sahnedeki tüm onarım birimlerinin zırhını toplayıp gemiye uygular.</summary>
+    /// <summary>Sahnedeki tüm onarım birimlerinin gövde bonusunu toplayıp gemiye uygular.</summary>
     public static void RefreshHullArmor()
     {
         var ship = FindFirstObjectByType<PlayerShip>();
@@ -74,18 +93,49 @@ public class RepairUnitComponent : ShipComponentBase
         ship.SetMaxHull(ship.baseMaxHullHP + bonus);
     }
 
+    // ── Zırh ──────────────────────────────────────────────────────────────────
+
+    /// <summary>Bu birimin zırhı (seviye × 0.5).</summary>
+    public float Plating => GetStatLevel(PlatingKey) * PlatingPerLevel;
+
+    /// <summary>
+    /// Ana geminin gövde zırhı — çalışan birimlerin EN YÜKSEĞİ, toplamı değil.
+    /// Zırh bir eşiktir; toplansaydı iki birim Swarm'ı hiç hasar veremez hâle
+    /// getirirdi. Hasarlı/deaktif birimin zırhı sayılmaz: gövde bakımını yapan
+    /// modül çalışmıyorsa kaplama da tutmaz.
+    /// </summary>
+    public static float HullPlating
+    {
+        get
+        {
+            float best = 0f;
+            foreach (var ru in s_units)
+                if (ru != null && ru.IsOperational && ru.Plating > best) best = ru.Plating;
+            return best;
+        }
+    }
+
+    /// <summary>
+    /// Bu birime zırh yükseltmesi satılabilir mi? Yalnızca BAŞKA bir birimde
+    /// zırh yokken. En yüksek geçerli olduğu için ikinci birime basılan zırh
+    /// hiçbir şey yapmazdı — oyuncuyu boş bir yükseltmeye ödeme yaptırmak yerine
+    /// iz o birimde hiç listelenmez. Zırhlı birim satılırsa iz yeniden açılır.
+    /// </summary>
+    public bool CanTakePlating
+    {
+        get
+        {
+            foreach (var ru in s_units)
+                if (ru != null && ru != this && ru.GetStatLevel(PlatingKey) > 0) return false;
+            return true;
+        }
+    }
+
     // ── Tamir ─────────────────────────────────────────────────────────────────
 
     void Update()
     {
         if (!IsOperational) return;
-
-        float effectiveRate   = repairRate     * GetMultiplier("repairRate");
-        float effectiveEnergy = energyPerRepair / GetMultiplier("energyEfficiency");
-
-        if (EnergyBus.Instance == null ||
-            !EnergyBus.Instance.RequestEnergy(effectiveEnergy * Time.deltaTime))
-            return;
 
         ShipComponentBase compTarget = FindMostDamagedComponent();
         float compRatio = compTarget != null && compTarget.maxHP > 0f
@@ -95,10 +145,22 @@ public class RepairUnitComponent : ShipComponentBase
         float hullRatio = ps != null && ps.maxHullHP > 0f
             ? ps.currentHullHP / ps.maxHullHP : 1f;
 
+        bool repairHull = ps != null && hullRatio < 1f && hullRatio <= compRatio;
+
+        // Onarılacak bir şey yoksa enerji ÇEKİLMEZ. Eskiden istek aramadan önce
+        // yapılıyordu: birim boştayken de saniyede 1 enerji yakıyordu.
+        if (!repairHull && compTarget == null) return;
+
+        float effectiveRate = repairRate * GetMultiplier("repairRate");
+
+        if (EnergyBus.Instance == null ||
+            !EnergyBus.Instance.RequestEnergy(energyPerRepair * Time.deltaTime))
+            return;
+
         // En çok hasarlı hedefi onar (hull veya komponent)
-        if (ps != null && hullRatio < 1f && hullRatio <= compRatio)
+        if (repairHull)
             ps.currentHullHP = Mathf.Min(ps.maxHullHP, ps.currentHullHP + effectiveRate * Time.deltaTime);
-        else if (compTarget != null)
+        else
             compTarget.Repair(effectiveRate * Time.deltaTime);
     }
 

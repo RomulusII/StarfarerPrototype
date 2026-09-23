@@ -216,6 +216,8 @@ public class EnemyInfoHUD : MonoBehaviour
         if (d.phaseInterval > 0f) sb.AppendLine(Loc.T("enemyinfo.phase", d.phaseInterval, d.phaseDuration));
         if (d.repairAura    > 0f) sb.AppendLine(Loc.T("enemyinfo.repairAura", d.repairAura, d.repairAuraRange));
         if (d.armorAura     > 0f) sb.AppendLine(Loc.T("enemyinfo.armorAura",  d.armorAura,  d.armorAuraRange));
+        if (d.shieldPulse   > 0f) sb.AppendLine(Loc.T("enemyinfo.shieldPulse", d.shieldPulse * 100f,
+                                                 d.shieldPulseInterval, d.shieldPulseRange));
         if (d.splitInto  != null) sb.AppendLine(Loc.T("enemyinfo.split", d.splitHpRatio * 100f));
         if (bot.IsPhased)         sb.AppendLine(Loc.T("enemyinfo.phased"));
 
@@ -272,6 +274,7 @@ public class EnemyInfoHUD : MonoBehaviour
         EnemyMovementKind.Stationary => Loc.T("enemy.move.stationary"),
         EnemyMovementKind.BombRun    => Loc.T("enemy.move.bombRun"),
         EnemyMovementKind.AttackRun  => Loc.T("enemy.move.attackRun"),
+        EnemyMovementKind.Support    => Loc.T("enemy.move.support"),
         _                            => m.ToString(),
     };
 

@@ -94,7 +94,8 @@ Motor, Enerji Jeneratörü, Kalkan, Ana Silah (slot 1), Otomatik Turretler, İki
 | **Splitter** (Bölünen) | 8 | Ölünce ikiye ayrılır (%50 HP) | Alan hasarı talebi |
 | **Juggernaut** (Kaleci) | 27 | Zırh +12, çok yavaş, 200 HP | Zırh eşiğinin doruk testi |
 | **Barrier** (Bariyer) | 7 | Silahsız; önünde YÖNLÜ yay kalkanı, ana geminin önüne park eder | Ateş hattı — del, dolan ya da bekle |
-| **Warden** (Muhafız) | 10 | Çevresindeki DİĞER gemilere +6 zırh aurası; kendisi 70 HP | Öncelik hedefleme — sürüyü PD/flak'e karşı zırhlar |
+| **Warden** (Muhafız) | 8 | Silahsız destek; bağlandığı geminin arkasında durur, çevresine +6 zırh aurası; kendisi 70 HP | Öncelik hedefleme — sürüyü PD/flak'e karşı zırhlar |
+| **Conduit** (Besleyici) | 8 | Silahsız destek; kalkanlı bir geminin arkasında durur, 2 sn'de bir kalkanları %20 dolduran dalga yayar | Kalkan kırmak bir yarış olur — önce Besleyici |
 | **Bastion** (Tabya) | 55 | Zırh 20, 400 HP, mevzi tutar (HoverFire) | Atış başına hasar — flak ve PD'nin doğal cevabı |
 
 Jammer `EnergyBus.JamFactor` üzerinden üretimi kısar; Phantom faz sırasında
@@ -620,7 +621,8 @@ kendi kendine prim yazmaz.
 | Onarıcı | 5.15 | 2.67 | 4.4 | +7 | **11** | 13 |
 | Bomb Runner | 2.00 | 20.00 | 9.8 | +3 | **13** | 12 |
 | Kaleci | 12.13 | 7.33 | 23.6 | +3 | **27** | 20 |
-| Muhafız | 4.01 | 2.50 | 3.3 | +7 | **10** | — |
+| Muhafız | 4.01 | 0.00 | 0.9 | +7 | **8** | 10 |
+| Besleyici | 3.43 | 0.00 | 0.8 | +7 | **8** | — |
 | Tabya | 22.90 | 8.33 | 50.0 | +5 | **55** | — |
 
 **Bariyer 3 → 7 bilinçli bir geri dönüştür.** Daha önce 8'den 3'e indirilmişti
@@ -647,9 +649,9 @@ FARKLI bir iş yapar. Tanıtılan tip değiller, havuzlara eklenirler.
 
 | | Tabya | Muhafız |
 |---|---|---|
-| Tehdit | **55** | **10** |
+| Tehdit | **55** | **8** (eskiden 10) |
 | HP / zırh | 400 / **20** | 70 / 2 |
-| Davranış | mevzi tutar (HoverFire), top 30 hasar / 6 sn | arkada durur, zayıf lazer |
+| Davranış | mevzi tutar (HoverFire), top 30 hasar / 6 sn | silahsız destek — bkz. "Destek Gemileri" |
 | Havuzda | 8. bölümden (level 71) | 6. bölümden (level 51) |
 | Sınadığı | atış başına hasar | öncelik hedefleme |
 
@@ -677,7 +679,7 @@ hedefleme sınavına** döner — Karıştırıcı'nın enerjiye yaptığını z
 | **Üst üste binmez** — en yüksek aura geçerli | Toplansaydı üç Muhafız aynı Swarm'a +18 verir ve onu her silaha karşı ölümsüz yapardı |
 | **Kendini korumaz**, 70 HP | Öncelik hedefi olduğu açık kalmalı |
 | **Süreli verilir** (0.6 sn, tazeleme 0.25 sn) | Menzilden çıkan gemi kendiliğinden kaybeder — ayrı bir "kaldır" yolu yok |
-| **Menzil halkası görünür** (soluk altın) | Görünmeyen aura "bu neden ölmüyor" sorusunu cevapsız bırakırdı |
+| **Aura görünür** — zırh verdiği her gemiye soluk bir ışın | Görünmeyen aura "bu neden ölmüyor" sorusunu cevapsız bırakırdı (bkz. "Destek Gemileri — görsel dil") |
 
 Onarıcı ile Muhafız **tek tarama ve tek sayacı** paylaşır (`EnemyBot.UpdateAuras`,
 `_auraTimer`): ikinci bir sayaç, kayda eklenmesi unutulacak ikinci bir alan
@@ -688,7 +690,90 @@ olurdu. Alınan aura zırhı ve kalan süresi kayda girer. Düşman bilgi kutusu
 ölçekten: Tabya +5 (zırh 20; Kaleci'nin 12'si +3), Muhafız +7 (Onarıcı'nın
 aurasıyla aynı).
 
-**Skin yok** — ikisi de prosedürel dikdörtgenle çiziliyor. **Oyunda denenmedi.**
+**Tabya'nın skin'i yok** — prosedürel dikdörtgenle çiziliyor. Muhafız'ınki var
+(bkz. "Destek Gemileri"). **Oyunda denenmedi.**
+
+### Destek Gemileri — Muhafız ve Besleyici
+
+İki SİLAHSIZ gemi, ikisi de başka bir gemiyi güçlendirir. Muhafız ilk hâlinde
+zayıf lazerli bir HoverFire gemisiydi; tehdidinin tamamı zaten aurasıydı ve
+silah yalnızca onu ateş hattına sokuyordu. Besleyici onun kalkan eşleniği.
+
+| | Muhafız | Besleyici |
+|---|---|---|
+| Tehdit | **8** | **8** |
+| HP / zırh | 70 / 2 | 60 / 0 |
+| Etki | menzildeki (4.5) DİĞER her gemiye **+6 zırh** | 2 sn'de bir dalga; ulaştığı kalkanlı gemiyi **maks. kalkanının %20'si** kadar doldurur |
+| Kimi korur | destek olmayan her gemiyi | yalnızca KALKANLI gemileri (Kalkan, Karıştırıcı, Bariyer) |
+| Havuzda | 6–10. bölüm | 6, 7, 8, 10 — 9. bölümde kalkanlı tip yok |
+
+**Hareket — `EnemyMovementKind.Support`** (`EnemyBot.UpdateSupport`):
+
+| Durum | Davranış |
+|---|---|
+| Korunacak gemi var | En yakınına bağlanır, onun oyuncuya göre **arkasında** (1.8 birim) durur; burnu korunana dönük |
+| Yalnız | Oyuncudan en az 10 birim uzağa çekilir, alanda kalır, yavaşça yana kayar (genlik 2, periyot 10 sn); burnu oyuncuya dönük |
+
+- **Bağ yapışkandır:** korunan ölene kadar hedef değişmez. Her taramada en
+  yakını seçseydi iki gemi arasında gidip gelir, hiçbirinin arkasında duramazdı.
+- **Çekilme noktası yalnız kaldığı AN bir kez seçilir** (`_retreatAnchor`, kayda
+  girer). Her karede "oyuncudan uzağa" yeniden hesaplansaydı yana kayma yönü
+  kendi hareketiyle döner ve gemi oyuncunun etrafında yörüngeye girerdi.
+- **Oyun alanından ÇIKMAZ.** Dalga temizlenmesini engeller (`BlocksWaveClear`),
+  yani oyuncu onu kovalayıp bitirmek zorunda; kaçıp kaybolsaydı leveli
+  kilitlerdi. Çekilme noktası varsayılan kadrajın içinde (sağ kenar ~12.6).
+- **Manevra iticili** (`omniThrust`), siperle aynı gerekçe: bir noktayı tutar,
+  kavis çizmez.
+- Hız 2.0 — korunana yetişebilmeli (Kalkan 2.0, Swarm 2.76).
+
+**Dalga kuruluşu — refakat kuralı** (`EnemyTypeData.EscortSatisfied`). Destek
+gemisi ancak dalgada koruyacağı biri VARSA seçilir; Besleyici için bu biri
+kalkanlı olmalı. Destek gemileri refakat SAYILMAZ (`CountsAsEscort`) — iki
+Muhafız birbirini koruyarak bir dalga oluşturamaz. Kampanyanın dalga dolumu
+(`FillByBudget`) ve serbest mod (`RollUnlockedType`) aynı soruyu aynı yerden sorar.
+
+**Besleyici'nin dalgası:**
+
+| Karar | Gerekçe |
+|---|---|
+| Dolum hedefin **şarj gecikmesini beklemez** | Bütün anlamı bu: kalkanı dövülen gemi normalde ateş kesilene kadar şarj olmaz, Besleyici o sırada da doldurur. Kalkan kırmak bir yarışa döner |
+| Etki cephe gemiye **VARDIĞI AN** | Anında değil: oyuncu dolumu dalganın gemiye değdiği anda görür. Cephe yarıçapı hem etkiyi hem görseli verir (`PulseRadius`) — ayrı yaşasalar saparlardı |
+| Yolculuk **1.2 sn**, yavaşlayarak (`1−(1−x)²`) | "Çok hızlı olmayan" — radyasyon gibi yayılır, şok dalgası gibi fırlamaz |
+| **Üst üste binmez** — alan gemi 1.5 sn yeni dalga almaz | Yolculuktan uzun, aralıktan kısa: tek Besleyici her dalgasında doldurur, ikincisi araya giremez. İki Besleyici bir Kalkan'ı ölümsüz yapmamalı |
+| Dolan kalkanda **isabet hilali** yanar | Oyuncu kalkanın nerede olduğunu zaten o dilden okuyor |
+| Aynı dalgadaki iki Besleyici senkron atmaz | Sayaç doğuşta rastgele fazla başlar |
+
+**Bariyer + Besleyici ölçülmedi.** 170'lik kalkana her dalga 34 ekliyor
+(17/sn), Bariyer'in kendi şarjı 24/sn ve 2.5 sn gecikmeli. Birlikte Bariyer'in
+"boşalt, pencereyi kullan" mekaniğini kapatabilirler. Oran tip başına
+ayrılmadı — önce oyunda görülecek.
+
+**Görsel dil — iki gemi iki ayrı dil konuşur** (`SupportAuraFx`). İkisi de
+"bu gemi neden ölmüyor" sorusunun cevabı ve cevaplar karışmamalı:
+
+- **Muhafız:** zırh verdiği her gemiye soluk bir ışın huzmesi; huzmenin içinde
+  gemiden hedefe akan soluk zırh ikonları (küçük arma kalkanı). Kimin
+  korunduğunu TEK TEK gösterir. Bağlar aura taramasıyla (0.25 sn) kurulup kopar.
+- **Besleyici:** merkezden dışa yayılan, önde bir halka ve arkasında daha silik
+  ikincisi — bir dalga. Rengi düşman kalkanlarının turuncusu: doldurduğu şeyin rengi.
+- **Menzil halkası ikisinde de çok soluk** (α 0.05 / 0.04; Muhafız'ınki eskiden
+  0.22'ydi). Aura bir KALKAN değildir ve kalkan kabuğunun diliyle — parlak
+  kenarlı daire — konuşmamalı; eski hâli bir küre kalkan gibi okunuyordu.
+
+**Sprite'lar** (`Tools/SkinGen/enemies.js`): Muhafız ince bir gövde ve iki
+yanında ona DEĞMEYEN iki kalın zırh plakası — zırhı kendine giymiyor, dışarı
+uzatıyor; burundaki prizma ışınların çıktığı yer. Onarıcı'nın yuvarlak emitör
+halkasından bilinçli olarak köşeli. Besleyici ortada iç içe halkalı iri bir
+reaktör ve çapraz dört radyatör kanadı — dışarı bir şey YAYAN, X'e yakın,
+oyundaki hiçbir gemiye benzemeyen bir siluet. Hitbox içi doluluk %74.2 / %68.6.
+
+**Kayıt:** bağ (kimlikle), tarama sayacı, çekilme noktası, dalga sayacı ve yaşı,
+alıcının kilit süresi. Salınım fazı ve yanal pay siperin alanlarını paylaşır —
+iki hareket tipi aynı gemide bir arada olamaz. Dalganın aday listesi kaydedilmez,
+kayıttan dönünce ilk karede yeniden toplanır. **Kaydet → yükle → kaydet testi
+koşulmadı.**
+
+**Oyunda denenmedi.**
 
 ### Zırh Eşiği — Tasarım Kararları
 
@@ -755,7 +840,7 @@ halkasından (Mk2) alındı; tier'ların taşıdığı güç stat eğrisine devr
 |---|---|---|---|---|---|
 | Kalkan Jeneratörü | Kristal | 45 | 100 kalkan, 1.8 şarj | 931, 16.8 | Max Kalkan · Şarj Hızı |
 | Enerji Jeneratörü | Metal | 65 | 18 üretim | 168 | Üretim · **Kapasitör** |
-| Onarım Birimi | Metal | 55 | 4.0 tamir | 37 | Tamir Hızı · Enerji Verimi · **Zırh** |
+| Onarım Birimi | Metal | 55 | 4.0 tamir | 37 | Tamir Hızı · **Zırh** · **Gövde** |
 | Depo | Metal | **50** | +900 metal / +350 kristal | +8.381 / +3.259 | Kapasite |
 | Hangar | Metal | 20 | 1 toplayıcı, 0 savaşçı | — | 7 iz (bkz. HangarComponent) |
 | Raylı / Enerji Turret | Metal | 22 | DPS 6 | DPS 56 | Hasar · Ateş Hızı |
@@ -821,7 +906,9 @@ Büyüme seviye içinde çarpımsal, **jeneratörler arası toplamsaldır** (zı
 aynı gerekçe): çarpımsal olsaydı ikinci jeneratör birincinin katı kadar tampon
 üretir ve tek doğru oyun "hepsini jeneratörle doldur" olurdu.
 
-**Zırh — onarım biriminin üçüncü izi.** Ana geminin `maxHullHP`'sini yükseltir.
+**Gövde — onarım biriminin üçüncü izi** (anahtarı tarihsel olarak `armor`;
+kayıtlarda o adla durur, ekranda eskiden "Zırh" yazıyordu). Ana geminin
+`maxHullHP`'sini yükseltir.
 Onarım birimine bağlanması tematik değil yapısal: gövde bakımı zaten o modülün
 işi ve zırh aynı slotta tamir hızıyla rekabet ediyor — "daha çok HP" ile "HP'yi
 daha hızlı geri kazan" arasında gerçek bir seçim doğuyor. Bonuslar **toplanır**,
@@ -829,6 +916,40 @@ daha hızlı geri kazan" arasında gerçek bir seçim doğuyor. Bonuslar **topla
 onarım birimi birincinin katı kadar değer üretir ve tek doğru oyun "hepsini
 onarım birimiyle doldur" olurdu. Maliyet çarpanı **×3** — doğrudan hayatta kalma
 satın alan bir iz, diğerleriyle aynı tabandan başlamamalı.
+
+**Zırh — onarım biriminin ikinci izi** (`plating`, denge r10). Gövdeye gelen
+her isabetten sabit hasar düşer, düşmanlardaki eşiğin aynısı:
+`max(hasar − zırh, hasar × 0.10)`, seviye başına **+0.5**. Işınlarda oran olarak
+(`BeamArmorEfficiency`, `PlayerShip.TakeDamage(beamDps)`).
+
+| Zırh seviyesi | 2 (zırh 1) | 4 (zırh 2) | 6 (zırh 3) |
+|---|---|---|---|
+| Swarm (3) | 2 | 1 | 0.3 |
+| Avcı (4) | 3 | 2 | 1 |
+| Armored (15) | 14 | 13 | 12 |
+| Tabya / bomba (30) | 29 | 28 | 27 |
+
+Kalabalığın cevabıdır, ağır tipleri önemsizleştirmez — oyunun "bazı anlarda
+geçici olarak aşırı zorlaşması" çok sayıda küçük isabetten geliyordu.
+
+| Karar | Gerekçe |
+|---|---|
+| **Yalnızca gövde**, kalkandan sonra | Komponentlere işleseydi Bomber (2) ve Sülük (3) zırh 2'de etkisiz kalır, Point Defence talebi ortadan kalkardı |
+| Birden fazla birimde **en yüksek** geçerli | Toplansaydı iki birim Swarm'ı hiç hasar veremez yapardı |
+| **Yalnızca BİR birim** zırh taşıyabilir (`CanTakePlating`) | En yüksek geçerli olduğu için ikinci birime basılan zırh hiçbir şey yapmazdı; iz orada hiç listelenmez. Zırhlı birim satılınca yeniden açılır |
+| Çalışmayan birimin zırhı sayılmaz | Gövde bakımını yapan modül çalışmıyorsa kaplama da tutmaz |
+| Maliyet çarpanı **×2** (`platingStatCostFactor`) | Gövde izinden ucuz: ağır toplara karşı genel bir hayatta kalma satmıyor |
+
+**"Enerji Verimi" izi kaldırıldı** — Zırh onun yerine geldi. Yalnızca birimin
+tamir sırasında çektiği 1 enerji/sn'yi azaltıyordu (Sv10'da bile 0.89/sn
+tasarruf), üstelik en yüksek iz olduğunda komponentin kayıtlı tüketimini
+(2.5 × 1.3^sv) büyütüyordu: Sv1 0.75/sn fazla yakıp 0.2/sn tasarruf ediyordu —
+yani net zarar eden bir yükseltmeydi. Kayıtlardaki seviyeleri iadesiz DÜŞER
+(`ComponentCatalog.IsRetiredStat`).
+
+**Onarım birimi boştayken enerji çekmiyor.** Enerji isteği eskiden hedef
+aranmadan ÖNCE yapılıyordu: tamir edilecek bir şey yokken de saniyede 1 enerji
+yanıyordu.
 
 ### Yükseltme Sistemi — Tasarım Kararları
 
@@ -867,7 +988,7 @@ hâlâ çok daha hızlı büyür; istenen buydu.
 | Silah hasar (raylı) | 45 | 45 | 334 | 4.079 | 10.285 |
 | Kalkan (kristal) | 68 | 68 | 504 | **6.164** | 15.542 |
 | Jeneratör üretim | 98 | 98 | 726 | 8.883 | 22.400 |
-| Onarım → **Zırh** (×3) | 83 | 249 | 1.846 | 22.571 | 56.915 |
+| Onarım → **Gövde** (×3) | 83 | 249 | 1.846 | 22.571 | 56.915 |
 
 Referans: Lv100'de bir levelin geliri ~2.070. Yani son stat seviyesi geç bir
 levelin 1.5–3 katı gelir eder; zırhın sonu kasten ulaşılamaz bir anıt.
@@ -2266,7 +2387,8 @@ bırakıldı.
 | BubbleShield.cs | Küresel kalkanın çarpışma yüzeyi — kabuk artık vurulabilir |
 | FormationGroup.cs | Bir dalganın birlikte uçan gemi grubu — çapa + yuvalar |
 | ViewBounds.cs | Kameranın en geniş kadrajı; doğum ve silinme sınırları buradan türer |
-| EnemyBot.cs | Data-driven düşman — hareket, ateş, direnç, zırh eşiği, faz/bölünme/onarım aurası |
+| EnemyBot.cs | Data-driven düşman — hareket, ateş, direnç, zırh eşiği, faz/bölünme/onarım aurası, destek gemisi (zırh aurası, kalkan dalgası) |
+| SupportAuraFx.cs | Destek gemilerinin görseli — Muhafız'ın ışın/ikon bağları, Besleyici'nin dalgası, soluk menzil halkası |
 | Asteroid.cs | Parçalanabilir asteroit — Large→Medium→Small, çarpma hasarı, enkaz bırakır |
 | Debris.cs | Enkaz — sürüklenip durur, kökene göre şekil + tipe göre renk, ömür sonunda solup yanıp söner |
 | ShootableMarker.cs | Vurulabilir mühimmatın etrafında yanıp sönen köşe parantezleri |
@@ -2951,6 +3073,9 @@ kendi içinde tutarlı. Tek yerden değiştirilebilir: `BuildWarningText`.
 - [x] **Tier zincirleri kaldırıldı** — tek eksen: stat seviyeleri 0–10,
       `statCostGrowth` 2.5 → 1.65, kayıt v2
 - [x] **Zırh statı** — onarım biriminin üçüncü izi, ana geminin max HP'sini yükseltir
+- [x] **Ana gemiye zırh** — onarım biriminin Enerji Verimi izi yerine isabet başına
+      hasar düşümü (seviye × 0.5), yalnızca gövdeye, tek birimde. Eski "Zırh" izi
+      "Gövde" adını aldı. Boştaki onarım birimi enerji çekmiyor. Denge revizyonu **10**.
 - [x] **Depo kapasite statı** — kaynak tavanı artık geç seviyeleri tutabiliyor
 - [x] **Düşman bilgi kutusu** — fare düşman üstündeyken sol üstte açılır
 - [x] **Slot göstergesi** — dolu slotlar halka çiziyor, komponent ikonu görünür kalıyor
@@ -2985,6 +3110,11 @@ kendi içinde tutarlı. Tek yerden değiştirilebilir: `BuildWarningText`.
 - [x] **Zırhlı tipler** — Tabya (tehdit 55, zırh 20) ve Muhafız (tehdit 10,
       +6 zırh aurası). Zırh eşiğini geç bölümlerde geri getirir, α'nın ağır
       ucunu açar. Denge revizyonu **7**. Oyunda denenmedi, skin'leri yok.
+- [x] **Destek gemileri** — Muhafız silahsız destek gemisine döndü (tehdit
+      8), yeni tip Besleyici (tehdit 8, kalkan dalgası %20 / 2 sn). Korunanın
+      arkasında durur, yalnız kalınca uzaklaşır; ışın/dalga görselleri, iki
+      sprite. Denge revizyonu **9**. Oyunda denenmedi; kayıt round-trip
+      testi koşulmadı; Bariyer + Besleyici ölçülecek.
 - [ ] **Denge testleri** — aşağıdaki listeye bak; sayıların hiçbiri oyunda denenmedi
 - [ ] Point defence turretleri — küçük/hızlı hedeflere odaklı otomatik turret
 - [ ] Mobil UI

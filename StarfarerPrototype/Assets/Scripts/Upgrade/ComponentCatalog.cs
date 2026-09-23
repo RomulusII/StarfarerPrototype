@@ -91,14 +91,34 @@ public static class ComponentCatalog
                                             (GeneratorComponent.CapacitorKey,  Loc.T("stat.capacitor")) },
         ComponentType.Shield     => new[] { ("rechargeRate", Loc.T("stat.rechargeRate")),
                                             ("maxShield",    Loc.T("stat.maxShield")) },
-        ComponentType.RepairUnit => new[] { ("repairRate",       Loc.T("stat.repairRate")),
-                                            ("energyEfficiency", Loc.T("stat.energyEfficiency")),
-                                            (RepairUnitComponent.ArmorKey, Loc.T("stat.armor")) },
+        ComponentType.RepairUnit => new[] { ("repairRate",                    Loc.T("stat.repairRate")),
+                                            (RepairUnitComponent.PlatingKey, Loc.T("stat.plating")),
+                                            (RepairUnitComponent.ArmorKey,   Loc.T("stat.armor")) },
         ComponentType.Storage    => new[] { (StorageComponent.CapacityKey, Loc.T("stat.capacity")) },
         ComponentType.Turret     => new[] { ("damage",   Loc.T("stat.damage")),
                                             ("fireRate", Loc.T("stat.fireRate")) },
         _                        => null,
     };
+
+    /// <summary>
+    /// KURULU bir komponentin şu an satın alınabilir izleri. Tipin izlerinden
+    /// farkı: bazı izler komponentin durumuna bağlıdır — zırh yalnızca tek bir
+    /// onarım biriminde olabilir (bkz. RepairUnitComponent.CanTakePlating).
+    /// Upgrade ekranı ve simülasyon bunu sorar; izin var olup olmadığını
+    /// soranlar (kayıt, iade) tipin tam listesini kullanır.
+    /// </summary>
+    public static (string key, string label)[] StatTracksFor(ComponentType type, ShipComponentBase comp)
+    {
+        var tracks = StatTracks(type);
+        if (tracks == null || !(comp is RepairUnitComponent ru) || ru.CanTakePlating) return tracks;
+        return System.Array.FindAll(tracks, t => t.key != RepairUnitComponent.PlatingKey);
+    }
+
+    /// <summary>
+    /// Kaldırılmış izler. Kayıttan geri kurulurken DÜŞÜRÜLÜR — iade yok.
+    /// "energyEfficiency": onarım biriminin eski izi, yerini Zırh aldı.
+    /// </summary>
+    public static bool IsRetiredStat(string key) => key == "energyEfficiency";
 
     /// <summary>
     /// Bu silah tipinde satın alınmaya DEĞER statlar.

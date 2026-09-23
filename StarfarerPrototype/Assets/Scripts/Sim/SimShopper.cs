@@ -187,7 +187,7 @@ public class SimShopper : MonoBehaviour
         foreach (var (slot, def, comp) in _loadout.EnumerateSlots())
         {
             if (def == null || comp == null) continue;
-            var tracks = ComponentCatalog.StatTracks(def.componentType);
+            var tracks = ComponentCatalog.StatTracksFor(def.componentType, comp);
             if (tracks == null) continue;
 
             foreach (var (key, _) in tracks)

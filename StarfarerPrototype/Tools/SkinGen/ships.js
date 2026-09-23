@@ -72,6 +72,7 @@ module.exports = {
     E.armored(), E.shield(), E.barrier(), E.bomber(), E.bombRunner(),
     E.interceptor(), E.artillery(), E.jammer(), E.phantom(),
     E.regenerator(), E.leech(), E.splitter(), E.juggernaut(),
+    E.warden(), E.conduit(),
 
     P.playerBody(), P.playerBarrel(),
 

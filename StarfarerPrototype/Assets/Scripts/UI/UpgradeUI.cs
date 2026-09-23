@@ -411,10 +411,9 @@ public class UpgradeUI : MonoBehaviour
 
     void BuildStatUpgradeSection(int slotIndex, ComponentDefinition def)
     {
-        var stats = GetStatsForType(def.componentType);
+        var comp  = _loadout?.GetSlotComponent(slotIndex);
+        var stats = ComponentCatalog.StatTracksFor(def.componentType, comp);
         if (stats == null || stats.Length == 0) return;
-
-        var comp = _loadout?.GetSlotComponent(slotIndex);
 
         MakeTextLabel(_popupContent.transform, Loc.T("upgrade.section.stat"), 20, TextAnchor.MiddleLeft);
 
@@ -974,10 +973,17 @@ public class UpgradeUI : MonoBehaviour
             {
                 var ru = comp as RepairUnitComponent;
                 if (ru == null) break;
-                float rate = ru.repairRate    * ru.GetMultiplier("repairRate");
-                float eng  = ru.energyPerRepair / ru.GetMultiplier("energyEfficiency");
-                sb.AppendLine(DeltaLine(Loc.T("detail.repairPerSec"), rate, "repairRate",       false));
-                sb.AppendLine(DeltaLine(Loc.T("detail.energyPerSec"), eng,  "energyEfficiency", true));
+                float rate = ru.repairRate * ru.GetMultiplier("repairRate");
+                sb.AppendLine(DeltaLine(Loc.T("detail.repairPerSec"), rate, "repairRate", false));
+                sb.AppendLine(Loc.T("detail.repairEnergy", ru.energyPerRepair));
+
+                // Zırh toplamsal (seviye × 0.5), çarpımsal değil — sonraki değer açıkça verilir
+                if (ru.CanTakePlating)
+                    sb.AppendLine(DeltaLine(Loc.T("detail.plating"), ru.Plating,
+                                            RepairUnitComponent.PlatingKey, false,
+                                            ru.Plating + RepairUnitComponent.PlatingPerLevel));
+                else
+                    sb.AppendLine(Loc.T("detail.platingElsewhere", RepairUnitComponent.HullPlating));
 
                 var ship = _loadout != null ? _loadout.GetComponent<PlayerShip>() : null;
                 if (ship != null)
@@ -1101,7 +1107,7 @@ public class UpgradeUI : MonoBehaviour
     /// </summary>
     static readonly string[] StatDescKeys =
     {
-        "damage", "fireRate", "armor", "capacity", "repairRate", "energyEfficiency",
+        "damage", "fireRate", "armor", "capacity", "repairRate", "plating",
         "production", "capacitor", "rechargeRate", "maxShield", "productionSpeed",
         "maxHP", "salvageRate", "speed", "maxCollectors", "maxFighters",
     };

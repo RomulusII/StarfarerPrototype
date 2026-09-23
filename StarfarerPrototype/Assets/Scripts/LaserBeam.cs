@@ -156,9 +156,10 @@ public class LaserBeam : MonoBehaviour
 
         if (hitsPlayer)
         {
-            // Oyuncu tarafında zırh eşiği yok; kalkan zaten havuz olarak emiyor
+            // Ana geminin gövde zırhı ışında ORAN olarak işler (dps geçilir);
+            // savaşçı ve toplayıcının zırhı yok.
             float amount = dps * dt;
-            _targetPlayer?.TakeDamage(amount);
+            _targetPlayer?.TakeDamage(amount, beamDps: dps);
             _targetFighter?.TakeDamage(amount);
             _targetCollector?.TakeDamage(amount);
             return;

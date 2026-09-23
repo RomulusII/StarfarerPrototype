@@ -198,6 +198,40 @@ public class EnemyTypeData : ScriptableObject
     /// </summary>
     public bool RequiresEscort => role == EnemyRole.Barrier;
 
+    /// <summary>
+    /// Destek gemisi mi (Muhafız, Besleyici)? Silahsızdır, kendi başına hiçbir
+    /// baskı üretmez; bütün işi korunan gemiyi güçlendirmektir. Refakat gerektirir
+    /// ve refakat SAYILMAZ — iki Muhafız birbirini koruyarak dalga oluşturamaz.
+    /// </summary>
+    public bool IsSupport => movementKind == EnemyMovementKind.Support;
+
+    /// <summary>
+    /// Başka gemileri koruyarak dalga kurabilir mi? Siper gemileri ve destek
+    /// gemileri koruyamaz — ikisi de refakat İSTER.
+    /// </summary>
+    public bool CountsAsEscort => !RequiresEscort && !IsSupport;
+
+    /// <summary>
+    /// Bu destek gemisi şu gemiyi koruyabilir mi — hem arkasına hizalanma hem
+    /// etki için aynı soru. Destek destek korumaz; Besleyici yalnızca kalkanı
+    /// olanı korur, çünkü kalkansız gemiye dalgasının hiçbir etkisi yok.
+    /// </summary>
+    public bool CanSupport(EnemyTypeData other) =>
+        other != null && !other.IsSupport && (shieldPulse <= 0f || other.maxShield > 0f);
+
+    /// <summary>
+    /// Dalga kurulurken seçilebilir mi? <paramref name="hasEscort"/> = dalgada
+    /// refakat sayılan bir gemi var, <paramref name="hasShielded"/> = dalgada
+    /// kalkanlı ve destek olmayan bir gemi var. Kural gemi tipinin kendisine ait,
+    /// kampanyanın dalga dolumu ve serbest mod aynı soruyu buradan sorar.
+    /// </summary>
+    public bool EscortSatisfied(bool hasEscort, bool hasShielded)
+    {
+        if (shieldPulse > 0f)            return hasShielded;
+        if (RequiresEscort || IsSupport) return hasEscort;
+        return true;
+    }
+
     // ── Özel davranışlar ──────────────────────────────────────────────────────
     // Her biri oyuncunun bir sistemine baskı yapar; süs değildir.
 
@@ -231,6 +265,15 @@ public class EnemyTypeData : ScriptableObject
     public float armorAura = 0f;
     public float armorAuraRange = 4.5f;
 
+    [Tooltip("Besleyici: her dalgada ulaştığı kalkanlı gemiyi MAKSİMUM kalkanının " +
+             "bu oranı kadar doldurur (0–1). Hedefin kendi şarj gecikmesini beklemez. " +
+             "0 = kapalı.")]
+    [Range(0f, 1f)] public float shieldPulse = 0f;
+    [Tooltip("İki dalga arası süre (sn).")]
+    public float shieldPulseInterval = 2f;
+    [Tooltip("Dalganın ulaştığı en uzak mesafe (birim).")]
+    public float shieldPulseRange = 4.5f;
+
     // ── Runtime factory metodları ─────────────────────────────────────────────
 
     /// <summary>
@@ -256,6 +299,7 @@ public class EnemyTypeData : ScriptableObject
         "BombRunner"  => CreateBombRunner(),
         "Bastion"     => CreateBastion(),
         "Warden"      => CreateWarden(),
+        "Conduit"     => CreateConduit(),
         _             => null,
     };
     // Editor'da SO asset oluşturulmadan önce oyunun çalışmasını sağlar.
@@ -712,10 +756,11 @@ public class EnemyTypeData : ScriptableObject
     /// sürüyü başlangıç donanımına karşı neredeyse ölümsüz yapıyordu.
     ///
     /// Kendisi korunmaz ve kırılgandır (70 HP) — öncelik hedefi olduğu açık
-    /// olmalı. Aura menzilini gösteren soluk altın bir halka taşır.
+    /// olmalı. SİLAHSIZDIR (bkz. <see cref="EnemyMovementKind.Support"/>): en
+    /// yakın gemiye bağlanıp onun arkasında durur, yalnız kalınca uzaklaşır.
     ///
-    /// TEHDİT FORMÜLDEN: dayanıklılık 70 / 17.47 = 4.0 · DPS 1.5 / 0.6 = 2.5
-    ///   0.234 × 4.0 × 3.5 = 3.3, yetenek +7 (Onarıcı'nın aurasıyla aynı)
+    /// TEHDİT FORMÜLDEN: dayanıklılık 70 / 17.47 = 4.0 · DPS 0
+    ///   0.234 × 4.0 × 1 = 0.9, yetenek +7 (Onarıcı'nın aurasıyla aynı) → 8
     /// </summary>
     public static EnemyTypeData CreateWarden()
     {
@@ -723,24 +768,68 @@ public class EnemyTypeData : ScriptableObject
         d.name          = "Warden";
         d.displayName   = "enemy.type.warden";
         d.role          = EnemyRole.Rear;
-        d.threatScore   = 10;
+        d.threatScore   = 8;
         d.maxHP         = 70f;
         d.armor         = 2f;
-        d.mass          = 4f;   d.enginePower   = 6f;
+        SetSupportFlight(d);
         d.bodyWidth     = 70;   d.bodyHeight    = 52;   d.sizeOrder = 4;
         d.bodyColor     = new Color(0.80f, 0.66f, 0.24f);
         d.barrelColor   = new Color(0.62f, 0.50f, 0.18f);
-        d.movementKind  = EnemyMovementKind.HoverFire;
-        d.engageRange   = 6.5f; d.fireRange     = 6f;
-        d.orbitRadius   = 5f;   d.engageDuration = 10f;
-        d.agility       = 0.7f; d.grip          = 0.8f;
-        d.evasionAngle  = 8f;   d.evasionPeriod = 2.8f;
-        d.escapeAngle   = 30f;
-        d.weaponKind    = EnemyWeaponKind.Laser;
-        d.fireDamage    = 6f;   d.fireRate      = 4f;   d.bulletSpeed = 4f;
         d.armorAura      = 6f;
         d.armorAuraRange = 4.5f;
         return d;
+    }
+
+    /// <summary>
+    /// Besleyici — kalkan destek gemisi. Muhafız'ın kalkan eşleniği: 2 sn'de bir
+    /// yaydığı dalga, ulaştığı her kalkanlı gemiyi maksimum kalkanının %20'si
+    /// kadar doldurur. Kalkanı olmayan gemiye etkisi yoktur, onları takip de etmez.
+    ///
+    /// Dolum hedefin şarj gecikmesini BEKLEMEZ — bütün anlamı bu. Kalkanı delmek
+    /// için dövülen bir gemi normalde ateş kesilene kadar şarj olmaz; Besleyici
+    /// o sırada da doldurur, yani kalkan kırmak artık bir yarış.
+    ///
+    /// Aynı gemiyi birden fazla Besleyici art arda dolduramaz
+    /// (bkz. EnemyBot.ReceiveShieldPulse): iki Besleyici bir Kalkan'ı
+    /// ölümsüz yapmamalı.
+    ///
+    /// TEHDİT FORMÜLDEN: dayanıklılık 60 / 17.47 = 3.4 · DPS 0
+    ///   0.234 × 3.4 × 1 = 0.8, yetenek +7 (Onarıcı ve Muhafız ile aynı) → 8
+    /// </summary>
+    public static EnemyTypeData CreateConduit()
+    {
+        var d = CreateInstance<EnemyTypeData>();
+        d.name          = "Conduit";
+        d.displayName   = "enemy.type.conduit";
+        d.role          = EnemyRole.Rear;
+        d.threatScore   = 8;
+        d.maxHP         = 60f;
+        SetSupportFlight(d);
+        d.bodyWidth     = 64;   d.bodyHeight    = 56;   d.sizeOrder = 4;
+        d.bodyColor     = new Color(0.36f, 0.62f, 0.78f);
+        d.barrelColor   = new Color(0.26f, 0.46f, 0.60f);
+        d.shieldPulse         = 0.20f;
+        d.shieldPulseInterval = 2f;
+        d.shieldPulseRange    = 4.5f;
+        return d;
+    }
+
+    /// <summary>
+    /// İki destek gemisinin ORTAK uçuşu ve silahsızlığı. Hız 2.0: korunan gemiye
+    /// yetişebilmeli — Kalkan (2.0) ile aynı, Karıştırıcı'dan (1.7) hızlı,
+    /// Swarm'ın (2.76) gerisinde. Salınım kapalı değil ama küçük; destek gemisi kaçamak değil,
+    /// SAKLANAN bir gemidir.
+    /// </summary>
+    static void SetSupportFlight(EnemyTypeData d)
+    {
+        d.mass          = 4f;   d.enginePower   = 8f;
+        d.movementKind  = EnemyMovementKind.Support;
+        d.engageRange   = 0f;   d.fireRange     = 0f;
+        d.agility       = 0.7f; d.grip          = 0.8f;
+        d.evasionAngle  = 8f;   d.evasionPeriod = 2.8f;
+        d.escapeAngle   = 30f;
+        d.weaponKind    = EnemyWeaponKind.None;
+        d.fireDamage    = 0f;   d.fireRate      = 0f;   d.bulletSpeed = 0f;
     }
 
     public static EnemyTypeData CreateBombRunner()

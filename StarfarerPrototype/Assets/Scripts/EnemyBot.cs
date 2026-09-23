@@ -75,6 +75,56 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     // üçte ikisi.
     const float ScreenSwayPeriod    = 10f;
 
+    // Destek (Support) — Muhafız ve Besleyici. Salınım fazı ve yanal pay siperin
+    // alanlarını (_screenSwayPhase, _screenLateral) paylaşır: iki hareket tipi
+    // aynı gemide bir arada olamaz, ayrı alan kayda ikinci bir kopya eklerdi.
+    EnemyBot _ward;               // arkasında durulan gemi — ölene kadar değişmez
+    float    _wardScanTimer;
+    Vector2  _retreatAnchor;      // yalnız kalınca tutulan nokta
+    bool     _hasRetreatAnchor;
+    SupportAuraFx _supportFx;
+
+    /// <summary>Korunan geminin bu kadar arkasında durulur (aura menzili 4.5).</summary>
+    const float SupportTrailDistance = 1.8f;
+
+    /// <summary>
+    /// Yalnız kalınca oyuncudan en az bu kadar uzakta durur. Varsayılan kadrajın
+    /// içinde (gemi solda %29'da, sağ kenar ~12.6) — kaçan gemi görünür kalmalı.
+    /// </summary>
+    const float SupportRetreatDistance = 10f;
+
+    /// <summary>
+    /// Yalnızken yana kayma genliği. Periyot siperinkiyle aynı (10 sn, faz kaydı
+    /// ortak): tepe hız 1.26 birim/sn, destek gemisinin 2.0'lık bütçesinin içinde.
+    /// </summary>
+    const float SupportSwayAmplitude = 2f;
+
+    /// <summary>Kaçış noktası görünür alanın kenarından en az bu kadar içeride.</summary>
+    const float SupportFieldInset = 1.5f;
+
+    const float WardScanInterval = 0.5f;
+
+    // Kalkan dalgası (Besleyici). Dalga TEK sayıdan türer (_pulseAge): cephenin
+    // yarıçapı hem etkiyi hem görseli verir.
+    float _pulseTimer;            // sonraki dalgaya kalan süre
+    float _pulseAge = -1f;        // yayılan dalganın yaşı; < 0 = dalga yok
+    List<EnemyBot> _pulseCandidates;   // dalga başında toplanır; kayıttan sonra yeniden
+
+    /// <summary>
+    /// Dalganın merkezden menzile varış süresi. "Çok hızlı olmayan" — 4.5 birimi
+    /// 1.2 sn'de alır (3.75 birim/sn, hiçbir destek gemisi bundan hızlı değil).
+    /// </summary>
+    const float PulseTravelTime = 1.2f;
+
+    /// <summary>
+    /// ALICI tarafı: kalkan dalgası aldıktan sonra bu süre yeni dalga almaz.
+    /// Birden fazla Besleyici üst üste bindirilemesin diye — iki Besleyici bir
+    /// Kalkan'ı ölümsüz yapmamalı. Dalga yolculuğundan (1.2) uzun, aralıktan
+    /// (2.0) kısa: tek Besleyici her dalgasında doldurur, ikincisi araya giremez.
+    /// </summary>
+    float _shieldPulseLockout;
+    const float ShieldPulseLockoutRatio = 0.75f;
+
     // Ateş etme
     float _fireTimer;
     float _fireRateBase;
@@ -300,6 +350,17 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
                 _screenLateral   = Random.Range(-1.5f, 1.5f);
                 break;
 
+            case EnemyMovementKind.Support:
+                // Siperle aynı gerekçe: korunan geminin arkasındaki NOKTAYI tutar,
+                // kavis çizmez. Burun korunan gemiye (yalnızken oyuncuya) döner.
+                _movement.omniThrust = true;
+                _screenSwayPhase = Random.Range(0f, Mathf.PI * 2f);
+                // Aynı gemiye bağlanan iki destek gemisi üst üste binmesin
+                _screenLateral   = Random.Range(-0.8f, 0.8f);
+                // Aynı dalgadaki iki Besleyici senkron atmasın
+                _pulseTimer      = Random.Range(0f, data.shieldPulseInterval);
+                break;
+
             case EnemyMovementKind.BombRun:
                 _bombRunFireTimer = _fireRateBase * 0.5f;
                 break;
@@ -378,6 +439,12 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         if (data.movementKind == EnemyMovementKind.Screen)
         {
             UpdateScreen();
+            return;
+        }
+
+        if (data.movementKind == EnemyMovementKind.Support)
+        {
+            UpdateSupport();
             return;
         }
 
@@ -797,6 +864,109 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         _screenPhase = ScreenPhase.Leaving;
     }
 
+    // ── Destek manevrası ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Destek gemisi (Muhafız, Besleyici): koruyabileceği en yakın gemiye
+    /// bağlanır ve onun ARKASINDA — oyuncuya göre uzak tarafında — durur.
+    /// Korunan gemi oyuncunun ateş hattında destek gemisine siper olur; onu
+    /// vurmak için ya korunanı geçmek ya da açı bulmak gerekir.
+    ///
+    /// Bağ YAPIŞKANDIR: korunan gemi ölene kadar hedef değişmez. Her taramada
+    /// en yakını seçseydi iki gemi arasında gidip gelir, hiçbirinin arkasında
+    /// duramazdı.
+    ///
+    /// Koruyacak kimse kalmayınca oyun alanından ÇIKMAZ: oyuncudan uzaklaşır,
+    /// görünür alanda bir noktaya çekilir ve yavaşça yana kayar. Dalga
+    /// temizlenmesini engellediği için oyuncu onu kovalayıp bitirmek zorunda —
+    /// kaçıp kaybolsaydı leveli kilitlerdi. Yeni bir dalga gelince korunacak
+    /// gemiye yeniden bağlanır.
+    ///
+    /// Silahsızdır. Tehdidi tamamen dolaylıdır (bkz. UpdateAuras,
+    /// UpdateShieldPulse).
+    /// </summary>
+    void UpdateSupport()
+    {
+        Vector2 self    = transform.position;
+        Vector2 shipPos = _playerShip != null ? (Vector2)_playerShip.transform.position : Vector2.zero;
+
+        if (!IsValidWard(_ward))
+        {
+            _ward = null;
+            _wardScanTimer -= Time.deltaTime;
+            if (_wardScanTimer <= 0f)
+            {
+                _wardScanTimer = WardScanInterval;
+                _ward = FindWard(self);
+            }
+        }
+
+        if (_ward != null)
+        {
+            _hasRetreatAnchor = false;
+
+            Vector2 wardPos = _ward.transform.position;
+            Vector2 away    = wardPos - shipPos;
+            away = away.sqrMagnitude > 0.01f ? away.normalized : Vector2.right;
+            Vector2 lateral = new Vector2(-away.y, away.x);
+
+            _movement.MoveToward(wardPos + away * SupportTrailDistance + lateral * _screenLateral);
+            _movement.AimAt(wardPos - self);
+        }
+        else
+        {
+            // Çekilme noktası yalnız kaldığı AN bir kez seçilir. Her karede
+            // "oyuncudan uzağa" yeniden hesaplansaydı yana kayma yönü kendi
+            // hareketiyle döner ve gemi oyuncunun etrafında yörüngeye girerdi.
+            if (!_hasRetreatAnchor)
+            {
+                Vector2 fromShip = self - shipPos;
+                float   dist     = Mathf.Max(fromShip.magnitude, SupportRetreatDistance);
+                Vector2 dir      = fromShip.sqrMagnitude > 0.01f ? fromShip.normalized : Vector2.right;
+                _retreatAnchor    = ClampToField(shipPos + dir * dist);
+                _hasRetreatAnchor = true;
+            }
+
+            Vector2 axis    = _retreatAnchor - shipPos;
+            axis = axis.sqrMagnitude > 0.01f ? axis.normalized : Vector2.right;
+            Vector2 lateral = new Vector2(-axis.y, axis.x);
+            float   sway    = Mathf.Sin(Time.time * SwayOmega + _screenSwayPhase);
+
+            _movement.MoveToward(ClampToField(_retreatAnchor + lateral * (sway * SupportSwayAmplitude)));
+            _movement.AimAt(shipPos - self);
+        }
+
+        if (Vector2.Distance(transform.position, Vector2.zero) > ViewBounds.DespawnRadius)
+            Destroy(gameObject);
+    }
+
+    bool IsValidWard(EnemyBot b) =>
+        b != null && b != this && b.isActiveAndEnabled && b.data != null
+        && data.CanSupport(b.data) && b.CurrentHP > 0f;
+
+    /// <summary>Koruyabileceği en yakın gemi; yoksa null.</summary>
+    EnemyBot FindWard(Vector2 self)
+    {
+        EnemyBot best  = null;
+        float    bestD = float.MaxValue;
+
+        foreach (var e in FindObjectsByType<EnemyBot>(FindObjectsSortMode.None))
+        {
+            if (!IsValidWard(e)) continue;
+            float d = ((Vector2)e.transform.position - self).sqrMagnitude;
+            if (d < bestD) { bestD = d; best = e; }
+        }
+        return best;
+    }
+
+    static Vector2 ClampToField(Vector2 p)
+    {
+        var r = ViewBounds.Visible;
+        return new Vector2(
+            Mathf.Clamp(p.x, r.xMin + SupportFieldInset, r.xMax - SupportFieldInset),
+            Mathf.Clamp(p.y, r.yMin + SupportFieldInset, r.yMax - SupportFieldInset));
+    }
+
     void DropBomb()
     {
         var go = new GameObject("Bomb");
@@ -1139,8 +1309,6 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         _auraArmorTimer = ArmorAuraHold;
     }
 
-    GameObject _auraRing;
-
     /// <summary>Hayalet fazı — vurulamaz olduğu pencere.</summary>
     public bool IsPhased => _phaseTimer > 0f;
 
@@ -1155,8 +1323,10 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 
         UpdatePhasing();
         UpdateAuras();
+        UpdateShieldPulse();
 
-        if (_auraArmorTimer > 0f) _auraArmorTimer -= Time.deltaTime;
+        if (_auraArmorTimer     > 0f) _auraArmorTimer     -= Time.deltaTime;
+        if (_shieldPulseLockout > 0f) _shieldPulseLockout -= Time.deltaTime;
     }
 
     /// <summary>
@@ -1200,7 +1370,8 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
     ///
     ///   Muhafız aurası: menzildeki DİĞER düşmanlara zırh verir (bkz.
     ///   ReceiveArmorAura). Muhafız kendini korumaz — öncelik hedefi olduğu açık
-    ///   kalmalı.
+    ///   kalmalı. Zırh verdiği her gemiye bir ışın uzanır (SupportAuraFx):
+    ///   görünmeyen bir aura "bu neden ölmüyor" sorusunu cevapsız bırakırdı.
     ///
     /// İki aura AYNI sayacı (_auraTimer, kayda giriyor) ve aynı taramayı
     /// paylaşır: ikinci bir sayaç, kayda eklenmesi unutulacak ikinci bir alan
@@ -1212,7 +1383,8 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         bool armor  = data.armorAura  > 0f;
         if (!repair && !armor) return;
 
-        if (armor) EnsureAuraRing();
+        if (armor && _supportFx == null)
+            _supportFx = SupportAuraFx.ForArmor(this, data.armorAuraRange, data.sizeOrder);
 
         _auraTimer -= Time.deltaTime;
         if (_auraTimer > 0f) return;
@@ -1221,6 +1393,8 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         float heal     = data.repairAura * 0.25f;
         float repairR2 = data.repairAuraRange * data.repairAuraRange;
         float armorR2  = data.armorAuraRange  * data.armorAuraRange;
+
+        if (armor) s_linkBuffer.Clear();
 
         foreach (var other in FindObjectsByType<EnemyBot>(FindObjectsSortMode.None))
         {
@@ -1232,31 +1406,127 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
                     Mathf.Min(other._healthBar.maxHealth, other._healthBar.currentHealth + heal);
 
             if (armor && d2 <= armorR2)
+            {
                 other.ReceiveArmorAura(data.armorAura);
+                s_linkBuffer.Add(other);
+            }
+        }
+
+        if (armor) _supportFx.SetLinks(s_linkBuffer);
+    }
+
+    static readonly List<EnemyBot> s_linkBuffer = new();
+
+    /// <summary>
+    /// Besleyici'nin kalkan dalgası. <c>shieldPulseInterval</c>'da bir merkezden
+    /// dışa doğru yayılır; cephe bir kalkanlı gemiye VARDIĞI AN o gemi maksimum
+    /// kalkanının <c>shieldPulse</c> oranı kadar dolar (bkz. ReceiveShieldPulse).
+    ///
+    /// Anında değil cepheyle: oyuncu dolumu dalganın gemiye değdiği anda görür.
+    /// Görsel ile etki aynı sayıdan türer (<see cref="PulseRadius"/>), ayrı
+    /// yaşasalardı zamanla birbirinden saparlardı.
+    ///
+    /// Aday listesi dalga başında bir kez toplanır — her karede sahneyi gezmek
+    /// saniyede 60 tarama demekti. Kayıttan dönünce liste boştur ve ilk karede
+    /// yeniden toplanır; dalganın yaşı ve sayacı kayda girer.
+    /// </summary>
+    void UpdateShieldPulse()
+    {
+        if (data.shieldPulse <= 0f) return;
+
+        if (_supportFx == null)
+            _supportFx = SupportAuraFx.ForShieldPulse(this, data.shieldPulseRange, data.sizeOrder);
+
+        if (_pulseAge >= 0f)
+        {
+            _pulseAge += Time.deltaTime;
+            float t = _pulseAge / PulseTravelTime;
+
+            if (t >= 1f)
+            {
+                _pulseAge        = -1f;
+                _pulseCandidates = null;
+                _supportFx.HidePulse();
+            }
+            else
+            {
+                float r = PulseRadius(_pulseAge);
+                _supportFx.ShowPulse(r, t);
+
+                if (_pulseCandidates == null) CollectPulseCandidates();
+
+                float   r2      = r * r;
+                float   lockout = data.shieldPulseInterval * ShieldPulseLockoutRatio;
+                Vector2 self    = transform.position;
+                foreach (var c in _pulseCandidates)
+                {
+                    if (c == null) continue;
+                    if (((Vector2)c.transform.position - self).sqrMagnitude > r2) continue;
+                    c.ReceiveShieldPulse(data.shieldPulse, lockout, self);
+                }
+            }
+        }
+
+        _pulseTimer -= Time.deltaTime;
+        if (_pulseTimer <= 0f)
+        {
+            _pulseTimer     += Mathf.Max(0.1f, data.shieldPulseInterval);
+            _pulseAge        = 0f;
+            _pulseCandidates = null;
         }
     }
 
     /// <summary>
-    /// Muhafız'ın aura menzilini gösteren soluk altın halka. Görünmeyen bir aura
-    /// "bu neden ölmüyor" sorusunu cevapsız bırakırdı — düşman bilgi kutusunun
-    /// var olma sebebi tam o soru. Kabuk sprite'ı küresel kalkanla paylaşılır
-    /// (tek çember üreteci); rengi ve yarıçapı farklı. Görsel olduğu için kayda
-    /// girmez, geri yüklemeden sonra ilk karede yeniden kurulur.
+    /// Cephenin yarıçapı. Yavaşlayarak açılır (1−(1−x)²): içeride hızlı,
+    /// kenarda durulur — radyasyon gibi yayılır, patlama gibi fırlamaz.
     /// </summary>
-    void EnsureAuraRing()
+    float PulseRadius(float age)
     {
-        if (_auraRing != null) return;
+        float x   = Mathf.Clamp01(age / PulseTravelTime);
+        float inv = 1f - x;
+        return data.shieldPulseRange * (1f - inv * inv);
+    }
 
-        _auraRing = new GameObject("ArmorAuraRing");
-        _auraRing.transform.SetParent(transform, false);
-        _auraRing.transform.localPosition = Vector3.zero;
-        // Sprite'ın dış kenarı 1 birim → ölçek doğrudan yarıçap.
-        _auraRing.transform.localScale = Vector3.one * data.armorAuraRange;
+    void CollectPulseCandidates()
+    {
+        _pulseCandidates ??= new List<EnemyBot>();
+        _pulseCandidates.Clear();
 
-        var sr = _auraRing.AddComponent<SpriteRenderer>();
-        sr.sprite       = BubbleShield.Shell();
-        sr.color        = new Color(0.95f, 0.78f, 0.30f, 0.22f);
-        sr.sortingOrder = data.sizeOrder - 1;
+        // Pay: dalga yol alırken gemiler de hareket eder
+        float   reach = data.shieldPulseRange + 1.5f;
+        Vector2 self  = transform.position;
+        foreach (var e in FindObjectsByType<EnemyBot>(FindObjectsSortMode.None))
+        {
+            if (e == this || e.data == null || !data.CanSupport(e.data)) continue;
+            if (((Vector2)e.transform.position - self).sqrMagnitude > reach * reach) continue;
+            _pulseCandidates.Add(e);
+        }
+    }
+
+    /// <summary>
+    /// Kalkan dalgası alır: maksimum kalkanın <paramref name="ratio"/> oranı
+    /// kadar doldurur. Şarj gecikmesine (_shieldRechargeTimer) DOKUNMAZ — dalga
+    /// ateş altında da doldurur, Besleyici'nin bütün anlamı bu.
+    ///
+    /// ÜST ÜSTE BİNMEZ: aldıktan sonra <paramref name="lockout"/> süre yeni dalga
+    /// almaz. Kalkanı zaten doluysa da süre işler — dalga geçti, yalnızca
+    /// yapacak işi yoktu; aksi halde dolu kalkanlı gemi ikinci Besleyici'nin
+    /// dalgasını bekleyip hemen ardından birincininkini de alırdı.
+    ///
+    /// Kalkanın dalgadan yana ucunda kısa bir parlama çıkar — isabet hilalinin
+    /// aynısı: oyuncu kalkanın nerede olduğunu zaten o dilden okuyor.
+    /// </summary>
+    public void ReceiveShieldPulse(float ratio, float lockout, Vector2 from)
+    {
+        if (_maxShieldHP <= 0f || _shieldPulseLockout > 0f) return;
+        _shieldPulseLockout = lockout;
+
+        if (_shieldHP >= _maxShieldHP) return;
+
+        _shieldHP = Mathf.Min(_maxShieldHP, _shieldHP + _maxShieldHP * ratio);
+        SyncShieldBar();
+        RefreshShieldVisual();
+        ShieldFlash(from);
     }
 
     /// <summary>
@@ -1586,6 +1856,14 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         auraArmor      = _auraArmor,
         auraArmorTimer = _auraArmorTimer,
 
+        ward               = IsValidWard(_ward) ? WorldSave.IdOf(_ward) : 0,
+        wardScanTimer      = _wardScanTimer,
+        retreatAnchor      = _retreatAnchor,
+        hasRetreatAnchor   = _hasRetreatAnchor,
+        pulseTimer         = _pulseTimer,
+        pulseAge           = _pulseAge,
+        shieldPulseLockout = _shieldPulseLockout,
+
         movement = _movement.CaptureState(),
         hasBrain = _brain != null,
         brain    = _brain != null ? _brain.CaptureState() : null,
@@ -1668,6 +1946,14 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         _auraArmor      = s.auraArmor;
         _auraArmorTimer = s.auraArmorTimer;
         if (_phaseTimer > 0f) SetPhaseVisual(true);
+
+        _ward               = WorldSave.Resolve<EnemyBot>(s.ward);
+        _wardScanTimer      = s.wardScanTimer;
+        _retreatAnchor      = s.retreatAnchor;
+        _hasRetreatAnchor   = s.hasRetreatAnchor;
+        _pulseTimer         = s.pulseTimer;
+        _pulseAge           = s.pulseAge;
+        _shieldPulseLockout = s.shieldPulseLockout;
 
         Velocity = s.velocity;
         _prevPos = transform.position;

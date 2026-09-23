@@ -77,6 +77,14 @@ public class EnemyState
     public float phaseTimer, phaseCooldown, auraTimer;
     public float auraArmor, auraArmorTimer;   // Muhafız'dan alınan zırh ve kalan süresi
 
+    // Destek gemisi (Muhafız, Besleyici) — salınım fazı ve yanal pay siperinkini paylaşır
+    public int     ward;                      // korunan gemi, kimlikle; 0 = yok
+    public float   wardScanTimer;
+    public Vector2 retreatAnchor;
+    public bool    hasRetreatAnchor;
+    public float   pulseTimer, pulseAge;      // Besleyici'nin dalgası; pulseAge < 0 = dalga yok
+    public float   shieldPulseLockout;        // alıcı: yeni dalga alana kadar kalan süre
+
     public MovementState movement;
     public bool          hasBrain;
     public BrainState    brain;

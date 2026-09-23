@@ -427,7 +427,94 @@ const barrier = () => {
   };
 };
 
+// Warden (Muhafiz) - zirh destek gemisi. Ince bir govde, iki yaninda govdeye
+// DEGMEYEN iki kalin zirh plakasi: zirhi kendine giymiyor, disari uzatiyor.
+// Plakalar one dogru acilir; burundaki prizma, auranin isinlarinin ciktigi yer.
+//
+// Onarici'dan (onde yuvarlak emitor halkasi) ayrismasi bilincli: ikisi es
+// tipler (biri HP, biri zirh aurasi), oyuncu siluetten hangisi oldugunu okumali.
+// Burada halka yok, KOSELI plakalar var.
+const warden = () => {
+  const p = pal(u(0.80, 0.66, 0.24), u(0.62, 0.50, 0.18));
+  const CY = 104;
+
+  // Ust plaka: arka-ic, on-ic, on-dis, arka-dis. Alt plaka ayna.
+  const plate = [58, 138, 206, 146, 238, 192, 52, 184];
+  const plateHi = [52, 184, 238, 192, 230, 180, 60, 174];      // dis kenar isigi
+  const strut = [104, 124, 124, 124, 126, 142, 102, 140];     // govde-plaka baglantisi
+
+  return {
+    name: "Warden", w: 280, h: 208, ppu: 400,
+    shapes: [
+      { pts: strut,               color: p.dark },
+      { pts: mirrorY(strut, CY),  color: p.dark },
+      { pts: plate,               color: p.wing },
+      { pts: mirrorY(plate, CY),  color: p.wing },
+      { pts: plateHi,             color: p.trim },
+      { pts: mirrorY(plateHi, CY), color: p.dark },
+
+      // Govde: ince mil
+      { pts: [216, 104, 196, 88, 130, 80, 56, 84, 30, 96,
+              30, 112, 56, 124, 130, 128, 196, 120], color: p.hull },
+      { pts: [30, 96, 30, 112, 50, 122, 50, 86], color: p.dark },          // motor blogu
+      { pts: [196, 120, 130, 128, 56, 124, 56, 119, 130, 123, 196, 115], color: p.light },
+
+      // Burun prizmasi: isinlarin ciktigi yer
+      { pts: [250, 104, 222, 88, 206, 104, 222, 120], color: p.light },
+      { pts: [240, 104, 222, 94, 214, 104, 222, 114], color: p.trim },
+
+      // Sensor lensi
+      { pts: [192, 104, 178, 94, 160, 97, 160, 111, 178, 114], color: p.eye },
+      { pts: [186, 104, 177, 98, 166, 100, 166, 108, 177, 110], color: p.eyeIn },
+    ],
+    skin: { id: "enemy.warden", colliderMode: "Box", hitboxScale: 1.0 },
+  };
+};
+
+// Conduit (Besleyici) - kalkan destek gemisi. Ortada iri bir reaktor cekirdegi
+// (ic ice halkalar), cevresinde capraz dort kisa radyator kanadi: disari bir sey
+// YAYAN bir gemi. Siluet X'e yakin ve yuvarlak - oyundaki hicbir gemide yok.
+// Burun (+X) kisa bir cikinti; destek gemisi korudugu gemiye doner.
+const conduit = () => {
+  const p = pal(u(0.36, 0.62, 0.78), u(0.26, 0.46, 0.60));
+  const CX = 124, CY = 112;
+
+  // Capraz kanat: merkezden sag-ust koseye. Digerleri aynalanir.
+  const vane = [150, 150, 170, 132, 214, 186, 196, 204];
+  const mirrorX = (pts, cx) => pts.map((v, i) => (i % 2 === 0 ? 2 * cx - v : v));
+  const vaneTip = [196, 204, 214, 186, 222, 196, 206, 212];
+
+  return {
+    name: "Conduit", w: 256, h: 224, ppu: 400,
+    shapes: [
+      { pts: vane,                             color: p.wing },
+      { pts: mirrorY(vane, CY),                color: p.wing },
+      { pts: mirrorX(vane, CX),                color: p.wing },
+      { pts: mirrorY(mirrorX(vane, CX), CY),   color: p.wing },
+      { pts: vaneTip,                          color: p.light },
+      { pts: mirrorY(vaneTip, CY),             color: p.light },
+      { pts: mirrorX(vaneTip, CX),             color: p.light },
+      { pts: mirrorY(mirrorX(vaneTip, CX), CY), color: p.light },
+
+      // Burun cikintisi
+      { pts: [232, 112, 208, 96, 196, 100, 196, 124, 208, 128], color: p.hull },
+
+      // Govde: sekizgen cerceve
+      { pts: circle(CX, CY, 76, 70, 8), color: p.hull },
+      { pts: [60, 66, 48, 112, 60, 158, 76, 158, 76, 66], color: p.dark },   // arka motor
+
+      // Reaktor: ic ice halkalar (buyukten kucuge, even-odd delik acmadigi icin ust uste)
+      { pts: circle(CX + 8, CY, 50, 50), color: p.light },
+      { pts: circle(CX + 8, CY, 40, 40), color: p.dark },
+      { pts: circle(CX + 8, CY, 30, 30), color: p.light },
+      { pts: circle(CX + 8, CY, 20, 20), color: p.eye },
+      { pts: circle(CX + 8, CY, 10, 10), color: p.eyeIn },
+    ],
+    skin: { id: "enemy.conduit", colliderMode: "Box", hitboxScale: 1.0 },
+  };
+};
+
 module.exports = {
   armored, shield, barrier, bomber, bombRunner, interceptor, artillery,
-  jammer, phantom, regenerator, leech, splitter, juggernaut,
+  jammer, phantom, regenerator, leech, splitter, juggernaut, warden, conduit,
 };

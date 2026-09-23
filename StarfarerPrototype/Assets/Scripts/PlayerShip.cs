@@ -148,7 +148,13 @@ public class PlayerShip : MonoBehaviour
         }
     }
 
-    public void TakeDamage(float amount, bool bypassShields = false)
+    /// <param name="beamDps">
+    /// Işınlar verir (0 = tekil isabet). Işın hasarı her karede minik parçalar
+    /// hâlinde gelir; zırh her parçayı ayrı ısırsaydı ışını neredeyse tamamen
+    /// yerdi ve sonuç kare hızına bağlanırdı. Işında zırh düşmanlardaki gibi
+    /// ORAN olarak uygulanır (BalanceConfig.BeamArmorEfficiency).
+    /// </param>
+    public void TakeDamage(float amount, bool bypassShields = false, float beamDps = 0f)
     {
         float remaining;
         if (bypassShields)
@@ -161,6 +167,16 @@ public class PlayerShip : MonoBehaviour
             foreach (var sg in FindObjectsByType<ShieldGeneratorComponent>(FindObjectsSortMode.None))
                 sg.NotifyDamageTaken();
         }
+
+        // Zırh YALNIZCA gövdeye, kalkandan sonra işler — kalkanı aşan kısım
+        // isabetin gövdeye değen kısmıdır. Komponentlere işlemez (bkz.
+        // RepairUnitComponent.HullPlating).
+        float plating = RepairUnitComponent.HullPlating;
+        float preArmor = remaining;
+        if (plating > 0f && remaining > 0f)
+            remaining = beamDps > 0f
+                ? remaining * BalanceConfig.Instance.BeamArmorEfficiency(beamDps, plating)
+                : BalanceConfig.Instance.ApplyArmor(remaining, plating);
 
         currentHullHP = Mathf.Max(0f, currentHullHP - remaining);
 
@@ -175,7 +191,8 @@ public class PlayerShip : MonoBehaviour
         BalanceLog.Event("player_damage")
                   .Num("gelen",  amount)
                   .Num("govde",  remaining)
-                  .Num("kalkan", amount - remaining)
+                  .Num("kalkan", amount - preArmor)
+                  .Num("zirh",   preArmor - remaining)
                   .Str("boost",  BoostController.Mode.ToString())
                   .Bool("bypass", bypassShields)
                   .Num("kalanHP", currentHullHP)
