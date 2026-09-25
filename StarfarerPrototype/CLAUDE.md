@@ -1557,7 +1557,7 @@ Slot'a kurulunca otomatik ateş açar, oyuncu müdahalesi gerekmez. Enerji tüke
 | **Lazer** | Orta (5f) | Orta | Yüksek | Yüksek | 4s | — |
 | **Roket** | Çok düşük (15f) | Yüksek | Orta | Düşük | 7.7s | Güdümlü, **çarpınca patlar** (yarıçap 1.2) |
 | **Nükleer Başlık** | Çok düşük (30f) | Çok yüksek (110) | Çok düşük (**1.25**) | Orta | **21.6s** | Güdümlü, hantal döner, **yarıçap 3.2** |
-| **Flak** | Hızlı (2f) | **Kıymık başına 3** | Orta (6) | Orta | 4.5s | **Şarapnel** — 30 kıymık, menzil 4, buluşma noktasında patlar |
+| **Flak** | Hızlı (2f) | **Kıymık başına 3** | Orta (6) | Orta | **1.33s** | **Şarapnel** — menzil 8, 30 kıymık (menzil 4), buluşma noktasında patlar |
 | **Point Defence** | Çok hızlı (0.28f) | Düşük/atış, **28.6 DPS** | **Çok yüksek (20)** | Düşük | 0.6s | Menzil 10.4 — önce mühimmat, sonra hafif gövde, sonra her şey |
 
 **Hedefleme — puanlama formülü** (`TurretTargeting`):
@@ -1685,7 +1685,9 @@ patlar; menzil sonunda da patlar, sessizce kaybolmaz.
 | | Değer | Neden |
 |---|---|---|
 | Kıymık | **30**, her biri **3** hasar (`turretShrapnel`, `turretDamage`) | Zırh kıymık BAŞINA ısırır: zırhsız gemiye 3, zırh 2'ye 1, Muhafız aurasında (+6) %10 |
-| Menzil | **4** (`turretBlastRadius`) = ana geminin boyu | Kıymığın gidebildiği mesafe |
+| Turret menzili | **8** = ana geminin boyunun (4) iki katı (ömür 8/6 sn) | Yakın savunma silahı; 27 birimde ekranın öbür ucuna ateş ediyordu |
+| Kıymık menzili | **4** (`turretBlastRadius`) = ana geminin boyu | Kıymığın gidebildiği mesafe |
+| Dağılım | açılar **tamamen rastgele** (koni içinde / 360°) | Düzgün aralık + sapma bir çark gibi, fazla düzenli okunuyordu. Kümelenip delik açması kabul — bir gemi bazen şanslı çıkar |
 | Doğrudan isabet | kıymıkların **%40**'ı (12) hedefe | `ShrapnelDirectShare` |
 | Kalanı | geliş yönünde **100°'lik koni** (±50°), hedefin ARKASINA | `ShrapnelConeHalfAngle`; kıymıklar hedefin kendi collider'larını — kalkanı dahil — delip geçer |
 | Havada patlama | 30 kıymık **360°** | Patlama noktası bir geminin içindeyse o gemi doğrudan isabet sayılır |
@@ -1695,9 +1697,18 @@ patlar; menzil sonunda da patlar, sessizce kaybolmaz.
 **Kıymıklar anlık ışındır (hitscan)**, nesne değil: 30 `Physics2D.Raycast`,
 paylaşılan tampon, sıfır bellek ayırma. Kıymık başına GameObject kurulsaydı
 kayda 30 nesne girer, her isabet ayrı kıvılcım patlaması doğururdu. Görsel
-aynı ışının üstünden gider (`HitEffect.SpawnShrapnel`): bütün kıymıklar aynı
-hızla uçar, çarpan kıymık çarptığı noktada söner — gösterilen kıymık hasar
-veren kıymığın kendisidir. Maliyet eski patlamanın 35 kıvılcımıyla aynı ligde.
+aynı ışının üstünden gider (`HitEffect.SpawnShrapnel`): her kıymığın hızı
+rastgele (menzil / 0.5 sn, ±%35), çarpan kıymık çarptığı noktada söner —
+gösterilen kıymık hasar veren kıymığın kendisidir. Maliyet eski patlamanın 35
+kıvılcımıyla aynı ligde. **Bedeli:** hasar anlık, görsel yavaş — 2 birimdeki
+hedefe kıymık ~0.25 sn sonra varır ama hasar o anda yazılmıştır. İlk hâlde
+tam menzile 0.22 sn'de varıyordu ve "aşırı hızlı" bulundu; gecikme oyunda
+göze batıyorsa hasar kıymığın varışına ertelenebilir (kayda girecek bekleyen
+isabetler demek).
+
+**Geride gri bir bulut kalır** (`HitEffect.SpawnFlakCloud`): 3–4 yumuşak leke,
+büyüyerek ~2.5 sn'de solar. Flak'in klasik imzası; oynanışa dokunmaz, kayda
+girmez.
 
 **Efekt ve kalkan hilali hedef BAŞINA bir kez** oynar, toplanan hasarla —
 12 kıymık yiyen gemi 12 patlama doğurmaz.
@@ -2477,6 +2488,7 @@ bırakıldı.
 | UpgradeUI.cs | Tab ile açılan upgrade ekranı, 4 panel layout |
 | SlotVisual.cs | World-space slot göstergesi — dolu slotta halka, boş slotta daire |
 | EnemyInfoHUD.cs | Fare düşman üstündeyken sol üstte açılan bilgi kutusu |
+| HudLayout.cs | Üst şeridin ortak ölçüleri — bar yüksekliği, YÜKSELT/KAPAT dikdörtgeni |
 | ComponentStats.cs | Komponent sayaçları (hasar, isabet, emilen, üretilen…) + `DamageSource` hasar kaynağı kapsamı |
 | EnergyBar.cs | Üst HUD şeridi: enerji + metal + kristal barları ve uyarı satırı |
 | HitEffect.cs | Çarpma kıvılcımlarının tek giriş noktası (`SpawnImpact`) + DeathEffect |
@@ -3049,6 +3061,22 @@ ayrı (`ShipLoadout.WeaponStats`). Stat yükseltmeleriyle (`StatLevels`) ilgisi 
 | **Komponentle doğar, satılınca ölür**; turret uzmanlaşma değiştirince SIFIRLANIR | Gatling'in isabet oranı ile Flak'inki aynı sayıya karışırsa ikisi de anlamsızlaşır — ana silah tiplerinin ayrı sayılmasıyla aynı gerekçe |
 | **Toplanan kaynak = toplayıcının depoya indirdiği** | Satış ve uzmanlaşma iadesi sayılmaz, tavanda yanan kısım da |
 | **Her iki kayıt katmanına girer** | Sayaçlar `SlotSave.counters` / `WeaponSave.counters`, geminin toplamları `SaveData` içinde — dünya kaydı da aynı `SaveData`'yı taşıdığı için tek yerden. Ölüm son level başı kaydına döndürür, sayaçlar da o ana döner. Uçuştaki turret/savaşçı mermisi sahibini slotla yazar (`TurretBulletState.owner`) |
+
+## Üst Şerit ve Dokunmatik Düğmeler — Tasarım Kararları
+
+Ölçülerin sahibi `HudLayout` — üç canvas (EnergyBar, BoostHUD, UpgradeUI) aynı
+sayıları kullanır; üçü de 1920×1080 referanslı, match 0.5, yani piksel ölçüsü
+üçünde de aynı yere düşer.
+
+| Karar | Gerekçe |
+|---|---|
+| Barlar **53 px** (44'ten +%20), yazı 22 → 26 | Küçük ekranda okunmuyordu |
+| **YÜKSELT sağ üstte**, upgrade ekranının **KAPAT**'ıyla AYNI dikdörtgen (180×68) | Oyuncu ekranı açtığı yerden kapatır. Eskiden alttaki boost şeridinin yanındaydı |
+| Düğme bardan **kalın** ve kenardan **içeride** (sağ 18, üst 8 px) | Telefonlarda ekranın en kenarındaki dokunuşlar sık sık kaçıyor |
+| Barlar sağda düğmeye yer bırakacak kadar **daralır** | Üst üste binmesinler |
+| **ANA MENÜ** sol GENEL şeridinin dibine taşındı | KAPAT'ın solunda kalsaydı ya kristal barın ucunu örtecek ya da opsiyon panelini aşağı itecekti |
+| Upgrade panellerinin üst kenarı **pikselle** verilir (barın ya da düğmenin altı) | Eski oran (0.95) en-boy oranı değişince piksel ölçülü şeritle çakışırdı |
+| Tarayıcının tam ekran / APK düğmeleri **%50 büyük** (fare 51, dokunmatik 69 px), köşeden 28 / 36 px içeride | Aynı kenar sorunu. **Bakılacak:** upgrade ekranında sağ alttaki bileşen listesinin son satırlarıyla çakışabilir |
 
 ## HUD Uyarıları — Tasarım Kararları
 

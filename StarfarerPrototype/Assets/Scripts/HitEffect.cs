@@ -135,18 +135,24 @@ public static class HitEffect
     /// <summary>
     /// Tek bir şarapnel kıymığının izi (bkz. DamageUtil.Shrapnel).
     ///
-    /// Kıymık hasarı anlıktır ama görseli uçar: hepsi AYNI hızla
-    /// (<paramref name="range"/> / ömür) gider, ömrü ise yolunun uzunluğuyla
-    /// orantılıdır. Hedefe çarpan kıymık tam çarptığı noktada söner, boşa
-    /// giden menzilin ucunda. Kıvılcım sürüklemesi kapalı — sürüklenseydi
-    /// kıymık gösterilen yerden önce dururdu ve oyuncu menzili yanlış okurdu.
+    /// Kıymık hasarı anlıktır ama görseli uçar. Her kıymığın hızı rastgele
+    /// (ortalama menzil / 0.5 sn, ±%35) — hepsi aynı hızda giderse dağılım
+    /// genişleyen bir halka gibi okunuyordu. Ömür yol / hız: hedefe çarpan
+    /// kıymık tam çarptığı noktada söner, boşa giden menzilin ucunda.
+    /// Kıvılcım sürüklemesi kapalı — sürüklenseydi kıymık gösterilen yerden
+    /// önce dururdu ve oyuncu menzili yanlış okurdu.
+    ///
+    /// Bedeli: hasar anlık, görsel yavaş. 2 birimdeki hedefe kıymık ~0.25 sn
+    /// sonra VARIR ama hasar o anda yazılmıştır. Göz bunu bir "vurdu" gecikmesi
+    /// olarak değil, patlamanın parçası olarak okuyor olmalı — oyunda bakılacak.
     /// </summary>
     public static void SpawnShrapnel(Vector2 origin, Vector2 dir, float length, float range)
     {
         if (length <= 0f || range <= 0f) return;
 
-        const float FullLife = 0.22f;
-        float life = Mathf.Max(0.03f, FullLife * length / range);
+        const float FullLife = 0.5f;
+        float speed = range / FullLife * Random.Range(0.65f, 1.35f);
+        float life  = Mathf.Max(0.03f, length / speed);
 
         var go = new GameObject("ShrapnelSpark");
         go.transform.position   = origin;
@@ -158,10 +164,66 @@ public static class HitEffect
         sr.color        = new Color(1f, 0.78f, 0.35f);
 
         var sp      = go.AddComponent<Spark>();
-        sp.velocity = dir.normalized * (range / FullLife);
+        sp.velocity = dir.normalized * speed;
         sp.lifetime = life;
         sp.baseSize = 1.6f;
         sp.drag     = 0f;
+    }
+
+    // ── Flak bulutu ───────────────────────────────────────────────────────────
+
+    static Sprite _puffSprite;
+
+    /// <summary>
+    /// Flak patlamasının geride bıraktığı küçük gri bulut — flak'in klasik
+    /// imzası: gökyüzünde asılı kalan patlama izleri. Birkaç yumuşak leke üst
+    /// üste binerek düzensiz bir bulut çizer; her biri hafifçe büyüyüp yavaşça
+    /// solar. Oynanışa dokunmaz, collider'ı yok; kayda girmez (bkz. "Tam Kayıt":
+    /// görsel efektler kaydedilmez).
+    /// </summary>
+    public static void SpawnFlakCloud(Vector2 at)
+    {
+        int blobs = Random.Range(3, 5);
+        for (int i = 0; i < blobs; i++)
+        {
+            var go = new GameObject("FlakPuff");
+            go.transform.position = at + Random.insideUnitCircle * 0.18f;
+
+            var sr          = go.AddComponent<SpriteRenderer>();
+            sr.sprite       = PuffSprite();
+            sr.sortingOrder = 23;   // kıvılcımların ve şok dalgasının altında
+            float g         = Random.Range(0.45f, 0.62f);
+            sr.color        = new Color(g, g, g * 1.04f, 0f);
+
+            var p        = go.AddComponent<SmokePuff>();
+            p.startSize  = Random.Range(0.28f, 0.42f);
+            p.endSize    = p.startSize * Random.Range(1.6f, 2.0f);
+            p.peakAlpha  = Random.Range(0.35f, 0.5f);
+            p.lifetime   = Random.Range(2.2f, 3.0f);
+            p.drift      = Random.insideUnitCircle * 0.08f;
+        }
+    }
+
+    /// <summary>Kenarı yumuşak gri disk — önbellekli, bütün bulutlar paylaşır.</summary>
+    static Sprite PuffSprite()
+    {
+        if (_puffSprite != null) return _puffSprite;
+
+        const int res = 32;
+        var tex = new Texture2D(res, res, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear };
+        var px  = new Color32[res * res];
+        float c = (res - 1) * 0.5f;
+        for (int i = 0; i < px.Length; i++)
+        {
+            float dx = (i % res - c) / c, dy = (i / res - c) / c;
+            float d  = Mathf.Sqrt(dx * dx + dy * dy);
+            float a  = Mathf.Clamp01(1f - d);
+            px[i] = new Color32(255, 255, 255, (byte)(a * a * 255));
+        }
+        tex.SetPixels32(px);
+        tex.Apply();
+        _puffSprite = Sprite.Create(tex, new Rect(0, 0, res, res), new Vector2(0.5f, 0.5f), res);
+        return _puffSprite;
     }
 
     public static void SpawnBlast(Vector2 center, float radius, float damage)
@@ -465,6 +527,42 @@ public class ShockWave : MonoBehaviour
 /// <summary>
 /// Tek bir kıvılcım parçacığı: hareket eder, yavaşlar, solar, küçülür.
 /// </summary>
+/// <summary>
+/// Flak bulutunun bir lekesi: hızla belirir (ömrün ilk %10'u), sonra büyüyerek
+/// yavaşça solar. Upgrade ekranı açıkken donar — oyun da duruyor.
+/// </summary>
+public class SmokePuff : MonoBehaviour
+{
+    public float   startSize, endSize, peakAlpha, lifetime;
+    public Vector2 drift;
+
+    float          _t;
+    SpriteRenderer _sr;
+
+    void Awake() => _sr = GetComponent<SpriteRenderer>();
+
+    void Update()
+    {
+        if (UpgradeUI.IsPaused) return;
+
+        _t += Time.deltaTime;
+        float k = Mathf.Clamp01(_t / lifetime);
+        if (k >= 1f) { Destroy(gameObject); return; }
+
+        const float FadeIn = 0.1f;
+        float a = k < FadeIn ? k / FadeIn : 1f - (k - FadeIn) / (1f - FadeIn);
+
+        var col = _sr.color;
+        col.a     = peakAlpha * a * a;   // kare: sonlara doğru daha da yavaş söner gibi okunur
+        _sr.color = col;
+
+        // Büyüme yavaşlayarak (1−(1−k)²): bulut önce açılır, sonra asılı kalır
+        float grow = 1f - (1f - k) * (1f - k);
+        transform.localScale = Vector3.one * Mathf.Lerp(startSize, endSize, grow);
+        transform.position  += (Vector3)(drift * Time.deltaTime);
+    }
+}
+
 public class Spark : MonoBehaviour
 {
     public Vector2 velocity;

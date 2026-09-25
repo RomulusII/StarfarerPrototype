@@ -361,9 +361,13 @@ public static class ComponentCatalog
             // Hedefleme DPS'i (3 / 2 = 1.5) gerçek değerin çok altında — bir
             // kıymığın hasarını gösteriyor. Puanlama göreli olduğu için hedef
             // SIRASI bozulmuyor; zırhlı hedefi doğru biçimde cezalandırıyor.
+            //
+            // MENZİL 8 = ana geminin boyunun (4) iki katı. Flak bir yakın savunma
+            // silahıdır; 27 birimde ekranın öbür ucundaki sürüye ateş ediyordu.
+            // Ömür hızla birlikte türetildi (bkz. "Mermi Hızı"): 6 × 1.333 = 8.
             TurretSpecType.Flak         => Spec(baseDef, spec, specCost: 30,
-                fireRate: 2f,  damage: 3f,  speed: 6f,   life: 4.5f, energy: 1f,
-                blastRadius: 4f, shrapnel: 30),                                        // menzil 27 sabit
+                fireRate: 2f,  damage: 3f,  speed: 6f,   life: 8f / 6f, energy: 1f,
+                blastRadius: 4f, shrapnel: 30),                                        // menzil 8
             // Roket artık ÇARPINCA PATLAR. Sayıları değişmedi, yani tek hedefe
             // karşı eskisiyle birebir aynı (birincil hedef patlamanın
             // merkezinde, mesafe ~0, tam hasar). Kazanç YALNIZCA kalabalıkta.

@@ -323,18 +323,17 @@ public static class DamageUtil
         for (int i = 0; i < direct; i++)
             ShrapnelStrike(primary, primaryKey, origin, dir, damage, weaponType);
 
-        // Düzgün aralık + küçük sapma — HitEffect.SpawnBlast'taki gerekçe:
-        // tam eşit aralık her patlamada aynı boşlukları bırakır ve bir gemi
-        // hep o boşluktan sıyrılır; tamamen rastgele ise kümelenip delik açar.
+        // Açılar TAMAMEN rastgele. Önce düzgün aralık + küçük sapma denendi:
+        // bir çark gibi, fazla düzenli okunuyordu. Rastgele dağılım kümelenip
+        // delik açar — ve bu kabul: gerçek şarapnel de öyle, bir gemi bazen
+        // şanslı çıkar. Ortalamada yoğunluk yine 1/mesafe ile düşer.
         int   rest   = count - direct;
         bool  cone   = primaryKey != null;
-        float arc    = cone ? ShrapnelConeHalfAngle * 2f : 360f;
-        float step   = arc / Mathf.Max(1, rest);
-        float start  = cone ? -ShrapnelConeHalfAngle + step * 0.5f : Random.Range(0f, 360f);
 
         for (int i = 0; i < rest; i++)
         {
-            float   angle = start + i * step + Random.Range(-0.3f, 0.3f) * step;
+            float   angle = cone ? Random.Range(-ShrapnelConeHalfAngle, ShrapnelConeHalfAngle)
+                                 : Random.Range(0f, 360f);
             Vector2 d     = Rotate(dir, angle);
             float   reach = range;
 

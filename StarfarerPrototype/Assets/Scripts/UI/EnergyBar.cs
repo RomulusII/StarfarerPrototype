@@ -7,7 +7,10 @@ using UnityEngine.UI;
 /// </summary>
 public class EnergyBar : MonoBehaviour
 {
-    const float BarH = 44f;  // piksel yükseklik (1080 referansında)
+    const float BarH = HudLayout.BarHeight;  // piksel yükseklik (1080 referansında)
+
+    // Barların kabı: ekranın tamamı DEĞİL, sağda YÜKSELT/KAPAT düğmesine yer bırakır
+    RectTransform _row;
 
     RectTransform _energyFill;
     RectTransform _metalFill;
@@ -34,6 +37,14 @@ public class EnergyBar : MonoBehaviour
         scaler.matchWidthOrHeight  = 0.5f;
 
         gameObject.AddComponent<GraphicRaycaster>();
+
+        var rowGO = new GameObject("BarRow", typeof(RectTransform));
+        rowGO.transform.SetParent(transform, false);
+        _row = (RectTransform)rowGO.transform;
+        _row.anchorMin = Vector2.zero;
+        _row.anchorMax = Vector2.one;
+        _row.offsetMin = Vector2.zero;
+        _row.offsetMax = new Vector2(-HudLayout.BarsRightMargin, 0f);
 
         // Üç eşit genişlikte bar, aynı y konumunda (üst)
         (_energyFill,  _energyText)  = MakeBar("Energy",  0f,     0.333f,
@@ -99,7 +110,7 @@ public class EnergyBar : MonoBehaviour
     (RectTransform fill, Text label) MakeBar(string id, float xMin, float xMax, Color bgCol, Color fillCol)
     {
         var bgGO = new GameObject(id + "Bg");
-        bgGO.transform.SetParent(transform, false);
+        bgGO.transform.SetParent(_row, false);
         bgGO.AddComponent<Image>().color = bgCol;
 
         var bg = bgGO.GetComponent<RectTransform>();
@@ -129,7 +140,7 @@ public class EnergyBar : MonoBehaviour
 
         var txt       = txtGO.AddComponent<Text>();
         txt.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        txt.fontSize  = 22;
+        txt.fontSize  = 26;   // bar yüksekliğiyle birlikte büyüdü (22 → 26)
         txt.fontStyle = FontStyle.Bold;
         txt.color     = new Color(1f, 1f, 1f, 0.92f);
         txt.alignment = TextAnchor.MiddleLeft;

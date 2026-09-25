@@ -105,6 +105,8 @@ public static class GameVersion
     ///       arkasına. Havada patlayıp hiçbir şeye değmeyen mermi `shot_hit`
     ///       yazmaz (ıska); `shot_hit` yeni `kiymik` alanını taşır. Flak'in
     ///       isabet oranı ve hasarı önceki revizyonlarla kıyaslanamaz.
+    ///  12 — FLAK MENZİLİ 27 -> 8 (ana geminin boyunun iki katı). Kıymık
+    ///       açıları tamamen rastgele (eskiden düzgün aralık + sapma).
     /// </summary>
-    public const int Denge = 11;
+    public const int Denge = 12;
 }

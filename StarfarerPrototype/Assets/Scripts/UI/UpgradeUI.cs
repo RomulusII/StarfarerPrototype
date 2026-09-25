@@ -1210,19 +1210,33 @@ public class UpgradeUI : MonoBehaviour
         btn.targetGraphic = img;
         btn.onClick.AddListener(Toggle);
 
-        var r = (RectTransform)go.transform;
-        r.anchorMin        = new Vector2(0.90f, 0.955f);
-        r.anchorMax        = new Vector2(0.995f, 0.998f);
-        r.anchoredPosition = Vector2.zero;
-        r.sizeDelta        = Vector2.zero;
+        // Oyundaki YÜKSELT düğmesiyle AYNI dikdörtgen (bkz. HudLayout)
+        HudLayout.PlaceTopRightButton((RectTransform)go.transform);
 
         AttachLabel(go.transform, Loc.T("upgrade.close"), 26);
     }
 
+    /// <summary>Üst şeridin altından başlayan paneller: barların altında kalır.</summary>
+    static void BelowBars(RectTransform r) => TopAt(r, HudLayout.BarHeight + 6f);
+
     /// <summary>
-    /// ANA MENÜ — oyunu bırakıp açılış menüsüne döner. KAPAT'ın hemen solunda,
-    /// aynı şeritte: ikisi de "bu ekrandan çık" düğmesi, biri oyuna diğeri
-    /// menüye. Rengi kasten sönük; KAPAT kırmızısıyla yarışmamalı, asıl düğme o.
+    /// Panelin üst kenarını ekranın tepesinden PİKSEL cinsinden verir. Oranla
+    /// verilseydi (eski 0.95) en-boy oranı değişince üst şeritle çakışırdı:
+    /// şerit piksel ölçülü, paneller oranlı.
+    /// </summary>
+    static void TopAt(RectTransform r, float pixelsFromTop)
+    {
+        r.anchorMax = new Vector2(r.anchorMax.x, 1f);
+        r.offsetMin = Vector2.zero;
+        r.offsetMax = new Vector2(0f, -pixelsFromTop);
+    }
+
+    /// <summary>
+    /// ANA MENÜ — oyunu bırakıp açılış menüsüne döner. Sol GENEL şeridinin
+    /// dibinde, kenardan içeride. Eskiden KAPAT'ın solundaydı; KAPAT büyüyüp
+    /// barlardan kalın olunca oradaki bir düğme ya kristal barın ucunu örtecek
+    /// ya da opsiyon panelini aşağı itecekti. Şeridin altı boştu.
+    /// Rengi kasten sönük; KAPAT kırmızısıyla yarışmamalı, asıl düğme o.
     ///
     /// Dünya olduğu gibi kaydedilir (bkz. WorldSave) ve DEVAM ET tam bu ana
     /// döner. Onay istemez: kaybedilecek bir ilerleme yok. (Tam kayıttan önce
@@ -1241,10 +1255,11 @@ public class UpgradeUI : MonoBehaviour
         btn.onClick.AddListener(OnMenuPressed);
 
         var r = (RectTransform)go.transform;
-        r.anchorMin        = new Vector2(0.80f, 0.955f);
-        r.anchorMax        = new Vector2(0.895f, 0.998f);
-        r.anchoredPosition = Vector2.zero;
-        r.sizeDelta        = Vector2.zero;
+        r.anchorMin        = new Vector2(0.008f, 0f);
+        r.anchorMax        = new Vector2(0.102f, 0f);
+        r.pivot            = new Vector2(0.5f, 0f);
+        r.sizeDelta        = new Vector2(0f, 60f);
+        r.anchoredPosition = new Vector2(0f, 18f);
 
         AttachLabel(go.transform, Loc.T("upgrade.mainMenu"), 22);
     }
@@ -1265,9 +1280,8 @@ public class UpgradeUI : MonoBehaviour
 
         var r = (RectTransform)_generalPanel.transform;
         r.anchorMin        = new Vector2(0f, 0f);
-        r.anchorMax        = new Vector2(0.11f, 0.95f);  // üst %5 serbest
-        r.anchoredPosition = Vector2.zero;
-        r.sizeDelta        = Vector2.zero;
+        r.anchorMax        = new Vector2(0.11f, 1f);
+        BelowBars(r);
 
         var vl = _generalPanel.AddComponent<VerticalLayoutGroup>();
         vl.padding                = new RectOffset(10, 10, 12, 12);
@@ -1297,9 +1311,8 @@ public class UpgradeUI : MonoBehaviour
 
         var r = (RectTransform)_slotInfoPanel.transform;
         r.anchorMin        = new Vector2(0.115f, 0.67f);
-        r.anchorMax        = new Vector2(0.57f,  0.95f);  // genişletildi + üst boşluk
-        r.anchoredPosition = Vector2.zero;
-        r.sizeDelta        = Vector2.zero;
+        r.anchorMax        = new Vector2(0.57f,  1f);
+        BelowBars(r);
 
         var outerVL = _slotInfoPanel.AddComponent<VerticalLayoutGroup>();
         outerVL.padding                = new RectOffset(14, 14, 12, 12);
@@ -1388,9 +1401,8 @@ public class UpgradeUI : MonoBehaviour
 
         var r = (RectTransform)_statsPanel.transform;
         r.anchorMin        = new Vector2(0.575f, 0.67f);
-        r.anchorMax        = new Vector2(0.78f,  0.95f);
-        r.anchoredPosition = Vector2.zero;
-        r.sizeDelta        = Vector2.zero;
+        r.anchorMax        = new Vector2(0.78f,  1f);
+        BelowBars(r);
 
         var vl = _statsPanel.AddComponent<VerticalLayoutGroup>();
         vl.padding                = new RectOffset(14, 14, 12, 12);
@@ -1535,10 +1547,10 @@ public class UpgradeUI : MonoBehaviour
         _hoverDetailPanel.AddComponent<DeselectOnClick>();
 
         var r = (RectTransform)_hoverDetailPanel.transform;
+        // KAPAT'ın altından başlar — düğme bu sütunun üstünde duruyor
         r.anchorMin        = new Vector2(0.785f, 0.67f);
-        r.anchorMax        = new Vector2(0.995f, 0.95f);  // üst boşluk
-        r.anchoredPosition = Vector2.zero;
-        r.sizeDelta        = Vector2.zero;
+        r.anchorMax        = new Vector2(0.995f, 1f);
+        TopAt(r, HudLayout.TopButtonBottom + 8f);
 
         var vl = _hoverDetailPanel.AddComponent<VerticalLayoutGroup>();
         vl.padding                = new RectOffset(16, 16, 12, 12);

@@ -50,29 +50,31 @@
         letter-spacing: .12em;
         color: #3a4655;
       }
+      /* Boyutlar bir tur %50 büyütüldü ve köşeden İÇERİ çekildi (12 → 28 px):
+         birçok telefonda ekranın en kenarındaki dokunuşlar kaçıyor. */
       #fs, #apk {
-        position: fixed; bottom: 12px;
-        height: 34px;
+        position: fixed; bottom: 28px;
+        height: 51px;
         display: none;
-        border: 0; border-radius: 4px;
+        border: 0; border-radius: 6px;
         background: rgba(20, 28, 40, .72); color: #cfe0f2;
-        font-size: 17px; line-height: 34px; cursor: pointer;
+        font-size: 26px; line-height: 51px; cursor: pointer;
       }
-      #fs  { right: 12px; width: 34px; }
+      #fs  { right: 28px; width: 51px; }
       #apk {
-        right: 54px; padding: 0 10px;
-        font: 600 12px/34px system-ui, -apple-system, Segoe UI, sans-serif;
+        right: 87px; padding: 0 15px;
+        font: 600 18px/51px system-ui, -apple-system, Segoe UI, sans-serif;
         letter-spacing: .08em; text-decoration: none;
       }
       #fs:hover, #apk:hover { background: rgba(32, 44, 62, .9); }
 
-      /* Dokunmatikte düğmeler büyür. 34 piksel fare için yeterli, parmak için
-         değil — ve bunlardan biri tam ekran, yani dar ekranda oyunun kaçış
-         yolu. Ulaşılamayan bir kaçış yolu, olmayanla aynı şey. */
+      /* Dokunmatikte düğmeler büyür. Fare boyutu parmak için yetmez — ve
+         bunlardan biri tam ekran, yani dar ekranda oyunun kaçış yolu.
+         Ulaşılamayan bir kaçış yolu, olmayanla aynı şey. */
       @media (pointer: coarse) {
-        #fs, #apk { height: 46px; bottom: 14px; }
-        #fs  { width: 46px; font-size: 22px; line-height: 46px; }
-        #apk { right: 70px; line-height: 46px; font-size: 13px; }
+        #fs, #apk { height: 69px; bottom: 36px; }
+        #fs  { right: 36px; width: 69px; font-size: 33px; line-height: 69px; }
+        #apk { right: 115px; line-height: 69px; font-size: 20px; }
       }
 
       /* PORTREYİ ENGELLEYEN KAPLAMA KALDIRILDI — ve neden, kalıcı bir ders:

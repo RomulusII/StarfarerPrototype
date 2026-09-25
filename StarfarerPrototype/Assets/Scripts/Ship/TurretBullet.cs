@@ -367,6 +367,7 @@ public class TurretBullet : MonoBehaviour
         DamageUtil.ShrapnelResult r;
         using (DamageSource.From(OwnerStats))
             r = DamageUtil.Shrapnel(at, _dir, primary, shrapnel, blastRadius, damage, weaponType);
+        HitEffect.SpawnFlakCloud(at);
 
         if (r.caught > 0)
         {

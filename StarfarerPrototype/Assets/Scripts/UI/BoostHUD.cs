@@ -20,6 +20,10 @@ public class BoostHUD : MonoBehaviour
     static readonly Color ColShield  = new Color(0.10f, 0.35f, 0.80f, 1f);
     static readonly Color ColWeapon  = new Color(0.75f, 0.25f, 0.10f, 1f);
 
+    // YÜKSELT: boost düğmelerinin nötr grisinden ayrılsın — üst şeritte tek
+    // başına duruyor ve KAPAT'ın kırmızısının oyundaki karşılığı.
+    static readonly Color ColUpgrade = new Color(0.16f, 0.36f, 0.24f, 0.95f);
+
     void Awake()
     {
         _canvas              = gameObject.AddComponent<Canvas>();
@@ -42,12 +46,14 @@ public class BoostHUD : MonoBehaviour
             () => OnToggle(BoostMode.Weapon), out _weaponLbl);
 
         // Upgrade ekranının tek girişi Tab tuşuydu; Android'de klavye yok, yani
-        // telefonda ekran hiç açılamıyordu. Düğme boost şeridinin yanına konur —
-        // ikisi de "oyun içi eylem" bandı. Kapatma düğmesi upgrade ekranının
-        // KENDİ içindedir, çünkü bu şerit o ekran açıkken gizleniyor.
-        BuildButton("UpgradeBtn",
-            new Vector2(0.64f, 0.02f), new Vector2(0.74f, 0.10f),
+        // telefonda ekran hiç açılamıyordu. Düğme sağ üstte, upgrade ekranının
+        // KAPAT düğmesiyle AYNI dikdörtgende (HudLayout): oyuncu ekranı açtığı
+        // yerden kapatır. Eskiden alttaki boost şeridinin yanındaydı.
+        var upgradeBtn = BuildButton("UpgradeBtn", Vector2.zero, Vector2.zero,
             () => FindFirstObjectByType<UpgradeUI>()?.Toggle(), out _upgradeLbl);
+        HudLayout.PlaceTopRightButton((RectTransform)upgradeBtn.transform);
+        upgradeBtn.GetComponent<Image>().color = ColUpgrade;
+        _upgradeLbl.fontSize = 24;
 
         ApplyTexts();
     }
