@@ -186,6 +186,9 @@ public class TurretBulletState
     /// <summary>Şarapnel kıymığı sayısı ve patlamaya kalan yol. 0 = yok.</summary>
     public int     shrapnel;
     public float   fuse;
+
+    /// <summary>Ateşleyen komponent (turret / savaşçının hangarı), slot + 1; 0 = yok.</summary>
+    public int     owner;
 }
 
 [Serializable]
@@ -209,6 +212,7 @@ public class PlasmaBeamState
     public float   width, maxLength, speed, dps, emitDuration;
     public int     phase, weaponType;
     public float   sparkTimer;
+    public bool    hitCounted;   // isabet sayıldı mı (bolt başına bir kez)
 }
 
 [Serializable]

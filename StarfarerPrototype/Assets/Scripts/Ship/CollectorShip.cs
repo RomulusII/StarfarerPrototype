@@ -144,8 +144,9 @@ public class CollectorShip : MonoBehaviour
     {
         for (int i = 0; i < _cargo.Length; i++)
         {
-            if (_cargo[i] > 0f)
-                ResourceInventory.Instance?.Add((ResourceType)i, _cargo[i]);
+            var inv = ResourceInventory.Instance;
+            if (_cargo[i] > 0f && inv != null)
+                inv.CountCollected((ResourceType)i, inv.Add((ResourceType)i, _cargo[i]));
             _cargo[i] = 0f;
         }
         _cargoTotal = 0f;

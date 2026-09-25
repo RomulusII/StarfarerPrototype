@@ -159,6 +159,10 @@ public class TurretController : ShipComponentBase
             bool isInstant = specType == TurretSpecType.Laser;
             _aimPos = isInstant ? target.position : PredictIntercept(target);
             AimAt(_aimPos);
+
+            // Efektif DPS'in paydası: menzilde bir hedefe kilitli geçen süre
+            // (bkz. ComponentStats.engagedTime).
+            Stats.engagedTime += Time.deltaTime;
         }
 
         _fireTimer -= Time.deltaTime;
@@ -305,6 +309,8 @@ public class TurretController : ShipComponentBase
         go.transform.position = spawnPos;
 
         var tb = go.AddComponent<TurretBullet>();
+        tb.owner       = this;
+        Stats.shotsFired++;
         tb.damage      = damage * GetMultiplier("damage");
         tb.speed       = bulletSpeed;
         tb.weaponType  = BulletWeaponType();
@@ -366,6 +372,7 @@ public class TurretController : ShipComponentBase
         beam.energyPerSecond = 0f;   // enerji ateş anında ödendi (TurretController.Update)
         beam.hitsPlayer      = false;
         beam.maxRange        = bulletLifeTime * bulletSpeed; // efektif menzil
+        beam.stats           = Stats;   // ışın atış saymaz: ıskalamaz (bkz. ComponentStats)
         beam.Init();
     }
 
@@ -394,6 +401,11 @@ public class TurretController : ShipComponentBase
     public void Specialize(TurretSpecType newSpec, ComponentDefinition newDef)
     {
         specType = newSpec;
+
+        // Sayaçlar sıfırlanır: Gatling'in isabet oranı ile Flak'inki aynı
+        // sayıya karışırsa ikisi de anlamsızlaşır (ana silahta tiplerin ayrı
+        // sayılmasıyla aynı gerekçe).
+        Stats = new ComponentStats();
 
         fireRate       = newDef.turretFireRate       > 0 ? newDef.turretFireRate       : fireRate;
         damage         = newDef.turretDamage         > 0 ? newDef.turretDamage         : damage;

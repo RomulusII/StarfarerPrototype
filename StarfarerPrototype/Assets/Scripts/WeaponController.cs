@@ -53,8 +53,59 @@ public class WeaponController : MonoBehaviour
         CancelLaserBeam();
     }
 
+    // ── Sayaçlar ──────────────────────────────────────────────────────────────
+
+    ShipLoadout _loadout;
+
+    /// <summary>Aktif silah tipinin sayaçları (bkz. ShipLoadout.WeaponStats).</summary>
+    ComponentStats Stats
+    {
+        get
+        {
+            if (_loadout == null) _loadout = GetComponentInParent<ShipLoadout>();
+            return _loadout != null ? _loadout.WeaponStats(weaponType) : null;
+        }
+    }
+
+    // "Menzilde düşman var mı" taraması 0.25 sn'de bir yapılır — sahneyi gezen
+    // bir sorgu. Kayda girmez: bir sonraki taramada yeniden hesaplanan önbellek.
+    float _engageScanTimer;
+    bool  _enemyInRange;
+
+    /// <summary>
+    /// Ana silahın dövüş süresi: menzilinde (bütün kadraj, ViewBounds.MaxShotRange)
+    /// düşman varken geçen süre. Nişanı oyuncu alıyor; "hedefe kilitli" diye bir
+    /// durum yok, ölçülebilecek olan düşmanın ulaşılabilir olduğu süre.
+    /// </summary>
+    void TrackEngagement()
+    {
+        if (UpgradeUI.IsPaused) return;
+
+        _engageScanTimer -= Time.deltaTime;
+        if (_engageScanTimer <= 0f)
+        {
+            _engageScanTimer = 0.25f;
+            _enemyInRange    = AnyEnemyInRange();
+        }
+
+        if (_enemyInRange && Stats != null) Stats.engagedTime += Time.deltaTime;
+    }
+
+    bool AnyEnemyInRange()
+    {
+        float range = ViewBounds.MaxShotRange;
+        Vector2 at  = transform.position;
+        foreach (var e in FindObjectsByType<EnemyBot>(FindObjectsSortMode.None))
+            if (e.IsValidTarget && Vector2.Distance(at, e.transform.position) <= range) return true;
+        foreach (var b in FindObjectsByType<BossShip>(FindObjectsSortMode.None))
+            if (b.IsValidTarget && Vector2.Distance(at, b.transform.position) <= range) return true;
+        return false;
+    }
+
     void Update()
     {
+        TrackEngagement();
+
         if (PointerInput.Locked)
         {
             CancelCharge();
@@ -110,6 +161,7 @@ public class WeaponController : MonoBehaviour
             beam.energyPerSecond = energyCostPerShot * energyMulti;
             // Sabit 22 birim kadrajın yarısına bile ulaşmıyordu (bkz. ViewBounds)
             beam.maxRange        = ViewBounds.MaxShotRange;
+            beam.stats           = Stats;   // ışın atış saymaz — ıskalamaz
             beam.Init();
             _activeLaserBeam = beam;
         }
@@ -226,6 +278,10 @@ public class WeaponController : MonoBehaviour
         beam.dps          = totalDmg * 3f;
         beam.weaponType   = WeaponType.Plasma;
         beam.emitDuration = 0.2f;   // namludan çıkış süresi — sonrası bolt olarak uçar
+        beam.stats        = Stats;
+
+        // Plazma bir ışın değil uçan bir bolttur — ıskalar, isabet oranına girer
+        if (beam.stats != null) beam.stats.shotsFired++;
     }
 
     // -------------------------------------------------------------------------
@@ -254,6 +310,8 @@ public class WeaponController : MonoBehaviour
         b.damage      = damage * damageMulti;
         b.weaponType  = type;
         b.boostAtFire = BoostController.Mode;
+        b.stats       = Stats;
+        if (b.stats != null) b.stats.shotsFired++;
         // Kadraj ATEŞ ANINDA ne kadar genişti. İsabet anındaki değil: soru
         // "hangi kadrajda nişan alındı" — mermi uçarken imleç çoktan yer
         // değiştirmiş olur. boostAtFire ile aynı gerekçe.

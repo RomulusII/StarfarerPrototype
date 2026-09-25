@@ -17,6 +17,12 @@ public class PlayerShip : MonoBehaviour
     public float currentHullHP;
     public bool  IsAlive       => currentHullHP > 0f;
 
+    /// <summary>
+    /// Gövdenin oyun boyunca aldığı toplam hasar (kalkan ve zırhtan sonra) —
+    /// onarım biriminin istatistik paneli. Kayda girer (SaveSystem.SaveData).
+    /// </summary>
+    public float hullDamageTaken;
+
     public List<MountSlot> mountSlots { get; private set; }
 
     Vector3        _fixedPosition;
@@ -178,7 +184,9 @@ public class PlayerShip : MonoBehaviour
                 ? remaining * BalanceConfig.Instance.BeamArmorEfficiency(beamDps, plating)
                 : BalanceConfig.Instance.ApplyArmor(remaining, plating);
 
+        float hullBefore = currentHullHP;
         currentHullHP = Mathf.Max(0f, currentHullHP - remaining);
+        hullDamageTaken += hullBefore - currentHullHP;
 
         if (_healthBar != null)
             _healthBar.currentHealth = currentHullHP;

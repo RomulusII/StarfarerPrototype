@@ -165,6 +165,24 @@ upgrade.mainMenu	ANA MENÜ	MAIN MENU	HAUPTMENÜ
 upgrade.panel.general	GENEL BİLGİLER	GENERAL	ÜBERSICHT
 upgrade.panel.slot	SLOT BİLGİSİ	SLOT INFO	SLOT-INFO
 upgrade.panel.option	OPSİYON DETAYI	OPTION DETAIL	OPTIONSDETAIL
+upgrade.panel.stats	İSTATİSTİK	STATISTICS	STATISTIK
+stats.damage	Toplam hasar	Total damage	Gesamtschaden
+stats.accuracy	İsabet oranı	Accuracy	Trefferquote
+stats.dps	Efektif DPS	Effective DPS	Effektive DPS
+stats.engaged	Dövüş süresi	Time engaged	Kampfzeit
+stats.kills	Kill	Kills	Abschüsse
+stats.munitions	Düşürülen mühimmat	Munitions downed	Abgefangene Munition
+stats.fighterDamageTaken	Savaşçıların aldığı hasar	Damage taken by fighters	Schaden an Jägern
+stats.fightersLost	Kaybedilen savaşçı	Fighters lost	Verlorene Jäger
+stats.absorbed	Emilen hasar	Damage absorbed	Absorbierter Schaden
+stats.refilled	Doldurulan kalkan	Shield recharged	Aufgeladener Schild
+stats.hullDamage	Gövdenin aldığı hasar	Hull damage taken	Rumpfschaden erlitten
+stats.repairedHull	Onarılan gövde	Hull repaired	Rumpf repariert
+stats.repairedParts	Onarılan komponent	Components repaired	Module repariert
+stats.produced	Üretilen enerji	Energy produced	Erzeugte Energie
+stats.collectedMetal	Toplanan metal	Metal collected	Gesammeltes Metall
+stats.collectedCrystal	Toplanan kristal	Crystal collected	Gesammelte Kristalle
+stats.percent	%{0}	{0}%	{0} %
 upgrade.box.hp	HP	HP	HP
 upgrade.box.shield	KALKAN	SHIELD	SCHILD
 upgrade.box.energy	ENERJİ	ENERGY	ENERGIE

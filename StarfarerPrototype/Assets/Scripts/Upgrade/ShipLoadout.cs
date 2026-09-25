@@ -33,6 +33,16 @@ public class ShipLoadout : MonoBehaviour
     // Silah stat upgrade seviyeleri — silah tipinden bağımsız, kalıcı
     private readonly Dictionary<WeaponType, Dictionary<string, int>> _weaponStatLevels = new();
 
+    // Ana silahın sayaçları — her TİP ayrı (bkz. ComponentStats)
+    private readonly Dictionary<WeaponType, ComponentStats> _weaponStats = new();
+
+    /// <summary>Bir ana silah tipinin sayaçları; ilk sorulduğunda doğar.</summary>
+    public ComponentStats WeaponStats(WeaponType type)
+    {
+        if (!_weaponStats.TryGetValue(type, out var s)) _weaponStats[type] = s = new ComponentStats();
+        return s;
+    }
+
     // Tip → slot indeksi haritası (Turret gibi çoklu olabilecek tipler List içinde)
     private readonly Dictionary<ComponentType, List<int>> _slotsByType = new();
 
@@ -381,11 +391,13 @@ public class ShipLoadout : MonoBehaviour
     }
 
     /// <summary>Kayıttan bir slotu stat seviyeleriyle birlikte geri kurar.</summary>
-    public bool RestoreSlot(int slotIndex, ComponentDefinition def, Dictionary<string, int> stats)
+    public bool RestoreSlot(int slotIndex, ComponentDefinition def, Dictionary<string, int> stats,
+                            ComponentStats counters = null)
     {
         if (!InstallComponent(def, slotIndex, deductCost: false)) return false;
 
         var comp = _slots[slotIndex];
+        if (comp != null && counters != null) comp.Stats = counters.Clone();
         if (comp != null && stats != null)
         {
             foreach (var kv in stats)
@@ -398,12 +410,14 @@ public class ShipLoadout : MonoBehaviour
     }
 
     /// <summary>Kayıttan silah durumunu geri kurar.</summary>
-    public void RestoreWeapon(WeaponType type, int damageLevel, int fireRateLevel)
+    public void RestoreWeapon(WeaponType type, int damageLevel, int fireRateLevel,
+                              ComponentStats counters = null)
     {
         var def = ComponentCatalog.Weapon(type);
         if (def == null) return;
 
         _unlockedWeapons[type] = def;
+        _weaponStats[type]     = counters != null ? counters.Clone() : new ComponentStats();
         _weaponStatLevels[type] = new Dictionary<string, int>
         {
             { "damage",   damageLevel   },

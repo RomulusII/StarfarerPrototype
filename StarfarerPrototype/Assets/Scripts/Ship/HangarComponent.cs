@@ -49,6 +49,11 @@ public class HangarComponent : ShipComponentBase
         _collectors.RemoveAll(c => c == null);
         _fighters.RemoveAll(f => f == null);
 
+        // Filonun dövüş süresi: HERHANGİ bir savaşçı dövüşürken geçen süre.
+        // Savaşçı başına toplansaydı DPS filonun değil tek savaşçının DPS'i olurdu.
+        foreach (var f in _fighters)
+            if (f.IsEngaged) { Stats.engagedTime += Time.deltaTime; break; }
+
         // Toplayıcı üretimi
         if (_collectors.Count < MaxCollectors)
         {

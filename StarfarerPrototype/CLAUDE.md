@@ -2477,6 +2477,7 @@ bırakıldı.
 | UpgradeUI.cs | Tab ile açılan upgrade ekranı, 4 panel layout |
 | SlotVisual.cs | World-space slot göstergesi — dolu slotta halka, boş slotta daire |
 | EnemyInfoHUD.cs | Fare düşman üstündeyken sol üstte açılan bilgi kutusu |
+| ComponentStats.cs | Komponent sayaçları (hasar, isabet, emilen, üretilen…) + `DamageSource` hasar kaynağı kapsamı |
 | EnergyBar.cs | Üst HUD şeridi: enerji + metal + kristal barları ve uyarı satırı |
 | HitEffect.cs | Çarpma kıvılcımlarının tek giriş noktası (`SpawnImpact`) + DeathEffect |
 | ProjectileLook.cs | Mermi görünümünün tek sahibi — boyut hasardan türer, parlaklık + hâle; collider'a dokunmaz |
@@ -3021,6 +3022,34 @@ yerini zırh aldı; bu levelde vurmayı belirleyen sayı odur. Değerler ölçek
 runtime kopyasından okunur, yani asset'teki taban değil bu levelde gerçekten
 geçerli olan sayı görünür. Boss ve hardpoint'leri de kutu açar.
 
+## İstatistik Paneli — Tasarım Kararları
+
+Upgrade ekranında slot bilgisi ile opsiyon detayı arasındaki panel: seçili
+komponentin OYUN İÇİ sayaçları. Sayaçların sahibi `ComponentStats` — her
+komponentte bir tane (`ShipComponentBase.Stats`), ana silahta her TİP için
+ayrı (`ShipLoadout.WeaponStats`). Stat yükseltmeleriyle (`StatLevels`) ilgisi yok.
+
+| Komponent | Satırlar |
+|---|---|
+| Turret / ana silah | toplam hasar · isabet · efektif DPS · dövüş süresi · kill · (PD'de ya da >0 ise) düşürülen mühimmat |
+| Hangar | savaşçıların toplamı, turretle aynı + aldıkları hasar + kaybedilen savaşçı |
+| Kalkan jeneratörü | emilen hasar · doldurulan kalkan |
+| Onarım birimi | gövdenin aldığı hasar (geminin toplamı) · onarılan gövde · onarılan komponent |
+| Enerji jeneratörü | üretilen enerji |
+| Depo | toplanan metal · toplanan kristal (geminin toplamı, her depo aynısını gösterir) |
+
+| Karar | Gerekçe |
+|---|---|
+| **Hasar = hedefin GERÇEKTEN kaybettiği** HP + kalkan (zırh, direnç sonrası, ölüm taşması hariç) | Ham hasar sayılsaydı zırhlı hedefe yazılan rakam yalan söylerdi. Kurban FARKI ölçer (`EnemyBot.ReportDamage`), hesaplamaz |
+| **Kaynak bir kapsamla taşınır** (`DamageSource.From(stats)`) | Hasar yolları (TryDamage, AreaDamage, Shrapnel) kaynak parametresi almıyor; almasaydı onlarca imza değişirdi. Kapsam dışındaki hasar hiçbir sayaca yazılmaz — boss ölürken hardpoint'lerin silinmesi kapsamı bilerek boşaltır |
+| **Efektif DPS = hasar / dövüş süresi** | Dövüş süresi: turret bir hedefe kilitliyken, savaşçılardan HERHANGİ biri dövüşürken, ana silahın menzilinde (bütün kadraj) düşman varken. Menzili kısa turret uzakta ölen düşman yüzünden cezalandırılmaz; enerjisizlikten ateş edemediği süre sayılır — o build'in kusuru |
+| **Işın atış saymaz** | Iskalamaz; paydası 0 kalır, isabet "—" görünür. Plazma bolt'tur, sayılır (bolt başına bir isabet) |
+| **Patlayan mermi** hedef yakaladıysa isabet | Flak'in havada patlayıp hiçbir şeye değmeyen mermisi ıskadır — log'la aynı kural |
+| **Kill yalnızca gemi** (düşman, boss) | Asteroit ve hardpoint hasara girer, kill'e girmez |
+| **Komponentle doğar, satılınca ölür**; turret uzmanlaşma değiştirince SIFIRLANIR | Gatling'in isabet oranı ile Flak'inki aynı sayıya karışırsa ikisi de anlamsızlaşır — ana silah tiplerinin ayrı sayılmasıyla aynı gerekçe |
+| **Toplanan kaynak = toplayıcının depoya indirdiği** | Satış ve uzmanlaşma iadesi sayılmaz, tavanda yanan kısım da |
+| **Her iki kayıt katmanına girer** | Sayaçlar `SlotSave.counters` / `WeaponSave.counters`, geminin toplamları `SaveData` içinde — dünya kaydı da aynı `SaveData`'yı taşıdığı için tek yerden. Ölüm son level başı kaydına döndürür, sayaçlar da o ana döner. Uçuştaki turret/savaşçı mermisi sahibini slotla yazar (`TurretBulletState.owner`) |
+
 ## HUD Uyarıları — Tasarım Kararları
 
 Barların hemen altında, tek satır (`EnergyBar`). İki kademe var ve ayrım
@@ -3160,6 +3189,9 @@ kendi içinde tutarlı. Tek yerden değiştirilebilir: `BuildWarningText`.
 - [x] **Flak şarapnel atar** — 30 kıymık × 3 hasar, menzil 4, buluşma
       noktasında havada patlar; doğrudan isabette %40 hedefe, kalanı arkasına.
       Denge revizyonu **11**. Oyunda denenmedi.
+- [x] **İstatistik paneli** — upgrade ekranında seçili komponentin sayaçları
+      (hasar, isabet, efektif DPS, kill, emilen/üretilen/onarılan/toplanan);
+      iki kayıt katmanına da girer.
 - [ ] **Turret menzili yükseltmeye bağlanacak** — bütün turretlerin taban
       menzili düşürülüp bir "Menzil" statı eklenecek (ertelendi).
 - [ ] **Denge testleri** — aşağıdaki listeye bak; sayıların hiçbiri oyunda denenmedi

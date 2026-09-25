@@ -178,6 +178,10 @@ public class ShieldGeneratorComponent : ShipComponentBase
             float prev    = currentShield;
             currentShield = Mathf.Min(currentShield + effectiveRate * Time.deltaTime, effectiveMax);
 
+            // Yalnızca sıfırın ÜSTÜNDEKİ dolum sayılır: boşalma cezasından
+            // (-10) sıfıra tırmanış kalkan değil, bekleme süresi.
+            Stats.refilled += Mathf.Max(0f, currentShield) - Mathf.Max(0f, prev);
+
             // Yalnızca deplete sonrası +10'a ilk kez ulaşıldığında animasyon başlat
             if (_depleted && !_reactivating && prev < ReactivationThreshold && currentShield >= ReactivationThreshold)
             {
@@ -252,10 +256,12 @@ public class ShieldGeneratorComponent : ShipComponentBase
 
         if (currentShield >= incomingDamage)
         {
-            currentShield -= incomingDamage;
+            currentShield  -= incomingDamage;
+            Stats.absorbed += incomingDamage;
             return 0f;
         }
 
+        Stats.absorbed += currentShield;
         float remaining = incomingDamage - currentShield;
         currentShield = DepletionPenalty;
         _depleted     = true;

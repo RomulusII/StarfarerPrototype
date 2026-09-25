@@ -21,6 +21,12 @@ public class PlasmaBeam : MonoBehaviour
     public float      emitDuration = 0.2f;   // Growing fazı süresi (saniye)
     public WeaponType weaponType;
 
+    /// <summary>Ana silahın plazma sayaçları. Kayıttan kurulan bolt tipinden yeniden bulur.</summary>
+    public ComponentStats stats;
+
+    // Bolt ilk hedefine değdi mi — isabet bolt başına BİR kez sayılır.
+    bool _hitCounted;
+
     enum Phase { Growing, Traveling, Fading }
 
     Vector3 _origin;
@@ -99,6 +105,7 @@ public class PlasmaBeam : MonoBehaviour
         phase         = (int)_phase,
         weaponType    = (int)weaponType,
         sparkTimer    = _sparkTimer,
+        hitCounted    = _hitCounted,
     };
 
     public static PlasmaBeam Rebuild(PlasmaBeamState s)
@@ -123,6 +130,8 @@ public class PlasmaBeam : MonoBehaviour
         p.emitDuration     = s.emitDuration;
         p.weaponType       = (WeaponType)s.weaponType;
         p._restoredInitial = s.initialEnergy;
+        p._hitCounted      = s.hitCounted;
+        p.stats            = Object.FindFirstObjectByType<ShipLoadout>()?.WeaponStats(p.weaponType);
 
         // Transform Update'te türetilir; ilk kareden ÖNCE de doğru olsun
         // (sıralama ve çarpışma o karede okunuyor).
@@ -227,8 +236,15 @@ public class PlasmaBeam : MonoBehaviour
             float efficiency = BalanceConfig.Instance.BeamArmorEfficiency(
                 dps, DamageUtil.ArmorOf(col));
 
-            DamageUtil.TryDamage(col, tickDmg * efficiency, weaponType,
-                                 armorPreApplied: true);
+            bool hit;
+            using (DamageSource.From(stats))
+                hit = DamageUtil.TryDamage(col, tickDmg * efficiency, weaponType,
+                                           armorPreApplied: true);
+            if (hit && !_hitCounted && stats != null)
+            {
+                _hitCounted = true;
+                stats.shotsHit++;
+            }
             totalEnergy -= tickDmg;
 
             if (_sparkTimer <= 0f)

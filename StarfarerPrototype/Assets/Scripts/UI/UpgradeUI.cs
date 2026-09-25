@@ -88,7 +88,19 @@ public class UpgradeUI : MonoBehaviour
             Toggle();
 
         if (_canvas != null && _canvas.enabled)
-            UpdateStatBoxes();    }
+        {
+            UpdateStatBoxes();
+
+            // Sayaçlar oyun duraklıyken değişmez, ama satış/uzmanlaşma gibi
+            // panel içi işlemler onları sıfırlayabilir. Yarım saniyede bir yeter.
+            _statsRefreshTimer -= Time.unscaledDeltaTime;
+            if (_statsRefreshTimer <= 0f)
+            {
+                _statsRefreshTimer = 0.5f;
+                UpdateCombatStats();
+            }
+        }
+    }
 
     /// <summary>
     /// Upgrade ekranını açar/kapatır. Tab tuşu ve ekran düğmesi AYNI yoldan
@@ -183,6 +195,7 @@ public class UpgradeUI : MonoBehaviour
 
         // Sağ sütun istatistiklerini güncelle
         UpdateSlotInfoStats();
+        UpdateCombatStats();
         UpdateCostDisplay(slotIndex);
 
         // Eğer aynı slotta stat seçiliyse açıklamayı yeniden göster
@@ -1173,6 +1186,7 @@ public class UpgradeUI : MonoBehaviour
 
         BuildGeneralPanel();
         BuildSlotInfoPanel();
+        BuildStatsPanel();
         BuildHoverDetailPanel();
         BuildListPanel();
         BuildCloseButton();
@@ -1351,6 +1365,165 @@ public class UpgradeUI : MonoBehaviour
         var statsLE = statsGo.AddComponent<LayoutElement>();
         statsLE.flexibleWidth   = 1f;
         statsLE.preferredHeight = 220f;
+    }
+
+    // ── İstatistik paneli ─────────────────────────────────────────────────────
+    //
+    // Slot bilgisi ile opsiyon detayı arasındaki boşlukta. Seçili komponentin
+    // oyun içi sayaçları (bkz. ComponentStats): ne kadar vurdu, ne kadar emdi,
+    // ne kadar üretti. İki metin üst üste: etiketler sola, değerler sağa
+    // yaslı — dar panelde "etiket: değer" satırları kırılıyordu.
+
+    private GameObject    _statsPanel;
+    private Text          _statsLabels, _statsValues;
+    private float         _statsRefreshTimer;
+    readonly StringBuilder _rowLabels = new(), _rowValues = new();
+
+    void BuildStatsPanel()
+    {
+        _statsPanel = new GameObject("StatsPanel", typeof(RectTransform));
+        _statsPanel.transform.SetParent(transform, false);
+        _statsPanel.AddComponent<Image>().color = new Color(0.07f, 0.06f, 0.16f, 0.95f);
+        _statsPanel.AddComponent<DeselectOnClick>();
+
+        var r = (RectTransform)_statsPanel.transform;
+        r.anchorMin        = new Vector2(0.575f, 0.67f);
+        r.anchorMax        = new Vector2(0.78f,  0.95f);
+        r.anchoredPosition = Vector2.zero;
+        r.sizeDelta        = Vector2.zero;
+
+        var vl = _statsPanel.AddComponent<VerticalLayoutGroup>();
+        vl.padding                = new RectOffset(14, 14, 12, 12);
+        vl.spacing                = 8f;
+        vl.childForceExpandWidth  = true;
+        vl.childForceExpandHeight = false;
+
+        var headerTxt = MakeLabel(_statsPanel.transform, Loc.T("upgrade.panel.stats"), 36, FontStyle.Bold);
+        headerTxt.color = new Color(0.55f, 0.45f, 0.80f, 1f);
+
+        var body = new GameObject("Body", typeof(RectTransform));
+        body.transform.SetParent(_statsPanel.transform, false);
+        var le = body.AddComponent<LayoutElement>();
+        le.flexibleWidth   = 1f;
+        le.preferredHeight = 220f;
+
+        _statsLabels = StatsColumn(body.transform, TextAnchor.UpperLeft,  new Color(0.75f, 0.78f, 0.95f, 1f));
+        _statsValues = StatsColumn(body.transform, TextAnchor.UpperRight, Color.white);
+
+        _statsPanel.SetActive(false);
+    }
+
+    static Text StatsColumn(Transform parent, TextAnchor align, Color color)
+    {
+        var go = new GameObject("Col", typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        var rt = (RectTransform)go.transform;
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.sizeDelta = Vector2.zero;
+
+        var t = go.AddComponent<Text>();
+        t.font               = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        t.fontSize           = 21;
+        t.color              = color;
+        t.alignment          = align;
+        t.horizontalOverflow = HorizontalWrapMode.Overflow;   // iki sütun aynı satırda kalmalı
+        t.verticalOverflow   = VerticalWrapMode.Overflow;
+        return t;
+    }
+
+    void UpdateCombatStats()
+    {
+        if (_statsPanel == null) return;
+        bool show = FillCombatRows(_currentSlotIndex);
+        _statsPanel.SetActive(show);
+        if (!show) return;
+        _statsLabels.text = _rowLabels.ToString();
+        _statsValues.text = _rowValues.ToString();
+    }
+
+    bool FillCombatRows(int slot)
+    {
+        _rowLabels.Clear();
+        _rowValues.Clear();
+        if (slot < 0 || _loadout == null) return false;
+
+        if (slot == WeaponSlot)
+        {
+            WeaponRows(_loadout.WeaponStats(_loadout.GetActiveWeaponType()), showMunitions: false);
+            return true;
+        }
+
+        var comp = _loadout.GetSlotComponent(slot);
+        if (comp == null) return false;
+        var s = comp.Stats;
+
+        switch (comp)
+        {
+            case TurretController tc:
+                WeaponRows(s, showMunitions: tc.specType == TurretSpecType.PointDefence);
+                break;
+
+            case HangarComponent:
+                WeaponRows(s, showMunitions: false);
+                Row("stats.fighterDamageTaken", Num(s.damageTaken));
+                Row("stats.fightersLost",       Num(s.fightersLost));
+                break;
+
+            case ShieldGeneratorComponent:
+                Row("stats.absorbed", Num(s.absorbed));
+                Row("stats.refilled", Num(s.refilled));
+                break;
+
+            case RepairUnitComponent:
+                var ship = _loadout.GetComponent<PlayerShip>();
+                Row("stats.hullDamage",    Num(ship != null ? ship.hullDamageTaken : 0f));
+                Row("stats.repairedHull",  Num(s.repairedHull));
+                Row("stats.repairedParts", Num(s.repairedParts));
+                break;
+
+            case GeneratorComponent:
+                Row("stats.produced", Num(s.produced));
+                break;
+
+            case StorageComponent:
+                // Geminin toplamı — hangi depoya indiği ayrılmıyor, her depo aynısını gösterir
+                var inv = ResourceInventory.Instance;
+                Row("stats.collectedMetal",   Num(inv != null ? inv.collectedMetal   : 0f));
+                Row("stats.collectedCrystal", Num(inv != null ? inv.collectedCrystal : 0f));
+                break;
+
+            default:
+                return false;
+        }
+        return true;
+    }
+
+    void WeaponRows(ComponentStats s, bool showMunitions)
+    {
+        Row("stats.damage",   Num(s.damage));
+        Row("stats.accuracy", s.Accuracy < 0f
+            ? "—"
+            : Loc.T("stats.percent", (s.Accuracy * 100f).ToString("0", Loc.Culture)));
+        Row("stats.dps",      s.engagedTime > 0.5f ? s.Dps.ToString("0.0", Loc.Culture) : "—");
+        Row("stats.engaged",  Duration(s.engagedTime));
+        Row("stats.kills",    Num(s.kills));
+        if (showMunitions || s.munitions > 0)
+            Row("stats.munitions", Num(s.munitions));
+    }
+
+    void Row(string key, string value)
+    {
+        _rowLabels.Append(Loc.T(key)).Append('\n');
+        _rowValues.Append(value).Append('\n');
+    }
+
+    static string Num(float v) => v.ToString("N0", Loc.Culture);
+
+    static string Duration(float seconds)
+    {
+        int t = Mathf.FloorToInt(seconds);
+        return t >= 3600 ? $"{t / 3600}:{t / 60 % 60:00}:{t % 60:00}" : $"{t / 60}:{t % 60:00}";
     }
 
     // Sağ üst — hover/tap ile seçilen opsiyon detayı

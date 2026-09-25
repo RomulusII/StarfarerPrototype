@@ -45,6 +45,9 @@ public static class SaveSystem
         public int    weaponType;
         public string statKeys;      // "a|b|c" — JsonUtility Dictionary desteklemez
         public string statLevels;    // "1|2|3"
+
+        /// <summary>İstatistik panelinin sayaçları — bkz. ComponentStats.</summary>
+        public ComponentStats counters;
     }
 
     [Serializable]
@@ -53,6 +56,7 @@ public static class SaveSystem
         public int weaponType;
         public int damageLevel;
         public int fireRateLevel;
+        public ComponentStats counters;   // her silah tipi ayrı sayar
     }
 
     [Serializable]
@@ -66,6 +70,12 @@ public static class SaveSystem
         // seçimdir (bkz. DifficultyManager).
         public int   difficulty;
         public int   activeWeapon;
+
+        // Geminin geneline ait istatistikler — bir komponente değil gemiye ait
+        // oldukları için slotların dışında (onarım ve depo panelleri okur).
+        public float hullDamageTaken;
+        public float collectedMetal, collectedCrystal;
+
         public List<SlotSave>   slots   = new();
         public List<WeaponSave> weapons = new();
     }
@@ -155,6 +165,9 @@ public static class SaveSystem
             crystal      = inv.crystal,
             difficulty   = (int)DifficultyManager.Current,
             activeWeapon = (int)loadout.GetActiveWeaponType(),
+            hullDamageTaken  = loadout.GetComponent<PlayerShip>()?.hullDamageTaken ?? 0f,
+            collectedMetal   = inv.collectedMetal,
+            collectedCrystal = inv.collectedCrystal,
         };
 
         foreach (var (slot, def, comp) in loadout.EnumerateSlots())
@@ -180,6 +193,7 @@ public static class SaveSystem
                 weaponType    = (int)def.weaponType,
                 statKeys      = string.Join("|", keys),
                 statLevels    = string.Join("|", levels),
+                counters      = comp != null ? comp.Stats.Clone() : null,
             });
         }
 
@@ -191,6 +205,7 @@ public static class SaveSystem
                 weaponType    = (int)wt,
                 damageLevel   = loadout.GetWeaponStatLevel(wt, "damage"),
                 fireRateLevel = loadout.GetWeaponStatLevel(wt, "fireRate"),
+                counters      = loadout.WeaponStats(wt).Clone(),
             });
         }
 
@@ -250,11 +265,17 @@ public static class SaveSystem
                 (WeaponType)s.weaponType);
             if (def == null) continue;
 
-            loadout.RestoreSlot(s.slot, def, ParseStats(s.statKeys, s.statLevels));
+            loadout.RestoreSlot(s.slot, def, ParseStats(s.statKeys, s.statLevels), s.counters);
         }
 
         foreach (var w in d.weapons)
-            loadout.RestoreWeapon((WeaponType)w.weaponType, w.damageLevel, w.fireRateLevel);
+            loadout.RestoreWeapon((WeaponType)w.weaponType, w.damageLevel, w.fireRateLevel,
+                                  w.counters);
+
+        var ship = loadout.GetComponent<PlayerShip>();
+        if (ship != null) ship.hullDamageTaken = d.hullDamageTaken;
+        inv.collectedMetal   = d.collectedMetal;
+        inv.collectedCrystal = d.collectedCrystal;
 
         loadout.FinishRestore((WeaponType)d.activeWeapon);
 

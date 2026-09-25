@@ -77,7 +77,8 @@ public class ResourceInventory : MonoBehaviour
     /// yuvarlamak zorundaydı: level 1'de asteroit parçası 0.5 kaynak düşürdüğü
     /// için kristalin tamamı yuvarlamada kayboluyordu.
     /// </summary>
-    public void Add(ResourceType type, float amount)
+    /// <returns>Depoya GERÇEKTEN giren miktar — tavana çarpıp yanan kısım hariç.</returns>
+    public float Add(ResourceType type, float amount)
     {
         // Tavana çarpan kısım YANAR. Gelirin ne kadarının boşa gittiğini ancak
         // burada görebiliriz: Add() sessizce kırpıyor, kimse haber vermiyordu.
@@ -104,6 +105,20 @@ public class ResourceInventory : MonoBehaviour
                   .Num("stok",   AmountOf(type))
                   .Num("tavan",  CapacityOf(type))
                   .End();
+        return gained;
+    }
+
+    /// <summary>
+    /// Toplayıcıların oyun boyunca depoya indirdiği kaynak — deponun istatistik
+    /// paneli. Satış iadesi ve uzmanlaşma iadesi SAYILMAZ, yalnızca toplanan;
+    /// tavanda yanan kısım da sayılmaz. Kayda girer (SaveSystem.SaveData).
+    /// </summary>
+    public float collectedMetal, collectedCrystal;
+
+    public void CountCollected(ResourceType type, float gained)
+    {
+        if (type == ResourceType.RawMaterial)        collectedMetal   += gained;
+        else if (type == ResourceType.EnergyCrystal) collectedCrystal += gained;
     }
 
     public int Get(ResourceType type)

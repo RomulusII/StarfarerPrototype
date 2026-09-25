@@ -211,6 +211,7 @@ public class Asteroid : MonoBehaviour, ITurretTarget
         if (_dead) return;
 
         float effective = amount * ResistanceFor(weaponType);
+        DamageSource.Dealt(Mathf.Min(effective, Mathf.Max(0f, hp)), killedShip: false);
         hp -= effective;
         if (_healthBar != null) _healthBar.TakeDamage(effective);
         if (hp > 0f) return;

@@ -106,6 +106,17 @@ public class GeneratorComponent : ShipComponentBase
             EnergyBus.Instance.RegisterProducer(_effectiveProduction);
     }
 
+    /// <summary>
+    /// Üretilen enerjinin sayacı. EnergyBus'ın saydığı üretimin aynısı: kayıtlı
+    /// üretim × (1 − karıştırma). Tampon doluyken boşa giden kısım da sayılır —
+    /// jeneratör onu ÜRETTİ, harcanamaması tamponun ve tüketimin sorunu.
+    /// </summary>
+    void Update()
+    {
+        if (UpgradeUI.IsPaused || EnergyBus.Instance == null) return;
+        Stats.produced += _effectiveProduction * (1f - EnergyBus.Instance.JamFactor) * Time.deltaTime;
+    }
+
     public override void OnStatUpgraded(string key)
     {
         if (key == CapacitorKey) { ApplyCapacitor(); return; }

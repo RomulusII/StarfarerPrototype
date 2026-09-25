@@ -159,9 +159,17 @@ public class RepairUnitComponent : ShipComponentBase
 
         // En çok hasarlı hedefi onar (hull veya komponent)
         if (repairHull)
+        {
+            float before = ps.currentHullHP;
             ps.currentHullHP = Mathf.Min(ps.maxHullHP, ps.currentHullHP + effectiveRate * Time.deltaTime);
+            Stats.repairedHull += ps.currentHullHP - before;
+        }
         else
+        {
+            float before = compTarget.currentHP;
             compTarget.Repair(effectiveRate * Time.deltaTime);
+            Stats.repairedParts += compTarget.currentHP - before;
+        }
     }
 
     ShipComponentBase FindMostDamagedComponent()

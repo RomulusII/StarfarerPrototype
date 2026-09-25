@@ -26,6 +26,9 @@ public class LaserBeam : MonoBehaviour
     public bool       continuous      = false; // true → süre sınırı yok, dışarıdan kapatılır
     public bool       hitsPlayer      = false; // true → düşman lazeri, player'a hasar verir
 
+    /// <summary>Hasarın yazılacağı sayaç (turret ya da ana silah). Düşman lazerinde null.</summary>
+    public ComponentStats stats;
+
     float        _remaining;
     Collider2D   _target;
     PlayerShip   _targetPlayer;
@@ -170,8 +173,9 @@ public class LaserBeam : MonoBehaviour
         float efficiency = BalanceConfig.Instance.BeamArmorEfficiency(
             dps, DamageUtil.ArmorOf(_target));
 
-        DamageUtil.TryDamage(_target, dps * efficiency * dt, weaponType,
-                             armorPreApplied: true);
+        using (DamageSource.From(stats))
+            DamageUtil.TryDamage(_target, dps * efficiency * dt, weaponType,
+                                 armorPreApplied: true);
     }
 
     // ── Görsel ────────────────────────────────────────────────────────────────
@@ -263,6 +267,9 @@ public class LaserBeam : MonoBehaviour
         beam.energyPerSecond = s.energyPerSecond;
         beam.hitsPlayer      = s.hitsPlayer;
         beam.maxRange        = s.maxRange;
+        // Sahibi ebeveyn zincirinden bulunur — ayrı bir kayıt alanı gerekmez
+        if (!s.hitsPlayer)
+            beam.stats = parent != null ? parent.GetComponentInParent<ShipComponentBase>()?.Stats : null;
         beam.Init();
         beam._remaining      = s.remaining;   // Init tam süreyle başlatır
         return beam;

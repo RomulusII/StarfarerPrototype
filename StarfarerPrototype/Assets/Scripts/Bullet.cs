@@ -33,6 +33,12 @@ public class Bullet : MonoBehaviour
     /// </summary>
     public float lifeTime;
 
+    /// <summary>
+    /// Ateşleyen silah tipinin sayaçları (ShipLoadout.WeaponStats). Kayda
+    /// girmez: kayıttan kurulan mermi onu silah tipinden yeniden bulur.
+    /// </summary>
+    public ComponentStats stats;
+
     /// <summary>Ana silah mermisinin hâlesi — sıcak beyaz.</summary>
     public static readonly Color GlowColor = new Color(1f, 0.85f, 0.55f);
 
@@ -74,8 +80,12 @@ public class Bullet : MonoBehaviour
         // çarpmanın kendisi kalkana olmuştur.
         var surface = DamageUtil.SurfaceOf(other);
 
-        if (DamageUtil.TryDamage(other, damage, weaponType))
+        bool hit;
+        using (DamageSource.From(stats)) hit = DamageUtil.TryDamage(other, damage, weaponType);
+
+        if (hit)
         {
+            if (stats != null) stats.shotsHit++;
             bool lethal = other.GetComponent<HealthBar>()?.currentHealth <= 0f;
 
             // İsabet oranının payı. Payda shot_fired'dır: ıskalayan mermi ömrü
@@ -142,6 +152,7 @@ public class Bullet : MonoBehaviour
         b.boostAtFire = (BoostMode)s.boost;
         b.zoomAtFire  = s.zoom;
         b.lifeTime    = s.life;
+        b.stats       = Object.FindFirstObjectByType<ShipLoadout>()?.WeaponStats(b.weaponType);
         return b;
     }
 }

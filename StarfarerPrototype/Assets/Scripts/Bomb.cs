@@ -76,8 +76,13 @@ public class Bomb : MonoBehaviour, ITurretTarget
 
     public void TakeDamage(float amount)
     {
+        // Düşmüş ama Destroy'u kare sonunu bekleyen bomba ikinci kez sayılmasın.
+        if (hp <= 0f) return;
         hp -= amount;
-        if (hp <= 0f) Destroy(gameObject);
+        if (hp > 0f) return;
+
+        DamageSource.MunitionDestroyed();
+        Destroy(gameObject);
     }
 
     void Update()

@@ -391,6 +391,14 @@ public class BossShip : MonoBehaviour, ITurretTarget
     {
         if (_dead) return;
 
+        // Kaybedilen FARK hasarı verenin sayacına yazılır (bkz. DamageSource).
+        float before = Mathf.Max(0f, _shieldHP) + _hullHP;
+        ApplyHit(amount, wt, armorPreApplied);
+        DamageSource.Dealt(before - Mathf.Max(0f, _shieldHP) - _hullHP, _dead);
+    }
+
+    void ApplyHit(float amount, WeaponType wt, bool armorPreApplied)
+    {
         // Zırh eşiği atış başına, kalkandan önce uygulanır. Işınlar zırhı
         // kendileri ORAN olarak uygulamıştır (BeamArmorEfficiency), tekrar kesilmez.
         if (!armorPreApplied)
@@ -456,9 +464,11 @@ public class BossShip : MonoBehaviour, ITurretTarget
         if (_dead) return;
         _dead = true;
 
-        // Tüm hardpoint'leri de yok et
-        foreach (var hp in _hardpoints)
-            if (hp.IsAlive) hp.TakeDamage(99999f);
+        // Tüm hardpoint'leri de yok et. Kapsam boşaltılır: son darbeyi vuran
+        // silah hardpoint'lerin kalan HP'sini de "vurmuş" sayılmasın.
+        using (DamageSource.From(null))
+            foreach (var hp in _hardpoints)
+                if (hp.IsAlive) hp.TakeDamage(99999f);
 
         _deathPiecesLeft = DeathPieces;
         _deathTimer      = 0f;

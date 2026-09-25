@@ -46,6 +46,22 @@ public class TurretBullet : MonoBehaviour
     public float      fuse;
 
     /// <summary>
+    /// Mermiyi ateşleyen komponent — turret ya da savaşçının hangarı.
+    /// Verdiği hasar, isabet ve kill onun sayacına yazılır (ComponentStats).
+    /// Kayda SLOT numarasıyla girer. Komponent satıldıysa null: mermi yine
+    /// vurur, sayılmaz.
+    /// </summary>
+    public ShipComponentBase owner;
+
+    ComponentStats OwnerStats => owner != null ? owner.Stats : null;
+
+    void CountHit()
+    {
+        var s = OwnerStats;
+        if (s != null) s.shotsHit++;
+    }
+
+    /// <summary>
     /// Ateşlendiği andaki kadraj genişliği. Turret kendi nişan alıyor, yani
     /// zoom onun isabetini ETKİLEMEMELİ — alan tam da bunu sınamak için var:
     /// ana silahın isabeti zoom'la düşerken turret'ınki düşmüyorsa, sebep
@@ -229,13 +245,18 @@ public class TurretBullet : MonoBehaviour
     bool TryHit(Collider2D other, Vector2 hitPos)
     {
         if (other == null || _spent) return false;
+        using (DamageSource.From(OwnerStats)) return TryHitCore(other, hitPos);
+    }
 
+    bool TryHitCore(Collider2D other, Vector2 hitPos)
+    {
         var bomb = other.GetComponent<Bomb>();
         if (bomb != null)
         {
             if (shrapnel > 0)     { Detonate(hitPos, other); return true; }
             if (blastRadius > 0f) { Explode(hitPos, other);  return true; }
 
+            CountHit();
             bomb.TakeDamage(damage);
             // Bomba tek vuruşta gider: Point Defence'in işini yaptığı görünsün
             HitEffect.SpawnImpact(hitPos, _dir, other.transform.position,
@@ -262,6 +283,7 @@ public class TurretBullet : MonoBehaviour
 
         if (DamageUtil.TryDamage(other, damage, weaponType))
         {
+            CountHit();
             bool lethal = other.GetComponent<HealthBar>()?.currentHealth <= 0f;
 
             BalanceLog.Event("shot_hit")
@@ -297,6 +319,7 @@ public class TurretBullet : MonoBehaviour
     void Explode(Vector2 at, Collider2D primary)
     {
         int caught = DamageUtil.AreaDamage(at, blastRadius, damage, weaponType);
+        CountHit();
 
         var surface = DamageUtil.SurfaceOf(primary);
         BalanceLog.Event("shot_hit")
@@ -341,9 +364,13 @@ public class TurretBullet : MonoBehaviour
         }
 
         var surface = primary != null ? DamageUtil.SurfaceOf(primary) : ImpactSurface.Hull;
-        var r = DamageUtil.Shrapnel(at, _dir, primary, shrapnel, blastRadius, damage, weaponType);
+        DamageUtil.ShrapnelResult r;
+        using (DamageSource.From(OwnerStats))
+            r = DamageUtil.Shrapnel(at, _dir, primary, shrapnel, blastRadius, damage, weaponType);
 
         if (r.caught > 0)
+        {
+            CountHit();
             BalanceLog.Event("shot_hit")
                       .Str("kaynak", "turret")
                       .Str("silah",  weaponType.ToString())
@@ -355,6 +382,7 @@ public class TurretBullet : MonoBehaviour
                       .Num("kiymik",    r.fragments)
                       .Bool("oldurdu", false)
                       .End();
+        }
 
         Destroy(gameObject);
     }
@@ -376,6 +404,7 @@ public class TurretBullet : MonoBehaviour
         blast      = blastRadius,
         shrapnel   = shrapnel,
         fuse       = fuse,
+        owner      = WorldSave.SlotOf(owner),
         zoom       = zoomAtFire,
         life       = LifeLeft,
         weaponType = (int)weaponType,
@@ -400,6 +429,7 @@ public class TurretBullet : MonoBehaviour
         tb.blastRadius  = s.blast;
         tb.shrapnel     = s.shrapnel;
         tb.fuse         = s.fuse;
+        tb.owner        = WorldSave.ResolveSlot(s.owner);
         tb.zoomAtFire   = s.zoom;
         tb.lifeTime     = s.life;
         tb.visual       = s.visual;

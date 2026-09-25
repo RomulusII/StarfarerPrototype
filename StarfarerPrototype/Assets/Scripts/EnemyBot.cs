@@ -1217,12 +1217,25 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         // YÖNLÜ kalkan burada devreye GİRMEZ: bu çağrı gövde collider'ından
         // geliyor, yani mermi yayı ıskalamış demektir. Kalkanı kenarından
         // dolanmanın ödülü tam da budur.
+        float before = HitPool;
         float hull = data.maxShield > 0f && _shieldHP > 0f && !data.HasDirectionalShield
             ? ApplyShieldLayer(shot, weaponType)
             : ApplyResistances(shot, weaponType, data.hullResistances);
 
         ApplyHullDamage(hull);
+        ReportDamage(before);
     }
+
+    /// <summary>Kalkan + gövde: bir isabetin gerçekten neyi götürdüğünün ölçüsü.</summary>
+    float HitPool => Mathf.Max(0f, _shieldHP) + Mathf.Max(0f, _healthBar.currentHealth);
+
+    /// <summary>
+    /// Kaybedileni hasarı verenin sayacına yazar (bkz. DamageSource). Fark
+    /// ölçülür, hesaplanmaz: zırh, direnç, kalkan katmanı ve ölüm taşması
+    /// böylece kendiliğinden içinde.
+    /// </summary>
+    void ReportDamage(float poolBefore)
+        => DamageSource.Dealt(poolBefore - HitPool, _healthBar.currentHealth <= 0f);
 
     /// <summary>
     /// Yay kalkanına isabet — yalnızca <see cref="BarrierShield"/> çağırır.
@@ -1238,7 +1251,9 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         float shot = armorPreApplied
             ? amount
             : BalanceConfig.Instance.ApplyArmor(amount, EffectiveArmor);
+        float before = HitPool;
         ApplyHullDamage(ApplyShieldLayer(shot, weaponType));
+        ReportDamage(before);
     }
 
     // Denge ölçümü: bu gemiye harcanan oyuncu emeğini ölçebilmek için doğum

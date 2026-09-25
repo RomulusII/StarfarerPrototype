@@ -56,6 +56,8 @@ public class BossHardpoint : MonoBehaviour
     {
         if (_dead) return;
 
+        // Hardpoint bir gemi değil — hasar sayılır, kill sayılmaz.
+        DamageSource.Dealt(Mathf.Min(amount, _hp), killedShip: false);
         _hp = Mathf.Max(0f, _hp - amount);
         if (_healthBar != null) _healthBar.TakeDamage(amount);
 

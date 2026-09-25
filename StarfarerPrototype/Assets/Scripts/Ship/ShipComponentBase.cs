@@ -34,6 +34,12 @@ public abstract class ShipComponentBase : MonoBehaviour
     public readonly Dictionary<string, int> StatLevels = new();
 
     /// <summary>
+    /// Oyun içi sayaçlar (hasar, isabet, emilen, üretilen…) — upgrade ekranının
+    /// İSTATİSTİK paneli. Yükseltme seviyeleriyle ilgisi yok; bkz. ComponentStats.
+    /// </summary>
+    public ComponentStats Stats = new();
+
+    /// <summary>
     /// Stat tavanı. Tier zincirleri kaldırılınca 8'den 10'a çıkarıldı — tier'ların
     /// taşıdığı güç stat eğrisine devredildi. Tavanı 10 tutmak, komponent
     /// tavanlarını eski Mk3 + Sv8 seviyesinin yakınında bırakır.

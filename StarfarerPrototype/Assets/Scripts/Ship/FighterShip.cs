@@ -63,9 +63,20 @@ public class FighterShip : MonoBehaviour
         _brain.leashToCombatArea = true;   // dogfight'ta ekrandan çıkmasın
     }
 
+    /// <summary>
+    /// Savaşçının sayaçları HANGARA yazılır: savaşçılar ölüp yeniden doğuyor,
+    /// kalıcı olan hangar. İstatistik paneli filonun toplamını gösterir.
+    /// </summary>
+    HangarComponent _hangarComp;
+    ComponentStats  HangarStats => _hangarComp != null ? _hangarComp.Stats : null;
+
+    /// <summary>Bir hedefle dövüşüyor mu — hangarın dövüş süresi buna bakar.</summary>
+    public bool IsEngaged => _brain != null && _brain.HasTarget;
+
     public void Init(Transform hangar, float speed, float maxHP, float fireRate, float damage)
     {
         _hangar               = hangar;
+        _hangarComp           = hangar != null ? hangar.GetComponent<HangarComponent>() : null;
         this.maxHP            = maxHP;
         this.currentHP        = maxHP;
         this.fireRate         = fireRate;
@@ -175,6 +186,8 @@ public class FighterShip : MonoBehaviour
         go.transform.position = transform.position;
 
         var tb        = go.AddComponent<TurretBullet>();
+        tb.owner      = _hangarComp;
+        if (HangarStats != null) HangarStats.shotsFired++;
         tb.damage     = damage;
         tb.speed      = 5f;
         tb.weaponType = WeaponType.Kinetic;
@@ -246,8 +259,17 @@ public class FighterShip : MonoBehaviour
 
     public void TakeDamage(float amount)
     {
+        // Ölmüş ama Destroy'u kare sonunu bekleyen savaşçı iki kez sayılmasın
+        if (currentHP <= 0f) return;
+
+        var s = HangarStats;
+        if (s != null) s.damageTaken += Mathf.Min(amount, currentHP);
+
         currentHP -= amount;
-        if (currentHP <= 0f) Destroy(gameObject);
+        if (currentHP > 0f) return;
+
+        if (s != null) s.fightersLost++;
+        Destroy(gameObject);
     }
 
     void BuildVisual()
