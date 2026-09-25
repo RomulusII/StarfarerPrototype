@@ -27,6 +27,12 @@ public class TurretController : ShipComponentBase
     /// Flak ve roket uzmanlaşmalarında dolu (bkz. ComponentCatalog.TurretSpec).
     /// </summary>
     public float          blastRadius    = 0f;
+
+    /// <summary>
+    /// Şarapnel kıymığı sayısı. 0 = şarapnel yok. Doluysa <see cref="blastRadius"/>
+    /// kıymığın menzili, <see cref="damage"/> kıymık başına hasardır.
+    /// </summary>
+    public int            shrapnelCount  = 0;
     [Tooltip("Saniyede derece — turretin maksimum dönüş hızı.")]
     public float          turnRate       = 180f;
 
@@ -316,6 +322,14 @@ public class TurretController : ShipComponentBase
         if (specType == TurretSpecType.NuclearRocket) tb.turnRate = 70f;
 
         tb.blastRadius = blastRadius;
+        tb.shrapnel    = shrapnelCount;
+
+        // Şarapnel mermisi çarpmayı beklemez: nişan alınan buluşma noktasına
+        // varınca patlar. Turret ancak namlu o noktaya 1°'den yakın dönükken
+        // ateş ettiği için (IsAimed) mermi noktanın hemen yanından geçer.
+        // Menzilin ötesi zaten vurulamaz; menzil sonunda da patlar.
+        if (shrapnelCount > 0)
+            tb.fuse = Mathf.Min(Vector2.Distance(spawnPos, _aimPos), EffectiveRange);
 
         tb.SetDirection(transform.right);
         tb.zoomAtFire = CameraController.ZoomOrani;
@@ -395,6 +409,7 @@ public class TurretController : ShipComponentBase
         // patlamaz". Korumalı atansaydı Flak'ten Gatling'e geçen turret
         // patlamaya devam ederdi.
         blastRadius    = newDef.turretBlastRadius;
+        shrapnelCount  = newDef.turretShrapnel;    // aynı gerekçe: 0 bir değerdir
 
         _currentMag = magazineSize;
         ApplySpecTurnRate();
@@ -539,6 +554,7 @@ public class TurretController : ShipComponentBase
         magazineSize   = def.turretMagazineSize   > 0 ? def.turretMagazineSize   : magazineSize;
         reloadTime     = def.turretReloadTime     > 0 ? def.turretReloadTime     : reloadTime;
         blastRadius    = def.turretBlastRadius;   // koşulsuz — bkz. Specialize
+        shrapnelCount  = def.turretShrapnel;      // koşulsuz — bkz. Specialize
 
         componentName = BuildLabel();
         _currentMag   = magazineSize;

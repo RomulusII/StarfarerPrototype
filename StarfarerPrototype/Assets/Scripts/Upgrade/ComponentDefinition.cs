@@ -67,4 +67,12 @@ public class ComponentDefinition : ScriptableObject
     /// (bkz. DamageUtil.AreaDamage).
     /// </summary>
     public float turretBlastRadius;
+
+    /// <summary>
+    /// Şarapnel kıymığı sayısı. 0 = şarapnel yok. Doluysa mermi alan hasarı
+    /// VERMEZ; patlayınca bu kadar kıymık saçar, her biri <see cref="turretDamage"/>
+    /// kadar vurur ve <see cref="turretBlastRadius"/> kadar uzağa gider
+    /// (bkz. DamageUtil.Shrapnel).
+    /// </summary>
+    public int   turretShrapnel;
 }

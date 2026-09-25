@@ -1557,7 +1557,7 @@ Slot'a kurulunca otomatik ateş açar, oyuncu müdahalesi gerekmez. Enerji tüke
 | **Lazer** | Orta (5f) | Orta | Yüksek | Yüksek | 4s | — |
 | **Roket** | Çok düşük (15f) | Yüksek | Orta | Düşük | 7.7s | Güdümlü, **çarpınca patlar** (yarıçap 1.2) |
 | **Nükleer Başlık** | Çok düşük (30f) | Çok yüksek (110) | Çok düşük (**1.25**) | Orta | **21.6s** | Güdümlü, hantal döner, **yarıçap 3.2** |
-| **Flak** | Hızlı (2f) | Düşük (12) | Orta (6) | Orta | 4.5s | **Yarıçap 1.8** — kalabalığın cevabı |
+| **Flak** | Hızlı (2f) | **Kıymık başına 3** | Orta (6) | Orta | 4.5s | **Şarapnel** — 30 kıymık, menzil 4, buluşma noktasında patlar |
 | **Point Defence** | Çok hızlı (0.28f) | Düşük/atış, **28.6 DPS** | **Çok yüksek (20)** | Düşük | 0.6s | Menzil 10.4 — önce mühimmat, sonra hafif gövde, sonra her şey |
 
 **Hedefleme — puanlama formülü** (`TurretTargeting`):
@@ -1635,11 +1635,12 @@ olurdu. Üç parça eklendi, üçü de mevcut mimariye oturuyor.
 
 | | Yarıçap | Tek hedefe DPS | Kimlik |
 |---|---|---|---|
-| **Flak** (kinetik) | 1.8 | 6.0 (diğerleriyle aynı) | kalabalıkta üstün, tek hedefte sıradan |
+| **Flak** (kinetik) | kıymık menzili 4 | doğrudan isabet 12 kıymık × 3 | kalabalığı biçer, zırhı çizer — bkz. "Flak — Şarapnel" |
 | **Güdümlü roket** | 1.2 | 4.0 (değişmedi) | patlama yalnızca KALABALIKTA kazanç |
 | **Nükleer başlık** | 3.2 | **3.67** (güdümlüden düşük) | formasyonu siler, boss'ta zayıf |
 
-**Tek yol: `DamageUtil.AreaDamage`.** Roket ve flak aynı fonksiyondan geçer
+**Tek yol: `DamageUtil.AreaDamage`.** Roket ve nükleer başlık aynı fonksiyondan geçer
+(flak denge r11'de bu yoldan çıktı, kendi yolu `DamageUtil.Shrapnel`)
 (`HitEffect.SpawnImpact` ile aynı gerekçe: ikinci bir yol sessizce sapar).
 Dört karar:
 
@@ -1670,9 +1671,50 @@ döner (dönüş hızı 150 → 70): geniş patlaması kaçamak hedefi zaten yak
 üstüne keskin güdüm onu her açıdan üstün kılardı. Menzil 27'de tutuldu, yavaş
 mermi zaten yeterli bir bedel.
 
-**Flak zırha karşı zayıf ve bu kasıtlı** — 12 hasarlı atış, zırh eşiğinin tam
-olarak cezalandırdığı şey. Bir döngü doğuyor: kalabalık flak'i ister, flak
+**Flak zırha karşı zayıf ve bu kasıtlı** — zırh eşiği KIYMIK başına ısırır
+(bkz. "Flak — Şarapnel"). Bir döngü doğuyor: kalabalık flak'i ister, flak
 zırhı davet eder. Ağır zırhlı tipler (Aşama 4) flak'in doğal cevabı.
+
+### Flak — Şarapnel (denge r11)
+
+Flak alan hasarı VERMEZ, kıymık saçar (`DamageUtil.Shrapnel`). Mermi
+**nişan aldığı buluşma noktasına varınca** (`TurretBullet.fuse`, turretin
+`PredictIntercept` sonucuna olan mesafe) ya da yolda ilk çarptığı hedefte
+patlar; menzil sonunda da patlar, sessizce kaybolmaz.
+
+| | Değer | Neden |
+|---|---|---|
+| Kıymık | **30**, her biri **3** hasar (`turretShrapnel`, `turretDamage`) | Zırh kıymık BAŞINA ısırır: zırhsız gemiye 3, zırh 2'ye 1, Muhafız aurasında (+6) %10 |
+| Menzil | **4** (`turretBlastRadius`) = ana geminin boyu | Kıymığın gidebildiği mesafe |
+| Doğrudan isabet | kıymıkların **%40**'ı (12) hedefe | `ShrapnelDirectShare` |
+| Kalanı | geliş yönünde **100°'lik koni** (±50°), hedefin ARKASINA | `ShrapnelConeHalfAngle`; kıymıklar hedefin kendi collider'larını — kalkanı dahil — delip geçer |
+| Havada patlama | 30 kıymık **360°** | Patlama noktası bir geminin içindeyse o gemi doğrudan isabet sayılır |
+| Sönüm | **yok** — geometriden gelir | Uzaktaki hedef daha dar açı kaplar, daha az kıymık yakalar (~1/mesafe) |
+| Siper | kıymık yolundaki İLK hedefte durur | Öndeki gemi arkadakini korur, kalkan kıymık emer |
+
+**Kıymıklar anlık ışındır (hitscan)**, nesne değil: 30 `Physics2D.Raycast`,
+paylaşılan tampon, sıfır bellek ayırma. Kıymık başına GameObject kurulsaydı
+kayda 30 nesne girer, her isabet ayrı kıvılcım patlaması doğururdu. Görsel
+aynı ışının üstünden gider (`HitEffect.SpawnShrapnel`): bütün kıymıklar aynı
+hızla uçar, çarpan kıymık çarptığı noktada söner — gösterilen kıymık hasar
+veren kıymığın kendisidir. Maliyet eski patlamanın 35 kıvılcımıyla aynı ligde.
+
+**Efekt ve kalkan hilali hedef BAŞINA bir kez** oynar, toplanan hasarla —
+12 kıymık yiyen gemi 12 patlama doğurmaz.
+
+**Log:** patlama başına tek `shot_hit`, `yakalanan` (ayrı hedef) ve `kiymik`
+(değen kıymık) alanlarıyla. **Hiçbir şeye değmeyen havada patlama `shot_hit`
+yazmaz** — o bir ıskadır.
+
+**Bir hata kapatıldı:** aynı karede ölü bir gemiye gelen ikinci isabet ölümü
+yeniden işliyordu (çift enkaz, çift bölünme, çift `enemy_death`) — Destroy
+kare sonunu bekliyor. Şarapnel bunu kural hâline getirdiği için
+`EnemyBot.TakeDamage` artık HP'si bitmiş gemiye hasar yazmıyor.
+
+**Hedefleme DPS'i gerçeğin altında** (3 / 2 = 1.5): turret kıymık hasarını
+atış hasarı sanıyor. Puanlama göreli olduğu için hedef sırası bozulmuyor ve
+zırhlı hedef doğru biçimde cezalandırılıyor. **Oyunda denenmedi**, sim
+uzmanlaşma satın almadığı için ölçülemiyor.
 
 **Log'a TEK isabet yazılır**, yakaladığı hedef sayısı ayrı alanda
 (`shot_hit.yakalanan`). İsabet oranı `shot_hit / shot_fired` olarak
@@ -3115,6 +3157,11 @@ kendi içinde tutarlı. Tek yerden değiştirilebilir: `BuildWarningText`.
       arkasında durur, yalnız kalınca uzaklaşır; ışın/dalga görselleri, iki
       sprite. Denge revizyonu **9**. Oyunda denenmedi; kayıt round-trip
       testi koşulmadı; Bariyer + Besleyici ölçülecek.
+- [x] **Flak şarapnel atar** — 30 kıymık × 3 hasar, menzil 4, buluşma
+      noktasında havada patlar; doğrudan isabette %40 hedefe, kalanı arkasına.
+      Denge revizyonu **11**. Oyunda denenmedi.
+- [ ] **Turret menzili yükseltmeye bağlanacak** — bütün turretlerin taban
+      menzili düşürülüp bir "Menzil" statı eklenecek (ertelendi).
 - [ ] **Denge testleri** — aşağıdaki listeye bak; sayıların hiçbiri oyunda denenmedi
 - [ ] Point defence turretleri — küçük/hızlı hedeflere odaklı otomatik turret
 - [ ] Mobil UI

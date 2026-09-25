@@ -1200,6 +1200,11 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
                            bool armorPreApplied = false)
     {
         if (_healthBar == null) return;
+        // Ölmüş ama Destroy'u kare sonunu bekleyen gemi. Aynı karede gelen
+        // ikinci isabet ölümü İKİNCİ KEZ işlerdi: çift enkaz, çift bölünme,
+        // çift ölüm kaydı. Şarapnel bunu kural hâline getiriyor — tek
+        // patlama aynı gemiye 12 kıymık yazıyor.
+        if (_healthBar.currentHealth <= 0f) return;
         if (IsPhased) return;   // Hayalet: faz sırasında hiçbir şey geçmez
 
         // Zırh EŞİĞİ dirençlerden ÖNCE, atış başına uygulanır. Sıra önemlidir:
@@ -1227,6 +1232,7 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
                                  bool armorPreApplied = false)
     {
         if (_healthBar == null) return;
+        if (_healthBar.currentHealth <= 0f) return;   // bkz. TakeDamage
         if (IsPhased) return;
 
         float shot = armorPreApplied

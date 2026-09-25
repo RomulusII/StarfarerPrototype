@@ -246,6 +246,188 @@ public static class DamageUtil
         return hit;
     }
 
+    // ── Şarapnel ──────────────────────────────────────────────────────────────
+
+    /// <summary>Doğrudan isabette kıymıkların çarpılan hedefe giden payı.</summary>
+    public const float ShrapnelDirectShare = 0.4f;
+
+    /// <summary>
+    /// Doğrudan isabette kalan kıymıkların saçıldığı koninin YARI açısı.
+    /// Kıymıklar merminin geliş yönünde, hedefin ARKASINA saçılır: mermi
+    /// hedefi delip geçen bir enerji taşıyor. 50° ile koni 100°; hedefin
+    /// hemen arkasındaki gemileri yakalar, yandakileri kaçırır.
+    /// </summary>
+    public const float ShrapnelConeHalfAngle = 50f;
+
+    public struct ShrapnelResult
+    {
+        public int caught;      // kıymık yiyen AYRI hedef sayısı
+        public int fragments;   // bir hedefe değen kıymık sayısı
+    }
+
+    // Hedef başına toplanan isabet — efekt ve kalkan parlaması hedef başına BİR
+    // kez oynar. Kıymık başına oynasaydı 12 kıymık yiyen gemi 12 ayrı kıvılcım
+    // patlaması ve 12 hilal doğururdu.
+    struct ShrapnelHit
+    {
+        public Collider2D    col;
+        public Vector2       point, dir;
+        public ImpactSurface surface;
+        public float         damage;
+        public int           fragments;
+    }
+
+    static readonly List<RaycastHit2D>   _shrapnelRay  = new();
+    static readonly List<ShrapnelHit>    _shrapnelHits = new();
+    static readonly Dictionary<Object, int> _shrapnelIdx = new();
+
+    /// <summary>
+    /// Şarapnel patlaması. Alan hasarından (<see cref="AreaDamage"/>) farkı:
+    /// yarıçaptaki her hedefe tek bir hasar yazılmaz, <paramref name="count"/>
+    /// kıymığın her biri ayrı bir ışın olarak atılır ve yolundaki İLK hedefe
+    /// ayrı bir atış olarak vurur.
+    ///
+    /// Bunun iki sonucu tasarımın kendisidir:
+    /// - **Zırh eşiği KIYMIK başına işler.** 3 hasarlı kıymık zırhsız gemiye
+    ///   3 vurur, zırh 2'ye 1, Muhafız aurasındaki gemiye (+6) %10. Kalabalığı
+    ///   biçer, zırhı çizer.
+    /// - **Hasar mesafeyle KENDİLİĞİNDEN söner.** Ayrı bir kenar sönümü yok;
+    ///   uzaktaki hedef daha dar bir açı kapladığı için daha az kıymık yakalar.
+    ///   Öndeki gemi arkadakine SİPER olur, kalkan kıymık emer.
+    ///
+    /// Kıymıklar anlıktır (hitscan): 30 ışın bir kerede atılır, kıymık başına
+    /// nesne kurulmaz ve kayda girecek bir şey kalmaz. Görseli aynı ışının
+    /// üstünden gider (<see cref="HitEffect.SpawnShrapnel"/>), yani oyuncunun
+    /// gördüğü kıymık hasar veren kıymığın ta kendisidir.
+    ///
+    /// <paramref name="primary"/> doluysa DOĞRUDAN İSABETTİR: kıymıkların
+    /// <see cref="ShrapnelDirectShare"/> kadarı o hedefe gider, kalanı merminin
+    /// geliş yönünde bir koni hâlinde arkasına saçılır ve hedefin kendi
+    /// collider'larını (kalkan kabuğu dahil) delip geçer. Boşsa mermi havada
+    /// patlamıştır ve kıymıklar 360° saçılır.
+    /// </summary>
+    public static ShrapnelResult Shrapnel(Vector2 origin, Vector2 dir, Collider2D primary,
+                                          int count, float range, float damage,
+                                          WeaponType weaponType)
+    {
+        var result = new ShrapnelResult();
+        if (count <= 0 || range <= 0f) return result;
+
+        _shrapnelHits.Clear();
+        _shrapnelIdx.Clear();
+        dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector2.right;
+
+        Object primaryKey = primary != null ? ReceiverOf(primary) : null;
+        int direct = primaryKey != null ? Mathf.RoundToInt(count * ShrapnelDirectShare) : 0;
+
+        for (int i = 0; i < direct; i++)
+            ShrapnelStrike(primary, primaryKey, origin, dir, damage, weaponType);
+
+        // Düzgün aralık + küçük sapma — HitEffect.SpawnBlast'taki gerekçe:
+        // tam eşit aralık her patlamada aynı boşlukları bırakır ve bir gemi
+        // hep o boşluktan sıyrılır; tamamen rastgele ise kümelenip delik açar.
+        int   rest   = count - direct;
+        bool  cone   = primaryKey != null;
+        float arc    = cone ? ShrapnelConeHalfAngle * 2f : 360f;
+        float step   = arc / Mathf.Max(1, rest);
+        float start  = cone ? -ShrapnelConeHalfAngle + step * 0.5f : Random.Range(0f, 360f);
+
+        for (int i = 0; i < rest; i++)
+        {
+            float   angle = start + i * step + Random.Range(-0.3f, 0.3f) * step;
+            Vector2 d     = Rotate(dir, angle);
+            float   reach = range;
+
+            int n = Physics2D.Raycast(origin, d, ContactFilter2D.noFilter, _shrapnelRay, range);
+            if (n > 0)
+            {
+                _shrapnelRay.Sort((a, b) => a.distance.CompareTo(b.distance));
+                for (int k = 0; k < _shrapnelRay.Count; k++)
+                {
+                    var col = _shrapnelRay[k].collider;
+                    var key = ReceiverOf(col);
+                    // Hedef olmayan (oyuncu gemisi, mermiler, enkaz) kıymığı
+                    // durdurmaz; doğrudan isabet alan hedef de — kıymık onu
+                    // delip geçiyor.
+                    if (key == null || key == primaryKey) continue;
+
+                    if (ShrapnelStrike(col, key, _shrapnelRay[k].point, d, damage, weaponType))
+                    {
+                        reach = _shrapnelRay[k].distance;
+                        break;
+                    }
+                }
+            }
+
+            HitEffect.SpawnShrapnel(origin, d, reach, range);
+        }
+
+        // Efektler hasardan SONRA ama yüzey hasardan ÖNCE okundu (ShrapnelStrike):
+        // bu patlama kalkanı düşürse bile ilk kıymık kalkana çarpmıştır.
+        foreach (var h in _shrapnelHits)
+        {
+            result.caught++;
+            result.fragments += h.fragments;
+            if (h.col == null) continue;
+
+            bool lethal = h.col.GetComponent<HealthBar>()?.currentHealth <= 0f;
+            HitEffect.SpawnImpact(h.point, h.dir, h.col.transform.position,
+                                  h.surface, h.damage, lethal);
+            if (h.surface == ImpactSurface.Shield) ShieldFlash(h.col, h.point);
+        }
+
+        return result;
+    }
+
+    /// <summary>Tek bir kıymığı uygular; vurulabildiyse true.</summary>
+    static bool ShrapnelStrike(Collider2D col, Object key, Vector2 point, Vector2 dir,
+                               float damage, WeaponType weaponType)
+    {
+        bool first   = !_shrapnelIdx.TryGetValue(key, out int idx);
+        var  surface = first ? SurfaceOf(col) : _shrapnelHits[idx].surface;
+
+        // Bomba TryDamage'ın bilmediği tek alıcı (bkz. AreaDamage).
+        var bomb = col.GetComponent<Bomb>();
+        if (bomb != null) bomb.TakeDamage(damage);
+        else if (!TryDamage(col, damage, weaponType)) return false;
+
+        if (first)
+        {
+            _shrapnelIdx[key] = _shrapnelHits.Count;
+            _shrapnelHits.Add(new ShrapnelHit
+            {
+                col = col, point = point, dir = dir, surface = surface,
+                damage = damage, fragments = 1,
+            });
+        }
+        else
+        {
+            var h = _shrapnelHits[idx];
+            h.damage += damage;
+            h.fragments++;
+            _shrapnelHits[idx] = h;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Collider'ın hasar alıcısı; kalkan yüzeyi için kalkanın SAHİBİ. Bir
+    /// geminin kalkanı ve gövdesi aynı alıcıdır — kıymık kabuğu delip aynı
+    /// geminin gövdesine ikinci kez vurmasın diye.
+    /// </summary>
+    static Object ReceiverOf(Collider2D col)
+    {
+        var owner = ShieldOwnerOf(col);
+        return owner != null ? owner : ReceiverKey(col);
+    }
+
+    static Vector2 Rotate(Vector2 v, float degrees)
+    {
+        float rad = degrees * Mathf.Deg2Rad;
+        float cos = Mathf.Cos(rad), sin = Mathf.Sin(rad);
+        return new Vector2(v.x * cos - v.y * sin, v.x * sin + v.y * cos);
+    }
+
     /// <summary>
     /// Bu collider patlamayı TETİKLER mi? Patlayan mermi yalnızca gerçek bir
     /// hedefe çarpınca patlamalı; yoksa sahnedeki alakasız bir collider'a

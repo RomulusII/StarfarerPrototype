@@ -5,6 +5,7 @@ using UnityEngine;
 /// Turret mermisi.
 /// Normal mod: sabit yön, ömür sonunda yok olur.
 /// Güdümlü mod (Roket): sınırlı dönüş hızıyla hedefe yönelir — organik yay çizer.
+/// Şarapnel modu (Flak): sigorta dolunca ya da ilk hedefte patlar, kıymık saçar.
 /// guidedTarget Transform'dur; EnemyBot ve BossShip dahil her hedefi izler.
 /// </summary>
 public class TurretBullet : MonoBehaviour
@@ -30,6 +31,21 @@ public class TurretBullet : MonoBehaviour
     public float      blastRadius = 0f;
 
     /// <summary>
+    /// Şarapnel kıymığı sayısı. 0 = şarapnel yok. Doluysa mermi alan hasarı
+    /// vermez; <see cref="blastRadius"/> kıymığın menzili, <see cref="damage"/>
+    /// kıymık başına hasardır (bkz. DamageUtil.Shrapnel).
+    /// </summary>
+    public int        shrapnel;
+
+    /// <summary>
+    /// Sigorta: patlamaya kalan yol (dünya birimi). 0 = sigorta yok, mermi
+    /// yalnızca çarpınca patlar. Turret bunu nişan aldığı buluşma noktasına
+    /// olan mesafeyle kurar. Kalan SÜRE değil kalan YOL yazılır: mermi
+    /// sabit hızla gidiyor ve yol, kayıttan dönüşte de aynı noktayı verir.
+    /// </summary>
+    public float      fuse;
+
+    /// <summary>
     /// Ateşlendiği andaki kadraj genişliği. Turret kendi nişan alıyor, yani
     /// zoom onun isabetini ETKİLEMEMELİ — alan tam da bunu sınamak için var:
     /// ana silahın isabeti zoom'la düşerken turret'ınki düşmüyorsa, sebep
@@ -53,6 +69,11 @@ public class TurretBullet : MonoBehaviour
     Vector2 _dir;
     float   _bornAt;
     bool    _started;
+
+    // Patladı: Destroy kare sonunda işler, aynı karede ikinci bir çarpma
+    // (trigger + süpürme) mermiyi iki kez patlatmasın. Kayda girmez — nesne
+    // bu kareyi zaten görmeyecek.
+    bool    _spent;
 
     /// <summary>Collider yarıçapı — süpürme mesafesi buna göre uzatılır.</summary>
     const float Radius = 0.07f;
@@ -83,7 +104,10 @@ public class TurretBullet : MonoBehaviour
     {
         _bornAt  = Time.time;
         _started = true;
-        if (lifeTime > 0f) Destroy(gameObject, lifeTime);
+        // Şarapnel mermisi ömrü dolunca sessizce kaybolmaz, PATLAR — ömrü
+        // Update sayar. Sigorta menzille sınırlı olduğu için bu yol normalde
+        // hiç tetiklenmez; emniyettir.
+        if (lifeTime > 0f && shrapnel <= 0) Destroy(gameObject, lifeTime);
     }
 
     public void SetDirection(Vector2 dir)
@@ -116,6 +140,7 @@ public class TurretBullet : MonoBehaviour
     void Update()
     {
         if (UpgradeUI.IsPaused) return;
+        if (_spent) return;
 
         if (isGuided)
         {
@@ -134,7 +159,19 @@ public class TurretBullet : MonoBehaviour
             }
         }
 
-        Sweep(speed * Time.deltaTime);
+        float step = speed * Time.deltaTime;
+
+        // Sigorta bu karede doluyorsa mermi tam patlama noktasına kadar gider;
+        // yolda bir şeye çarparsa orada patlar (Sweep).
+        bool fuseDone = fuse > 0f && step >= fuse;
+        if (fuseDone) step = fuse;
+
+        if (Sweep(step)) return;
+
+        if (fuse > 0f) fuse -= step;
+
+        bool expired = shrapnel > 0 && lifeTime > 0f && Time.time - _bornAt >= lifeTime;
+        if (fuseDone || expired) Detonate(transform.position, null);
     }
 
     /// <summary>
@@ -152,9 +189,10 @@ public class TurretBullet : MonoBehaviour
     /// görür. OnTriggerEnter2D yerinde kalır — merminin ÜSTÜNE gelen hedefler
     /// için gerekli.
     /// </summary>
-    void Sweep(float distance)
+    /// <returns>Bir şeye çarpıp yok olduysa true.</returns>
+    bool Sweep(float distance)
     {
-        if (distance <= 0f) return;
+        if (distance <= 0f) return false;
 
         int count = Physics2D.Raycast(transform.position, _dir,
                                       ContactFilter2D.noFilter, _sweep, distance + Radius);
@@ -162,10 +200,11 @@ public class TurretBullet : MonoBehaviour
         {
             _sweep.Sort((a, b) => a.distance.CompareTo(b.distance));
             for (int i = 0; i < _sweep.Count; i++)
-                if (TryHit(_sweep[i].collider, _sweep[i].point)) return;
+                if (TryHit(_sweep[i].collider, _sweep[i].point)) return true;
         }
 
         transform.Translate(_dir * distance, Space.World);
+        return false;
     }
 
     static Vector2 Rotate(Vector2 v, float degrees)
@@ -189,12 +228,13 @@ public class TurretBullet : MonoBehaviour
     /// </summary>
     bool TryHit(Collider2D other, Vector2 hitPos)
     {
-        if (other == null) return false;
+        if (other == null || _spent) return false;
 
         var bomb = other.GetComponent<Bomb>();
         if (bomb != null)
         {
-            if (blastRadius > 0f) { Explode(hitPos, other); return true; }
+            if (shrapnel > 0)     { Detonate(hitPos, other); return true; }
+            if (blastRadius > 0f) { Explode(hitPos, other);  return true; }
 
             bomb.TakeDamage(damage);
             // Bomba tek vuruşta gider: Point Defence'in işini yaptığı görünsün
@@ -206,6 +246,12 @@ public class TurretBullet : MonoBehaviour
 
         // Patlayan mermi hedefi AYIRMAZ: çarptığı her şeyde patlar ve hasarı
         // alan hasarı yolundan gider.
+        if (shrapnel > 0 && DamageUtil.IsBlastTarget(other))
+        {
+            Detonate(hitPos, other);
+            return true;
+        }
+
         if (blastRadius > 0f && DamageUtil.IsBlastTarget(other))
         {
             Explode(hitPos, other);
@@ -268,6 +314,51 @@ public class TurretBullet : MonoBehaviour
         Destroy(gameObject);
     }
 
+    // Patlama noktasını içine alan collider'ı bulmak için paylaşılan tampon.
+    static readonly List<Collider2D> _inside = new();
+
+    /// <summary>
+    /// Şarapnel patlaması. <paramref name="primary"/> çarpılan hedeftir; null
+    /// ise mermi sigortayla HAVADA patlamıştır. Havada patlayan mermi bir
+    /// geminin içindeyse o da doğrudan isabet sayılır — yoksa içeriden saçılan
+    /// kıymıklar o gemiyi hiç görmezdi.
+    ///
+    /// Log'a tek satır yazılır, yalnızca en az bir hedef yakalandıysa: hiçbir
+    /// şeye değmeyen havada patlama bir ISKALAMADIR, isabet oranı bunu
+    /// göstermeli.
+    /// </summary>
+    void Detonate(Vector2 at, Collider2D primary)
+    {
+        if (_spent) return;
+        _spent = true;
+
+        if (primary == null)
+        {
+            _inside.Clear();
+            Physics2D.OverlapPoint(at, ContactFilter2D.noFilter, _inside);
+            foreach (var col in _inside)
+                if (DamageUtil.IsBlastTarget(col)) { primary = col; break; }
+        }
+
+        var surface = primary != null ? DamageUtil.SurfaceOf(primary) : ImpactSurface.Hull;
+        var r = DamageUtil.Shrapnel(at, _dir, primary, shrapnel, blastRadius, damage, weaponType);
+
+        if (r.caught > 0)
+            BalanceLog.Event("shot_hit")
+                      .Str("kaynak", "turret")
+                      .Str("silah",  weaponType.ToString())
+                      .Str("yuzey",  surface.ToString())
+                      .Str("hedef",  primary != null ? DamageUtil.TypeNameOf(primary) : "havada")
+                      .Num("hasar",  damage)
+                      .Num("zoom",   zoomAtFire)
+                      .Num("yakalanan", r.caught)
+                      .Num("kiymik",    r.fragments)
+                      .Bool("oldurdu", false)
+                      .End();
+
+        Destroy(gameObject);
+    }
+
     // ── Kayıt ─────────────────────────────────────────────────────────────────
 
     float LifeLeft => !_started || lifeTime <= 0f
@@ -283,6 +374,8 @@ public class TurretBullet : MonoBehaviour
         turnRate   = turnRate,
         hp         = hp,
         blast      = blastRadius,
+        shrapnel   = shrapnel,
+        fuse       = fuse,
         zoom       = zoomAtFire,
         life       = LifeLeft,
         weaponType = (int)weaponType,
@@ -305,6 +398,8 @@ public class TurretBullet : MonoBehaviour
         tb.turnRate     = s.turnRate;
         tb.hp           = s.hp;
         tb.blastRadius  = s.blast;
+        tb.shrapnel     = s.shrapnel;
+        tb.fuse         = s.fuse;
         tb.zoomAtFire   = s.zoom;
         tb.lifeTime     = s.life;
         tb.visual       = s.visual;

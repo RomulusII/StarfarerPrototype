@@ -132,6 +132,38 @@ public static class HitEffect
     /// Kıvılcım sayısı yarıçapla büyür ama HASARLA değil: küçük yarıçaplı ağır
     /// bir patlama ile geniş yarıçaplı hafif bir patlama farklı görünmeli.
     /// </summary>
+    /// <summary>
+    /// Tek bir şarapnel kıymığının izi (bkz. DamageUtil.Shrapnel).
+    ///
+    /// Kıymık hasarı anlıktır ama görseli uçar: hepsi AYNI hızla
+    /// (<paramref name="range"/> / ömür) gider, ömrü ise yolunun uzunluğuyla
+    /// orantılıdır. Hedefe çarpan kıymık tam çarptığı noktada söner, boşa
+    /// giden menzilin ucunda. Kıvılcım sürüklemesi kapalı — sürüklenseydi
+    /// kıymık gösterilen yerden önce dururdu ve oyuncu menzili yanlış okurdu.
+    /// </summary>
+    public static void SpawnShrapnel(Vector2 origin, Vector2 dir, float length, float range)
+    {
+        if (length <= 0f || range <= 0f) return;
+
+        const float FullLife = 0.22f;
+        float life = Mathf.Max(0.03f, FullLife * length / range);
+
+        var go = new GameObject("ShrapnelSpark");
+        go.transform.position   = origin;
+        go.transform.localScale = Vector3.one * 1.6f;
+
+        var sr          = go.AddComponent<SpriteRenderer>();
+        sr.sprite       = SharedSprite();
+        sr.sortingOrder = 25;
+        sr.color        = new Color(1f, 0.78f, 0.35f);
+
+        var sp      = go.AddComponent<Spark>();
+        sp.velocity = dir.normalized * (range / FullLife);
+        sp.lifetime = life;
+        sp.baseSize = 1.6f;
+        sp.drag     = 0f;
+    }
+
     public static void SpawnBlast(Vector2 center, float radius, float damage)
     {
         if (radius <= 0f) return;
@@ -439,6 +471,9 @@ public class Spark : MonoBehaviour
     public float   lifetime;
     public float   baseSize;
 
+    /// <summary>Saniyedeki hız kaybı katsayısı. 0 = sürüklenmez (şarapnel).</summary>
+    public float   drag = 6f;
+
     float          _timer;
     SpriteRenderer _sr;
 
@@ -455,7 +490,7 @@ public class Spark : MonoBehaviour
 
         // Hareket + sürükleme
         transform.position += (Vector3)(velocity * Time.deltaTime);
-        velocity           *= Mathf.Max(0f, 1f - Time.deltaTime * 6f);
+        velocity           *= Mathf.Max(0f, 1f - Time.deltaTime * drag);
 
         // Alfa ve boyut azalır
         if (_sr != null)

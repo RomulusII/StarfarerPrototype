@@ -345,26 +345,25 @@ public static class ComponentCatalog
                 fireRate: 3f,  damage: 8.67f, speed: 14f,  life: 4f,   energy: 3f),
             TurretSpecType.Plasma       => Spec(baseDef, spec, specCost: 40,
                 fireRate: 6f,  damage: 36f, speed: 5f,   life: 4f,   energy: 4f),
-            // FLAK — kalabalığın cevabı. Tek hedefe karşı diğerleriyle AYNI
-            // ligde (12 / 2.0 = 6.0 DPS); bütün değeri yakaladığı hedef
-            // sayısından gelir. Yani flak bir GÜÇ yükseltmesi değil, bir
-            // DURUM yükseltmesi: sahne kalabalıkken üstün, tek hedefte sıradan.
+            // FLAK — kalabalığın cevabı. ŞARAPNEL atar (denge r11): mermi
+            // nişan aldığı buluşma noktasında ya da ilk çarptığı hedefte
+            // patlar ve 30 kıymık saçar. `damage` KIYMIK BAŞINA hasardır,
+            // `blastRadius` kıymığın gidebildiği mesafedir (ana geminin boyu).
             //
-            // Bu oyunun şu anki hâlinde bir eksiği kapatıyor: düşman statı
-            // düzleşip dalgalar 4 gemiden 46'ya çıktı, oysa oyuncunun
-            // cephaneliğinde tek bir alan hasarı yoktu (bkz. CLAUDE.md,
-            // "Kalabalığın Cevabı").
+            // Zırha KARŞI ZAYIF ve bu kasıtlı: zırh eşiği KIYMIK başına işler,
+            // 3 hasarlı kıymık zırh 2'de 1'e, Muhafız aurasında (+6) %10'a
+            // düşer. Kalabalık flak'i ister, flak zırhı davet eder.
             //
-            // Yarıçap 1.8: Swarm'ların formasyon aralığı ~0.6-1.0 birim, yani
-            // iyi nişan alınmış bir atış 3-5 gemi yakalar. Kenar sönümü
-            // (%40) merkeze nişan almayı ödüllendirir.
+            // Doğrudan isabette kıymıkların %40'ı hedefe gider, kalanı merminin
+            // geliş yönünde bir koni hâlinde hedefin ARKASINA saçılır. Havada
+            // patlayan mermi 360° saçar. Ayrıntı: DamageUtil.Shrapnel.
             //
-            // Zırha KARŞI ZAYIF ve bu kasıtlı: 12 hasarlı atış, zırh eşiğinin
-            // tam olarak cezalandırdığı şeydir. Ağır zırhlı tipler flak'in
-            // doğal cevabıdır — kalabalık flak'i ister, flak zırhı davet eder.
+            // Hedefleme DPS'i (3 / 2 = 1.5) gerçek değerin çok altında — bir
+            // kıymığın hasarını gösteriyor. Puanlama göreli olduğu için hedef
+            // SIRASI bozulmuyor; zırhlı hedefi doğru biçimde cezalandırıyor.
             TurretSpecType.Flak         => Spec(baseDef, spec, specCost: 30,
-                fireRate: 2f,  damage: 12f, speed: 6f,   life: 4.5f, energy: 1f,
-                blastRadius: 1.8f),                                                    // menzil 27 sabit
+                fireRate: 2f,  damage: 3f,  speed: 6f,   life: 4.5f, energy: 1f,
+                blastRadius: 4f, shrapnel: 30),                                        // menzil 27 sabit
             // Roket artık ÇARPINCA PATLAR. Sayıları değişmedi, yani tek hedefe
             // karşı eskisiyle birebir aynı (birincil hedef patlamanın
             // merkezinde, mesafe ~0, tam hasar). Kazanç YALNIZCA kalabalıkta.
@@ -402,7 +401,7 @@ public static class ComponentCatalog
 
     static ComponentDefinition Spec(ComponentDefinition baseDef, TurretSpecType spec, int specCost,
         float fireRate, float damage, float speed, float life, float energy,
-        int mag = 0, float reload = 0f, float blastRadius = 0f)
+        int mag = 0, float reload = 0f, float blastRadius = 0f, int shrapnel = 0)
     {
         // Ad taban tipin anahtarından gelir; uzmanlaşma eki DisplayName'de
         // turretSpecType'tan üretilir, yani burada birleşik bir metin doğmaz.
@@ -422,6 +421,7 @@ public static class ComponentCatalog
         d.turretMagazineSize   = mag;
         d.turretReloadTime     = reload;
         d.turretBlastRadius    = blastRadius;
+        d.turretShrapnel       = shrapnel;
         return d;
     }
 

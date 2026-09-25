@@ -98,6 +98,13 @@ public static class GameVersion
     ///       birden fazla birimde en yükseği geçerli ve yalnızca biri taşıyabilir.
     ///       Onarım birimi boştayken artık enerji çekmiyor (eskiden sürekli
     ///       1/sn). `player_damage` olayı `zirh` alanını taşır.
+    ///  11 — FLAK ŞARAPNEL ATAR. Alan hasarı yerine 30 kıymık, kıymık başına
+    ///       3 hasar, menzil 4 (ana geminin boyu); zırh kıymık başına ısırır.
+    ///       Mermi nişan aldığı buluşma noktasında ya da menzil sonunda havada
+    ///       patlar. Doğrudan isabette %40 hedefe, kalanı 100°'lik koniyle
+    ///       arkasına. Havada patlayıp hiçbir şeye değmeyen mermi `shot_hit`
+    ///       yazmaz (ıska); `shot_hit` yeni `kiymik` alanını taşır. Flak'in
+    ///       isabet oranı ve hasarı önceki revizyonlarla kıyaslanamaz.
     /// </summary>
-    public const int Denge = 10;
+    public const int Denge = 11;
 }

@@ -182,6 +182,10 @@ public class TurretBulletState
 
     /// <summary>Patlama yarıçapı. 0 = patlamayan mermi.</summary>
     public float   blast;
+
+    /// <summary>Şarapnel kıymığı sayısı ve patlamaya kalan yol. 0 = yok.</summary>
+    public int     shrapnel;
+    public float   fuse;
 }
 
 [Serializable]
