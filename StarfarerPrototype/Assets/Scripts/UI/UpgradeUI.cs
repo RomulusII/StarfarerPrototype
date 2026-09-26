@@ -1480,6 +1480,9 @@ public class UpgradeUI : MonoBehaviour
                 WeaponRows(s, showMunitions: false);
                 Row("stats.fighterDamageTaken", Num(s.damageTaken));
                 Row("stats.fightersLost",       Num(s.fightersLost));
+                // Toplayıcılar da hangardan çıkıyor; sayaç geminin toplamı (depo paneliyle aynı)
+                var invH = ResourceInventory.Instance;
+                Row("stats.collectorsLost",     Num(invH != null ? invH.collectorsLost : 0));
                 break;
 
             case ShieldGeneratorComponent:
@@ -1503,6 +1506,13 @@ public class UpgradeUI : MonoBehaviour
                 var inv = ResourceInventory.Instance;
                 Row("stats.collectedMetal",   Num(inv != null ? inv.collectedMetal   : 0f));
                 Row("stats.collectedCrystal", Num(inv != null ? inv.collectedCrystal : 0f));
+                Row("stats.lostMetal",        Num(inv != null ? inv.lostMetal        : 0f));
+                Row("stats.lostCrystal",      Num(inv != null ? inv.lostCrystal      : 0f));
+                Row("stats.burnedMetal",      Num(inv != null ? inv.burnedMetal      : 0f));
+                Row("stats.burnedCrystal",    Num(inv != null ? inv.burnedCrystal    : 0f));
+                Row("stats.collectorsLost",   Num(inv != null ? inv.collectorsLost   : 0));
+                Row("stats.cargoLostMetal",   Num(inv != null ? inv.cargoLostMetal   : 0f));
+                Row("stats.cargoLostCrystal", Num(inv != null ? inv.cargoLostCrystal : 0f));
                 break;
 
             default:

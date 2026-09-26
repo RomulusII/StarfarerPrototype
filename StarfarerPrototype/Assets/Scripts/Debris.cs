@@ -127,10 +127,10 @@ public class Debris : MonoBehaviour
 
         transform.position += (Vector3)(Velocity * Time.deltaTime);
 
-        if (transform.position.x < DespawnX) { Destroy(gameObject); return; }
+        if (transform.position.x < DespawnX) { Expire(); return; }
 
         _life -= Time.deltaTime;
-        if (_life <= 0f) { Destroy(gameObject); return; }
+        if (_life <= 0f) { Expire(); return; }
 
         ApplyTint(AlphaForRemaining(SecondsLeft()));
     }
@@ -172,6 +172,17 @@ public class Debris : MonoBehaviour
         // metal/kristal ayrımını silerdi. Şekil kökenden, renk kaynaktan gelir;
         // iki eksen birbirine karışmamalı.
         _sr.color = c;
+    }
+
+    /// <summary>
+    /// Toplanamadan kayboldu — kalan miktar deponun "kaybolan" sayacına yazılır.
+    /// Yalnızca bu iki yol (soldan çıkış, ömür) sayılır; toplanıp biten enkaz
+    /// ve kayıt yüklenirken silinen enkaz kayıp değildir.
+    /// </summary>
+    void Expire()
+    {
+        ResourceInventory.Instance?.CountLost(resourceType, resourceAmount);
+        Destroy(gameObject);
     }
 
     /// <summary>İstenen miktarı tüketir; gerçekte tüketilen miktarı döner.</summary>

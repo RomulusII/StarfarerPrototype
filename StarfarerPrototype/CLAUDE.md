@@ -3044,11 +3044,11 @@ ayrı (`ShipLoadout.WeaponStats`). Stat yükseltmeleriyle (`StatLevels`) ilgisi 
 | Komponent | Satırlar |
 |---|---|
 | Turret / ana silah | toplam hasar · isabet · efektif DPS · dövüş süresi · kill · (PD'de ya da >0 ise) düşürülen mühimmat |
-| Hangar | savaşçıların toplamı, turretle aynı + aldıkları hasar + kaybedilen savaşçı |
+| Hangar | savaşçıların toplamı, turretle aynı + aldıkları hasar + kaybedilen savaşçı + kaybedilen toplayıcı |
 | Kalkan jeneratörü | emilen hasar · doldurulan kalkan |
 | Onarım birimi | gövdenin aldığı hasar (geminin toplamı) · onarılan gövde · onarılan komponent |
 | Enerji jeneratörü | üretilen enerji |
-| Depo | toplanan metal · toplanan kristal (geminin toplamı, her depo aynısını gösterir) |
+| Depo | toplanan · toplanamayan · depo dolu yanan · kaybedilen toplayıcı · toplayıcıyla giden — metal ve kristal ayrı (geminin toplamı, her depo aynısını gösterir) |
 
 | Karar | Gerekçe |
 |---|---|
@@ -3060,6 +3060,7 @@ ayrı (`ShipLoadout.WeaponStats`). Stat yükseltmeleriyle (`StatLevels`) ilgisi 
 | **Kill yalnızca gemi** (düşman, boss) | Asteroit ve hardpoint hasara girer, kill'e girmez |
 | **Komponentle doğar, satılınca ölür**; turret uzmanlaşma değiştirince SIFIRLANIR | Gatling'in isabet oranı ile Flak'inki aynı sayıya karışırsa ikisi de anlamsızlaşır — ana silah tiplerinin ayrı sayılmasıyla aynı gerekçe |
 | **Toplanan kaynak = toplayıcının depoya indirdiği** | Satış ve uzmanlaşma iadesi sayılmaz, tavanda yanan kısım da |
+| **Üç ayrı kayıp** | Toplanamayan: toplayıcı yetişemeden soldan çıkan ya da ömrü dolan enkaz (`Debris.Expire`). Toplayıcıyla giden: vurulup ölen toplayıcının kargosu (sayısıyla birlikte; hangar paneli de gösterir). Yanan: depoya ulaştı ama tavan doluydu. Cevapları farklı: daha çok toplayıcı / toplayıcıyı koru / depoyu büyüt |
 | **Her iki kayıt katmanına girer** | Sayaçlar `SlotSave.counters` / `WeaponSave.counters`, geminin toplamları `SaveData` içinde — dünya kaydı da aynı `SaveData`'yı taşıdığı için tek yerden. Ölüm son level başı kaydına döndürür, sayaçlar da o ana döner. Uçuştaki turret/savaşçı mermisi sahibini slotla yazar (`TurretBulletState.owner`) |
 
 ## Üst Şerit ve Dokunmatik Düğmeler — Tasarım Kararları

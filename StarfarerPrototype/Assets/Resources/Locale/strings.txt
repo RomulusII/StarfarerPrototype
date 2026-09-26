@@ -182,6 +182,13 @@ stats.repairedParts	Onarılan komponent	Components repaired	Module repariert
 stats.produced	Üretilen enerji	Energy produced	Erzeugte Energie
 stats.collectedMetal	Toplanan metal	Metal collected	Gesammeltes Metall
 stats.collectedCrystal	Toplanan kristal	Crystal collected	Gesammelte Kristalle
+stats.lostMetal	Toplanamayan metal	Metal uncollected	Nicht eingesammeltes Metall
+stats.lostCrystal	Toplanamayan kristal	Crystal uncollected	Nicht eingesammelte Kristalle
+stats.burnedMetal	Depo dolu, yanan metal	Metal wasted (full)	Metall verfallen (voll)
+stats.burnedCrystal	Depo dolu, yanan kristal	Crystal wasted (full)	Kristalle verfallen (voll)
+stats.collectorsLost	Kaybedilen toplayıcı	Collectors lost	Verlorene Sammler
+stats.cargoLostMetal	Toplayıcıyla giden metal	Metal lost with collectors	Metall mit Sammlern verloren
+stats.cargoLostCrystal	Toplayıcıyla giden kristal	Crystal lost with collectors	Kristalle mit Sammlern verloren
 stats.percent	%{0}	{0}%	{0} %
 upgrade.box.hp	HP	HP	HP
 upgrade.box.shield	KALKAN	SHIELD	SCHILD

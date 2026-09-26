@@ -121,6 +121,45 @@ public class ResourceInventory : MonoBehaviour
         else if (type == ResourceType.EnergyCrystal) collectedCrystal += gained;
     }
 
+    /// <summary>
+    /// Toplayıcı yetişemeden kaybolan enkaz (soldan çıktı ya da ömrü doldu).
+    /// Ölen toplayıcının kargosu AYRI sayılır (<see cref="CountCollectorLost"/>):
+    /// biri "toplayıcı yetişmiyor", diğeri "toplayıcı korunmuyor" der.
+    /// </summary>
+    public float lostMetal, lostCrystal;
+
+    /// <summary>Vurulup ölen toplayıcılar ve onlarla birlikte giden kargo.</summary>
+    public int   collectorsLost;
+    public float cargoLostMetal, cargoLostCrystal;
+
+    public void CountCollectorLost(float[] cargo)
+    {
+        collectorsLost++;
+        if (cargo == null) return;
+        for (int i = 0; i < cargo.Length; i++)
+        {
+            if ((ResourceType)i == ResourceType.RawMaterial)        cargoLostMetal   += cargo[i];
+            else if ((ResourceType)i == ResourceType.EnergyCrystal) cargoLostCrystal += cargo[i];
+        }
+    }
+
+    /// <summary>Depoya ulaşan ama tavan dolu olduğu için YANAN kaynak.</summary>
+    public float burnedMetal, burnedCrystal;
+
+    public void CountLost(ResourceType type, float amount)
+    {
+        if (amount <= 0f) return;
+        if (type == ResourceType.RawMaterial)        lostMetal   += amount;
+        else if (type == ResourceType.EnergyCrystal) lostCrystal += amount;
+    }
+
+    public void CountBurned(ResourceType type, float amount)
+    {
+        if (amount <= 0f) return;
+        if (type == ResourceType.RawMaterial)        burnedMetal   += amount;
+        else if (type == ResourceType.EnergyCrystal) burnedCrystal += amount;
+    }
+
     public int Get(ResourceType type)
     {
         switch (type)

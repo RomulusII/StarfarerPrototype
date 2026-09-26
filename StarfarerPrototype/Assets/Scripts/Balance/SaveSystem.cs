@@ -75,6 +75,9 @@ public static class SaveSystem
         // oldukları için slotların dışında (onarım ve depo panelleri okur).
         public float hullDamageTaken;
         public float collectedMetal, collectedCrystal;
+        public float lostMetal, lostCrystal, burnedMetal, burnedCrystal;
+        public int   collectorsLost;
+        public float cargoLostMetal, cargoLostCrystal;
 
         public List<SlotSave>   slots   = new();
         public List<WeaponSave> weapons = new();
@@ -168,6 +171,13 @@ public static class SaveSystem
             hullDamageTaken  = loadout.GetComponent<PlayerShip>()?.hullDamageTaken ?? 0f,
             collectedMetal   = inv.collectedMetal,
             collectedCrystal = inv.collectedCrystal,
+            lostMetal        = inv.lostMetal,
+            lostCrystal      = inv.lostCrystal,
+            burnedMetal      = inv.burnedMetal,
+            burnedCrystal    = inv.burnedCrystal,
+            collectorsLost   = inv.collectorsLost,
+            cargoLostMetal   = inv.cargoLostMetal,
+            cargoLostCrystal = inv.cargoLostCrystal,
         };
 
         foreach (var (slot, def, comp) in loadout.EnumerateSlots())
@@ -276,6 +286,13 @@ public static class SaveSystem
         if (ship != null) ship.hullDamageTaken = d.hullDamageTaken;
         inv.collectedMetal   = d.collectedMetal;
         inv.collectedCrystal = d.collectedCrystal;
+        inv.lostMetal        = d.lostMetal;
+        inv.lostCrystal      = d.lostCrystal;
+        inv.burnedMetal      = d.burnedMetal;
+        inv.burnedCrystal    = d.burnedCrystal;
+        inv.collectorsLost   = d.collectorsLost;
+        inv.cargoLostMetal   = d.cargoLostMetal;
+        inv.cargoLostCrystal = d.cargoLostCrystal;
 
         loadout.FinishRestore((WeaponType)d.activeWeapon);
 

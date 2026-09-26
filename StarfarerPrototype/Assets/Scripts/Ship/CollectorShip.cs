@@ -146,7 +146,11 @@ public class CollectorShip : MonoBehaviour
         {
             var inv = ResourceInventory.Instance;
             if (_cargo[i] > 0f && inv != null)
-                inv.CountCollected((ResourceType)i, inv.Add((ResourceType)i, _cargo[i]));
+            {
+                float gained = inv.Add((ResourceType)i, _cargo[i]);
+                inv.CountCollected((ResourceType)i, gained);
+                inv.CountBurned((ResourceType)i, _cargo[i] - gained);
+            }
             _cargo[i] = 0f;
         }
         _cargoTotal = 0f;
@@ -270,8 +274,14 @@ public class CollectorShip : MonoBehaviour
 
     public void TakeDamage(float amount)
     {
+        // Ölmüş ama Destroy'u kare sonunu bekleyen toplayıcının kargosu iki kez sayılmasın
+        if (currentHP <= 0f) return;
         currentHP -= amount;
-        if (currentHP <= 0f) Destroy(gameObject);
+        if (currentHP > 0f) return;
+
+        // Kargo gemiyle birlikte gider — depoya hiç ulaşmamış kaynak
+        ResourceInventory.Instance?.CountCollectorLost(_cargo);
+        Destroy(gameObject);
     }
 
     void BuildVisual()
