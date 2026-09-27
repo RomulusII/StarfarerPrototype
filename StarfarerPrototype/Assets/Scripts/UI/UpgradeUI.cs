@@ -335,6 +335,7 @@ public class UpgradeUI : MonoBehaviour
         if (slotIndex == WeaponSlot)
         {
             BuildWeaponSwitchRows();
+            BuildMainGunAimSection();
             BuildWeaponStatSection();
             return;
         }
@@ -355,7 +356,10 @@ public class UpgradeUI : MonoBehaviour
         else
         {
             if (def.componentType == ComponentType.Turret)
+            {
                 BuildTurretSpecSection(slotIndex, def);
+                BuildTurretAimSection(slotIndex);
+            }
             BuildStatUpgradeSection(slotIndex, def);
         }
     }
@@ -420,6 +424,83 @@ public class UpgradeUI : MonoBehaviour
                 btn.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.28f, 1f);
             }
         }
+    }
+
+    // ── Nişan modu ────────────────────────────────────────────────────────────
+
+    static readonly Color AimSelectedColor = new Color(0.10f, 0.55f, 0.20f, 1f);
+    static readonly Color DisabledColor    = new Color(0.25f, 0.25f, 0.28f, 1f);
+
+    /// <summary>
+    /// Turretin nişan modu. Point Defence'te bölüm hiç yok (her zaman otomatik);
+    /// füzelerde elle mod yok.
+    /// </summary>
+    void BuildTurretAimSection(int slotIndex)
+    {
+        if (!(_loadout?.GetSlotComponent(slotIndex) is TurretController tc)) return;
+        if (tc.specType == TurretSpecType.PointDefence) return;
+
+        BuildAimModeRows(tc.aimMode,
+            m => FireControl.Allows(tc.specType, tc.baseType, m),
+            m => { if (_loadout.SetTurretAimMode(slotIndex, m)) OnSlotClicked(slotIndex); },
+            null);
+    }
+
+    /// <summary>
+    /// Ana silahın nişan modu. Otomatik modlar bilgisayar ister — elle nişan
+    /// oyunun temel eylemi, bedava otomatiğe dönmemeli.
+    /// </summary>
+    void BuildMainGunAimSection()
+    {
+        if (_loadout == null) return;
+        bool online = ComputerComponent.IsOnline;
+        BuildAimModeRows(_loadout.MainGunAimMode,
+            m => m == AimMode.Manual || online,
+            m => { _loadout.MainGunAimMode = m; OnSlotClicked(WeaponSlot); },
+            online ? null : Loc.T("upgrade.aim.needComputer"));
+    }
+
+    void BuildAimModeRows(AimMode current, System.Func<AimMode, bool> allowed,
+                          System.Action<AimMode> select, string note)
+    {
+        MakeTextLabel(_popupContent.transform, Loc.T("upgrade.section.aim"), 20, TextAnchor.MiddleLeft);
+
+        var row = CreateRow(_popupContent.transform);
+        foreach (var (mode, key, width) in new[]
+        {
+            (AimMode.Manual,   "upgrade.aim.manual",   120f),
+            (AimMode.Assisted, "upgrade.aim.assisted", 200f),
+            (AimMode.Auto,     "upgrade.aim.auto",     160f),
+        })
+        {
+            if (!allowed(mode) && mode == AimMode.Manual) continue;   // füze: hiç gösterme
+
+            var captured = mode;
+            var btn = AddButton(row.transform, Loc.T(key), () => select(captured), width);
+            if (!allowed(mode))
+            {
+                btn.interactable = false;
+                btn.GetComponent<Image>().color = DisabledColor;
+            }
+            else if (mode == current)
+                btn.GetComponent<Image>().color = AimSelectedColor;
+        }
+
+        if (note != null)
+        {
+            var n = MakeTextLabel(_popupContent.transform, note, 18, TextAnchor.MiddleLeft);
+            n.color = new Color(1f, 0.60f, 0.2f, 1f);
+        }
+
+        // Anahtar kapalıyken seçim durur ama devrede değildir — oyuncu neden
+        // "işe yaramadığını" görebilmeli; anahtar da buradan açılabilir.
+        var toggleRow = CreateRow(_popupContent.transform);
+        bool on = FireControl.CustomAiming;
+        var tBtn = AddButton(toggleRow.transform,
+            Loc.T(on ? "upgrade.aim.customOn" : "upgrade.aim.customOff"),
+            () => { FireControl.CustomAiming = !FireControl.CustomAiming; OnSlotClicked(_currentSlotIndex); },
+            340f);
+        tBtn.GetComponent<Image>().color = on ? AimSelectedColor : new Color(0.35f, 0.30f, 0.18f, 1f);
     }
 
     void BuildStatUpgradeSection(int slotIndex, ComponentDefinition def)
@@ -1041,6 +1122,17 @@ public class UpgradeUI : MonoBehaviour
                                         StorageComponent.CapacityKey, false));
                 break;
             }
+            case ComponentType.Computer:
+            {
+                // Değerler FireControl'den okunur — bilgisayarın kendisi değil,
+                // gemideki ÇALIŞAN bilgisayar belirler (yıkıksa bilgisayarsız değerler).
+                sb.AppendLine(DeltaLineAbs(Loc.T("detail.lead"),
+                    FireControl.Lead * 100f, ComputerComponent.LeadKey,
+                    BalanceConfig.Instance.aimLeadPerLevel * 100f, "%"));
+                sb.AppendLine(Loc.T("detail.spread", FireControl.SpreadDeg));
+                sb.AppendLine(Loc.T("detail.guidance", FireControl.GuidanceMultiplier));
+                break;
+            }
             case ComponentType.Hangar:
             {
                 var hc = comp as HangarComponent;
@@ -1088,6 +1180,15 @@ public class UpgradeUI : MonoBehaviour
     /// Bir sonraki seviyedeki DEĞER. Adımı statStep'ten farklı olan izler
     /// (kapasitör) bunu verir; verilmezse delta genel adımdan hesaplanır.
     /// </param>
+    /// <summary>Toplamsal adımlı izler için (öngörü): seçiliyse "+adım" ekler.</summary>
+    string DeltaLineAbs(string label, float current, string statKey, float step, string unit)
+    {
+        string valStr = current.ToString("0.#", Loc.Culture) + unit;
+        if (_selectedStatKey != statKey || _selectedStatSlot != _currentSlotIndex)
+            return $"{label}: {valStr}";
+        return $"{label}: {valStr}  (+{step.ToString("0.#", Loc.Culture)}{unit})";
+    }
+
     string DeltaLine(string label, float current, string statKey, bool isDecreasing,
                      float? explicitNext = null)
     {
@@ -1123,6 +1224,7 @@ public class UpgradeUI : MonoBehaviour
         "damage", "fireRate", "armor", "capacity", "repairRate", "plating",
         "production", "capacitor", "rechargeRate", "maxShield", "productionSpeed",
         "maxHP", "salvageRate", "speed", "maxCollectors", "maxFighters",
+        "lead", "precision", "guidance",
     };
 
     static string GetStatDescription(string key)
@@ -1146,7 +1248,16 @@ public class UpgradeUI : MonoBehaviour
 
     static ComponentDefinition[] _weaponDefs;
 
-    static ComponentDefinition[] GetCatalogDefs(int slotIndex) => ComponentCatalog.Purchasable;
+    /// <summary>
+    /// Boş bir slota kurulabilecekler. Bilgisayar gemide tektir — kuruluysa
+    /// listede hiç görünmez (gri bir satır "neden alamıyorum" diye sorardı).
+    /// </summary>
+    ComponentDefinition[] GetCatalogDefs(int slotIndex)
+    {
+        var all = ComponentCatalog.Purchasable;
+        if (_loadout == null || !_loadout.HasComputer) return all;
+        return System.Array.FindAll(all, d => d.componentType != ComponentType.Computer);
+    }
 
     /// <summary>Turret uzmanlaşma tanımı — veri ComponentCatalog'da tutulur.</summary>
     static ComponentDefinition GetSpecDef(ComponentDefinition baseDef, TurretSpecType spec)
@@ -1163,6 +1274,7 @@ public class UpgradeUI : MonoBehaviour
             case ComponentType.Turret:     return Loc.T("componentType.turret");
             case ComponentType.Hangar:     return Loc.T("componentType.hangar");
             case ComponentType.Storage:    return Loc.T("componentType.storage");
+            case ComponentType.Computer:   return Loc.T("componentType.computer");
             default:                       return type.ToString();
         }
     }

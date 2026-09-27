@@ -36,6 +36,24 @@ public class TurretController : ShipComponentBase
     [Tooltip("Saniyede derece — turretin maksimum dönüş hızı.")]
     public float          turnRate       = 180f;
 
+    /// <summary>
+    /// Oyuncunun bu turret için SEÇTİĞİ nişan modu. Geçerli mod
+    /// <see cref="EffectiveMode"/>'dur: özel nişan kapalıyken her turret
+    /// otomatiktir, Point Defence her zaman otomatiktir, füzeler elle olamaz.
+    /// Kayda girer (SlotSave.aimMode).
+    /// </summary>
+    public AimMode        aimMode        = AimMode.Auto;
+
+    /// <summary>Şu an geçerli nişan modu.</summary>
+    public AimMode EffectiveMode => FireControl.EffectiveTurretMode(specType, baseType, aimMode);
+
+    /// <summary>
+    /// Elle modda namlunun imlece "dönük" sayıldığı açı. Otomatikteki 1° elle
+    /// tutturulamaz: imleç hareket ederken namlu onu hep bir adım geriden izler
+    /// ve turret hiç ateş etmezdi.
+    /// </summary>
+    const float ManualAimTolerance = 4f;
+
     float   _fireTimer;
     int     _currentMag;
     bool    _reloading;
@@ -149,25 +167,54 @@ public class TurretController : ShipComponentBase
         if (!IsOperational)     return;
         if (UpgradeUI.IsPaused) return;
 
-        var target = AcquireTarget();
+        var  mode       = EffectiveMode;
+        bool manualFire = false;
+        Transform target = null;
 
-        if (target != null)
+        if (mode == AimMode.Manual)
         {
-            // Lazer beam anlık (raycast) — lead gereksiz, mevcut pozisyonu hedefle.
-            // Diğer tüm spec'ler (roket dahil) mermi seyahat süresi hesaplayarak
-            // düşmanın buluşma noktasını öngörür.
-            bool isInstant = specType == TurretSpecType.Laser;
-            _aimPos = isInstant ? target.position : PredictIntercept(target);
-            AimAt(_aimPos);
+            // Elle: namlu imlece döner, oyuncu tetiğe bastıkça ateş eder. Hedef
+            // yok — mermi nereye nişan alındıysa oraya gider (flak orada patlar).
+            if (!PointerInput.Locked && FireControl.TryPointerWorld(out var pointer))
+            {
+                _aimPos = pointer;
+                AimAt(_aimPos);
+                manualFire = PointerInput.FireHeld;
+            }
+            if (manualFire) Stats.engagedTime += Time.deltaTime;
+        }
+        else
+        {
+            // Otomatik: hedefi turret seçer. Seçili hedef: oyuncunun işaretlediği
+            // hedef — menzil dışındaysa ya da hiç yoksa turret BOŞTA bekler,
+            // kendi hedefini seçmez (seçseydi otomatikten farkı kalmazdı).
+            var aimTarget = mode == AimMode.Auto ? AcquireTargetRef() : MarkedTargetInRange();
+            target = aimTarget?.TargetTransform;
 
-            // Efektif DPS'in paydası: menzilde bir hedefe kilitli geçen süre
-            // (bkz. ComponentStats.engagedTime).
-            Stats.engagedTime += Time.deltaTime;
+            if (target != null)
+            {
+                // Lazer beam anlık (raycast) — öngörü gereksiz, mevcut pozisyonu
+                // hedefle. Diğerleri bilgisayarın öngörüsü kadar buluşma noktasına
+                // kayar (FireControl.Lead) — bilgisayarsız turret doğrudan hedefe
+                // ateş eder.
+                bool isInstant = specType == TurretSpecType.Laser;
+                _aimPos = isInstant
+                    ? target.position
+                    : FireControl.AimPoint(transform.position, target.position,
+                                           aimTarget.TargetVelocity, bulletSpeed);
+                AimAt(_aimPos);
+
+                // Efektif DPS'in paydası: menzilde bir hedefe kilitli geçen süre
+                // (bkz. ComponentStats.engagedTime).
+                Stats.engagedTime += Time.deltaTime;
+            }
         }
 
         _fireTimer -= Time.deltaTime;
         float effectiveFireRate = EffectiveFireInterval;
-        if (_fireTimer <= 0f && !_reloading && target != null && IsAimed(_aimPos))
+        bool  ready = manualFire ? IsAimed(_aimPos, ManualAimTolerance)
+                                 : target != null && IsAimed(_aimPos);
+        if (_fireTimer <= 0f && !_reloading && ready)
         {
             bool hasEnergy = EnergyBus.Instance == null ||
                              EnergyBus.Instance.RequestEnergy(energyPerShot);
@@ -176,11 +223,23 @@ public class TurretController : ShipComponentBase
         }
     }
 
-    bool IsAimed(Vector3 worldPos)
+    bool IsAimed(Vector3 worldPos, float tolerance = 1f)
     {
         var   dir         = worldPos - transform.position;
         float targetAngle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-        return Mathf.Abs(Mathf.DeltaAngle(transform.eulerAngles.z, targetAngle)) < 1f;
+        return Mathf.Abs(Mathf.DeltaAngle(transform.eulerAngles.z, targetAngle)) < tolerance;
+    }
+
+    /// <summary>
+    /// Oyuncunun işaretlediği hedef, bu turret onu vurabiliyorsa. Menzil dışı
+    /// ya da geçersiz hedef null döner — turret boşta bekler.
+    /// </summary>
+    ITurretTarget MarkedTargetInRange()
+    {
+        var t = TargetMarker.Current;
+        if (t == null || !t.IsValidTarget) return null;
+        if (Vector2.Distance(transform.position, t.TargetTransform.position) > EffectiveRange) return null;
+        return t;
     }
 
     // -------------------------------------------------------------------------
@@ -191,7 +250,7 @@ public class TurretController : ShipComponentBase
     /// Kilitli hedefi döndürür; kilit düştüyse veya değerlendirme zamanı geldiyse
     /// TurretTargeting'e yeniden seçtirir. Seçim mantığı ve puanlama orada.
     /// </summary>
-    Transform AcquireTarget()
+    ITurretTarget AcquireTargetRef()
     {
         // Kilit hâlâ geçerli ve menzilde mi?
         bool lockValid = _lockedTarget != null
@@ -221,7 +280,7 @@ public class TurretController : ShipComponentBase
                 specType == TurretSpecType.Laser ? LaserSpeedBias : 0f);
         }
 
-        return _lockedTarget?.TargetTransform;
+        return _lockedTarget;
     }
 
     static PlayerShip _cachedShip;
@@ -241,40 +300,6 @@ public class TurretController : ShipComponentBase
             : Mathf.MoveTowardsAngle(transform.eulerAngles.z, angle, turnRate * Time.deltaTime);
         transform.rotation = Quaternion.Euler(0f, 0f, next);
     }
-
-    // Hedefin mermisiyle buluşacağı noktayı hesaplar
-    Vector3 PredictIntercept(Transform target)
-    {
-        Vector2 toTarget  = (Vector2)(target.position - transform.position);
-        Vector2 targetVel = GetTargetVelocity(target);
-
-        float a = Vector2.Dot(targetVel, targetVel) - bulletSpeed * bulletSpeed;
-        float b = 2f * Vector2.Dot(targetVel, toTarget);
-        float c = Vector2.Dot(toTarget, toTarget);
-
-        float t = 0f;
-        if (Mathf.Abs(a) < 0.001f)
-        {
-            if (Mathf.Abs(b) > 0.001f) t = -c / b;
-        }
-        else
-        {
-            float disc = b * b - 4f * a * c;
-            if (disc < 0f) return target.position;
-            float sq = Mathf.Sqrt(disc);
-            float t1 = (-b + sq) / (2f * a);
-            float t2 = (-b - sq) / (2f * a);
-            if      (t1 > 0f && t2 > 0f) t = Mathf.Min(t1, t2);
-            else if (t1 > 0f)            t = t1;
-            else if (t2 > 0f)            t = t2;
-            else return target.position;
-        }
-
-        return target.position + (Vector3)(targetVel * t);
-    }
-
-    Vector2 GetTargetVelocity(Transform target)
-        => _lockedTarget != null ? _lockedTarget.TargetVelocity : Vector2.zero;
 
     // -------------------------------------------------------------------------
     // Ateş etme
@@ -327,6 +352,10 @@ public class TurretController : ShipComponentBase
         // güdümlü rokete üstün kılardı — takas olmaktan çıkardı.
         if (specType == TurretSpecType.NuclearRocket) tb.turnRate = 70f;
 
+        // Güdüm bilgisayardan gelir (FireControl.GuidanceMultiplier): iki
+        // roketin ARASINDAKİ oran korunur, ikisi birlikte keskinleşir.
+        if (isRocket) tb.turnRate *= FireControl.GuidanceMultiplier;
+
         tb.blastRadius = blastRadius;
         tb.shrapnel    = shrapnelCount;
 
@@ -337,7 +366,10 @@ public class TurretController : ShipComponentBase
         if (shrapnelCount > 0)
             tb.fuse = Mathf.Min(Vector2.Distance(spawnPos, _aimPos), EffectiveRange);
 
-        tb.SetDirection(transform.right);
+        // Sapma: bilgisayarın hassasiyeti kadar rastgele hata. Elle modda
+        // nişanı oyuncu alıyor — orada bilgisayarın payı yok.
+        float spread = EffectiveMode == AimMode.Manual ? 0f : FireControl.RollSpread();
+        tb.SetDirection(FireControl.Rotate(transform.right, spread));
         tb.zoomAtFire = CameraController.ZoomOrani;
 
         BalanceLog.Event("shot_fired")

@@ -34,9 +34,15 @@ public class WeaponMount : MonoBehaviour
         sr.sortingOrder = 1;
     }
 
+    MainGunAim _aim;
+
     void Update()
     {
         if (PointerInput.Locked) return;
+
+        // Otomatik modlarda namluyu MainGunAim döndürür.
+        if (_aim == null) _aim = GetComponent<MainGunAim>();
+        if (_aim != null && _aim.Automated) return;
 
         // Fare YOKSA (Android) namlu son yönünde kalır — eskiden Mouse.current
         // kontrolsüz okunuyordu ve telefonda ilk karede patlıyordu.

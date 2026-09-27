@@ -287,6 +287,43 @@ public class BalanceConfig : ScriptableObject
              "(Lv50 zırhında 2.13'e karşı 2.70 DPS).")]
     public float beamArmorBitesPerSecond = 2f;
 
+    // ── Nişan (Bilgisayar) ────────────────────────────────────────────────────
+
+    [Header("Nişan — Bilgisayar")]
+    [Tooltip("Bilgisayar YOKKEN öngörü: 0 = turret hedefin şu anki konumuna " +
+             "ateş eder. Yana uçan hedefi pek vuramaz, kendisine doğru geleni vurur.")]
+    [Range(0f, 1f)] public float aimLeadNoComputer = 0f;
+
+    [Tooltip("Bilgisayar kurulu, Öngörü Sv0.")]
+    [Range(0f, 1f)] public float aimLeadBase = 0.3f;
+
+    [Tooltip("Öngörü izinin seviye başına katkısı. 0.3 + 10 × 0.07 = 1.0: " +
+             "Sv10'da nişan tam buluşma noktasındadır (eski davranış).")]
+    public float aimLeadPerLevel = 0.07f;
+
+    [Tooltip("Bilgisayar YOKKEN atış başına sapma tavanı (derece).")]
+    public float aimSpreadNoComputer = 4f;
+
+    [Tooltip("Bilgisayar kurulu, Hassasiyet Sv0 — sapma tavanı (derece).")]
+    public float aimSpreadBase = 3f;
+
+    [Tooltip("Hassasiyet izinin seviye başına sapma çarpanı. 3 × 0.8^10 = 0.32°.")]
+    public float aimSpreadDecay = 0.8f;
+
+    [Tooltip("Sapmanın inebileceği en düşük değer (derece).")]
+    public float aimSpreadMin = 0.4f;
+
+    [Tooltip("Bilgisayar YOKKEN füzelerin dönüş hızı çarpanı.")]
+    public float guidanceNoComputer = 0.6f;
+
+    [Tooltip("Bilgisayar kurulu, Güdüm Sv0.")]
+    public float guidanceBase = 0.8f;
+
+    [Tooltip("Güdüm izinin seviye başına çarpanı. 0.8 × 1.07^10 = 1.57. " +
+             "statStep (1.25) kullanılmaz: dönüş hızı 7 katına çıkınca füze " +
+             "hiçbir hedefi kaçırmaz, güdüm bir karar olmaktan çıkar.")]
+    public float guidanceStep = 1.07f;
+
     // ── Zorluk ────────────────────────────────────────────────────────────────
 
     [Header("Zorluk")]

@@ -86,6 +86,7 @@ public class GameManager : MonoBehaviour
         BuildGameOverUI();
         BuildUpgradeUI();
         BuildBoostHUD();
+        BuildCameraPad();
         BuildSpeedHUD();
         BuildEnemyInfoHUD();
 
@@ -416,6 +417,12 @@ public class GameManager : MonoBehaviour
     {
         var go = new GameObject("BoostHUD");
         go.AddComponent<BoostHUD>();
+    }
+
+    void BuildCameraPad()
+    {
+        var go = new GameObject("CameraPadHUD");
+        go.AddComponent<CameraPadHUD>();
     }
 
     void BuildEnemyInfoHUD()

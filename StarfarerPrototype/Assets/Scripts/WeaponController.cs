@@ -17,6 +17,30 @@ public class WeaponController : MonoBehaviour
     /// </summary>
     public const float KineticBulletSpeed = 6f;
 
+    /// <summary>Tam şarjlı plazma bolt'unun hızı — otomatik nişanın öngörüsü için.</summary>
+    const float PlasmaMaxSpeed = 28f;
+
+    /// <summary>
+    /// Aktif silahın mermi hızı — otomatik nişanın öngörü hesabı okur. Lazer
+    /// anlıktır; otomatik nişan plazmayı hep TAM şarjla bırakır.
+    /// </summary>
+    public float ProjectileSpeed => weaponType switch
+    {
+        WeaponType.Plasma => PlasmaMaxSpeed,
+        WeaponType.Laser  => 1000f,
+        _                 => KineticBulletSpeed,
+    };
+
+    MainGunAim _aim;
+
+    /// <summary>
+    /// Tetik: elle modda oyuncunun, otomatik modlarda <see cref="MainGunAim"/>'in.
+    /// Ateş yollarının (kinetik / lazer / plazma) hiçbiri kimin bastığını bilmez.
+    /// </summary>
+    bool TriggerHeld => _aim != null && _aim.Automated ? _aim.TriggerHeld : PointerInput.FireHeld;
+
+    bool Automated => _aim != null && _aim.Automated;
+
     public WeaponType weaponType   = WeaponType.Kinetic;
     public float damage            = 10f;
     public float fireRate          = 1.00f;   // Kinetik: atışlar arası, Plazma: atış sonrası bekleme
@@ -38,6 +62,9 @@ public class WeaponController : MonoBehaviour
         // kullanıyor (bkz. AimLine). Ayrı bir nesneye kurulsaydı iki dönüş
         // birbirini kovalardı.
         gameObject.AddComponent<AimLine>();
+
+        // Otomatik nişan silahla AYNI nesnede: namluyu (bu transform) döndürür.
+        _aim = gameObject.AddComponent<MainGunAim>();
 
         _kineticSprite = SkinLibrary.Get(SkinId.PlayerBulletKinetic, 10, 30, Color.white);
 
@@ -127,10 +154,11 @@ public class WeaponController : MonoBehaviour
 
     void UpdateKinetic()
     {
-        if (PointerInput.FireHeld && Time.time >= _nextFireTime)
+        if (TriggerHeld && Time.time >= _nextFireTime)
         {
             _nextFireTime = Time.time + fireRate;
             SpawnBullet(_kineticSprite, WeaponType.Kinetic, speed: KineticBulletSpeed);
+            _aim?.OnShot();
         }
     }
 
@@ -140,7 +168,7 @@ public class WeaponController : MonoBehaviour
 
     void UpdateLaser()
     {
-        bool held = PointerInput.FireHeld;
+        bool held = TriggerHeld;
 
         if (held && _activeLaserBeam == null)
         {
@@ -184,8 +212,19 @@ public class WeaponController : MonoBehaviour
 
     void UpdatePlasma()
     {
-        bool held     = PointerInput.FireHeld;
-        bool released = PointerInput.FireReleased;
+        bool held, released;
+        if (Automated)
+        {
+            // Otomatik nişan plazmayı TAM şarjla ve bekleme bitmişken bırakır;
+            // hedef kaybolursa şarjı tutar, yeni hedefte hemen bırakır.
+            held     = _aim.TriggerHeld;
+            released = held && ChargeRatio() >= 1f && Time.time >= _nextFireTime;
+        }
+        else
+        {
+            held     = PointerInput.FireHeld;
+            released = PointerInput.FireReleased;
+        }
 
         if (held)
         {
@@ -209,6 +248,7 @@ public class WeaponController : MonoBehaviour
             {
                 _nextFireTime = Time.time + fireRate;
                 FirePlasmaBolt(ratio);
+                _aim?.OnShot();
             }
         }
     }

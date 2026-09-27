@@ -236,6 +236,10 @@ public class SimShopper : MonoBehaviour
         if (empty >= 0)
         {
             foreach (var def in ComponentCatalog.Purchasable)
+            {
+                // Bilgisayar tektir; ikincisi kurulamaz, seçenek sayılmamalı
+                // (sayılsaydı "ucuz" profil onu sonsuza dek denerdi).
+                if (def.componentType == ComponentType.Computer && _loadout.HasComputer) continue;
                 list.Add(new Option
                 {
                     Kind     = Kind.Install,
@@ -244,6 +248,7 @@ public class SimShopper : MonoBehaviour
                     Cost     = def.cost,
                     Resource = def.costResource,
                 });
+            }
         }
 
         return list;

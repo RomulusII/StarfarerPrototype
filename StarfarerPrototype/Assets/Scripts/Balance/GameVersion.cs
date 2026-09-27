@@ -107,6 +107,11 @@ public static class GameVersion
     ///       isabet oranı ve hasarı önceki revizyonlarla kıyaslanamaz.
     ///  12 — FLAK MENZİLİ 27 -> 8 (ana geminin boyunun iki katı). Kıymık
     ///       açıları tamamen rastgele (eskiden düzgün aralık + sapma).
+    ///  13 — NİŞAN BİLGİSAYARA BAĞLANDI. Bilgisayarsız turret hedefin şu anki
+    ///       konumuna ateş eder (öngörü 0) ve atış başına ±4° sapar; Bilgisayar
+    ///       komponenti (40 kristal) öngörü / hassasiyet / güdüm izleriyle bunu
+    ///       düzeltir. Füze dönüşü bilgisayarsız ×0.6. Turret isabet oranı ve
+    ///       hasarı önceki revizyonlarla kıyaslanamaz. Slot sayısı 10 → 14.
     /// </summary>
-    public const int Denge = 12;
+    public const int Denge = 13;
 }

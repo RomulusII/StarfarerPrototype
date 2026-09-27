@@ -12,7 +12,7 @@ using UnityEngine;
 /// yalnızca yarısını kaplıyordu.
 ///
 /// Sayılar artık kameranın kendi alanlarından türer (<see cref="CameraController"/>
-/// maxZoomSize / shipScreenX / shipScreenY / panRange). Kadraj ayarı
+/// maxZoomSize / shipScreenX / shipScreenY / panRange / panRangeY). Kadraj ayarı
 /// değiştiğinde doğum sınırları da kendiliğinden takip eder.
 /// </summary>
 public static class ViewBounds
@@ -125,11 +125,14 @@ public static class ViewBounds
         float baseX = shipPos.x + (0.5f - ctl.shipScreenX) * 2f * halfW;
         float baseY = shipPos.y + (ctl.shipScreenY - 0.5f) * 2f * halfH;
 
-        // Pan yalnızca yatayda; dikeyde kadraj sabit.
+        // Kaydırma iki eksende de (WASD / kamera pedi) — dünya en geniş kadrajın
+        // kaydırılabildiği her yeri kapsamalı, yoksa düşman görünür alanda doğar.
         float minX = baseX - ctl.panRange - halfW;
         float maxX = baseX + ctl.panRange + halfW;
+        float minY = baseY - ctl.panRangeY - halfH;
+        float maxY = baseY + ctl.panRangeY + halfH;
 
-        _rect = Rect.MinMaxRect(minX, baseY - halfH, maxX, baseY + halfH);
+        _rect = Rect.MinMaxRect(minX, minY, maxX, maxY);
         _computedAspect = aspect;
     }
 

@@ -2,9 +2,15 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Mouse / dokunmatik pozisyonuna göre kamerayı kaydırır ve zoom yapar.
-/// Merkeze yakın yavaş, kenara yakın hızlı (power curve).
-/// Z pozisyonu -10 sabit, ortographic size 5-7 arası kayar.
+/// Kamerayı oyuncunun AÇIK komutlarıyla kaydırır ve zoom yapar: klavyede
+/// WASD (kaydırma) ve Q / E (yaklaş / uzaklaş), ekranın sol altında aynı işi
+/// gören düğmeler (<see cref="CameraPadHUD"/>). C ve pedin ortası kadrajı sıfırlar.
+///
+/// İMLEÇLE KAYDIRMA KALDIRILDI. Eskiden imleç ekranın %80'inden sonra kamerayı
+/// kaydırıyor, %90'ından sonra zoom-out yapıyordu. Kamera bir kontrol değil
+/// NİŞANIN YAN ETKİSİYDİ: kenardaki bir düşmana nişan almak kadrajı o yöne
+/// kaçırıyor ve dünyayı tam nişan alırken küçültüyordu. Nişan ile kadraj
+/// artık iki ayrı el.
 ///
 /// KADRAJ: Ana gemi sabit duruyor; kamerayı ona göre konumlandırırız. Hedef,
 /// geminin EKRANDA belirli bir oranda durması: solda ve HUD'dan kalan dikey
@@ -25,8 +31,22 @@ public class CameraController : MonoBehaviour
              "katılarak kalan bandın ortası: 0.52.")]
     [Range(0.05f, 0.95f)] public float shipScreenY = 0.52f;
 
-    [Tooltip("Mouse ile yatay kaydırma menzili (birim), kadraj tabanının etrafında.")]
+    [Tooltip("Yatay kaydırma menzili (birim), kadraj tabanının iki yanında.")]
     public float panRange = 8f;
+
+    [Tooltip("Dikey kaydırma menzili (birim), kadraj tabanının altında ve üstünde.\n\n" +
+             "ViewBounds bunu da okur: doğum sınırları kaydırılabilen alanın dışında kalmalı.")]
+    public float panRangeY = 3f;
+
+    [Tooltip("Kaydırma hızı — saniyede ekran YÜKSEKLİĞİNİN bu kadarı. Zoom'dan bağımsız " +
+             "hissettirsin diye dünya birimiyle değil kadrajla ölçülür.")]
+    public float panSpeed = 0.9f;
+
+    [Tooltip("Zoom hızı — saniyede ortographic size'ın bu oranı kadar (logaritmik).")]
+    public float zoomSpeed = 0.8f;
+
+    [Tooltip("Kameranın hedef konuma/zoom'a yetişme hızı. Yüksek = sert, düşük = süzülür.")]
+    public float followSharpness = 10f;
 
     [Header("Upgrade Kadrajı")]
     [Tooltip("Upgrade ekranı açıkken gemi ekranın SOLUNDAN bu oranda dursun.\n\n" +
@@ -49,8 +69,13 @@ public class CameraController : MonoBehaviour
     public float upgradeZoomSize = 2.5f;
 
     [Header("Zoom")]
-    [Tooltip("Dinlenme hâlindeki ortographic size.")]
+    [Tooltip("Dinlenme hâlindeki ortographic size — oyun bununla başlar ve C onu geri getirir.")]
     public float minZoomSize = 5f;
+
+    [Tooltip("En yakın zoom (ortographic size). Dinlenme kadrajından yakın: oyuncu " +
+             "bir kalabalığa ya da gemiye yaklaşıp bakabilsin. Doğum sınırlarını " +
+             "etkilemez — onları yalnızca EN GENİŞ kadraj belirler.")]
+    public float closestZoomSize = 3.5f;
 
     [Tooltip("Tam zoom-out'taki ortographic size. ViewBounds bunu okuyup dünyanın " +
              "ne kadar geniş olması gerektiğini hesaplar — doğum noktaları ve toz " +
@@ -89,10 +114,16 @@ public class CameraController : MonoBehaviour
 
     private const float ZoomSpeed = 5f;
 
+    // Oyuncunun kadrajı: tabandan kayma (dünya birimi) ve istenen zoom.
+    // Kamera her karede bunlara yumuşakça yetişir.
+    Vector2 _offset;
+    float   _wantedSize;
+
     void Awake()
     {
         _cam = GetComponent<Camera>();
         ApplyDeviceZoom();
+        _wantedSize = minZoomSize;
     }
 
     // ── Cihaz ölçeği ──────────────────────────────────────────────────────────
@@ -118,6 +149,7 @@ public class CameraController : MonoBehaviour
         float k = DeviceZoomFactor();
         minZoomSize     *= k;
         maxZoomSize     *= k;
+        closestZoomSize *= k;
         upgradeZoomSize *= k;
 
         // Doğum ve silinme sınırları maxZoomSize'dan türer; önbellek düşmezse
@@ -227,33 +259,68 @@ public class CameraController : MonoBehaviour
             return;
         }
 
-        Vector2 inputPos = ReadInputPosition();
-        if (inputPos == Vector2.zero) return;
+        // Açılış menüsünde kadraj oynamaz — menünün arkasındaki sahne bir fon.
+        if (!StartMenuUI.IsOpen) ReadControls();
 
-        Vector2 screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+        // Zoom önce: kadraj tabanı o anki size'dan türer.
+        float k = 1f - Mathf.Exp(-followSharpness * Time.unscaledDeltaTime);
+        _cam.orthographicSize = Mathf.Lerp(_cam.orthographicSize, _wantedSize, k);
 
-        Vector2 delta = (inputPos - screenCenter) / screenCenter;
-        float t = Mathf.Clamp01(delta.magnitude);
-        Vector2 direction = delta.normalized;
-
-        Vector2 basePos = FramingBase();
-
-        float moveT = Mathf.Clamp01((t - 0.8f) / 0.2f);
-        float curvedMoveT = Mathf.Pow(moveT, 2f);
-        Vector3 targetPos = new Vector3(
-            basePos.x + direction.x * curvedMoveT * panRange,
-            basePos.y,
-            -10f);
-        transform.position = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * 3f);
-
-        float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
-        float targetSize = Mathf.Lerp(minZoomSize, maxZoomSize, zoomT);
-        _cam.orthographicSize = Mathf.Lerp(_cam.orthographicSize, targetSize, Time.deltaTime * 3f);
+        Vector2 basePos   = FramingBase();
+        Vector3 targetPos = new Vector3(basePos.x + _offset.x, basePos.y + _offset.y, -10f);
+        transform.position = Vector3.Lerp(transform.position, targetPos, k);
 
         // Kaydın okuyacağı hâl: 0 = dinlenme kadrajı, 1 = tam zoom-out.
         // Ham ortographic size değil ORAN yazılıyor; cihaz ölçeği min/max'ı
         // zaten kaydırıyor, yani 5.2 sayısı iki cihazda aynı şeyi anlatmaz.
         ZoomOrani = Mathf.InverseLerp(minZoomSize, maxZoomSize, _cam.orthographicSize);
+    }
+
+    /// <summary>
+    /// Klavye ve ekran pedinin komutları. Süre DUVAR SAATİYLE ölçülür: hız
+    /// kontrolü ×10'dayken kamera on kat hızlı kaymamalı, oyun durmuşken de
+    /// kadraj oynatılabilmeli.
+    /// </summary>
+    void ReadControls()
+    {
+        Vector2 pan  = CameraPadHUD.Pan;
+        float   zoom = CameraPadHUD.Zoom;
+        bool    reset = CameraPadHUD.ConsumeReset();
+
+        var kb = Keyboard.current;
+        if (kb != null)
+        {
+            if (kb.wKey.isPressed) pan.y += 1f;
+            if (kb.sKey.isPressed) pan.y -= 1f;
+            if (kb.dKey.isPressed) pan.x += 1f;
+            if (kb.aKey.isPressed) pan.x -= 1f;
+            if (kb.qKey.isPressed) zoom -= 1f;   // yaklaş
+            if (kb.eKey.isPressed) zoom += 1f;   // uzaklaş
+            if (kb.cKey.wasPressedThisFrame) reset = true;
+        }
+
+        if (reset)
+        {
+            _offset     = Vector2.zero;
+            _wantedSize = minZoomSize;
+            return;
+        }
+
+        float dt = Time.unscaledDeltaTime;
+
+        if (pan.sqrMagnitude > 0f)
+        {
+            // Çapraz basış daha hızlı gitmesin
+            if (pan.sqrMagnitude > 1f) pan.Normalize();
+            _offset += pan * (panSpeed * 2f * _wantedSize * dt);
+        }
+
+        if (zoom != 0f)
+            _wantedSize *= Mathf.Exp(Mathf.Clamp(zoom, -1f, 1f) * zoomSpeed * dt);
+
+        _wantedSize = Mathf.Clamp(_wantedSize, closestZoomSize, maxZoomSize);
+        _offset.x   = Mathf.Clamp(_offset.x, -panRange,  panRange);
+        _offset.y   = Mathf.Clamp(_offset.y, -panRangeY, panRangeY);
     }
 
     /// <summary>
@@ -328,17 +395,5 @@ public class CameraController : MonoBehaviour
             _onZoomComplete?.Invoke();
             _onZoomComplete = null;
         }
-    }
-
-    /// <summary>Touch varsa birincil dokunuş, yoksa mouse. İkisi de yoksa Vector2.zero.</summary>
-    static Vector2 ReadInputPosition()
-    {
-        if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
-            return Touchscreen.current.primaryTouch.position.ReadValue();
-
-        if (Mouse.current != null)
-            return Mouse.current.position.ReadValue();
-
-        return Vector2.zero;
     }
 }

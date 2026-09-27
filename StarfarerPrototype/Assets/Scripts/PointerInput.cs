@@ -58,10 +58,9 @@ public static class PointerInput
     {
         if (Source != null) return Source.TryPosition(out screen);
 
-        var touch = Touchscreen.current;
-        if (touch != null && touch.primaryTouch.press.isPressed)
+        if (TryAimTouch(out var aim))
         {
-            screen = touch.primaryTouch.position.ReadValue();
+            screen = aim.position.ReadValue();
             return true;
         }
 
@@ -83,9 +82,11 @@ public static class PointerInput
         {
             if (Source != null) return Source.FireHeld;
 
-            var touch = Touchscreen.current;
-            if (touch != null && touch.primaryTouch.press.isPressed)
-                return !OverUI(touch.primaryTouch.touchId.ReadValue());
+            if (TryAimTouch(out _)) return true;
+            if (AnyTouchPressed()) return false;   // yalnızca UI'daki parmaklar var
+
+            // Fareyle kamera pedini tutmak da sol tuştur; ateş sayılmamalı.
+            if (CameraPadHUD.AnyHeld) return false;
 
             var mouse = Mouse.current;
             return mouse != null && mouse.leftButton.isPressed;
@@ -100,12 +101,58 @@ public static class PointerInput
             if (Source != null) return Source.FireReleased;
 
             var touch = Touchscreen.current;
-            if (touch != null && touch.primaryTouch.press.wasReleasedThisFrame)
-                return true;
+            if (touch != null)
+                foreach (var t in touch.touches)
+                    if (t.press.wasReleasedThisFrame && t.touchId.ReadValue() == s_aimTouchId)
+                        return true;
 
             var mouse = Mouse.current;
             return mouse != null && mouse.leftButton.wasReleasedThisFrame;
         }
+    }
+
+    /// <summary>
+    /// Nişan parmağı: UI'nın ÜSTÜNDE BAŞLAMAYAN ilk basılı dokunuş.
+    ///
+    /// Eskiden birincil dokunuş (ilk parmak) okunuyordu. Sol başparmak kamera
+    /// pedini tutarken sağ başparmak nişan alınca birincil dokunuş PED oluyordu:
+    /// namlu pede dönüyor, ateş ise UI üstünde olduğu için kesiliyordu. İki
+    /// parmakla oynamak mümkün değildi.
+    ///
+    /// Parmak bir kez nişan parmağı seçilince kalkana kadar öyle kalır — sürüklerken
+    /// bir düğmenin üstünden geçmesi nişanı kesmemeli.
+    /// </summary>
+    static int s_aimTouchId = -1;
+
+    static bool TryAimTouch(out UnityEngine.InputSystem.Controls.TouchControl aim)
+    {
+        aim = null;
+        var ts = Touchscreen.current;
+        if (ts == null) return false;
+
+        // Önce mevcut nişan parmağı hâlâ basılı mı
+        foreach (var t in ts.touches)
+            if (t.press.isPressed && t.touchId.ReadValue() == s_aimTouchId) { aim = t; return true; }
+
+        s_aimTouchId = -1;
+        foreach (var t in ts.touches)
+        {
+            if (!t.press.isPressed) continue;
+            int id = t.touchId.ReadValue();
+            if (OverUI(id)) continue;
+            s_aimTouchId = id;
+            aim = t;
+            return true;
+        }
+        return false;
+    }
+
+    static bool AnyTouchPressed()
+    {
+        var ts = Touchscreen.current;
+        if (ts == null) return false;
+        foreach (var t in ts.touches) if (t.press.isPressed) return true;
+        return false;
     }
 
     static bool OverUI(int pointerId)

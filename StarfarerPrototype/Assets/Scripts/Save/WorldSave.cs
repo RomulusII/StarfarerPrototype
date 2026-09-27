@@ -258,6 +258,11 @@ public static class WorldSave
                 w.components.Add(s);
             }
 
+            // Kimlikler yukarıda verildi; işaret bir hedefe o kimlikle bağlanır.
+            w.markedTarget  = RefOf(TargetMarker.Current);
+            var aim = ship.GetComponentInChildren<MainGunAim>();
+            if (aim != null) w.mainGunTarget = RefOf(aim.LockedTarget);
+
             foreach (var g in groups)     if (g.Active) w.formations.Add(g.CaptureState());
             foreach (var e in enemies)    w.enemies.Add(e.CaptureState());
             foreach (var b in bosses)     w.bosses.Add(b.CaptureState());
@@ -493,7 +498,12 @@ public static class WorldSave
         {
             var wc = s_player.GetComponentInChildren<WeaponController>();
             if (wc != null) wc.RestoreCooldown(w.weaponCooldown);
+
+            var aim = s_player.GetComponentInChildren<MainGunAim>();
+            if (aim != null) aim.RestoreLock(ResolveTarget(w.mainGunTarget));
         }
+
+        TargetMarker.Restore(ResolveTarget(w.markedTarget));
 
         // Rastgelelik EN SON: kurulum sırasında Awake/Start'ların çektiği sayılar
         // akışı ilerletti. Burada geri konan durum, kaydın alındığı andaki akıştır.

@@ -37,9 +37,10 @@ const strip = (y, x0, x1, step, w, h, color) => {
 //   sirt kulesi (govdeden yukselen yapi)     -> slot 1 (ana silah), 4
 //   bel govdesi (dar, iki omuzla baglanir)   -> slot 5, 8
 //   karin hangar modulu (bindirme agizlari)  -> slot 6
-//   bas kesimi (kopru + kamali pruva)        -> slot 2, 9
+//   bas kesimi (kopru + kamali pruva)        -> slot 2, 9, 13
+//   aralar (blok-kule, blok-hangar, karin)   -> slot 10, 11, 12
 //
-// Konumlar PlayerShip.slotPositions ile BIREBIR eslesir; biri degisirse
+// Konumlar PlayerShip.SlotPositions ile BIREBIR eslesir; biri degisirse
 // digeri de degismeli. Tuval <-> dunya: canvas = (800 + 400x, 480 + 400y).
 //
 // ── Neden yan profil ─────────────────────────────────────────────────────

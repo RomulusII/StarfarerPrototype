@@ -8,7 +8,8 @@ using UnityEngine;
 /// </summary>
 public class ShipLoadout : MonoBehaviour
 {
-    public int slotCount = 10;
+    /// <summary>Slot sayısı gövdeden türer (<see cref="PlayerShip.SlotPositions"/>).</summary>
+    public int slotCount => PlayerShip.SlotPositions.Length;
 
     /// <summary>
     /// Ana silahın slotu. SABİT bir gerçektir, türetilmez.
@@ -51,6 +52,16 @@ public class ShipLoadout : MonoBehaviour
 
     public IEnumerable<int> GetSlotsByType(ComponentType type) =>
         _slotsByType.TryGetValue(type, out var list) ? list : Enumerable.Empty<int>();
+
+    /// <summary>Gemide kurulu bir bilgisayar var mı (en fazla bir tane olabilir).</summary>
+    public bool HasComputer => GetSlotsByType(ComponentType.Computer).Any(i => _installedDefs[i] != null);
+
+    /// <summary>
+    /// Ana silahın SEÇİLEN nişan modu. Geçerli olan mod bundan türer
+    /// (<see cref="FireControl.EffectiveMainGunMode"/>): özel nişan kapalıysa ya
+    /// da bilgisayar çalışmıyorsa ana silah her zaman elledir.
+    /// </summary>
+    public AimMode MainGunAimMode = AimMode.Manual;
 
     void Awake()
     {
@@ -118,6 +129,9 @@ public class ShipLoadout : MonoBehaviour
         // sahiplenildiğinde de silah bir daha geri gelmiyordu.
         bool isWeapon = def.componentType == ComponentType.Weapon;
         if (isWeapon != (slotIndex == WeaponSlotIndex)) return false;
+
+        // Bilgisayar tektir — isabet bir toplam değil, tek bir sistemin kalitesi.
+        if (def.componentType == ComponentType.Computer && HasComputer) return false;
 
         // Enerji kapısı — kuracak enerji yoksa kaynak da harcanmaz
         if (deductCost && !HasEnergyHeadroom(def.baseEnergyCost)) return false;
@@ -189,6 +203,10 @@ public class ShipLoadout : MonoBehaviour
                 comp = hc;
                 break;
 
+            case ComponentType.Computer:
+                comp = go.AddComponent<ComputerComponent>();
+                break;
+
             case ComponentType.Storage:
                 var st = go.AddComponent<StorageComponent>();
                 st.Init(def.storageMetal, def.storageCrystal);
@@ -236,6 +254,15 @@ public class ShipLoadout : MonoBehaviour
         if (_slotsByType.TryGetValue(removedType, out var list))
             list.Remove(slotIndex);
 
+        return true;
+    }
+
+    /// <summary>Bir turretin nişan modunu seçer; uzmanlaşma izin vermiyorsa reddeder.</summary>
+    public bool SetTurretAimMode(int slotIndex, AimMode mode)
+    {
+        if (!(GetSlotComponent(slotIndex) is TurretController tc)) return false;
+        if (!FireControl.Allows(tc.specType, tc.baseType, mode)) return false;
+        tc.aimMode = mode;
         return true;
     }
 
@@ -468,9 +495,14 @@ public class ShipLoadout : MonoBehaviour
         {
             if (_slots[i] == comp)
             {
+                var removed = _installedDefs[i];
                 _slots[i]         = null;
                 _installedDefs[i] = null;
                 _slotObjects[i]   = null;
+                // Tip haritası da temizlenir: yıkılan bilgisayar "kurulu" sayılıp
+                // yenisinin kurulmasını engellemesin.
+                if (removed != null && _slotsByType.TryGetValue(removed.componentType, out var l))
+                    l.Remove(i);
                 return;
             }
         }

@@ -48,6 +48,9 @@ public static class SaveSystem
 
         /// <summary>İstatistik panelinin sayaçları — bkz. ComponentStats.</summary>
         public ComponentStats counters;
+
+        /// <summary>Turretin seçilen nişan modu (AimMode). Eksikse 0 = Otomatik.</summary>
+        public int aimMode;
     }
 
     [Serializable]
@@ -70,6 +73,13 @@ public static class SaveSystem
         // seçimdir (bkz. DifficultyManager).
         public int   difficulty;
         public int   activeWeapon;
+
+        /// <summary>
+        /// Ana silahın seçilen nişan modu (AimMode). Alan eklenmeden önceki
+        /// kayıtlarda yok; başlangıç değeri Elle — JsonUtility eksik alanda
+        /// kurucunun değerini korur.
+        /// </summary>
+        public int   mainGunAim = (int)AimMode.Manual;
 
         // Geminin geneline ait istatistikler — bir komponente değil gemiye ait
         // oldukları için slotların dışında (onarım ve depo panelleri okur).
@@ -168,6 +178,7 @@ public static class SaveSystem
             crystal      = inv.crystal,
             difficulty   = (int)DifficultyManager.Current,
             activeWeapon = (int)loadout.GetActiveWeaponType(),
+            mainGunAim   = (int)loadout.MainGunAimMode,
             hullDamageTaken  = loadout.GetComponent<PlayerShip>()?.hullDamageTaken ?? 0f,
             collectedMetal   = inv.collectedMetal,
             collectedCrystal = inv.collectedCrystal,
@@ -204,6 +215,7 @@ public static class SaveSystem
                 statKeys      = string.Join("|", keys),
                 statLevels    = string.Join("|", levels),
                 counters      = comp != null ? comp.Stats.Clone() : null,
+                aimMode       = comp is TurretController tc ? (int)tc.aimMode : 0,
             });
         }
 
@@ -276,6 +288,8 @@ public static class SaveSystem
             if (def == null) continue;
 
             loadout.RestoreSlot(s.slot, def, ParseStats(s.statKeys, s.statLevels), s.counters);
+            if (def.componentType == ComponentType.Turret)
+                loadout.SetTurretAimMode(s.slot, (AimMode)s.aimMode);
         }
 
         foreach (var w in d.weapons)
@@ -295,6 +309,7 @@ public static class SaveSystem
         inv.cargoLostCrystal = d.cargoLostCrystal;
 
         loadout.FinishRestore((WeaponType)d.activeWeapon);
+        loadout.MainGunAimMode = (AimMode)d.mainGunAim;
 
         // Kaynaklar depo kapasitesine bağlı; slotlar kurulduktan SONRA yazılmalı
         inv.metal   = Mathf.Min(d.metal,   inv.maxMetal);

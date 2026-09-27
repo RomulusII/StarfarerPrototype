@@ -1542,6 +1542,79 @@ nişan hattına girdikten sonra kesilir.
   - Telemetri oturum satırı `zorluk` alanını taşır; denge revizyonu 3.
 - RepairUnit en düşük HP oranlı komponenti önceliklendirir; Easy modda deaktif komponentleri de tamir eder
 
+### Nişan ve Bilgisayar — Tasarım Kararları
+
+**Nişan İSABETİ bilgisayardan gelir** (`FireControl`, `ComputerComponent`).
+Bilgisayarsız turret hedefin ŞU ANKİ konumuna ateş eder ve atış başına
+birkaç derece sapar. Sonuç kendiliğinden anlamlı: yana uçan gemiyi pek
+vuramaz, kendisine doğru geleni (öngörü gerektirmeyen radyal hareket) vurur.
+
+| | Bilgisayar yok | Sv0 | Sv10 |
+|---|---|---|---|
+| **Öngörü** — nişan hedeften buluşma noktasına ne kadar kayar | 0 | 0.30 | 1.00 (eski davranış) |
+| **Hassasiyet** — atış başına sapma tavanı | ±4° | ±3° | ±0.4° (taban) |
+| **Güdüm** — füze dönüş hızı çarpanı | ×0.6 | ×0.8 | ×1.57 |
+
+- Sayıların sahibi `BalanceConfig` ("Nişan — Bilgisayar"). Güdüm `statStep`
+  (1.25) kullanmaz: dönüş hızı 7 katına çıkınca füze hiçbir hedefi kaçırmaz.
+- Sapma **üçgen dağılımlı** (iki düzgün sayının ortalaması): çoğu atış
+  merkeze yakın gider. Düzgün dağılımda sapma olduğundan büyük okunurdu.
+- **Işın sapmaz ve öngörmez** — ışının kimliği "ıskalamaz".
+- **Elle modda bilgisayarın payı yok** — nişanı oyuncu alıyor.
+- Bilgisayar **gemide tektir** (`ShipLoadout.InstallComponent`, upgrade
+  listesinde kuruluysa görünmez). İsabet bir toplam değil tek bir sistemin
+  kalitesi. **Kristalle alınır (40)** — kristal talebi arzın altında kalıyordu.
+- Yıkılınca bütün turretler bilgisayarsız isabete düşer, ana silah elle moda
+  döner: Bomber'ın doğal hedefi.
+
+**Oyunda denenmedi. Turret DPS'leri %61 isabete göre ayarlıydı** — bilgisayarsız
+nişan bunu belirgin biçimde düşürecek. Denge revizyonu **13**; simülasyonla
+ölçülmeli (sahte oyuncu bilgisayarı "ucuz" profilde alabilir).
+
+#### Nişan modları
+
+Her turret ve ana silah için üç mod (`AimMode`, sıra kayda yazılır — Otomatik 0):
+
+| Mod | Hedefi kim seçer | Nişanı kim alır |
+|---|---|---|
+| **Elle** | — | oyuncu (namlu imlece döner, tetiğe bastıkça ateş) |
+| **Seçili hedef** | oyuncu (sol tık) | silah |
+| **Otomatik** | silah (`TurretTargeting`) | silah |
+
+| Kural | Gerekçe |
+|---|---|
+| **Point Defence hep otomatik**, bölüm upgrade ekranında hiç yok | Bombayı kalkana varmadan vurmak insan tepkisini bekleyemez |
+| **Füzeler elle olamaz** | Güdüm bir hedef ister, imleç hedef değildir |
+| **Ana silahta Seçili/Otomatik bilgisayar ister** | Elle nişan oyunun temel eylemi; bedava otomatiğe dönmemeli. Otomatik nişanın kalitesi de bilgisayardan gelir, yani yükseltmesi düşük bir bilgisayarla iyi bir oyuncunun elle nişanı daha isabetlidir |
+| **Tek anahtar: VARSAYILAN / ÖZEL** (HUD'da boost'ların yanında, `FireControl.CustomAiming`) | Varsayılan: turretler otomatik, ana silah elle. Özel: upgrade ekranındaki seçimler. Seçimler silinmez, yalnızca devre dışı kalır — savaşın ortasında iki düzen arasında tek dokunuşla gidip gelinir. Kontrol tercihi olduğu için PlayerPrefs'te |
+| **Mod turret başına** | Lazer ve raylı top farklı yerlere nişan almalı — oyuncu birini kendi yönetip diğerini bırakabilmeli |
+
+**Seçili hedef** (`TargetMarker`):
+- Sol tık hem hedef seçer hem ateş eder. Tıklanan noktada hedef varsa
+  işaretlenir (yakalama yarıçapı 0.6; kalkana tıklamak gemiyi seçer).
+- **Boşluğa tıklamak işareti SİLMEZ.** Silseydi elle ateş eden ana silahın her
+  atışı — öngörü için hedefin ÖNÜNE, boşluğa tıklanır — seçili hedef modundaki
+  turretleri boşa düşürürdü. İşaret hedef yok olunca kalkar.
+- İşaretli hedef yoksa ya da menzil dışındaysa silah **boşta bekler**, kendi
+  hedefini seçmez — seçseydi otomatikten farkı kalmazdı.
+- Geçici olarak vurulamayan hedef (Hayalet fazı) işareti kaybetmez; nişangâh
+  sönükleşir, silahlar bekler.
+- **Nişangâh yalnızca seçili hedef modunda bir silah varken** görünür (ve
+  tıklama ancak o zaman hedef seçer): hiçbir şeyin kullanmadığı bir işaret
+  "bu ne yapıyor" sorusunu doğururdu. Kesik halka + içe bakan çentik —
+  vurulabilir mühimmatın köşe parantezinden ayrı okunsun.
+
+**Ana silahın otomatiği** (`MainGunAim`): silahla aynı nesnede, ondan önce
+çalışır; namluyu 360°/sn ile döndürür ve 2°'ye girince tetiği çeker. Ateş
+yolları (`WeaponController`) kimin bastığını bilmez. Plazma **tam şarjla**
+bırakılır; lazerin hızlı hedef tercihi lazer turretiyle aynı.
+
+**Kayıt:** turret modu `SlotSave.aimMode`, ana silah `SaveData.mainGunAim`
+(eksikse Elle), işaretli hedef ve ana silahın kilidi `WorldState.markedTarget`
+/ `mainGunTarget`. **Kaydet → yükle → kaydet testi koşulmadı.**
+
+**Bilgisayarın skin'i yok** — prosedürel halkayla çiziliyor.
+
 ### Otomatik Turretler — Tasarım Kararları
 
 Slot'a kurulunca otomatik ateş açar, oyuncu müdahalesi gerekmez. Enerji tüketir.
@@ -2446,6 +2519,10 @@ bırakıldı.
 | Debris.cs | Enkaz — sürüklenip durur, kökene göre şekil + tipe göre renk, ömür sonunda solup yanıp söner |
 | ShootableMarker.cs | Vurulabilir mühimmatın etrafında yanıp sönen köşe parantezleri |
 | LevelBannerUI.cs | Her level başında üstte 2–3 sn görünen level / bölüm bandı |
+| FireControl.cs | Nişan modu kuralları (`AimMode`, VARSAYILAN/ÖZEL anahtarı) ve nişan isabetinin tek sahibi |
+| ComputerComponent.cs | Atış kontrol bilgisayarı — öngörü / hassasiyet / güdüm, gemide tek |
+| MainGunAim.cs | Ana silahın Seçili hedef / Otomatik modları — namluyu döndürür, tetiği çeker |
+| TargetMarker.cs | Sol tıkla işaretlenen hedef ve üstündeki nişangâh |
 | ComponentCatalog.cs | Tüm komponent tanımlarının tek sahibi — ne var, kaça, hangi zincirle |
 | BalanceConfig.cs | Gelir ve zırh eğrilerinin tek sahibi (SO; asset yoksa varsayılan) |
 | LevelCurve.cs | Düşman ölçeklemesi: kaçamak ve manevra levelden türer; HP/hasar/zırh DÜZ (yalnızca boss levelle büyür) |
@@ -2472,6 +2549,7 @@ bırakıldı.
 | WebChrome.cs | Tarayıcı sayfasının APK / tam ekran düğmelerini yalnızca menü ve upgrade ekranında gösterir (`Plugins/WebGL/WebChrome.jslib`) |
 | StarField.cs | 400 yıldız, -15/+15 birim arası random pozisyon |
 | CameraController.cs | Parallax kayma + zoom, power curve (t²) |
+| CameraPadHUD.cs | Sol alttaki kamera pedi — WASD/Q/E/C ile aynı işi gören basılı tutulan düğmeler |
 | HealthBar.cs | Can/kalkan barı, SpriteRenderer tabanlı, child olarak eklenir |
 | GameManager.cs | HP sıfırlanınca Game Over, Restart, TimeScale yönetimi |
 | ShipComponentBase.cs | Tüm komponentlerin base class'ı — HP, TakeDamage, zorluk-aware yıkım |
@@ -2588,16 +2666,43 @@ yatayda 16:9'dan 2.4'e kadar test edildi, hepsinde panellerin dışında kalıyo
 - Kayma dünya birimiyle değil **ekran oranıyla** verilir (`shipScreenX/Y`); Free Aspect'te
   pencere en-boy oranı ve zoom değişince kadraj bozulmasın diye. Gerekli dünya kayması
   her karede kameranın o anki yarı genişlik/yüksekliğinden türetilir.
-- **Temel pozisyon:** Orthographic Size: 5
-- **Kayma:** Mouse ekranın %80'inden sonra başlar, maksimum 8 birim, power curve t²
-- **Zoom:** Mouse ekranın %90'ından sonra başlar, Size 5→7
-- **Formül:**
-```csharp
-float t = Mathf.Clamp01(delta.magnitude);
-float moveT = Mathf.Clamp01((t - 0.8f) / 0.2f);
-float curvedMoveT = Mathf.Pow(moveT, 2f);
-float zoomT = Mathf.Clamp01((t - 0.9f) / 0.1f);
-```
+- **Temel pozisyon:** Orthographic Size: 5 (dinlenme kadrajı)
+
+### Kamera Kontrolü — Tasarım Kararları
+
+**İmleçle kaydırma KALDIRILDI.** Eskiden imleç ekranın %80'inden sonra kamerayı
+yatayda kaydırıyor, %90'ından sonra zoom-out yapıyordu. Kamera bir kontrol değil
+NİŞANIN YAN ETKİSİYDİ: kenardaki bir düşmana nişan almak kadrajı o yöne kaçırıyor
+ve dünyayı tam nişan alırken küçültüyordu. Nişan ile kadraj artık iki ayrı el.
+
+| Girdi | Klavye | Ekran (`CameraPadHUD`, sol alt) |
+|---|---|---|
+| Kaydır | W A S D | dört yön düğmesi |
+| Yaklaş / uzaklaş | Q / E | + / − |
+| Kadrajı sıfırla | C | pedin ortası |
+
+| Karar | Gerekçe |
+|---|---|
+| Düğmeler BASILI TUTULDUKÇA çalışır, birden fazlası aynı anda | Kaydırma bir süreç; çapraz kaydırma ve kaydırırken zoom mümkün olmalı |
+| Kaydırma hızı **kadraja göre** (saniyede ekran yüksekliğinin 0.9'u) | Dünya birimiyle sabit olsaydı yakın zoom'da fırlar, uzakta sürünürdü |
+| Zoom **logaritmik** | Her basış kadrajı aynı ORANDA değiştirir |
+| Süre **duvar saatiyle** | Hız ×10'dayken kamera on kat kaymamalı; oyun duruyorken de kadraj oynamalı |
+| Menzil: yatay ±8, **dikey ±3**, zoom 3.5–7 | Dikey kaydırma yeni; `ViewBounds` onu da kapsar (doğum sınırları kaydırılabilen alanın dışında). En yakın zoom doğum sınırını etkilemez — onu yalnızca EN GENİŞ kadraj belirler |
+| Kayma **kadraj tabanına göre** tutulur | Zoom değişince gemi ekranda aynı oranda kalır |
+| Ped sol altta | Sağ el nişan alıyor (fare / sağ başparmak) |
+
+**Fareyle pede basmak ateş sayılmaz** (`CameraPadHUD.AnyHeld`) — sol tuş aynı
+tuş; yoksa pedi tutan oyuncu ana silahı pede doğru ateşlerdi.
+
+**Dokunmatikte nişan parmağı UI'da BAŞLAMAYAN ilk dokunuştur**
+(`PointerInput.TryAimTouch`). Eskiden birincil dokunuş okunuyordu: sol başparmak
+pedi tutarken sağ başparmak nişan alınca namlu pede dönüyor, ateş kesiliyordu —
+iki parmakla oynamak mümkün değildi. Seçilen parmak kalkana kadar nişan parmağıdır.
+
+Mobilde ped bir BAŞLANGIÇ; asıl mobil kontrol henüz kararlaştırılmadı
+(yüzen sanal çubuk / sol yarı ekranda sürükleme / zoom kaydıracı).
+
+**Oyunda denenmedi.**
 
 ---
 
@@ -2852,9 +2957,16 @@ yönden geldi.
 | Sırt kulesi (gövdeden yükselir) | 1, 4 | Slot 1 **ana silah** — namlu kuleden yukarı uzanır |
 | Bel gövdesi (dar, iki omuzla bağlanır) | 5, 8 | |
 | Karın hangar modülü | 6 | Bindirme ağızları — hangar burada başlar |
-| Baş kesimi (köprü + kamalı pruva) | 2, 9 | |
+| Baş kesimi (köprü + kamalı pruva) | 2, 9, 13 | 13 pruva kamasında |
+| Aralar (blok–kule, blok–hangar, karın) | 10, 11, 12 | |
 
-`PlayerShip.slotPositions` ile `Tools/SkinGen/player.js` **birebir eşleşir**;
+**10 → 14 slot.** Yeni dördü SONA eklendi ki eski kayıtların slot numaraları
+aynı yere düşsün; bel slotları (5, 8) onlara yer açmak için y −0.15 → 0'a
+çekildi. Slot sayısının tek sahibi `PlayerShip.SlotPositions` —
+`ShipLoadout.slotCount` ondan türer. Yeni slotlar sprite'ın ışık şeritlerinin
+üstüne düşebilir (ör. 12); siluet yeniden çizilmedi.
+
+`PlayerShip.SlotPositions` ile `Tools/SkinGen/player.js` **birebir eşleşir**;
 biri değişirse diğeri de değişmeli. Dönüşüm: `canvas = (800 + 400x, 480 + 400y)`.
 `ComponentCatalog.StartingLoadout`'un slot numaraları (0, 3, 6) bilinçli olarak
 korundu — makine bloğu ve hangar modülü zaten doğru yerler.
@@ -3221,6 +3333,11 @@ kendi içinde tutarlı. Tek yerden değiştirilebilir: `BuildWarningText`.
 - [x] **İstatistik paneli** — upgrade ekranında seçili komponentin sayaçları
       (hasar, isabet, efektif DPS, kill, emilen/üretilen/onarılan/toplanan);
       iki kayıt katmanına da girer.
+- [x] **Nişan modları ve Bilgisayar** — 14 slot; turret isabeti bilgisayara
+      bağlandı (öngörü / hassasiyet / güdüm); her turret ve ana silah için
+      Elle / Seçili hedef / Otomatik, HUD'da VARSAYILAN/ÖZEL anahtarı.
+      Denge revizyonu **13**. Oyunda denenmedi; kayıt round-trip testi
+      koşulmadı; turret isabeti ölçülmeli.
 - [ ] **Turret menzili yükseltmeye bağlanacak** — bütün turretlerin taban
       menzili düşürülüp bir "Menzil" statı eklenecek (ertelendi).
 - [ ] **Denge testleri** — aşağıdaki listeye bak; sayıların hiçbiri oyunda denenmedi
@@ -3611,10 +3728,8 @@ Sıra kararlaştırıldı: **hitbox ayrımı → denge testleri → skin'ler.**
   oyuncunun kalıbı gerçekten öğrenip öğrenemediği ancak oynayarak anlaşılır.
   Ayar noktaları: `EnemyTypeData.evasionPeriod` (imza), `WanderHarmonic` /
   `WanderHarmonicGain` (desenin karmaşıklığı).
-- [ ] **Kamera dikey kaydırma yok.** `CameraController` yalnızca yatay kayıyor
-  (`direction.x`), dikey kayma hiç uygulanmıyor. Yukarı/aşağı bakabilmek için eklenmeli.
-- [ ] **Otomatik zoom rahatsız edici.** Mouse ekranın %90'ından sonra size 5→7.
-  Alternatif: zoom miktarını azaltıp yatay kaydırmayı artırmak. Test edilecek.
+- [x] **Kamera kontrolü** — imleçle kaydırma/zoom kaldırıldı; WASD + Q/E + C ve
+  sol altta kamera pedi, dikey kaydırma eklendi (bkz. "Kamera Kontrolü").
 - [ ] **Yıldız alanı kadrajı karşılamıyor.** `StarField` 36×14 birim (-18..18, -7..7).
   Yeni kadrajda kamera sağa kaydığı için görünür alan x ekseninde +24'e, y ekseninde
   -8.7'ye kadar gidiyor — kenarlarda yıldızsız boşluk kalır. Alan büyütülmeli

@@ -6,7 +6,7 @@ using UnityEngine;
 ///
 /// Katman ayrımı:
 ///   ComponentCatalog — ne var, kaça
-///   ShipLoadout      — oyuncuda ne kurulu (10 slot, kur/sat)
+///   ShipLoadout      — oyuncuda ne kurulu (14 slot, kur/sat)
 ///   UpgradeUI        — bunlar nasıl gösteriliyor
 ///
 /// TIER ZİNCİRLERİ KALDIRILDI. Her komponentin tek sürümü vardır; ilerleme
@@ -40,6 +40,7 @@ public static class ComponentCatalog
                 Generator,
                 Repair,
                 Storage,
+                Computer,
                 TurretKinetic,
                 TurretEnergy,
                 TurretMissile,
@@ -97,6 +98,9 @@ public static class ComponentCatalog
         ComponentType.Storage    => new[] { (StorageComponent.CapacityKey, Loc.T("stat.capacity")) },
         ComponentType.Turret     => new[] { ("damage",   Loc.T("stat.damage")),
                                             ("fireRate", Loc.T("stat.fireRate")) },
+        ComponentType.Computer   => new[] { (ComputerComponent.LeadKey,      Loc.T("stat.lead")),
+                                            (ComputerComponent.PrecisionKey, Loc.T("stat.precision")),
+                                            (ComputerComponent.GuidanceKey,  Loc.T("stat.guidance")) },
         _                        => null,
     };
 
@@ -228,6 +232,28 @@ public static class ComponentCatalog
             _storage.storageCrystal = 350f;
             _storage.baseEnergyCost = 0.8f;
             return _storage;
+        }
+    }
+
+    // ── Bilgisayar ────────────────────────────────────────────────────────────
+    // Atış kontrolü — turretlerin ve otomatik ana silahın isabeti (FireControl).
+    // Gemide yalnızca BİR tane olabilir.
+    //
+    // KRİSTALLE alınır: bir enerji/elektronik sistemi, ve kristal talebi arzın
+    // altında kalıyordu (bkz. "Kristal talebi şimdilik arzın altında") — o
+    // fazlalığın eriyeceği yer olarak bekleniyordu.
+
+    static ComponentDefinition _computer;
+
+    public static ComponentDefinition Computer
+    {
+        get
+        {
+            if (_computer != null) return _computer;
+            _computer = New("component.computer", ComponentType.Computer,
+                            ResourceType.EnergyCrystal, cost: 40, sell: 16);
+            _computer.baseEnergyCost = 1.5f;
+            return _computer;
         }
     }
 
@@ -524,6 +550,7 @@ public static class ComponentCatalog
             case ComponentType.RepairUnit: return Repair;
             case ComponentType.Storage:    return Storage;
             case ComponentType.Hangar:     return Hangar;
+            case ComponentType.Computer:   return Computer;
             case ComponentType.Weapon:     return Weapon(weapon);
 
             case ComponentType.Turret:

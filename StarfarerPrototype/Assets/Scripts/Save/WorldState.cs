@@ -310,6 +310,12 @@ public class WorldState
     public float  weaponCooldown;
     public string rng;
 
+    // Nişan: oyuncunun işaretlediği hedef ve otomatik ana silahın kilidi
+    // (kimlik; 0 = yok). Seçili hedef modundaki silahlar işaretsiz kalsaydı
+    // kayıttan dönünce hepsi boşta beklerdi.
+    public int    markedTarget;
+    public int    mainGunTarget;
+
     public EnemySpawner.FreeRunState free;
     public ChapterRunState    chapter;
     public AsteroidFieldState asteroidField;

@@ -1,4 +1,5 @@
-public enum ComponentType { Generator, Shield, RepairUnit, Weapon, Turret, Hangar, Storage }
+// Sıra kayda (int) yazılır — yeni tip yalnızca SONA eklenir.
+public enum ComponentType { Generator, Shield, RepairUnit, Weapon, Turret, Hangar, Storage, Computer }
 public enum ResourceType { RawMaterial, EnergyCrystal }
 public enum WeaponType { Kinetic, Laser, Plasma }
 

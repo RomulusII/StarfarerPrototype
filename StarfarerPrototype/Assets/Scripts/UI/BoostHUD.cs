@@ -11,10 +11,11 @@ public class BoostHUD : MonoBehaviour
     private Canvas _canvas;
     private Button _shieldBtn;
     private Button _weaponBtn;
+    private Button _aimBtn;
 
     // Etiketler kurulumda bir kez yazılır; dil menüden değişince tazelenmeleri
     // gerekir (GameManager bu HUD'u menüden önce kurar).
-    private Text _shieldLbl, _weaponLbl, _upgradeLbl;
+    private Text _shieldLbl, _weaponLbl, _upgradeLbl, _aimLbl;
 
     static readonly Color ColNormal  = new Color(0.18f, 0.18f, 0.22f, 0.92f);
     static readonly Color ColShield  = new Color(0.10f, 0.35f, 0.80f, 1f);
@@ -23,6 +24,9 @@ public class BoostHUD : MonoBehaviour
     // YÜKSELT: boost düğmelerinin nötr grisinden ayrılsın — üst şeritte tek
     // başına duruyor ve KAPAT'ın kırmızısının oyundaki karşılığı.
     static readonly Color ColUpgrade = new Color(0.16f, 0.36f, 0.24f, 0.95f);
+
+    // Özel nişan açıkken: upgrade ekranındaki seçimler devrede.
+    static readonly Color ColAimCustom = new Color(0.10f, 0.55f, 0.20f, 1f);
 
     void Awake()
     {
@@ -45,6 +49,15 @@ public class BoostHUD : MonoBehaviour
             new Vector2(0.51f, 0.02f), new Vector2(0.62f, 0.10f),
             () => OnToggle(BoostMode.Weapon), out _weaponLbl);
 
+        // Nişan düzeni: VARSAYILAN (turretler otomatik, ana silah elle) ile
+        // ÖZEL (upgrade ekranında her silah için seçilen mod) arasında tek
+        // dokunuşla geçiş. Boost'ların yanında, çünkü o da savaşın ortasında
+        // değiştirilen bir düzen — seçimler silinmez, yalnızca devre dışı kalır.
+        _aimBtn = BuildButton("AimModeBtn",
+            new Vector2(0.64f, 0.02f), new Vector2(0.73f, 0.10f),
+            () => { FireControl.CustomAiming = !FireControl.CustomAiming; ApplyTexts(); },
+            out _aimLbl);
+
         // Upgrade ekranının tek girişi Tab tuşuydu; Android'de klavye yok, yani
         // telefonda ekran hiç açılamıyordu. Düğme sağ üstte, upgrade ekranının
         // KAPAT düğmesiyle AYNI dikdörtgende (HudLayout): oyuncu ekranı açtığı
@@ -66,6 +79,8 @@ public class BoostHUD : MonoBehaviour
         if (_shieldLbl  != null) _shieldLbl.text  = Loc.T("hud.boost.shield");
         if (_weaponLbl  != null) _weaponLbl.text  = Loc.T("hud.boost.weapon");
         if (_upgradeLbl != null) _upgradeLbl.text = Loc.T("hud.upgrade");
+        if (_aimLbl     != null) _aimLbl.text     = Loc.T(FireControl.CustomAiming ? "hud.aim.custom"
+                                                                                   : "hud.aim.default");
     }
 
     void Update()
@@ -78,6 +93,12 @@ public class BoostHUD : MonoBehaviour
 
         _weaponBtn.GetComponent<Image>().color =
             BoostController.Mode == BoostMode.Weapon ? ColWeapon : ColNormal;
+
+        // Anahtar upgrade ekranından da değişebiliyor; etiket her karede eşlenir.
+        bool custom = FireControl.CustomAiming;
+        _aimBtn.GetComponent<Image>().color = custom ? ColAimCustom : ColNormal;
+        string want = Loc.T(custom ? "hud.aim.custom" : "hud.aim.default");
+        if (_aimLbl.text != want) _aimLbl.text = want;
     }
 
     void OnToggle(BoostMode mode)

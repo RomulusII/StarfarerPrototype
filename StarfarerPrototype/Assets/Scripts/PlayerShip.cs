@@ -9,6 +9,33 @@ using UnityEngine;
 /// </summary>
 public class PlayerShip : MonoBehaviour
 {
+    /// <summary>
+    /// Slot konumları — geminin YAPILARINI takip eder, düzgün bir ızgara değildir
+    /// (bkz. Awake'teki not). Slot sayısının TEK sahibi burasıdır:
+    /// <see cref="ShipLoadout"/> dizilerini bu uzunluktan kurar.
+    ///
+    /// 10 → 14: son dört slot sona eklendi ki eski kayıtların slot numaraları
+    /// aynı yere düşsün. Bel slotları (5, 8) onlara yer açmak için 0.15 yukarı
+    /// çekildi.
+    /// </summary>
+    public static readonly Vector2[] SlotPositions =
+    {
+        new Vector2(-1.29f,  0.75f), //  0 — Kıç makine bloğu, üst   (jeneratör)
+        new Vector2( 0.20f,  0.87f), //  1 — Sırt kulesi, ön         (ANA SİLAH)
+        new Vector2( 1.10f,  0.38f), //  2 — Baş, üst
+        new Vector2(-1.29f,  0.00f), //  3 — Kıç makine bloğu, orta  (kalkan)
+        new Vector2(-0.40f,  0.87f), //  4 — Sırt kulesi, arka
+        new Vector2(-0.45f,  0.00f), //  5 — Bel gövdesi, sol
+        new Vector2(-0.40f, -0.87f), //  6 — Karın hangar modülü     (hangar)
+        new Vector2(-1.29f, -0.75f), //  7 — Kıç makine bloğu, alt
+        new Vector2( 0.25f,  0.00f), //  8 — Bel gövdesi, sağ
+        new Vector2( 1.10f, -0.45f), //  9 — Baş, alt
+        new Vector2(-0.81f,  0.51f), // 10 — Makine bloğu ile kule arası, üst
+        new Vector2(-0.83f, -0.45f), // 11 — Makine bloğu ile hangar arası, alt
+        new Vector2( 0.44f, -0.60f), // 12 — Karın, hangarın önü
+        new Vector2( 1.66f,  0.00f), // 13 — Pruva kaması
+    };
+
     [Tooltip("Zırh yükseltmesi olmadan gövde HP'si. maxHullHP bundan TÜRER — " +
              "doğrudan yazılmaz, yoksa zırh bonusu yeniden hesaplanınca silinir.")]
     public float baseMaxHullHP = 200f;
@@ -73,6 +100,10 @@ public class PlayerShip : MonoBehaviour
         if (!TryGetComponent<ShipLoadout>(out _))
             gameObject.AddComponent<ShipLoadout>();
 
+        // Seçili hedef modunun hedefi ve nişangâhı (bkz. TargetMarker)
+        if (!TryGetComponent<TargetMarker>(out _))
+            gameObject.AddComponent<TargetMarker>();
+
         // World-space slot objeleri.
         //
         // Konumlar geminin YAPILARINI takip eder, düzgün bir ızgara değildir.
@@ -84,28 +115,16 @@ public class PlayerShip : MonoBehaviour
         //
         // Her konum Tools/SkinGen/player.js'teki bir yapıya oturur; biri
         // değişirse diğeri de değişmeli. Tuval ↔ dünya: canvas = (800+400x, 480+400y).
+        // Konumların kendisi: SlotPositions.
         //
         // Başlangıç donanımının slot numaraları ComponentCatalog.StartingLoadout'ta:
         // jeneratör 0, kalkan 3, hangar 6 — yani makine bloğu ve hangar modülü.
-        Vector2[] slotPositions = new Vector2[]
-        {
-            new Vector2(-1.29f,  0.75f), // 0 — Kıç makine bloğu, üst   (jeneratör)
-            new Vector2( 0.20f,  0.87f), // 1 — Sırt kulesi, ön         (ANA SİLAH)
-            new Vector2( 1.10f,  0.38f), // 2 — Baş, üst
-            new Vector2(-1.29f,  0.00f), // 3 — Kıç makine bloğu, orta  (kalkan)
-            new Vector2(-0.40f,  0.87f), // 4 — Sırt kulesi, arka
-            new Vector2(-0.45f, -0.15f), // 5 — Bel gövdesi, sol
-            new Vector2(-0.40f, -0.87f), // 6 — Karın hangar modülü     (hangar)
-            new Vector2(-1.29f, -0.75f), // 7 — Kıç makine bloğu, alt
-            new Vector2( 0.25f, -0.15f), // 8 — Bel gövdesi, sağ
-            new Vector2( 1.10f, -0.45f), // 9 — Baş, alt
-        };
 
-        for (int i = 0; i < slotPositions.Length; i++)
+        for (int i = 0; i < SlotPositions.Length; i++)
         {
             var slotGO = new GameObject($"Slot_{i}");
             slotGO.transform.SetParent(transform, false);
-            slotGO.transform.localPosition = slotPositions[i];
+            slotGO.transform.localPosition = SlotPositions[i];
             slotGO.transform.localScale    = Vector3.one;
 
             var visual          = slotGO.AddComponent<SlotVisual>();

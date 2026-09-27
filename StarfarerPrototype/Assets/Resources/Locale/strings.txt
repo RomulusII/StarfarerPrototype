@@ -330,3 +330,25 @@ chapter.9.title	Sektör 9: Bölünen Sürü	Sector 9: The Splitting Swarm	Sektor
 chapter.9.story	Öldürdükçe çoğalıyorlar. Tek hedefe odaklanmak artık işe yaramıyor.	They multiply as you kill them. Focusing a single target no longer works.	Sie vermehren sich, während ihr sie tötet. Ein einzelnes Ziel zu fokussieren funktioniert nicht mehr.
 chapter.10.title	Sektör 10: Kovan Zihni	Sector 10: The Hive Mind	Sektor 10: Das Schwarmbewusstsein
 chapter.10.story	Sinyalin kaynağı. Bütün bu tasarımlar tek bir yerden çıkıyordu.	The source of the signal. Every one of these designs came from a single place.	Die Quelle des Signals. All diese Konstruktionen stammen von einem einzigen Ort.
+
+# ── Nişan / Bilgisayar ──
+component.computer	Bilgisayar	Fire Computer	Feuerleitrechner
+componentType.computer	Atış Kontrolü	Fire Control	Feuerleitung
+stat.lead	Öngörü	Lead	Vorhalt
+stat.precision	Hassasiyet	Precision	Präzision
+stat.guidance	Güdüm	Guidance	Lenkung
+statdesc.lead	Turretlerin nişanı hedeften, merminin hedefle buluşacağı noktaya kayar.\nBilgisayarsız turret hedefin ŞU ANKİ konumuna ateş eder: yana uçan gemiyi pek vuramaz, kendisine doğru geleni vurur. Sv10'da nişan tam buluşma noktasındadır.{2}	Turrets aim ahead of the target, toward where the shot will meet it.\nWithout a computer a turret fires at the target's CURRENT position: it rarely hits a ship crossing its line of fire, but it hits one coming straight at it. At level 10 it aims at the exact intercept point.{2}	Geschütze zielen vor das Ziel, dorthin, wo der Schuss es trifft.\nOhne Rechner feuert ein Geschütz auf die AKTUELLE Position: Querfliegende Schiffe trifft es kaum, anfliegende schon. Auf Stufe 10 zielt es genau auf den Treffpunkt.{2}
+statdesc.precision	Her atışın rastgele sapmasını daraltır.\nSapma uzak hedefte büyür: 4° hata 10 birimde 0.7 birim ıskadır.{2}	Narrows the random spread of every shot.\nSpread grows with distance: a 4° error misses by 0.7 units at a range of 10.{2}	Verringert die zufällige Streuung jedes Schusses.\nStreuung wächst mit der Entfernung: 4° Fehler verfehlen auf 10 Einheiten um 0,7.{2}
+statdesc.guidance	Füzelerin dönüş hızını artırır — kaçamak hedeflerden daha zor kaçarlar.{2}	Increases missile turn rate — evasive targets shake them off less easily.{2}	Erhöht die Wendigkeit von Raketen — ausweichende Ziele entkommen ihnen schwerer.{2}
+detail.lead	Öngörü	Lead	Vorhalt
+detail.spread	Sapma: ±{0:0.#}°	Spread: ±{0:0.#}°	Streuung: ±{0:0.#}°
+detail.guidance	Füze dönüşü: ×{0:0.##}	Missile turn: ×{0:0.##}	Raketenwendung: ×{0:0.##}
+upgrade.section.aim	── NİŞAN ──	── AIMING ──	── ZIELEN ──
+upgrade.aim.manual	ELLE	MANUAL	MANUELL
+upgrade.aim.assisted	SEÇİLİ HEDEF	MARKED TARGET	MARKIERTES ZIEL
+upgrade.aim.auto	OTOMATİK	AUTO	AUTO
+upgrade.aim.needComputer	Otomatik nişan için Bilgisayar kurulmalı.	Install a Fire Computer to unlock automatic aiming.	Für automatisches Zielen wird ein Feuerleitrechner benötigt.
+upgrade.aim.customOn	ÖZEL NİŞAN: AÇIK	CUSTOM AIMING: ON	EIGENES ZIELEN: AN
+upgrade.aim.customOff	ÖZEL NİŞAN: KAPALI	CUSTOM AIMING: OFF	EIGENES ZIELEN: AUS
+hud.aim.default	NİŞAN\nVARSAYILAN	AIM\nDEFAULT	ZIELEN\nSTANDARD
+hud.aim.custom	NİŞAN\nÖZEL	AIM\nCUSTOM	ZIELEN\nEIGEN
