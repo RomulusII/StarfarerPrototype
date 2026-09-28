@@ -140,7 +140,8 @@ public class EnemyInfoHUD : MonoBehaviour
         var d = bot.Data;
         if (d == null) return;
 
-        _title.text    = string.IsNullOrEmpty(d.displayName) ? d.name : Loc.T(d.displayName);
+        _title.text    = (string.IsNullOrEmpty(d.displayName) ? d.name : Loc.T(d.displayName))
+                       + EnemyTier.Suffix(d);
         _subtitle.text = Loc.T("enemyinfo.subtitle", RoleLabel(d.role), d.threatScore);
 
         SetBar(_hpFill, _hpText, bot.CurrentHP, bot.MaxHP,

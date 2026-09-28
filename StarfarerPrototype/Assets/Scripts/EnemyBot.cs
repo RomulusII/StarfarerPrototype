@@ -1285,6 +1285,7 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
 
             BalanceLog.Event("enemy_death")
                       .Str("tip",    data.name)
+                      .Num("tier",   data.tier)
                       .Num("tehdit", data.threatScore)
                       .Num("maxHP",  data.maxHP)
                       .Num("kalkan", data.maxShield)
@@ -1561,7 +1562,10 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         for (int i = 0; i < 2; i++)
         {
             Vector3 offset = new Vector3(Random.Range(-0.4f, 0.4f), Random.Range(-0.4f, 0.4f), 0f);
-            var frag = EnemySpawner.Spawn(data.splitInto, transform.position + offset);
+            // Parçalar bölünenin tier'ını taşır: T3 Bölünen'den T1 parça çıkması
+            // bölünmeyi bir zayıflama değil bir dönüşüm yapardı.
+            var frag = EnemySpawner.Spawn(EnemyTier.Apply(data.splitInto, data.tier),
+                                          transform.position + offset);
             if (frag == null) continue;
 
             // Parçalar zayıflar; yoksa bölünmek düşmanı güçlendirirdi
@@ -1704,8 +1708,15 @@ public class EnemyBot : MonoBehaviour, ITurretTarget
         var body = new GameObject("Body");
         body.transform.SetParent(transform, false);
         var sr = body.AddComponent<SpriteRenderer>();
-        sr.sprite       = SkinLibrary.Get(data.SkinId, w, h, c);
+        // Tier'ın kendi sprite'ı (zırh plakaları tier renginde, Tools/SkinGen/
+        // tiers.js); yoksa tabana düşer. Siluet aynı — hitbox tabanınkinden
+        // türer ve değişmez.
+        Sprite tierSprite = data.tier > 1 ? SkinLibrary.GetOrNull(EnemyTier.SkinKey(data)) : null;
+        sr.sprite       = tierSprite != null ? tierSprite : SkinLibrary.Get(data.SkinId, w, h, c);
         sr.sortingOrder = data.sizeOrder;
+
+        if (data.tier > 1)
+            gameObject.AddComponent<TierMarker>().Init(data.tier, h / 100f);
     }
 
     void BuildBarrel(Color barrelColor)

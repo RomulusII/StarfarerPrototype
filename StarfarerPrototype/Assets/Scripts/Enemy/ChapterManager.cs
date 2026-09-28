@@ -208,7 +208,8 @@ public class ChapterManager : MonoBehaviour
     List<string> StreamNames()
     {
         var names = new List<string>(_stream.Count);
-        foreach (var t in _stream) if (t != null) names.Add(t.name);
+        // Tier ada eklenir ("Swarm#3") — bkz. EnemyTier.Encode
+        foreach (var t in _stream) if (t != null) names.Add(EnemyTier.Encode(t));
         return names;
     }
 
@@ -244,7 +245,7 @@ public class ChapterManager : MonoBehaviour
         if (s.stream != null)
             foreach (var n in s.stream)
             {
-                var t = EnemyTypeData.ByName(n);
+                var t = EnemyTier.Decode(n);
                 if (t != null) _stream.Add(t);
             }
         _streamTimer = s.streamTimer;
@@ -482,14 +483,21 @@ public class ChapterManager : MonoBehaviour
         _pendingSpawns.Clear();
         if (pool != null && pool.Length > 0 && wave.budgetMax > 0)
         {
+            // Tanıtım leveli (bölümün 1.) tier ATMAZ: oyuncu tipin davranışını
+            // önce sade hâliyle öğrenir.
+            int tierLevel = GameProgress.LevelInChapter == 1 ? 0 : GameProgress.CurrentLevel;
+
             FillByBudget(_pendingSpawns, pool,
                 Random.Range(wave.budgetMin, wave.budgetMax + 1),
-                wave.isSurge ? BalanceConfig.Instance.surgeAlpha : float.NaN);
+                wave.isSurge ? BalanceConfig.Instance.surgeAlpha : float.NaN,
+                tierLevel);
 
             // Bölümün tanıtılan tipi bütçeye sığmadıysa bir tane zorla eklenir
             // (bkz. BuildWaves). Bütçeyi bir tip kadar aşmak, bölümün kimliğini
             // hiç göstermemekten iyidir — boş dalga kuralıyla aynı gerekçe.
-            if (wave.guaranteedType != null && !_pendingSpawns.Contains(wave.guaranteedType))
+            // AD ile aranır: listede tipin tier'lı KOPYASI olabilir, referans tutmaz.
+            if (wave.guaranteedType != null &&
+                !_pendingSpawns.Exists(t => t != null && t.name == wave.guaranteedType.name))
                 _pendingSpawns.Add(wave.guaranteedType);
 
             // Dalganın GERÇEKTEN ne ürettiği: bütçe küçük ve tipler pahalı
@@ -769,8 +777,12 @@ public class ChapterManager : MonoBehaviour
     /// Kompozisyon alfası; NaN = <see cref="BalanceConfig.compositionAlpha"/>.
     /// Cümbüş dalgası kendi alfasını geçer.
     /// </param>
+    /// <param name="tierLevel">
+    /// Tier zarının okuduğu level (bkz. EnemyTier). 0 = tier atılmaz — tanıtım
+    /// leveli ve çevrimdışı model (CurveModel) böyle çağırır.
+    /// </param>
     public static void FillByBudget(List<EnemyTypeData> list, EnemyTypeData[] pool, int budget,
-                                    float alpha = float.NaN)
+                                    float alpha = float.NaN, int tierLevel = 0)
     {
         var cfg = BalanceConfig.Instance;
         if (float.IsNaN(alpha)) alpha = cfg.compositionAlpha;
@@ -849,6 +861,11 @@ public class ChapterManager : MonoBehaviour
                 roll -= cfg.CompositionWeight(affordable[i].threatScore, alpha);
                 if (roll <= 0f) { chosen = affordable[i]; break; }
             }
+
+            // Tip seçildikten SONRA tier zarı: tier'lar havuza ayrı tip olarak
+            // girseydi dağılımları kompozisyon alfasına karışır, ayarlanamazdı.
+            // Tier kalan bütçeye sığmazsa bir alt tier'a iner.
+            chosen = EnemyTier.Roll(chosen, tierLevel, budget);
 
             list.Add(chosen);
             budget -= chosen.threatScore;

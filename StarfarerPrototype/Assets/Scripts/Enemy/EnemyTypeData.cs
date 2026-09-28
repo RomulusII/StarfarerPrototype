@@ -24,6 +24,10 @@ public class EnemyTypeData : ScriptableObject
     public EnemyRole   role;
     public int         threatScore = 1;
 
+    [Tooltip("1 = taban tip. 2–4 = güçlü sürüm (EnemyTier.Apply doldurur); " +
+             "threatScore ve statlar zaten tier'lı değerlerdir.")]
+    public int         tier = 1;
+
     [Header("Temel İstatistikler")]
     public float maxHP         = 30f;
     public float maxShield     = 0f;
