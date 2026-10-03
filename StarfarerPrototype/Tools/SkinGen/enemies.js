@@ -13,6 +13,7 @@ const armored = () => {
   const fin = [110, 158, 98, 192, 132, 192, 152, 160];
 
   return {
+    pal: p,
     name: "Armored", w: 320, h: 220, ppu: 400,
     shapes: [
       { pts: fin,               color: p.wing },
@@ -38,6 +39,7 @@ const shield = () => {
   const fin = [120, 146, 104, 184, 142, 184, 164, 148];
 
   return {
+    pal: p,
     name: "Shield", w: 280, h: 200, ppu: 400,
     shapes: [
       { pts: fin,               color: p.wing },
@@ -63,6 +65,7 @@ const bomber = () => {
   const fin = [56, 34, 44, 46, 74, 46, 84, 35];
 
   return {
+    pal: p,
     name: "Bomber", w: 176, h: 48, ppu: 400,
     shapes: [
       { pts: fin,              color: p.wing },
@@ -85,6 +88,7 @@ const bombRunner = () => {
   const fin = [96, 136, 82, 172, 118, 172, 138, 138];
 
   return {
+    pal: p,
     name: "BombRunner", w: 260, h: 180, ppu: 400,
     shapes: [
       { pts: fin,              color: p.wing },
@@ -112,6 +116,7 @@ const interceptor = () => {
   const tail = [40, 48, 22, 70, 34, 70, 54, 50];
 
   return {
+    pal: p,
     name: "Interceptor", w: 208, h: 72, ppu: 400,
     shapes: [
       { pts: wing,              color: p.wing },
@@ -136,6 +141,7 @@ const artillery = () => {
   const fin = [92, 146, 78, 180, 114, 180, 134, 148];
 
   return {
+    pal: p,
     name: "Artillery", w: 344, h: 184, ppu: 400,
     shapes: [
       { pts: fin,              color: p.wing },
@@ -222,6 +228,7 @@ const jammer = () => {
                 14, 53, 84, 63, 140, 77, 168, 85];
 
   return {
+    pal: p,
     name: "Jammer", w: 264, h: 208, ppu: 400,
     shapes: [
       { pts: antA,               color: p.wing },
@@ -259,6 +266,7 @@ const phantom = () => {
   const wing = [150, 66, 46, 96, 16, 96, 16, 86, 40, 78, 116, 62];
 
   return {
+    pal: p,
     name: "Phantom", w: 232, h: 120, ppu: 400,
     shapes: [
       { pts: wing,              color: p.wing },
@@ -281,6 +289,7 @@ const regenerator = () => {
   const fin = [110, 172, 94, 214, 134, 214, 156, 176];
 
   return {
+    pal: p,
     name: "Regenerator", w: 312, h: 232, ppu: 400,
     shapes: [
       { pts: fin,               color: p.wing },
@@ -309,6 +318,7 @@ const leech = () => {
   const leg2 = [110, 60, 98, 80, 108, 82, 122, 62];
 
   return {
+    pal: p,
     name: "Leech", w: 160, h: 88, ppu: 400,
     shapes: [
       { pts: claw,              color: p.wing },
@@ -336,6 +346,7 @@ const splitter = () => {
   const fin  = [104, 156, 90, 194, 128, 194, 148, 158];
 
   return {
+    pal: p,
     name: "Splitter", w: 288, h: 216, ppu: 400,
     shapes: [
       { pts: fin,                color: p.wing },
@@ -360,6 +371,7 @@ const juggernaut = () => {
   const fin = [150, 208, 130, 262, 180, 262, 208, 212];
 
   return {
+    pal: p,
     name: "Juggernaut", w: 440, h: 288, ppu: 400,
     shapes: [
       { pts: fin,               color: p.wing },
@@ -395,6 +407,7 @@ const barrier = () => {
   const tip   = [160,188, 174,183, 171,169, 157,173];
 
   return {
+    pal: p,
     name: "Barrier", w: 184, h: 248, ppu: 400,
     shapes: [
       { pts: prong,             color: p.wing },
@@ -444,6 +457,7 @@ const warden = () => {
   const strut = [104, 124, 124, 124, 126, 142, 102, 140];     // govde-plaka baglantisi
 
   return {
+    pal: p,
     name: "Warden", w: 280, h: 208, ppu: 400,
     shapes: [
       { pts: strut,               color: p.dark },
@@ -485,6 +499,7 @@ const conduit = () => {
   const vaneTip = [196, 204, 214, 186, 222, 196, 206, 212];
 
   return {
+    pal: p,
     name: "Conduit", w: 256, h: 224, ppu: 400,
     shapes: [
       { pts: vane,                             color: p.wing },

@@ -278,6 +278,9 @@ statdesc.maxFighters	Hangarın maksimum savaşçı sayısını artırır.\nHer s
 # ── Düşman tipi adları ───────────────────────────────────────────────────────
 # Swarm/Armored/Shield/Bomber/Bomb Runner Türkçe sütunda da İngilizceydi;
 # olduğu gibi bırakıldı, çevirmek istersen tek satır değiştirmek yeterli.
+enemy.tier.2	Zırhlı	Plated	Beplankt
+enemy.tier.3	Ağır	Heavy	Schwer
+enemy.tier.4	Elit	Elite	Elite
 enemy.type.swarm	Swarm	Swarm	Schwarm
 enemy.type.armored	Armored	Armored	Gepanzert
 enemy.type.shield	Shield	Shield	Schild

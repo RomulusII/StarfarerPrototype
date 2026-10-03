@@ -693,6 +693,61 @@ aurasıyla aynı).
 **Tabya'nın skin'i yok** — prosedürel dikdörtgenle çiziliyor. Muhafız'ınki var
 (bkz. "Destek Gemileri"). **Oyunda denenmedi.**
 
+### Düşman Tier'ları — Tasarım Kararları (denge r14)
+
+Aynı tipin güçlü sürümleri. Davranış, hız ve çeviklik AYNI; değişen
+dayanıklılık, hasar ve zırh. Sahibi `EnemyTier`.
+
+| Tier | Ad | HP / kalkan | Hasar | Zırh | Tehdit | Renk |
+|---|---|---|---|---|---|---|
+| T1 | — | ×1 | ×1 | +0 | ×1 | tipin kendi rengi |
+| T2 | Zırhlı | ×1.8 | ×1.3 | +1 | ×2.3 | bronz |
+| T3 | Ağır | ×3 | ×1.7 | +3 | ×4.7 | çelik mavisi |
+| T4 | Elit | ×5 | ×2.2 | +6 | ×10 | altın |
+
+| Karar | Gerekçe |
+|---|---|
+| Tier **kendi tehdit puanını** taşır | Dalga bütçesinden gücü kadar yer yer (daha az gemi), enkaz tehditten türediği için gücüyle orantılı düşer — ayrı bir kural gerekmedi. "Düz düşman statı" kararıyla çelişmez: o karar gizli sertleşmeye karşıydı, tier hem görünür hem dürüst fiyatlı |
+| Tehdit çarpanı **kağıt tahmini** | Formül Swarm/Avcı/Armored için elle uygulanıp ortalandı. `enemy_spawn` / `enemy_death` `tier` taşır — ölçünce tip başına düzeltilir |
+| Zırh eki **küçük** (+1/+3/+6) | Swarm T4'e +9, başlangıç topunu atış başına 1'e düşürüp gemiyi ölümsüz yapardı |
+| **Ağır tipler** (taban tehdit ≥ 20: Kaleci, Tabya) en fazla **T2** | Kaleci T4 1.000 HP, 18 zırh — dalga değil duvar |
+| **Boss ve boss dronları** tier almaz | Boss kendi eğrisiyle büyüyor |
+| Destek gemileri ve Bariyer için **ayrı kural yok** | Silahsızlar, hasar çarpanı boşa düşer; aura gücü çarpılmaz — yalnızca HP ve zırh büyür |
+| Tier **tip seçildikten SONRA** zarla atılır | Havuza ayrı tip olarak girselerdi dağılımları kompozisyon alfasına karışır, ayarlanamazdı. Tier kalan bütçeye sığmazsa alt tier'a iner |
+| **Tanıtım leveli** (bölümün 1.) ve garanti tip tier'sız | Oyuncu tipi önce sade hâliyle öğrenir |
+| Bölünen'in parçaları **tier'ı taşır** | T3'ten T1 parça çıkması bölünmeyi bir dönüşüm yapardı |
+
+Zar tablosu (`EnemyTier.DistributionFor`), serbest modda rampanın denk geldiği levelden:
+
+| Bölüm | T1 | T2 | T3 | T4 |
+|---|---|---|---|---|
+| 1–3 | %100 | — | — | — |
+| 4–5 | %80 | %20 | — | — |
+| 6–7 | %60 | %30 | %10 | — |
+| 8–9 | %40 | %35 | %20 | %5 |
+| 10 | %25 | %35 | %25 | %15 |
+
+**Görünüş:** siluet aynı, zırh plakaları tier renginde. Sprite'lar ELLE
+çizilmez: `Tools/SkinGen/tiers.js` her düşman sprite'ını aynı poligonlarla,
+paletin zırh rolleri (kanat, kenar, koyu panel) tier rengine çevrilmiş olarak
+yeniden çizer; gövde, ışık ve sensör lensi tipin kimliği olarak kalır. 16 tip ×
+3 = 48 sprite, anahtar `enemy.<tip>.t2…t4`, bulunamazsa tabana düşer. Her gemi
+paletini `pal` alanında taşır; rol, parçanın renk NESNESİyle tanınır.
+
+Gövdenin altında **tier − 1 kadar chevron** (`TierMarker`, dönmez): renk
+körlüğü ve kendi rengi tier rengine yakın tipler (altın T4 ile sarı Avcı /
+Muhafız) için. Tier renkleri iki yerde yazılı — `tiers.js` ve
+`EnemyTier.ColorOf` — ve aynı kalmalı.
+
+**Kayıt:** tier ölçeklenmiş verinin içinde (`EnemyState.dataJson`). Henüz
+doğmamış kollar tip ADIYLA yazıldığı için tier ada eklenir ("Swarm#3",
+`EnemyTier.Encode`); yazılmasaydı kaydet/aç ile düşman zayıflatılabilirdi.
+Kaydet → yükle → kaydet testi level 52, 82, 95'te tier'lı düşmanlarla birebir.
+
+**Oyunda denenmedi.** Tier sprite'ları oyunda görülmedi; bakılacaklar: tier
+okunuyor mu, chevron gövdeye çok mu yakın, Bariyer T4 (tehdit 70, kalkan ×5)
+geç bölümde bir duvar mı.
+
 ### Destek Gemileri — Muhafız ve Besleyici
 
 İki SİLAHSIZ gemi, ikisi de başka bir gemiyi güçlendirir. Muhafız ilk hâlinde
@@ -2567,6 +2622,8 @@ bırakıldı.
 | SlotVisual.cs | World-space slot göstergesi — dolu slotta halka, boş slotta daire |
 | EnemyInfoHUD.cs | Fare düşman üstündeyken sol üstte açılan bilgi kutusu |
 | HudLayout.cs | Üst şeridin ortak ölçüleri — bar yüksekliği, YÜKSELT/KAPAT dikdörtgeni |
+| EnemyTier.cs | Düşman tier'ları — çarpanlar, zar tablosu, kayıt kodlaması |
+| TierMarker.cs | Tier'lı düşmanın altındaki chevron işareti |
 | ComponentStats.cs | Komponent sayaçları (hasar, isabet, emilen, üretilen…) + `DamageSource` hasar kaynağı kapsamı |
 | EnergyBar.cs | Üst HUD şeridi: enerji + metal + kristal barları ve uyarı satırı |
 | HitEffect.cs | Çarpma kıvılcımlarının tek giriş noktası (`SpawnImpact`) + DeathEffect |
@@ -3338,6 +3395,9 @@ kendi içinde tutarlı. Tek yerden değiştirilebilir: `BuildWarningText`.
       Elle / Seçili hedef / Otomatik, HUD'da VARSAYILAN/ÖZEL anahtarı.
       Denge revizyonu **13**. Oyunda denenmedi; kayıt round-trip testi
       koşulmadı; turret isabeti ölçülmeli.
+- [x] **Düşman tier'ları** — T2 Zırhlı / T3 Ağır / T4 Elit; kendi tehdit
+      puanı, palet varyantı sprite'lar (48), chevron işareti, bölüm 4'ten
+      itibaren. Denge revizyonu **14**. Oyunda denenmedi.
 - [ ] **Turret menzili yükseltmeye bağlanacak** — bütün turretlerin taban
       menzili düşürülüp bir "Menzil" statı eklenecek (ertelendi).
 - [ ] **Denge testleri** — aşağıdaki listeye bak; sayıların hiçbiri oyunda denenmedi

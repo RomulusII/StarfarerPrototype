@@ -26,6 +26,7 @@ const swarm = () => {
   const wingUpper = [208,43, 36,77, 20,77, 20,68, 28,43];
 
   return {
+    pal: C,
     name: "Swarm",
     w: 240, h: 80, ppu: 400,
     shapes: [
@@ -66,13 +67,21 @@ const K = require("./components");
 const PR = require("./props");
 const B  = require("./boss");
 
-module.exports = {
-  ships: [
+const enemyShips = [
     swarm(),
     E.armored(), E.shield(), E.barrier(), E.bomber(), E.bombRunner(),
     E.interceptor(), E.artillery(), E.jammer(), E.phantom(),
     E.regenerator(), E.leech(), E.splitter(), E.juggernaut(),
     E.warden(), E.conduit(),
+];
+
+// Tier varyantları (T2–T4): aynı siluet, zırh tonu farklı — bkz. tiers.js
+const { tierVariants } = require("./tiers");
+
+module.exports = {
+  ships: [
+    ...enemyShips,
+    ...tierVariants(enemyShips),
 
     P.playerBody(), P.playerBarrel(),
 

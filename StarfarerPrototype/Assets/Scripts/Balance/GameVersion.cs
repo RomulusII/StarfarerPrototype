@@ -112,6 +112,11 @@ public static class GameVersion
     ///       komponenti (40 kristal) öngörü / hassasiyet / güdüm izleriyle bunu
     ///       düzeltir. Füze dönüşü bilgisayarsız ×0.6. Turret isabet oranı ve
     ///       hasarı önceki revizyonlarla kıyaslanamaz. Slot sayısı 10 → 14.
+    ///  14 — DÜŞMAN TIER'LARI. Aynı tipin güçlü sürümleri: T2 Zırhlı (HP ×1.8,
+    ///       hasar ×1.3, zırh +1), T3 Ağır (×3, ×1.7, +3), T4 Elit (×5, ×2.2,
+    ///       +6); tehdit ×2.3 / ×4.7 / ×10, enkaz tehditle orantılı. Bölüm 4'ten
+    ///       itibaren dalgalara karışır. `enemy_spawn` / `enemy_death` `tier`
+    ///       alanını taşır. Bölüm 4+ kadroları önceki revizyonlarla kıyaslanamaz.
     /// </summary>
-    public const int Denge = 13;
+    public const int Denge = 14;
 }

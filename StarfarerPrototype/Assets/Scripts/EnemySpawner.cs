@@ -247,6 +247,7 @@ public class EnemySpawner : MonoBehaviour
         // geçerli olan sayı budur (düşman bilgi kutusuyla aynı gerekçe).
         BalanceLog.Event("enemy_spawn")
                   .Str("tip",    data.name)
+                  .Num("tier",   data.tier)
                   .Num("tehdit", data.threatScore)
                   .Num("maxHP",  bot.data.maxHP)
                   .Num("kalkan", bot.data.maxShield)
@@ -524,6 +525,8 @@ public class EnemySpawner : MonoBehaviour
         {
             var t = RollUnlockedType(level, left);
             if (t == null) break;
+            // Tier zarı kampanyayla aynı tablodan, rampanın denk geldiği levelden
+            t = EnemyTier.Roll(t, EquivalentLevel(level), left);
             list.Add(t);
             NoteChosen(t);
             left -= Mathf.Max(1, t.threatScore);
