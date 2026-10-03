@@ -90,6 +90,7 @@ public class UpgradeUI : MonoBehaviour
         if (_canvas != null && _canvas.enabled)
         {
             UpdateStatBoxes();
+            RefreshCameraToggle();
 
             // Sayaçlar oyun duraklıyken değişmez, ama satış/uzmanlaşma gibi
             // panel içi işlemler onları sıfırlayabilir. Yarım saniyede bir yeter.
@@ -1303,6 +1304,7 @@ public class UpgradeUI : MonoBehaviour
         BuildListPanel();
         BuildCloseButton();
         BuildMenuButton();
+        BuildCameraToggle();
     }
 
     /// <summary>
@@ -1374,6 +1376,53 @@ public class UpgradeUI : MonoBehaviour
         r.anchoredPosition = new Vector2(0f, 18f);
 
         AttachLabel(go.transform, Loc.T("upgrade.mainMenu"), 22);
+    }
+
+    // ── Otomatik kamera anahtarı ──────────────────────────────────────────────
+    // ANA MENÜ'nün hemen üstünde, sol şeridin dibinde. Bir oyun ayarı ama
+    // ayrı bir ayarlar ekranı yok; upgrade ekranı zaten oyunun duraklatılıp
+    // düzenlendiği yer (nişan anahtarı da burada).
+
+    Text  _cameraToggleLabel;
+    Image _cameraToggleBg;
+
+    static readonly Color CameraAutoColor   = new Color(0.10f, 0.55f, 0.20f, 1f);
+    static readonly Color CameraManualColor = new Color(0.20f, 0.24f, 0.32f, 1f);
+
+    void BuildCameraToggle()
+    {
+        var go = new GameObject("CameraToggleBtn", typeof(RectTransform));
+        go.transform.SetParent(transform, false);
+
+        _cameraToggleBg = go.AddComponent<Image>();
+
+        var btn = go.AddComponent<Button>();
+        btn.targetGraphic = _cameraToggleBg;
+        btn.onClick.AddListener(() =>
+        {
+            CameraController.AutoCamera = !CameraController.AutoCamera;
+            RefreshCameraToggle();
+        });
+
+        var r = (RectTransform)go.transform;
+        r.anchorMin        = new Vector2(0.008f, 0f);
+        r.anchorMax        = new Vector2(0.102f, 0f);
+        r.pivot            = new Vector2(0.5f, 0f);
+        r.sizeDelta        = new Vector2(0f, 60f);
+        r.anchoredPosition = new Vector2(0f, 18f + 60f + 10f);   // ANA MENÜ'nün üstü
+
+        _cameraToggleLabel = AttachLabel(go.transform, "", 19);
+        RefreshCameraToggle();
+    }
+
+    /// <summary>Etiket ve renk anahtardan okunur — dil menüden de değişebilir.</summary>
+    void RefreshCameraToggle()
+    {
+        if (_cameraToggleLabel == null) return;
+        bool on = CameraController.AutoCamera;
+        string want = Loc.T(on ? "upgrade.camera.auto" : "upgrade.camera.manual");
+        if (_cameraToggleLabel.text != want) _cameraToggleLabel.text = want;
+        _cameraToggleBg.color = on ? CameraAutoColor : CameraManualColor;
     }
 
     void OnMenuPressed()

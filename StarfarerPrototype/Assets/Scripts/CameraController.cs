@@ -260,14 +260,25 @@ public class CameraController : MonoBehaviour
         }
 
         // Açılış menüsünde kadraj oynamaz — menünün arkasındaki sahne bir fon.
-        if (!StartMenuUI.IsOpen) ReadControls();
+        if (!StartMenuUI.IsOpen)
+        {
+            ReadControls();
+            ReadAutoCamera();
+        }
+
+        // Elle kadraj ile otomatik kameranın katkısı TOPLANIR ve birlikte
+        // sınırlanır: otomatik kamera açıkken de WASD / ped / joystick çalışır.
+        Vector2 offset = new Vector2(
+            Mathf.Clamp(_offset.x + _autoPan, -panRange, panRange), _offset.y);
+        float   size   = Mathf.Clamp(_wantedSize + _autoZoom * (maxZoomSize - minZoomSize),
+                                     closestZoomSize, maxZoomSize);
 
         // Zoom önce: kadraj tabanı o anki size'dan türer.
         float k = 1f - Mathf.Exp(-followSharpness * Time.unscaledDeltaTime);
-        _cam.orthographicSize = Mathf.Lerp(_cam.orthographicSize, _wantedSize, k);
+        _cam.orthographicSize = Mathf.Lerp(_cam.orthographicSize, size, k);
 
         Vector2 basePos   = FramingBase();
-        Vector3 targetPos = new Vector3(basePos.x + _offset.x, basePos.y + _offset.y, -10f);
+        Vector3 targetPos = new Vector3(basePos.x + offset.x, basePos.y + offset.y, -10f);
         transform.position = Vector3.Lerp(transform.position, targetPos, k);
 
         // Kaydın okuyacağı hâl: 0 = dinlenme kadrajı, 1 = tam zoom-out.
@@ -281,11 +292,74 @@ public class CameraController : MonoBehaviour
     /// kontrolü ×10'dayken kamera on kat hızlı kaymamalı, oyun durmuşken de
     /// kadraj oynatılabilmeli.
     /// </summary>
+    // ── Otomatik kamera (imleç kenarda) ───────────────────────────────────────
+
+    const string AutoCameraPref = "starfarer.autoCamera";
+    static int s_autoCamera = -1;   // -1: henüz okunmadı
+
+    /// <summary>
+    /// OTOMATİK KAMERA: imleç (ya da nişan parmağı) ekranın kenarına yaklaştıkça
+    /// kamera o yöne kayar ve uzaklaşır — eski davranış. Varsayılan KAPALI;
+    /// upgrade ekranından açılır. Kontrol tercihi olduğu için PlayerPrefs'te
+    /// (dil ve zorluk gibi).
+    ///
+    /// Kaldırılmıştı çünkü kadrajı nişanın yan etkisine çeviriyordu. Bazı
+    /// oyuncular için o yan etki tam istedikleri şey — kenardaki düşmana nişan
+    /// almak onu kadraja da getiriyor. Seçim artık oyuncunun.
+    /// </summary>
+    public static bool AutoCamera
+    {
+        get
+        {
+            if (s_autoCamera < 0) s_autoCamera = PlayerPrefs.GetInt(AutoCameraPref, 0);
+            return s_autoCamera == 1;
+        }
+        set
+        {
+            s_autoCamera = value ? 1 : 0;
+            PlayerPrefs.SetInt(AutoCameraPref, s_autoCamera);
+            PlayerPrefs.Save();
+        }
+    }
+
+    // Otomatik kameranın katkısı: yatay kayma (birim) ve zoom-out oranı (0..1).
+    // Elle kadrajın ÜSTÜNE eklenir.
+    float _autoPan, _autoZoom;
+    float _autoPanTarget, _autoZoomTarget;
+
+    /// <summary>
+    /// Eski formülün aynısı: imleç ekran merkezinden %80 uzaklaşınca kayma,
+    /// %90'dan sonra zoom-out başlar, t² eğrisiyle. İşaretçi yoksa (parmak
+    /// kalktı) son hedef korunur — eski davranış da kamerayı yerinde bırakıyordu.
+    /// </summary>
+    void ReadAutoCamera()
+    {
+        if (!AutoCamera)
+        {
+            _autoPanTarget = _autoZoomTarget = 0f;
+        }
+        else if (!PointerInput.Locked && PointerInput.TryPosition(out Vector2 inputPos))
+        {
+            Vector2 center = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+            Vector2 delta  = (inputPos - center) / center;
+            float   t      = Mathf.Clamp01(delta.magnitude);
+            Vector2 dir    = delta.sqrMagnitude > 0f ? delta.normalized : Vector2.zero;
+
+            float moveT = Mathf.Clamp01((t - 0.8f) / 0.2f);
+            _autoPanTarget  = dir.x * moveT * moveT * panRange;
+            _autoZoomTarget = Mathf.Clamp01((t - 0.9f) / 0.1f);
+        }
+
+        float k = 1f - Mathf.Exp(-3f * Time.unscaledDeltaTime);
+        _autoPan  = Mathf.Lerp(_autoPan,  _autoPanTarget,  k);
+        _autoZoom = Mathf.Lerp(_autoZoom, _autoZoomTarget, k);
+    }
+
     void ReadControls()
     {
-        Vector2 pan  = CameraPadHUD.Pan;
-        float   zoom = CameraPadHUD.Zoom;
-        bool    reset = CameraPadHUD.ConsumeReset();
+        Vector2 pan  = CameraPadHUD.Pan  + CameraStickHUD.Pan;
+        float   zoom = CameraPadHUD.Zoom + CameraStickHUD.Zoom;
+        bool    reset = CameraPadHUD.ConsumeReset() | CameraStickHUD.ConsumeReset();
 
         var kb = Keyboard.current;
         if (kb != null)

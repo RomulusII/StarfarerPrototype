@@ -419,10 +419,17 @@ public class GameManager : MonoBehaviour
         go.AddComponent<BoostHUD>();
     }
 
+    /// <summary>
+    /// Kamera kontrolü: dokunmatik cihazda yüzen joystick + zoom şeridi,
+    /// masaüstünde WASD ile aynı işi gören düğme pedi. İkisi aynı anda kurulmaz —
+    /// telefonda ped sol başparmağın yerini kaplar, masaüstünde joystick anlamsız.
+    /// </summary>
     void BuildCameraPad()
     {
-        var go = new GameObject("CameraPadHUD");
-        go.AddComponent<CameraPadHUD>();
+        if (Application.isMobilePlatform)
+            new GameObject("CameraStickHUD").AddComponent<CameraStickHUD>();
+        else
+            new GameObject("CameraPadHUD").AddComponent<CameraPadHUD>();
     }
 
     void BuildEnemyInfoHUD()

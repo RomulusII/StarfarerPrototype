@@ -2603,8 +2603,9 @@ bırakıldı.
 | StartMenuUI.cs | Açılış ekranı — kampanya / devam / serbest mod / zorluk / level seçimi |
 | WebChrome.cs | Tarayıcı sayfasının APK / tam ekran düğmelerini yalnızca menü ve upgrade ekranında gösterir (`Plugins/WebGL/WebChrome.jslib`) |
 | StarField.cs | 400 yıldız, -15/+15 birim arası random pozisyon |
-| CameraController.cs | Parallax kayma + zoom, power curve (t²) |
-| CameraPadHUD.cs | Sol alttaki kamera pedi — WASD/Q/E/C ile aynı işi gören basılı tutulan düğmeler |
+| CameraController.cs | Kadraj: WASD/ped/joystick ile kaydırma ve zoom, isteğe bağlı otomatik (imleç kenarda) kamera, cihaz ölçeği |
+| CameraPadHUD.cs | Masaüstünde sol alttaki kamera pedi — WASD/Q/E/C ile aynı işi gören basılı tutulan düğmeler |
+| CameraStickHUD.cs | Dokunmatikte yüzen kamera joystick'i + dikey zoom şeridi |
 | HealthBar.cs | Can/kalkan barı, SpriteRenderer tabanlı, child olarak eklenir |
 | GameManager.cs | HP sıfırlanınca Game Over, Restart, TimeScale yönetimi |
 | ShipComponentBase.cs | Tüm komponentlerin base class'ı — HP, TakeDamage, zorluk-aware yıkım |
@@ -2727,16 +2728,34 @@ yatayda 16:9'dan 2.4'e kadar test edildi, hepsinde panellerin dışında kalıyo
 
 ### Kamera Kontrolü — Tasarım Kararları
 
-**İmleçle kaydırma KALDIRILDI.** Eskiden imleç ekranın %80'inden sonra kamerayı
-yatayda kaydırıyor, %90'ından sonra zoom-out yapıyordu. Kamera bir kontrol değil
-NİŞANIN YAN ETKİSİYDİ: kenardaki bir düşmana nişan almak kadrajı o yöne kaçırıyor
-ve dünyayı tam nişan alırken küçültüyordu. Nişan ile kadraj artık iki ayrı el.
+**İmleçle kaydırma artık İSTEĞE BAĞLI — varsayılan KAPALI.** Eskiden imleç
+ekranın %80'inden sonra kamerayı yatayda kaydırıyor, %90'ından sonra zoom-out
+yapıyordu. Kamera bir kontrol değil NİŞANIN YAN ETKİSİYDİ: kenardaki bir düşmana
+nişan almak kadrajı o yöne kaçırıyor ve dünyayı tam nişan alırken küçültüyordu.
+Önce tamamen kaldırıldı, sonra **OTOMATİK KAMERA** olarak geri geldi: bazı
+oyuncular için o yan etki tam istedikleri şey. Upgrade ekranında ANA MENÜ'nün
+üstündeki **KAMERA ELLE / OTOMATİK** düğmesi açar
+(`CameraController.AutoCamera`, PlayerPrefs — kontrol tercihi).
 
-| Girdi | Klavye | Ekran (`CameraPadHUD`, sol alt) |
-|---|---|---|
-| Kaydır | W A S D | dört yön düğmesi |
-| Yaklaş / uzaklaş | Q / E | + / − |
-| Kadrajı sıfırla | C | pedin ortası |
+- Formül eskisinin aynısı (%80 kayma, %90 zoom, t², yumuşatma 3/sn).
+- Otomatik kameranın katkısı elle kadrajın **ÜSTÜNE eklenir** ve birlikte
+  sınırlanır — açıkken de WASD / ped / joystick çalışır.
+- İşaretçi yoksa (parmak kalktı) son hedef korunur; eski davranış da kamerayı
+  yerinde bırakıyordu.
+
+| Girdi | Klavye | Masaüstü ekran (`CameraPadHUD`, sol alt) | Dokunmatik (`CameraStickHUD`) |
+|---|---|---|---|
+| Kaydır | W A S D | dört yön düğmesi | sol şeritte **yüzen joystick** |
+| Yaklaş / uzaklaş | Q / E | + / − | en soldaki **zoom şeridi** (yukarı = yaklaş) |
+| Kadrajı sıfırla | C | pedin ortası | joystick bölgesine **çift dokunuş** |
+
+**Dokunmatikte ped yerine yüzen joystick** (`Application.isMobilePlatform`;
+ikisi aynı anda kurulmaz). Başparmak sol şeridin (ekranın %5–22'si) neresine
+değerse çubuğun merkezi orası olur — sabit bir ped, ekrana bakmadan doğru
+düğmeyi bulmayı ister. Sapma 120 px'te tam hız, %12 ölü bölge, çıktı analog.
+Zoom şeridi aynı mantıkla: değdiğin yer sıfır, uzaklık hız. Şerit UI olduğu
+için oradaki dokunuş nişan sayılmaz; bedeli şeridin içine nişan alınamaması,
+bu yüzden dar tutuldu ve gemi (soldan %29) dışında kalıyor.
 
 | Karar | Gerekçe |
 |---|---|
@@ -2756,10 +2775,7 @@ tuş; yoksa pedi tutan oyuncu ana silahı pede doğru ateşlerdi.
 pedi tutarken sağ başparmak nişan alınca namlu pede dönüyor, ateş kesiliyordu —
 iki parmakla oynamak mümkün değildi. Seçilen parmak kalkana kadar nişan parmağıdır.
 
-Mobilde ped bir BAŞLANGIÇ; asıl mobil kontrol henüz kararlaştırılmadı
-(yüzen sanal çubuk / sol yarı ekranda sürükleme / zoom kaydıracı).
-
-**Oyunda denenmedi.**
+**Oyunda denenmedi** — joystick bir telefonda hiç denenmedi.
 
 ---
 
