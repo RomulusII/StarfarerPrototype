@@ -3,7 +3,16 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes, viewport-fit=cover">
+    <!-- iPhone'da TAM EKRANIN TEK YOLU ana ekrana eklemek. Safari iPhone'da
+         Fullscreen API'sini yalnızca <video> için açar; tuvali tam ekrana
+         almak mümkün değil (iPad'de mümkün). Ana ekrandan açılan sayfa ise
+         adres ve araç çubuğu olmadan, uygulama gibi açılır — bu meta'lar onu
+         ister. viewport-fit=cover çentiğin yanını da oyuna verir. -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="{{{ PRODUCT_NAME }}}">
     <title>{{{ PRODUCT_NAME }}}</title>
     <style>
       /* Oyun landscape ve kadrajını kendi hesaplıyor (bkz. CameraController,
@@ -77,6 +86,35 @@
         #apk { right: 115px; line-height: 69px; font-size: 20px; }
       }
 
+      /* Çentikli telefonlarda (viewport-fit=cover) düğmeler ev çubuğunun ve
+         yuvarlak köşenin altında kalmasın. */
+      @supports (bottom: env(safe-area-inset-bottom)) {
+        #fs, #apk { bottom: calc(28px + env(safe-area-inset-bottom)); }
+        #fs { right: calc(28px + env(safe-area-inset-right)); }
+        @media (pointer: coarse) {
+          #fs, #apk { bottom: calc(36px + env(safe-area-inset-bottom)); }
+          #fs { right: calc(36px + env(safe-area-inset-right)); }
+        }
+      }
+
+      /* iPhone'da tam ekran düğmesi "Ana Ekrana Ekle" talimatını açar. */
+      #ioshint {
+        position: fixed; inset: 0;
+        display: none; align-items: center; justify-content: center;
+        background: rgba(5, 7, 12, .82);
+        z-index: 10;
+      }
+      #ioshint > div {
+        max-width: min(420px, 86vw);
+        padding: 22px 24px;
+        border-radius: 10px;
+        background: #121a26; color: #cfe0f2;
+        font: 500 17px/1.5 system-ui, -apple-system, sans-serif;
+        text-align: center;
+      }
+      #ioshint b { color: #fff; }
+      #ioshint .ico { font-size: 26px; vertical-align: -3px; }
+
       /* PORTREYİ ENGELLEYEN KAPLAMA KALDIRILDI — ve neden, kalıcı bir ders:
          oyun landscape diye portrede ekranı kapatan bir uyarı koyduk. Sonuç,
          çözmeye çalıştığından kötü oldu. Yatayda tuval görünen alandan uzun
@@ -132,6 +170,8 @@
 
     <button id="fs" title="Tam ekran">&#9974;</button>
 
+    <div id="ioshint"><div id="ioshinttext"></div></div>
+
 
     <script src="Build/{{{ LOADER_FILENAME }}}"></script>
     <script>
@@ -158,11 +198,45 @@
       // herhangi bir anda döner. Bu yüzden her biri yalnızca kendi durumunu
       // yazar ve görünürlük tek yerden uygulanır.
       var unityReady = false, gameWantsChrome = false;
+      // iOS: iPhone'da tuval tam ekrana alınamaz (Fullscreen API yalnızca
+      // <video> için). iPad'de webkit önekiyle çalışır. iPadOS 13+ kendini
+      // masaüstü Mac olarak tanıttığı için dokunma noktası sayısıyla ayrılır.
+      var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      var fsSupported = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+      // Ana ekrandan açıldıysa zaten tarayıcı çubuğu yok: düğmenin işi kalmadı.
+      var standalone = window.navigator.standalone === true ||
+                       (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
+                       (window.matchMedia && window.matchMedia("(display-mode: fullscreen)").matches);
+      var fsUseful = !standalone && (fsSupported || isIOS);
+
       function applyChrome() {
         var show = unityReady && gameWantsChrome;
-        fs.style.display  = show ? "block" : "none";
-        apk.style.display = show && apkVar ? "block" : "none";
+        fs.style.display  = show && fsUseful ? "block" : "none";
+        // APK yalnızca Android'de kurulur — iPhone'da indirme düğmesi yalan söyler.
+        apk.style.display = show && apkVar && !isIOS ? "block" : "none";
       }
+
+      // Talimat metni sayfa dilinden: bu sayfa oyunun Loc katmanının dışında.
+      var share = "<span class='ico'>&#x2B06;&#xFE0E;</span>";
+      var hintText = {
+        tr: "iPhone'da tarayıcı oyunu tam ekrana alamıyor.<br><br>" +
+            "Alttaki <b>Paylaş</b> " + share + " düğmesine bas, ardından " +
+            "<b>Ana Ekrana Ekle</b>'yi seç. Oyunu ana ekrandaki simgeden açınca " +
+            "tarayıcı çubukları olmadan, tam ekran açılır.",
+        de: "Auf dem iPhone kann der Browser das Spiel nicht im Vollbild zeigen.<br><br>" +
+            "Tippe unten auf <b>Teilen</b> " + share + " und wähle " +
+            "<b>Zum Home-Bildschirm</b>. Über das Symbol gestartet, läuft das Spiel " +
+            "ohne Browserleisten im Vollbild.",
+        en: "On iPhone the browser can't show the game full screen.<br><br>" +
+            "Tap <b>Share</b> " + share + " at the bottom, then " +
+            "<b>Add to Home Screen</b>. Launched from that icon, the game runs " +
+            "full screen without the browser bars."
+      };
+      var lang = (navigator.language || "en").slice(0, 2).toLowerCase();
+      var ioshint = document.querySelector("#ioshint");
+      document.querySelector("#ioshinttext").innerHTML = hintText[lang] || hintText.en;
+      ioshint.onclick = function () { ioshint.style.display = "none"; };
       window.starfarerSetChrome = function (visible) {
         gameWantsChrome = !!visible;
         applyChrome();
@@ -209,6 +283,7 @@
         // APK, ya da ana ekrana eklenmiş (display: fullscreen) bir web
         // uygulaması.
         fs.onclick = function () {
+          if (!fsSupported) { ioshint.style.display = "flex"; return; }
           unityInstance.SetFullscreen(1);
           // Yönelim kilidi YALNIZCA tam ekranda çalışır (tarayıcı kuralı) ve
           // masaüstünde hiç desteklenmez. Başarısızlığı yutuyoruz: kilit bir
