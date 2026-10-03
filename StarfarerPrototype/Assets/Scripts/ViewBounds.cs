@@ -12,7 +12,7 @@ using UnityEngine;
 /// yalnızca yarısını kaplıyordu.
 ///
 /// Sayılar artık kameranın kendi alanlarından türer (<see cref="CameraController"/>
-/// maxZoomSize / shipScreenX / shipScreenY / panRange / panRangeY). Kadraj ayarı
+/// maxZoomSize / shipScreenX / shipScreenY / panRangeLeft / panRangeRight / panRangeY). Kadraj ayarı
 /// değiştiğinde doğum sınırları da kendiliğinden takip eder.
 /// </summary>
 public static class ViewBounds
@@ -33,7 +33,7 @@ public static class ViewBounds
 
     // Kamera ve gemi bulunamazsa (test sahnesi, erken Awake) kullanılan kadraj.
     // Bugünkü ayarlarla hesaplanmış değerlerdir; kod her durumda çalışsın diye.
-    static readonly Rect FallbackRect = new Rect(-18f, -9f, 50f, 15f);
+    static readonly Rect FallbackRect = new Rect(-23f, -12f, 64f, 20f);
 
     static Rect  _rect;
     static float _computedAspect = -1f;
@@ -127,8 +127,8 @@ public static class ViewBounds
 
         // Kaydırma iki eksende de (WASD / kamera pedi) — dünya en geniş kadrajın
         // kaydırılabildiği her yeri kapsamalı, yoksa düşman görünür alanda doğar.
-        float minX = baseX - ctl.panRange - halfW;
-        float maxX = baseX + ctl.panRange + halfW;
+        float minX = baseX - ctl.panRangeLeft  - halfW;
+        float maxX = baseX + ctl.panRangeRight + halfW;
         float minY = baseY - ctl.panRangeY - halfH;
         float maxY = baseY + ctl.panRangeY + halfH;
 

@@ -58,11 +58,11 @@ public class GeneratorComponent : ShipComponentBase
     public float CapacitorBonus => CapacitorBonusAt(GetStatLevel(CapacitorKey));
 
     /// <summary>
-    /// Verilen seviyedeki tampon bonusu. Her seviye tamponu %50 büyütür:
+    /// Verilen seviyedeki tampon bonusu. Her seviye tamponu ikiye katlar (+%100):
     ///
-    ///     bonus(L) = tabanTampon × (1.5^L − 1)
+    ///     bonus(L) = tabanTampon × (2^L − 1)
     ///
-    /// Taban EnergyBus'tan OKUNUR, sabit yazılmaz — böylece "her seviye +%50"
+    /// Taban EnergyBus'tan OKUNUR, sabit yazılmaz — böylece "her seviye +%100"
     /// ifadesi taban kapasite değiştiğinde de doğru kalır.
     ///
     /// Bonus jeneratörler arasında TOPLAMSALDIR (zırh iziyle aynı gerekçe):

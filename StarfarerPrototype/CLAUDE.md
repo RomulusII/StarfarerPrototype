@@ -929,14 +929,14 @@ turretlerin aynı anda ateşlemesi, plazma şarjı ve kalkan boost'u anlık olar
 üretimin çok üstünde enerji ister — tampon boşsa o atışlar hiç yapılamaz.
 Üretimi yükseltmek bunu da çözer ama çok daha pahalıya; tampon dar bir cevaptır.
 
-**Her seviye tamponu %50 büyütür** (`capacitorStatStep = 1.5`) — oyundaki tek
+**Her seviye tamponu ikiye katlar** (`capacitorStatStep = 2.0`, denge r15; önce 1.5) — oyundaki tek
 statStep istisnası ve bilinçli. Sebep: kapasitör bir AKIŞ değil STOK. Üretim
 tüketimle yarışır (statStep 1.25'e karşı energyGrowth 1.30) ve o yarış
 dengelidir; tampon o yarışa hiç girmez, yalnızca ne kadar süre burst
 yapabildiğini belirler. 1.25 ile ilk seviye 98 metala **+6 enerji** veriyordu,
 yani oyundaki en zayıf yükseltmeydi.
 
-    bonus(L) = tabanTampon × (1.5^L − 1)
+    bonus(L) = tabanTampon × (2^L − 1)
 
 Taban EnergyBus'tan OKUNUR, sabit yazılmaz — "her seviye +%50" ifadesi taban
 kapasite değiştiğinde de doğru kalsın diye.
@@ -949,13 +949,15 @@ neredeyse her zaman daha doğruydu — yani tampon bir seçenek değil, tuzaktı
 | Sv | Max enerji | O seviyenin fiyatı | (eski) |
 |---|---|---|---|
 | 0 | 50 | — | — |
-| 1 | 75 | **49** | 98 |
-| 5 | 380 | **363** | 726 |
-| 10 | 2.883 | **4.442** | 8.883 |
+| 1 | 100 | **49** | 98 |
+| 5 | 1.600 | **363** | 726 |
+| 10 | 51.200 | **4.442** | 8.883 |
 
 İzi sonuna kadar götürmek 11.200 metal — kampanya gelirinin (~45.800) dörtte
 biri. Eskiden 22.400'dü, yani tek başına gelirin yarısı.
-Sv10 tamponu, Sv10 jeneratörün 17 saniyelik tam üretimini depolar.
+Sv10 tamponu, Sv10 jeneratörün ~5 dakikalık tam üretimini depolar (1.5 ile 17 sn'di).
+**Oyunda denenmedi** — geç seviyeler pratikte sınırsız tampon demek; Sv5 (1.600)
+zaten bütün burst ihtiyacını karşılıyor olabilir.
 
 Büyüme seviye içinde çarpımsal, **jeneratörler arası toplamsaldır** (zırh iziyle
 aynı gerekçe): çarpımsal olsaydı ikinci jeneratör birincinin katı kadar tampon
@@ -2763,7 +2765,7 @@ bu yüzden dar tutuldu ve gemi (soldan %29) dışında kalıyor.
 | Kaydırma hızı **kadraja göre** (saniyede ekran yüksekliğinin 0.9'u) | Dünya birimiyle sabit olsaydı yakın zoom'da fırlar, uzakta sürünürdü |
 | Zoom **logaritmik** | Her basış kadrajı aynı ORANDA değiştirir |
 | Süre **duvar saatiyle** | Hız ×10'dayken kamera on kat kaymamalı; oyun duruyorken de kadraj oynamalı |
-| Menzil: yatay ±8, **dikey ±3**, zoom 3.5–7 | Dikey kaydırma yeni; `ViewBounds` onu da kapsar (doğum sınırları kaydırılabilen alanın dışında). En yakın zoom doğum sınırını etkilemez — onu yalnızca EN GENİŞ kadraj belirler |
+| Menzil: sola 13 / sağa 17 (eskiden ±8; görüş geminin iki yanında %30 uzatıldı), **dikey ±3**, zoom 3.5–7 | Dikey kaydırma yeni; `ViewBounds` onu da kapsar (doğum sınırları kaydırılabilen alanın dışında). En yakın zoom doğum sınırını etkilemez — onu yalnızca EN GENİŞ kadraj belirler |
 | Kayma **kadraj tabanına göre** tutulur | Zoom değişince gemi ekranda aynı oranda kalır |
 | Ped sol altta | Sağ el nişan alıyor (fare / sağ başparmak) |
 

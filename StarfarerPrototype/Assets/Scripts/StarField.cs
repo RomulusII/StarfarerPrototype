@@ -30,7 +30,7 @@ public class StarField : MonoBehaviour
     [SerializeField] private float density = 0.75f;
 
     [Tooltip("Emniyet tavanı: patolojik bir kadrajda GameObject sayısı patlamasın.")]
-    [SerializeField] private int maxMotes = 1600;
+    [SerializeField] private int maxMotes = 2400;
 
     [Tooltip("Görünür alanın dışına taşan pay. Kenardan giren zerre kadrajın " +
              "içinde belirmesin diye.")]

@@ -209,9 +209,9 @@ public class BalanceConfig : ScriptableObject
              "(statStep 1.25'e karşı energyGrowth 1.30) ve o yarış dengelidir. " +
              "Tampon o yarışa hiç girmez — yalnızca ne kadar süre burst " +
              "yapabildiğini belirler. 1.25 ile ilk seviye 98 metala +12 enerji " +
-             "veriyordu, yani oyundaki en zayıf yükseltme oluyordu. 1.5'te her " +
-             "seviye tamponu tam yarı yarıya büyütür.")]
-    public float capacitorStatStep = 1.5f;
+             "veriyordu, yani oyundaki en zayıf yükseltme oluyordu. 1.5 de az " +
+             "bulundu; 2.0'da her seviye tamponu İKİYE katlar (denge r15).")]
+    public float capacitorStatStep = 2f;
 
     [Tooltip("Zırh (gövde HP) statının maliyet çarpanı. Onarım biriminin diğer " +
              "izleriyle aynı tabandan başlasaydı, doğrudan hayatta kalma satın " +

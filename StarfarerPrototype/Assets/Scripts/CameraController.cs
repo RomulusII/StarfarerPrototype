@@ -31,8 +31,15 @@ public class CameraController : MonoBehaviour
              "katılarak kalan bandın ortası: 0.52.")]
     [Range(0.05f, 0.95f)] public float shipScreenY = 0.52f;
 
-    [Tooltip("Yatay kaydırma menzili (birim), kadraj tabanının iki yanında.")]
-    public float panRange = 8f;
+    [Tooltip("Sola kaydırma menzili (birim), kadraj tabanından.\n\n" +
+             "Eskiden iki yön de 8'di. Görüş geminin iki yanında %30 uzatıldı: " +
+             "en geniş kadrajda gemiden sola 17.7 → 22.7, sağa 31.9 → 40.9 birim " +
+             "(2.4 en-boy). İki yön AYRI çünkü gemi ekranın solunda duruyor — aynı " +
+             "pay iki tarafta farklı oranlara denk gelir.")]
+    public float panRangeLeft = 13f;
+
+    [Tooltip("Sağa kaydırma menzili (birim), kadraj tabanından. Bkz. panRangeLeft.")]
+    public float panRangeRight = 17f;
 
     [Tooltip("Dikey kaydırma menzili (birim), kadraj tabanının altında ve üstünde.\n\n" +
              "ViewBounds bunu da okur: doğum sınırları kaydırılabilen alanın dışında kalmalı.")]
@@ -269,7 +276,7 @@ public class CameraController : MonoBehaviour
         // Elle kadraj ile otomatik kameranın katkısı TOPLANIR ve birlikte
         // sınırlanır: otomatik kamera açıkken de WASD / ped / joystick çalışır.
         Vector2 offset = new Vector2(
-            Mathf.Clamp(_offset.x + _autoPan, -panRange, panRange), _offset.y);
+            Mathf.Clamp(_offset.x + _autoPan, -panRangeLeft, panRangeRight), _offset.y);
         float   size   = Mathf.Clamp(_wantedSize + _autoZoom * (maxZoomSize - minZoomSize),
                                      closestZoomSize, maxZoomSize);
 
@@ -346,7 +353,7 @@ public class CameraController : MonoBehaviour
             Vector2 dir    = delta.sqrMagnitude > 0f ? delta.normalized : Vector2.zero;
 
             float moveT = Mathf.Clamp01((t - 0.8f) / 0.2f);
-            _autoPanTarget  = dir.x * moveT * moveT * panRange;
+            _autoPanTarget  = dir.x * moveT * moveT * (dir.x < 0f ? panRangeLeft : panRangeRight);
             _autoZoomTarget = Mathf.Clamp01((t - 0.9f) / 0.1f);
         }
 
@@ -393,7 +400,7 @@ public class CameraController : MonoBehaviour
             _wantedSize *= Mathf.Exp(Mathf.Clamp(zoom, -1f, 1f) * zoomSpeed * dt);
 
         _wantedSize = Mathf.Clamp(_wantedSize, closestZoomSize, maxZoomSize);
-        _offset.x   = Mathf.Clamp(_offset.x, -panRange,  panRange);
+        _offset.x   = Mathf.Clamp(_offset.x, -panRangeLeft, panRangeRight);
         _offset.y   = Mathf.Clamp(_offset.y, -panRangeY, panRangeY);
     }
 

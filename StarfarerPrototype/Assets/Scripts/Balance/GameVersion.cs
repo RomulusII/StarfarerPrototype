@@ -117,6 +117,9 @@ public static class GameVersion
     ///       +6); tehdit ×2.3 / ×4.7 / ×10, enkaz tehditle orantılı. Bölüm 4'ten
     ///       itibaren dalgalara karışır. `enemy_spawn` / `enemy_death` `tier`
     ///       alanını taşır. Bölüm 4+ kadroları önceki revizyonlarla kıyaslanamaz.
+    ///  15 — KAPASİTÖR +%100 ve GENİŞ KADRAJ. capacitorStatStep 1.5 → 2.0;
+    ///       yatay kaydırma menzili 8/8 → sola 13 / sağa 17. Doğum sınırları
+    ///       ve ana silah menzili kadrajdan türediği için onlar da büyüdü.
     /// </summary>
-    public const int Denge = 14;
+    public const int Denge = 15;
 }
